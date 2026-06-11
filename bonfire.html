@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Bonfire — Cosmic Algorithmic Explorations</title>
+    <meta
+      name="description"
+      content="Part two: a thousand lights for the price of one. Embers on curl-noise wind, multi-bounce color bleeding from a one-frame time loop, the sky as the topmost cascade — and a fire you can stir with your bare hands."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero-fire"></div>
+      <div class="hero-title">
+        <h1>The Bonfire</h1>
+        <p class="subtitle">
+          Part two: every ember above is a real light source, and there are thousands
+          of them. The trees cast their shadows, the ground blushes with bounced fire,
+          the sky is whatever the topmost cascade says it is. Stir the smoke with your
+          cursor — or click ✋ in the last demo and feed the fire by hand.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Part one ended with a confession of scope: one lamp, one room, lights that
+        could be counted on one hand. That was deliberate — the lava lamp had to earn
+        the machinery: the distance field, the cascade hierarchy, the merge. This
+        part spends what part one earned. The bonfire above has no machinery the lamp
+        didn't have. Not one new pass. What it has is the nerve to ask the same
+        machinery a question that would bankrupt any other lighting technique:
+        <em>what if everything is a light?</em>
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The free lunch</span>A thousand lights, one price</h2>
+      <p>
+        Recall the shape of the algorithm. Radiance cascades never ask "where are the
+        lights?" — they ask every probe "what do you <em>see</em>?", marching rays
+        against the distance field and reading emission wherever they land. The
+        scene's light sources are just bright pixels. Nothing in the cost depends on
+        how many there are: the work is fixed by the canvas resolution and the
+        cascade count, full stop.
+      </p>
+      <p>
+        Sit with how strange that is. Forward rendering pays per light, per pixel —
+        film and game lighting departments have spent forty years budgeting
+        <em>light counts</em>. The gravity series spent six parts strangling an n²
+        between bodies. Light transport has the same n² — every pixel wants light
+        from every source — and radiance cascades dissolve it by changing the
+        question: stop enumerating sources, start sampling the field they create. It
+        is part five's particle-mesh move, played on photons.
+      </p>
+      <div data-demo="sparks"></div>
+      <p>
+        Drag the slider from sixteen lights to eight thousand and watch the only
+        number that matters: the frame rate, which does not care. Each spark is a
+        genuine emitter <em>and</em> a genuine occluder — sparks shadow each other,
+        visible when a dense cloud drifts behind a pillar. The wind is part six's
+        curl noise, four lines of it, because divergence-free drift is still the
+        cheapest way to make particles look alive.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The time loop</span>Bounce, by procrastination</h2>
+      <p>
+        Everything so far is <em>direct</em> light: source to surface, one hop. Real
+        rooms are mostly lit by the second hop — light that hit a wall and left
+        again, tinted. The textbook answer solves a matrix coupling every surface to
+        every other. We are not going to do that. We are going to exploit the laziest
+        fact about a demo that never stops running: there is always a previous frame.
+      </p>
+      <pre><code>emission(x) = base_emission(x) + albedo(x) · fluence_<span class="cm">last frame</span>(x)
+<span class="cm">// every surface re-emits a tinted slice of the light it received a frame ago</span></code></pre>
+      <p>
+        That is the entire implementation — one texture read in the scene shader,
+        sampling the cascade-0 output the previous frame already paid for. The first
+        frame computes direct light. The second frame's surfaces glow with it, so its
+        cascades deliver one-bounce light. The third delivers two-bounce. The
+        infinite series converges geometrically (each bounce is dimmer by the albedo)
+        and it converges <em>in time</em>, about a frame per bounce — which for light
+        in a room means: instantly, as far as any human can tell.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Radiosity and the Cornell box</span>
+        <p>
+          The textbook approach is radiosity, published in 1984 — the year Cornell
+          built the box that every graphics paper since has photographed. It solves
+          the full surface-to-surface coupling as a matrix. The time-loop trick above
+          computes the same geometric series, one term per frame, for the cost of a
+          texture read.
+        </p>
+      </aside>
+      <div data-demo="room"></div>
+      <p>
+        The crimson wall on the left and the teal wall on the right are not lights.
+        Toggle the bounce off and the room turns literal: one warm disk, hard
+        shadows, black walls. Toggle it on and carry the lamp toward a wall — the
+        whole room leans crimson, the way a hallway does when sun hits a painted
+        door. Crank the strength past 1 and you can even make the room unstable, a
+        resonating light-cavity no real paint could sustain. The slider is, honestly,
+        an energy-conservation violation dial. Physics until 1.0; art direction
+        after.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The biggest light</span>The sky is a cascade</h2>
+      <p>
+        One light has been missing from this series, and it is the big one. Daylight
+        is not a source in the scene — it is what the world looks like when rays
+        escape the scene entirely. The cascade hierarchy has a precise slot for
+        exactly that idea. When a top-cascade ray finishes its interval having hit
+        nothing, part one merged it with darkness. But "what does a ray see when it
+        leaves the world?" has a better answer: <em>the environment</em>. Replace the
+        black with a function of direction — dark blue overhead, ember-orange at the
+        horizon, a bright smear where the sun sits — and every probe, every pixel,
+        every shadow now agrees about the sky, for free.
+      </p>
+      <pre><code>if (top cascade ray escapes):
+    radiance = sky(direction)   <span class="cm">// the horizon is just the merge nobody claimed</span></code></pre>
+      <p>
+        This is not a hack bolted onto the algorithm; it is the algorithm's own
+        semantics. The top cascade's intervals are the longest rays — light from very
+        far away — and an environment map is precisely "light from infinitely far
+        away, indexed by direction." Skylight, with soft sky-shadows under the trees
+        and a sun that bruises the horizon, costs one function evaluated at the top
+        level only.
+      </p>
+      <div data-demo="dusk"></div>
+      <p>
+        Slide from night to day and watch the power balance invert. At night the
+        bonfire owns every surface; the ground is fire-colored and the tree shadows
+        point away from the flame. By noon the sun owns the scene, shadows snap
+        parallel, and the fire's contribution shrinks to a warm smudge — exactly why
+        campfires feel different at night, rendered by the same five cascades either
+        way.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Assembly</span>Feed the fire</h2>
+      <p>
+        Everything at once, plus the part six controller: click ✋, let the camera
+        find your hand, and the fire is yours. Your palm stirs the wind that carries
+        the embers; your index fingertip sheds them directly, a sparkler you can wave
+        through the dark. Every ember you conjure is a light, lighting the trees, the
+        ground, the smoke of other embers — and costing the renderer nothing it
+        wasn't already paying.
+      </p>
+      <div data-demo="fire"></div>
+      <p>
+        The debug views tell the same story as part one, with better scenery.
+        <em>Scene</em> is a few silhouettes and a swarm of bright dots — the entire
+        input. <em>Distance field</em> shows the jump flood rippling as embers fly
+        through it, a thousand moving holes in space. <em>Light only</em> is the
+        whole argument of this series in one image: turn it on at night and
+        everything you see arrived at its pixel from somewhere else.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>What the question costs</h2>
+      <p>
+        Part one built a cathedral to light a single lamp. This part filled it with
+        congregants and discovered the pews were free: a thousand lights, infinite
+        bounces, and the sky itself, all bought with three small edits — none of
+        which touched the cascade march, the merge, or the distance field. That is
+        the signature of a good abstraction: the expensive part doesn't know how
+        ambitious you've become.
+      </p>
+      <p>
+        What it cannot do yet is also visible above, if you look for it. The smoke
+        doesn't scatter — rays pass through empty space untouched, so there are no
+        god rays slanting through the trees, no glow trapped in haze. Light in this
+        world is binary: it travels free or it stops dead. The next part is about the
+        in-between — <em>participating media</em>, fog that absorbs and scatters, and
+        the bonfire finally getting the smoke column it deserves.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Light in a Browser Tab, part two ·
+        <a href="/lava.html">part one: The Lava Lamp</a> ·
+        the <a href="/index.html">gravity series</a> that precedes both
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://github.com/Raikiri/RadianceCascades">Sannikov, "Radiance Cascades" (2023)</a> ·
+        <a href="https://doi.org/10.1145/964965.808601">Goral, Torrance, Greenberg &amp; Battaile, "Modeling the Interaction of Light Between Diffuse Surfaces" (1984)</a> ·
+        <a href="https://doi.org/10.1145/1276377.1276435">Bridson, Hourihan &amp; Nordenstam, "Curl-Noise for Procedural Fluid Flow" (2007)</a> ·
+        <a href="https://jason.today/rc">McGhee, "Building Real-Time Global Illumination" (2024)</a> ·
+        <a href="https://arxiv.org/abs/2006.10214">Zhang et al., "MediaPipe Hands" (2020)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/bonfire.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Music of the Spheres — Cosmic Algorithmic Explorations</title>
+    <meta
+      name="description"
+      content="Part five: the cosmic web. Gravity solved as music — an FFT Poisson solver, Zel'dovich initial conditions, and an expanding universe condensing out of primordial static, live in a browser tab."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero-web"></div>
+      <div class="hero-title">
+        <h1>The Music of the Spheres</h1>
+        <p class="subtitle">
+          Part five: the n² wall falls a third time — this time to a change of key.
+          Gravity solved as waves, a mesh instead of a tree, and the cosmic web
+          condensing out of primordial static. You are watching the universe grow up.
+          Stir it if you must.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Every part of this series so far has simulated something you could point a
+        telescope at: a galaxy, a dome of stars, a glass of water, a ring of dust
+        becoming moons. The simulation above is pointed at everything. Each glowing
+        fleck is not a star but a parcel of matter the size of a galaxy cluster, half
+        a million of them filling a box that stands in for the whole universe —
+        starting from the universe's actual starting condition: almost perfectly
+        smooth, with ripples of one part in a hundred thousand. Left alone, gravity
+        amplifies those ripples into knots, the knots link into filaments, the
+        filaments fence off voids. Astronomers call the result the <em>cosmic web</em>.
+        It is the largest pattern that exists, and the real one — mapped galaxy by
+        galaxy by the biggest surveys in science — looks exactly like this.
+      </p>
+      <p>
+        None of the machinery this series has built can run that simulation. Part
+        one's tree wants clumps to summarize; the early universe is uniform, and the
+        structure is in exquisitely small differences. Part three's grid wants forces
+        with a cutoff; gravity has none. This article builds the third and last great
+        structure of the series, and it is the strangest: it solves gravity by
+        changing what the word "where" means.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · A third kind of problem</span>The universe has no edge</h2>
+      <p>
+        Start with what makes cosmology different. A galaxy is a thing in empty space;
+        you can put a box around it and the box ends. The universe is not in a box —
+        wherever you stand, it continues, statistically the same, in every direction.
+        Simulators handle this the only honest way available: make the box
+        <em>periodic</em>. Leave through the right wall, re-enter through the left. A
+        particle near the edge pulls on its neighbours <em>through</em> the wall.
+        Part four freed the grid from its box; cosmology glues the box back together
+        into a torus.
+      </p>
+      <p>
+        For part one's tree this is quietly disastrous. Barnes–Hut walks outward
+        until contributions dwindle — but on a torus there is no outward, and the sum
+        over infinite periodic images converges so reluctantly that doing it honestly
+        (Ewald summation, borrowed from crystallography) roughly doubles the cost and
+        triples the code. The deeper problem: in the early universe, density
+        contrasts are 0.001%. A tree spends its cleverness deciding which lumps
+        matter; here there are no lumps yet.
+      </p>
+      <p>
+        So here is the pivot, and it is the whole article: stop thinking of gravity
+        as pairs and start thinking of it as a <em>field</em>. Mass density is a
+        function ρ over the box. The gravitational potential φ is another function,
+        and physics relates them with one equation — Poisson's:
+      </p>
+      <pre><code>∇²φ = 4πG ρ        // the potential's curvature equals the density</code></pre>
+      <p>
+        Forces are then just the downhill direction: <code>F = -∇φ</code>. No pairs
+        anywhere. A particle doesn't ask "who pulls me?" — it asks "how steep is the
+        floor where I stand?", and the floor already knows about everyone, periodic
+        images included. The price: given the density everywhere, we must solve that
+        equation for the potential everywhere. Sample the box on a 512×512 mesh and
+        Poisson's equation becomes 262,144 simultaneous equations, every unknown
+        coupled to its neighbours, sixty times a second. That sounds like a research
+        problem. It is about to become three lines of code.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Everything is waves</span>Fourier's claim</h2>
+      <p>
+        The key fact: any function over the box — however jagged — can be written
+        exactly as a sum of sine waves. That is Fourier's theorem, and the demo below
+        makes it tactile. A signal of 256 samples, rebuilt from its waves, lowest
+        frequency first. The bump is cheap — a handful of waves nail it. The square
+        wave fights back: slide the budget up and watch the overshoot at the corners
+        refuse to die. Even the noise surrenders eventually, because 256 samples can
+        only hold 128 waves of information — the two representations are the same
+        size. Nothing is lost in either direction.
+      </p>
+
+      <div data-demo="fourier"></div>
+
+      <aside class="note">
+        <span class="note-label">Aside · The committee refused to publish it</span>
+        <p>
+          In 1807 Joseph Fourier, fresh from administering half of Egypt for Napoleon,
+          handed the French Academy a memoir on heat flow containing this claim — and
+          the committee, including Lagrange, the greatest analyst alive, refused to
+          publish it. Lagrange objected that sums of smooth waves could never make a
+          sharp corner. He was nearly right: the corner costs infinitely many waves,
+          and they ring where they meet it — the overshoot you just saw is the
+          <em>Gibbs phenomenon</em>, Lagrange's ghost collecting his due. But Fourier
+          was right where it counted, and analysis spent the next century absorbing
+          the shock.
+        </p>
+      </aside>
+      <p>
+        The point that matters for us: <em>a function and its spectrum are the same
+        object written in two alphabets</em>. The samples say what the value is at
+        each place; the spectrum says how much of each wave it contains. Either
+        determines the other. Changing alphabets is the <em>Fourier transform</em>,
+        and the reason to do it is that some sentences are dramatically easier to say
+        in one alphabet than the other. Ours is one of them.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The equation dissolves</span>Division instead of differential equations</h2>
+      <p>
+        Take a single wave of density: ρ = sin(<em>k</em>x). Differentiate twice and
+        you get −<em>k</em>² sin(<em>k</em>x) — <em>the same wave</em>, scaled. Waves
+        pass through the Laplacian untouched in shape. So for one wave, the potential
+        is just that wave divided by −<em>k</em>², and there is nothing more to solve.
+        Any density is a sum of such waves; the equation is linear, so each wave
+        solves independently — and the system of 262,144 coupled equations falls apart
+        into 262,144 separate one-line problems.
+      </p>
+      <p>
+        Watch the whole solve happen under your scroll wheel — decompose, divide,
+        recombine:
+      </p>
+
+      <div data-scrolly="poisson-waves"></div>
+
+      <p>
+        In code:
+      </p>
+      <pre><code>spectrum = fft2d(density);          // change alphabet
+for (each wave k) {
+  spectrum[k] /= -dot(k, k);        // ...solve Poisson's equation (!)
+}
+potential = inverse_fft2d(spectrum); // change back</code></pre>
+      <p>
+        The middle line is the entire physics. In the position alphabet, Poisson's
+        equation couples every cell to every cell; in the wave alphabet it is
+        diagonal — pure elementwise division. Division by k² is gravity saying it
+        cares about bulk, not detail: a long lazy ripple makes a deep wide well, a
+        rapid flutter barely dents the potential. And notice what the periodic box
+        bought us: sines only fit a torus if they close on themselves, so on a
+        periodic box the wave alphabet isn't an approximation — it is the native
+        script. The boundary condition that crippled the tree is the one the
+        transform gets for free.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: the k = 0 wave, or why only contrast gravitates</summary>
+        <div class="fold-body">
+          <p>
+            One wave gets special treatment: <em>k</em> = 0, the box's average
+            density, would divide by zero. We zero it instead, which quietly
+            subtracts the mean — in a periodic universe only <em>contrast</em>
+            gravitates, because the uniform background pulls equally in every
+            direction and cancels. Cosmologists argued about the legitimacy of this
+            for decades (it's sometimes called the "Jeans swindle"); the FFT just
+            shrugs and does the right thing.
+          </p>
+        </div>
+      </details>
+      <p>
+        Below, the idea running live. Drag to paint mass; the box solves Poisson's
+        equation for the entire field every frame and draws the potential as a
+        topographic map. Fifty thousand weightless tracer grains fall through the
+        field so you can feel the slopes. Paint two blobs and watch their wells merge
+        into one basin before the blobs themselves touch. Paint near an edge and the
+        well wraps — the torus, visible. Shift-drag erases.
+      </p>
+
+      <div data-demo="paint"></div>
+
+      <p>
+        Stop and notice the shape of the trick, because it is the third one this
+        series has pulled. The tree didn't make gravity cheaper; it changed the
+        question to one a tree answers fast. The sort didn't find neighbours faster;
+        it rearranged memory so neighbours found themselves. And the transform
+        doesn't grind through a differential equation; it carries the problem to an
+        alphabet where the equation was never hard. Mathematicians call the pattern
+        <em>diagonalization</em>; engineers call it picking the right representation.
+        It is the most valuable move in computational science.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The fast in Fourier</span>n log n</h2>
+      <p>
+        One debt outstanding: <code>fft2d</code> itself. Computing one wave's
+        coefficient is a weighted sum over all n samples; n coefficients therefore
+        cost n² — and the wall this series has hit three times grins from a new
+        doorway. A 512×512 mesh transformed naively is ~69 billion multiplications
+        per transform, four transforms per frame. The scheme dies right here without
+        a fast transform.
+      </p>
+      <p>
+        The escape: a transform of size n splits into two transforms of size n/2 —
+        one on the even-indexed samples, one on the odd — stitched together with one
+        rotation per output. Applied recursively, that is n log n. The wiring diagram
+        below is the <em>butterfly network</em> for 16 points: log₂(16) = 4 layers,
+        each layer pairing every value with a partner half the array apart, then a
+        quarter, then an eighth. If the shape tingles your déjà vu, it should: it is
+        part three's prefix-sum ladder wearing complex rotations — the same doubling
+        cascade, which is precisely why the FFT is a perfect GPU citizen. The bars
+        underneath race the honest n² transform against the FFT on your machine,
+        right now.
+      </p>
+
+      <div data-demo="butterfly"></div>
+
+      <aside class="note">
+        <span class="note-label">Aside · Gauss's notebook and the bomb detectors</span>
+        <p>
+          The fast transform was found by the right man absurdly early. In 1805 Carl
+          Friedrich Gauss — interpolating the orbit of the asteroid Pallas, which is
+          to say, <em>doing gravity</em> — needed exactly these sums, noticed the
+          even/odd split, scribbled it in a notebook in Latin, and never published.
+          The idea slept for 160 years. It woke in 1965, when Cooley and Tukey
+          reinvented it so seismometer arrays could tell Soviet underground nuclear
+          tests from earthquakes — a treaty-verification problem with a budget. Within
+          a decade the FFT was running everywhere signals were. Every phone call,
+          every image, every MRI scan passes through Gauss's notebook; by operation
+          count it is plausibly the most-executed nontrivial algorithm in existence.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: the FFT as a GPU kernel</summary>
+        <div class="fold-body">
+          <p>
+            One workgroup takes one row of the mesh into shared memory, folds it
+            log₂(512) = 9 times with a barrier between folds — the identical rhythm
+            to part three's scan — and writes it back. Rows, then columns: a 2D
+            transform is just two rounds of 1D ones. Four such transforms plus one
+            division per cell, and the box's exact periodic gravity costs about as
+            much as blurring a 512-pixel image — under a millisecond.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 5 · The mesh machine</span>Particles meet the field</h2>
+      <p>
+        The solver speaks fields; the matter is particles. The bridge is the last new
+        idea, and after parts three and four it will feel familiar. The scheme is
+        called <em>particle-mesh</em>, and each step walks one lap:
+      </p>
+      <pre><code>deposit:  particles paint their mass onto the mesh     // gather → field
+solve:    FFT → divide by -k² → inverse FFT             // the whole of physics
+gradient: difference neighbouring cells → force mesh    // downhill, per cell
+gather:   particles read the force where they stand     // field → particles
+kick &amp; drift, wrap through the walls, repeat</code></pre>
+      <p>
+        Only <em>deposit</em> and <em>gather</em> need design. The crude deposit
+        drops each particle's whole mass into the cell under it — and jitters: as a
+        particle glides across a cell border its mass teleports, the field twitches,
+        and the twitch kicks the particle that caused it. The standard fix,
+        <em>cloud-in-cell</em>, splits the mass over the four cells the particle
+        overlaps, weighted by overlap area, so the deposit slides as smoothly as the
+        particle does. Gathering interpolates the force back with the same four
+        weights — using one scheme down and a different one up injects tiny
+        self-forces, a particle tugging its own bootstraps. Symmetry here is not
+        aesthetics; it is momentum conservation. Drag the particles:
+      </p>
+
+      <div data-demo="cic"></div>
+
+      <p>
+        And that is all of it — no tree to walk, no buckets to sort, just paint,
+        transform, divide, transform, read. Below, the full machine: part four's cold
+        blob of dust, reborn in a periodic box. The slider changes nothing about the
+        particles and everything about the mesh. At 64×64 the force is a blur and the
+        collapse is mush; at 512×512 the same blob shatters into filaments and knots.
+        What you are feeling is the method's one honest price: <strong>below the size
+        of a cell, gravity does not exist</strong>. The mesh is the softening. Watch
+        the edges of the box while it collapses — the periodic images collapse in
+        perfect sympathy, because they are it.
+      </p>
+
+      <div data-demo="collapse"></div>
+
+      <p>
+        For a galaxy, that price is fatal — part one needed forces down at star
+        spacing, which is why it grew a tree. For cosmology the price is perfect:
+        the structures of interest are enormous, smooth, and everywhere, exactly what
+        a uniform mesh resolves evenly. Tree and mesh are not rivals; they are two
+        ends of one trade — the tree spends bookkeeping to focus resolution where
+        matter clumps, the mesh spends uniformity to make the whole box cheap. Hold
+        that thought for the coda.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 6 · Let there be lumps</span>Seeding and growing a universe</h2>
+      <p>
+        The machine is built. Now feed it the universe. Two ingredients remain.
+      </p>
+      <p>
+        <strong>The seeds.</strong> The young universe was almost featureless —
+        density ripples of one part in 10⁵, random in phase but with a measured
+        statistical fingerprint: how much ripple at each <em>scale</em>, the
+        <em>power spectrum</em>. We know it because the ripples are photographed —
+        they are the mottling of the cosmic microwave background, mapped by COBE,
+        WMAP and Planck. Making initial conditions is therefore short: fill a grid
+        with white noise, transform it, scale each wave to the chosen spectrum. Then,
+        rather than placing particles randomly (which would add noise of our own),
+        start them on a perfect lattice and <em>displace</em> each one along the
+        field's gradient, with tiny velocities pointing the same way.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Zel'dovich, 1970</span>
+        <p>
+          The displacement recipe is Zel'dovich's approximation: for the gentle
+          beginning of structure formation, every ripple grows in lockstep, so a
+          straight-line nudge is exact. The seeds are made of FFTs too, and run in
+          milliseconds at re-seed time.
+        </p>
+      </aside>
+      <p>
+        <strong>The stretching.</strong> Space itself expands, and gravity must win
+        against it. Simulators fold the expansion into the coordinates —
+        <em>comoving</em> coordinates ride the stretch, so the box stays size 1 while
+        real distances grow with the scale factor a(t). The expansion survives only
+        as a drag term in the equations of motion: kicks and drifts weighted by
+        powers of a. Nothing else changes — the same kernels, the same four FFTs; the
+        clock just ticks in scale factor, from a = 0.02 (a universe at 2% of its
+        present size) toward a = 1, which is the day you are reading this.
+      </p>
+      <p>
+        Run it. The readout shows the scale factor climbing; the toggle shows why
+        expansion matters. With expansion off, gravity runs unopposed and the box
+        crunches into a few fat blobs. With it on, gravity wins slowly, locally, and
+        only where the seeds favoured it: knots first, then filaments between knots,
+        then the great voids as matter drains onto the web. The <em>ripple
+        strength</em> slider is the cosmologists' σ₈: turn it down and structure
+        arrives later and wispier. The <em>tilt</em> reweights large scales against
+        small: negative grows a few grand filaments, positive a foam of small halos.
+        These are the same dials Planck measured for the real sky — and there are
+        only three of them.
+      </p>
+
+      <div data-demo="web"></div>
+
+      <p>
+        One honest caveat: this box is 2D, so the growth exponents differ from our
+        universe's, and the "web" is really walls and wells seen edge-on. The
+        algorithms are the real ones — the dimensions are a display choice. Add the
+        third coordinate and this exact pipeline — FFTs, cloud-in-cell, comoving
+        kicks — is how the canonical simulations of the 1980s established that cold
+        dark matter plus these seeds makes the galaxy distribution we observe.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The view from the top of the staircase</h2>
+      <p>
+        Five parts, three structures, one enemy. The n² wall fell three times, to
+        three genuinely different ideas about what a computation is:
+      </p>
+      <p>
+        <strong>1. The tree summarized space.</strong> Far things blur; resolution
+        should follow interest. Part one's pyramid answers "everything, from here" in
+        log n, and pays in memory spent on hierarchy.
+      </p>
+      <p>
+        <strong>2. The sort organized memory.</strong> Near things touch; neighbours
+        should be adjacent in RAM, not just in space. Part three's counting sort
+        answers "who is beside me" in O(1), and pays with a scan.
+      </p>
+      <p>
+        <strong>3. The transform changed alphabets.</strong> Some equations are only
+        hard in the language they were asked in. The FFT carries Poisson's equation
+        to the alphabet where it is division, and pays n log n — the cheapest toll
+        ever charged for solving a planet-sized system exactly.
+      </p>
+      <p>
+        And the real codes — the ones that ran the Millennium Simulation's ten
+        billion particles, the ones fitting dark energy right now — choose none of
+        the above. They choose <em>two</em>. TreePM splits gravity at a seam a few
+        mesh cells wide: the mesh (this article) carries the far field, periodic and
+        fast; the tree (part one) carries the near field, sharp and adaptive where
+        matter clumps. Part four married the tree to the sort; the professionals
+        marry the tree to the mesh. Every structure in this series is load-bearing in
+        production cosmology, today, in the same combinations this series stumbled
+        into by following the physics.
+      </p>
+      <p>
+        The staircase continues — a third coordinate, adaptive meshes nested in the
+        deep wells, initial conditions drawn from Planck's actual chains rather than
+        a slider. But this is the step where the series' machines close into a
+        circle: the same butterfly that sharpened a square wave seeds a universe, and
+        the same gravity that flung two dots apart in part one draws the largest
+        structure in existence. Newton needed one law for the apple and the Moon. It
+        turned out to be enough for the web between the galaxies — and, with a tree,
+        a sort, and a change of key, for your browser tab.
+      </p>
+      <p>
+        <strong>Continued in <a href="/part6.html">Part six: The Sorcerer's Apprentice</a></strong> —
+        the series becomes a toy: a 3D stable-fluids solver, curl noise, half a
+        million paint particles, and your actual hands conducting the whole thing
+        through the webcam.
+      </p>
+      <p>
+        ← <a href="/part4.html">Part four: Worlds from Dust</a> ·
+        <a href="/part3.html">Part three: Sorting Water</a> ·
+        <a href="/part2.html">Part two: Gravity on a Dome</a> ·
+        <a href="/index.html">Part one: Gravity in a Browser Tab</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part five of the WebGPU particle series ·
+        <a href="/index.html">Part one</a> ·
+        <a href="/part2.html">Part two</a> ·
+        <a href="/part3.html">Part three</a> ·
+        <a href="/part4.html">Part four</a> ·
+        <a href="/part6.html">Part six →</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://gallica.bnf.fr/ark:/12148/bpt6k1045508v">Fourier, "Théorie analytique de la chaleur" (1822)</a> ·
+        <a href="https://doi.org/10.1109/MASSP.1984.1162257">Heideman, Johnson &amp; Burrus, "Gauss and the history of the FFT" (1984)</a> ·
+        <a href="https://doi.org/10.1090/S0025-5718-1965-0178586-1">Cooley &amp; Tukey (1965)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1970A%26A.....5...84Z/abstract">Zel'dovich (1970)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1981csup.book.....H/abstract">Hockney &amp; Eastwood, "Computer Simulation Using Particles" (1981)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1985ApJS...57..241E/abstract">Efstathiou, Davis, Frenk &amp; White (1985)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/2005MNRAS.364.1105S/abstract">Springel, Gadget-2 / TreePM (2005)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/part5.ts"></script>
+  </body>
+</html>

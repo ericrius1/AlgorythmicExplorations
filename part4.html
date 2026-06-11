@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worlds from Dust — Cosmic Algorithmic Explorations</title>
+    <meta
+      name="description"
+      content="Part four: planet formation. Part one's gravity pyramid and part three's hash grid run over the same buffer — dust attracts, collides, sticks, and becomes moons in your browser tab."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero-disk"></div>
+      <div class="hero-title">
+        <h1>Worlds from Dust</h1>
+        <p class="subtitle">
+          Part four: the series' two machines meet. Gravity from part one's pyramid,
+          collisions from part three's grid, one buffer between them — and a ring of dust
+          that clumps into moons. Stir it and watch it heal.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Part three ended with a promise. <a href="/index.html">Part one</a> built a
+        structure for the <em>far field</em> — a pyramid of summarized mass, because in
+        a galaxy distant crowds matter in aggregate.
+        <a href="/part3.html">Part three</a> built the opposite structure for the
+        <em>near field</em> — a sorted grid of buckets, because water only touches its
+        neighbours. The promise: nothing stops both from living in the same
+        simulation. Gravity from the tree, contacts from the grid — dust attracting,
+        colliding, and sticking. The beginnings of a solar system.
+      </p>
+      <p>
+        That is this article. The ring above is sixty thousand grains of dust on
+        near-circular orbits around a star. Every grain pulls on every other grain
+        through part one's pyramid; every grain shoves the grains it actually touches
+        through part three's counting sort. Left alone, the ring curdles — clumps
+        condense, collide, and grow into moonlets. This is the mechanism, in miniature
+        and in 2D, by which the floor you are standing on came to exist.
+      </p>
+      <p>
+        Getting there takes three steps: understanding why gravity alone can never
+        build a planet, freeing part three's grid from its box, and the wedding itself
+        — plus one quiet ingredient that turns out to be the entire secret.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Ghosts</span>Why gravity can't finish the job</h2>
+      <p>
+        A confession about part one. The galaxy's <em>softening</em> parameter was
+        introduced as a fix for division by zero. Its real meaning is physical: it
+        declares that bodies have no surface. Below the softening length, gravity
+        fades out instead of diverging, and two particles heading straight at each
+        other slide through like ghosts. For a galaxy this is the <em>correct</em>
+        physics — stars are so small compared to the space between them that when two
+        galaxies collide, essentially no two stars touch. Astronomers call such
+        systems <em>collisionless</em>.
+      </p>
+      <p>
+        Planets are not made in that world. Watch what gravity alone does to a cold
+        cloud of dust:
+      </p>
+
+      <div data-demo="ghosts"></div>
+
+      <p>
+        The cloud falls inward, as it must. And then it <em>misses</em>. Every grain
+        sails through the centre, out the far side, and back up to nearly the height
+        it fell from — the cloud breathes in and out forever. It cannot settle, and
+        the reason is bookkeeping: gravity is a conservative force. Whatever kinetic
+        energy the collapse gains, the re-expansion spends, exactly. A cloud that
+        interacts only through gravity has no way to get rid of the energy of its own
+        fall. Press the <em>both</em> button and the same cloud does something a
+        galaxy never does — but that's Step 4's story. First the contacts have to
+        survive leaving their box.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Losing the box</span>A grid with no walls</h2>
+      <p>
+        Part three's grid had a hidden load-bearing wall — four of them. The cell
+        index was computed from position inside a fixed box, and the box made the cell
+        count finite. The tank had walls anyway, so nothing was lost. But a collapsing
+        dust cloud lives in open space, and an orbiting ring flings the occasional
+        grain far away. Cover that with a dense grid and you face a dilemma: make the
+        box huge and waste millions of counters on empty space, or make it tight and
+        watch particles escape it.
+      </p>
+      <p>
+        The escape hatch: keep the cells, lose the box. A cell is now just a pair of
+        integers — which column, which row, anywhere in the infinite plane — and those
+        integers are <em>hashed</em> into a fixed table of 65,536 buckets:
+      </p>
+      <pre><code>fn bucketOf(c: vec2i) -> u32 {
+  let h = u32(c.x) * 0x9E3779B1u ^ u32(c.y) * 0x85EBCA77u;
+  return h &amp; 65535u;   // which bucket this cell shares
+}</code></pre>
+      <p>
+        Nothing else changes. The histogram counts bucket occupants, the scan finds
+        bucket starts, the scatter groups particles by bucket — part three's machinery
+        runs untouched. The price: unrelated cells, possibly half a world apart,
+        occasionally land in the same bucket, so the 3×3 query dredges up
+        <em>impostors</em>. And the algorithm does not care, because the force pass
+        was always going to measure the distance to every candidate anyway. A real
+        neighbour passes the distance test; an impostor from across the world fails it
+        by a margin of, well, the world. The filter was already installed.
+      </p>
+      <p>
+        The demo below makes the impostors visible. Same pile of discs as part three,
+        but its 576 cells share a deliberately tiny hash table. Yellow is your
+        cursor's 3×3 window; red cells are strangers that happen to share its buckets,
+        and red discs are the impostor candidates the distance test throws away. Slide
+        the table size up and watch the collisions evaporate:
+      </p>
+
+      <div data-demo="hash"></div>
+
+      <aside class="note">
+        <span class="note-label">Aside · Hashing was born in a filing cabinet</span>
+        <p>
+          In 1953, Hans Peter Luhn — an IBM researcher who later gave the world the
+          checksum on your credit card — wrote an internal memo proposing that records
+          be filed not by their full key but by a short scrambled digest of it, with
+          colliding records chained in the same bin. Arnold Dumey published the idea
+          openly in 1956; Knuth traced the lineage back to Luhn. The data structure
+          invented to find insurance records on magnetic drums is exactly what lets
+          twenty thousand dust grains find each other in infinite space.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The wedding</span>Two structures, one buffer</h2>
+      <p>
+        Now marry them. The obstacle is not conceptual — the far field and the near
+        field don't even speak to each other — it is plumbing. Part three's sort
+        <em>permutes the particles every substep</em>: grain #4,071 is somebody else
+        after every shuffle. Part one's solver carried a per-body mass array, indexed
+        by particle number. Bolt them together naively and the masses stay put while
+        the particles dance — every grain inherits a stranger's weight, sixty times a
+        second.
+      </p>
+      <p>
+        The orthodox fix is to sort the masses alongside (a key–value sort, one more
+        scattered array). The better fix is to delete the assumption that creates the
+        problem: <strong>make every grain identical.</strong> A speck of
+        protoplanetary dust is not a star; nothing demands variety. If all masses are
+        equal, any permutation of the particles is invisible to gravity — the pyramid
+        sums <em>counts</em> instead of masses — and the mass buffer ceases to exist.
+        Total dust mass is fixed; the particle-count slider only changes how finely it
+        is sampled.
+      </p>
+      <p>
+        With that, the two structures snap together, every substep, on the same
+        buffer:
+      </p>
+      <pre><code>sort     → hash, count, scan, scatter        // part three (4 dispatches + scan)
+pyramid  → bounds, mass scatter, reduce ×8   // part one   (11 dispatches)
+force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both answers)</code></pre>
+      <p>
+        Here is that force kernel's view of the world, one structure at a time:
+      </p>
+
+      <div data-scrolly="two-structures"></div>
+
+      <p>
+        Note the two structures aren't the same size, and shouldn't be. The pyramid
+        takes its root box from a bounds reduction each substep — it stretches to fit
+        wherever the cloud wanders, because gravity needs to see everything. The hash
+        cells stay locked at one grain diameter forever, because contact physics
+        happens at the scale of a grain. Far field sized to the world, near field
+        sized to the particle. The force kernel is the only place they meet: walk the
+        pyramid for the pull of the whole cloud, walk nine buckets for the shove of
+        the actual neighbours, add, integrate. The star isn't in the buffer at all — a
+        single analytic <code>GM/r²</code> term handles it, the same "constraints are
+        just forces" move as part two's dome.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The professionals do it this way too</span>
+        <p>
+          The workhorse codes of planetary science — Derek Richardson and colleagues'
+          <em>pkdgrav</em> (2000) is the standard citation — are tree codes for
+          gravity with a neighbour structure bolted on for collisions, evolving
+          millions of planetesimals per orbit. They run in 3D with better integrators
+          and real collision outcomes, but the skeleton — far field from a tree, near
+          field from spatial bins, every step — is the one on this page.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The secret ingredient</span>Losing energy on purpose</h2>
+      <p>
+        Here is the part that no data-structure cleverness supplies. Go back to the
+        collapsing cloud and try all three buttons:
+      </p>
+
+      <div data-demo="collapse"></div>
+
+      <p>
+        <em>Gravity only</em> is Step 1's ghost: collapse, miss, re-expand, forever.
+        <em>Contacts only</em> is a handful of marbles tossed in space: they bump,
+        drift, and disperse, because nothing binds them. But <em>both</em> produces
+        something new — the cloud collapses, and this time the fall <em>lands</em>.
+        Grains pile onto grains; the swirl tightens into a dense, slowly-spinning ball
+        with debris settling around it. A planetesimal.
+      </p>
+      <p>
+        The difference is one term in the contact force. The spring–dashpot contact,
+        unchanged from part three's sand, pushes overlapping grains apart <em>and
+        bleeds off their approach velocity</em>. The dashpot makes collisions
+        inelastic: every bump converts a little ordered falling-motion into nothing
+        (in real dust, into heat). Slide the <em>stickiness</em> slider to zero and
+        the collapse turns into a bouncing swarm that never settles — gravity plus
+        perfectly elastic contact still conserves energy, and conservative systems
+        don't form planets. Energy must leave. That is the whole secret. Galaxies stay
+        gauzy and eternal because they cannot dissipate; dust becomes worlds because
+        it can.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Newton's pendulums and an unread Russian monograph</span>
+        <p>
+          Newton measured exactly this property in the <em>Principia</em> — dropping
+          pendulum bobs of steel, glass, and cork against each other and recording how
+          much of the rebound survived. His <em>coefficient of restitution</em> is the
+          dashpot's great-grandparent; the stickiness slider is a restitution knob.
+        </p>
+        <p>
+          The man who worked out that this is how planets form spent years almost
+          entirely unread. Viktor Safronov, working in Moscow through the 1950s and
+          60s, built the planetesimal theory — dust settling, colliding, sticking, the
+          survivors sweeping up the stragglers — and published it in 1969 as a slim
+          Russian monograph. A 1972 NASA translation reached a handful of western
+          astronomers, and within a decade his picture had quietly become the
+          foundation of the field. Nearly every planet-formation simulation running
+          today is an elaboration of Safronov's loop: gravity gathers, collisions
+          dissipate, bodies grow.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 5 · The disk</span>Moons from a ring</h2>
+      <p>
+        The collapse demo is planet formation with the difficulty turned down — a
+        cloud with nowhere to go but inward. The real nursery is a <em>disk</em>, and
+        a disk fights back. Here is the hero ring again, at full size and with the
+        knobs exposed:
+      </p>
+
+      <div data-demo="disk"></div>
+
+      <p>
+        The antagonist in a disk is <em>shear</em>. Orbits are faster on the inside
+        lane — Kepler's third law — so any clump that starts to gather is constantly
+        smeared into a spiral arc by its own halves orbiting at different rates. Watch
+        the early frames: the ring doesn't clot evenly, it grows tight spiral streaks
+        — self-gravity winning locally while shear stretches the winnings. Where
+        enough grains crowd together, a knot condenses out of a streak, collisions
+        kill its internal motion, and a moonlet is born. From then on it sweeps its
+        lane, scattering or swallowing what it meets, and the survivors space
+        themselves out like teeth on a comb.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Saturn runs this experiment live</span>
+        <p>
+          Planetary scientists call the end stage <em>oligarchic growth</em> — Kokubo
+          and Ida's simulations of it in the late 1990s used a few thousand
+          planetesimals; the slider above goes to 150,000. And Saturn's A ring is the
+          experiment running where we can watch: a sheet of colliding ice grains whose
+          self-gravity keeps trying to make moons and whose shear keeps tearing them
+          apart. Cassini photographed the stalemate — ephemeral elongated clumps
+          (<em>self-gravity wakes</em>, the spiral streaks above) and hundred-metre
+          "propeller" moonlets that won their local fight but not the war. The
+          stickiness slider moves the front line of that battle.
+        </p>
+      </aside>
+      <p>
+        An honesty note, in the series tradition: real planet formation is 3D, its
+        dust is embedded in gas whose drag both saps orbits and — via the
+        <em>streaming instability</em> — actively herds grains into clumps, and real
+        collisions can shatter as well as stick. This demo has none of that; it is a
+        cartoon. But the cartoon's skeleton — a tree for the far field, a sorted grid
+        for the near field, dissipation doing the creating — is the production
+        skeleton, and every refinement is one more force or one more sorted array
+        away.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>What part four teaches</h2>
+      <p>
+        <strong>1. Structures compose.</strong> The pyramid never learned about the
+        hash grid; the hash grid never learned about the pyramid. Each answers exactly
+        one question — "what does everything far away add up to?", "who is touching
+        me?" — and the force kernel just asks both. Production simulations are not one
+        clever structure; they are libraries of single-purpose ones, composed.
+      </p>
+      <p>
+        <strong>2. Dissipation is where structure comes from.</strong> Every force in
+        parts one and two conserved energy, and accordingly nothing in those articles
+        ever <em>became</em> anything — the galaxy was a galaxy at the start and the
+        end. One lossy term in the contact force gave time an arrow, and suddenly
+        clouds become planetesimals and rings become moons. The cheapest line of
+        physics in the series is the one doing the creating.
+      </p>
+      <p>
+        <strong>3. Choose data so the structures can't disagree.</strong> The sort
+        permutes particles; gravity indexed them by name. The fix wasn't cleverer
+        bookkeeping, it was making the grains identical so the bookkeeping became
+        unnecessary — the same instinct as part one's implicit tree and part three's
+        sort-instead-of-lists: don't manage the hard case, delete it.
+      </p>
+      <p>
+        The staircase continues. A third coordinate folds into both structures and the
+        disk becomes a true 3D nebula. Letting colliding grains <em>merge</em> needs
+        particles to die and masses to vary — which needs stream compaction and a
+        key–value radix sort, both of which are (what else?) scans. Gas drag is one
+        more force. And the moonlets this page grows in seconds took the real disk a
+        hundred thousand years — the timestep tricks that close that gap are a
+        staircase of their own. From a galaxy to a glass of water to a newborn solar
+        system, it has been the same climb: find the structure the physics wants, then
+        arrange memory so ten thousand threads can build it without waiting.
+      </p>
+      <p>
+        <strong>Continued in <a href="/part5.html">Part five: The Music of the Spheres</a></strong> —
+        the n² wall falls a third time, to a change of key: gravity solved by FFT,
+        Poisson's equation collapsing to a single division, and the cosmic web
+        condensing out of measured primordial ripples.
+      </p>
+      <p>
+        ← <a href="/part3.html">Part three: Sorting Water</a> ·
+        <a href="/part2.html">Part two: Gravity on a Dome</a> ·
+        <a href="/index.html">Part one: Gravity in a Browser Tab</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part four of the WebGPU particle series ·
+        <a href="/index.html">Part one</a> ·
+        <a href="/part2.html">Part two</a> ·
+        <a href="/part3.html">Part three</a> ·
+        <a href="/part5.html">Part five →</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://ui.adsabs.harvard.edu/abs/1972epcf.book.....S/abstract">Safronov, "Evolution of the Protoplanetary Cloud" (1969, transl. 1972)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1973ApJ...183.1051G/abstract">Goldreich &amp; Ward (1973)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1998Icar..131..171K/abstract">Kokubo &amp; Ida (1998)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/2000Icar..143...45R/abstract">Richardson et al., pkdgrav (2000)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/2005ApJ...620..459Y/abstract">Youdin &amp; Goodman (2005)</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/2006Natur.440..648T/abstract">Tiscareno et al. (2006)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/part4.ts"></script>
+  </body>
+</html>
