@@ -153,13 +153,17 @@ export class StepClock {
     return this.running;
   }
 
-  // Fraction [0,1) through the current step, for drawing playheads.
+  // Fraction [0,1) through the cycle, for drawing playheads. Continuous:
+  // `nextTime` is the next *unscheduled* step, so the current position on the
+  // step timeline is step + (now - nextTime)/dur — negative fraction inside
+  // the lookahead window. Anchoring on the previous step and clamping (the
+  // old way) made the playhead snap forward at each pump and freeze through
+  // the lookahead: a visible jump-stutter every step.
   phase(stepsPerCycle: number): number {
     if (!this.running) return 0;
     const dur = 60 / (this.bpm * this.stepsPerBeat);
-    const t = Tone.now();
-    const intoStep = 1 - Math.min(Math.max((this.nextTime - t) / dur, 0), 1);
-    return (((this.step - 1 + intoStep) % stepsPerCycle) + stepsPerCycle) % stepsPerCycle / stepsPerCycle;
+    const cont = Math.max(this.step + (Tone.now() - this.nextTime) / dur, 0);
+    return (cont % stepsPerCycle) / stepsPerCycle;
   }
 
   start(): void {
