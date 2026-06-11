@@ -50,7 +50,9 @@ fn vignette(uv: vec2f) -> f32 {
 
 @fragment
 fn fs(v: VOut) -> @location(0) vec4f {
-  let c = scene(v.uv);
+  // touch D so "auto" pipeline layout keeps binding 1 even for scenes
+  // that compute everything from uniforms alone
+  let c = scene(v.uv) + vec3f(D[0]) * 1e-20;
   return vec4f(max(c, vec3f(0.0)), 1.0);
 }
 `;
