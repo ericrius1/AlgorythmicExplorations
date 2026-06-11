@@ -30,17 +30,15 @@
       <p>
         This series is about music theory — but it refuses to start where the
         textbooks start, with staff lines and Italian vocabulary. Music theory is
-        downstream of physics. Scales, chords, keys, the reason a minor chord feels
-        like rain: all of it traces back to facts about vibrating objects and the ear
-        that evolved to hear them. So we will start where the sound starts, and build
-        the theory only when the physics demands it.
+        downstream of physics. Scales, chords, and keys all trace back in part to
+        vibrating objects and the ear that evolved to hear them. So we will start
+        with sound itself and introduce theory from there.
       </p>
       <p>
         The wave at the top of this page is a musical note — the A below middle C.
         Tap it and the line becomes your actual speaker output, captured and redrawn
-        a hundred times a second. By the end of this post you will know everything
-        that line is doing and why it sounds the way it does. By the end of the
-        series, you'll watch a browser tab compose.
+        a hundred times a second. This post explains the main features of that line
+        and how they affect what you hear.
       </p>
 
       <!-- ================================================================ -->
@@ -57,7 +55,7 @@
 220 Hz  →  the A one octave up
 440 Hz  →  the A orchestras tune to</code></pre>
       <p>
-        That's pitch. The whole mystery of it. A note isn't a <em>thing</em>, it's a
+        That repeat rate determines pitch. A note isn't a <em>thing</em>, it's a
         <em>rate</em> — and everything your ear calls "higher" or "lower" is your
         brain reporting a rate change.
       </p>
@@ -113,8 +111,7 @@ for (let i = 1; i &lt; N - 1; i++) {
         what happens after release: the kink you made splits in two, the halves run
         to the ends, bounce, and cross — and out of that traffic emerges a stable,
         repeating wobble. The repetition rate of that wobble is the string's
-        frequency. The wave equation doesn't just <em>allow</em> a musical note; it
-        <em>insists</em> on one.
+        frequency. The fixed ends select stable repeating modes from the wave equation.
       </p>
 
       <div data-demo="string"></div>
@@ -123,16 +120,16 @@ for (let i = 1; i &lt; N - 1; i++) {
         Now watch the coloured bars under the string, and try the two pluck buttons.
         Pluck the middle: only a few bars light, and the tone is round, almost
         flute-like. Pluck near the bridge: the bars light all the way up, and the
-        same string at the same pitch turns thin and twangy. The bars are the secret
-        anatomy of the note — and the next section names them.
+        same string at the same pitch turns thin and twangy. The bars show the
+        components responsible for that difference.
       </p>
       <details class="fold">
         <summary>Deep dive: where the sound in this demo actually comes from</summary>
         <div class="fold-body">
           <p>
             The audio isn't a recording of the simulation — at real speed the sim
-            would need ~44,000 steps a second. Instead, the demo uses the deepest
-            fact about the wave equation: every possible motion of the string is a
+            would need ~44,000 steps a second. Instead, the demo uses a key property
+            of the wave equation: every possible motion of the string is a
             sum of <em>standing waves</em> — shapes
             sin(πx), sin(2πx), sin(3πx)… that don't travel, just oscillate in
             place, each at its own frequency f, 2f, 3f…
@@ -173,9 +170,9 @@ for (let i = 1; i &lt; N - 1; i++) {
         Same pitch, different recipe: that's why a trumpet isn't a flute.
       </p>
       <p>
-        And the kitchen runs in both directions. In 1822 Joseph Fourier showed that
+        The same idea runs in both directions. In 1822 Joseph Fourier showed that
         <em>any</em> repeating wave — including the square and saw shapes from the
-        oscilloscope — can be cooked from pure sine waves at harmonic frequencies.
+        oscilloscope — can be built from pure sine waves at harmonic frequencies.
         The mixing board below is that theorem made playable: eight partials of C3,
         eight faders. The faint coloured lines are the ingredients; the bright line
         is their sum, and the sound.
@@ -228,7 +225,7 @@ for (let i = 1; i &lt; N - 1; i++) {
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>Three numbers and a promise</h2>
+      <h2><span class="kicker">Epilogue</span>Three properties of a note</h2>
       <p>
         Dissection complete. A note is a repeating pressure wave, and your ear cares
         about exactly three things in it:
@@ -240,14 +237,13 @@ spectrum   → timbre   (the recipe of harmonics riding on the fundamental)</cod
         Everything we built today concerned <em>one</em> note alone. But music
         begins — really begins — the moment there are two. Play two notes together
         and their harmonic ladders overlap: some pairs of rungs line up and fuse,
-        others land close-but-not-quite and fight. That fight is audible as
-        roughness; the truce is what musicians call consonance; and the full
-        treaty — which pairs of notes agree, and precisely why — is the subject of
-        part two.
+        others land close-but-not-quite and beat against one another. That beating is
+        audible as roughness; smoother combinations are called consonant. Part two
+        examines which pairs sound consonant and why.
       </p>
       <p>
         <strong>Continued in <a href="/harmony.html">Part two: Why Notes Agree</a></strong> —
-        beats, whole-number ratios, and the harmonic handshake: consonance as
+        beats, whole-number ratios, and harmonic alignment: consonance as
         physics you can hear and see.
       </p>
     </main>

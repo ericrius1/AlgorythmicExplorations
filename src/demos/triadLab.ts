@@ -64,8 +64,8 @@ fn scene(uv: vec2f) -> vec3f {
 
   // handshakes and collisions between every pair of voices
   for (var a = 0u; a < 4u; a++) {
-    for (var b = 0u; b < 4u; b++) {
-      if (a >= count || b >= count || a == b) { continue; }
+    for (var b = a + 1u; b < 4u; b++) {
+      if (b >= count) { continue; }
       let fa = uf(4u + a);
       let fb = uf(4u + b);
       for (var i = 1u; i <= ${P}u; i++) {

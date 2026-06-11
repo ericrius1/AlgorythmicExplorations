@@ -45,16 +45,15 @@
         neighbours" is easier than "sum the whole universe"?
       </p>
       <p>
-        It is — once you know who your neighbours are. That question is the whole
-        subject of this article. Answering it at GPU speed takes one of the oldest
-        algorithms in computing plus the single most useful primitive in parallel
-        programming, and at the end, those two ideas pour a glass of water.
+        It is — once you know who your neighbours are. Answering that question at GPU
+        speed takes one of the oldest algorithms in computing plus a fundamental
+        parallel primitive. Together they make the fluid demo possible.
       </p>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 1 · The opposite problem</span>Paying n² for nothing</h2>
       <p>
-        Start the way part one started: honestly. A box of discs under gravity. Two
+        Start with a box of discs under gravity. Two
         discs push apart when they overlap — a stiff spring plus a little damping, the
         standard contact model — and feel nothing otherwise. The obvious
         implementation is the same two nested loops as the galaxy:
@@ -119,15 +118,14 @@
         On the CPU this is a solved problem: build an array of little lists, one per
         cell, in a single pass. And here the GPU becomes the obstacle. "Append to a
         list" means pointers, allocation, and a write position that depends on who
-        appended before you — the same serial disease that infected the Barnes–Hut
+        appended before you — the same serial dependency that complicated the Barnes–Hut
         tree build. Ten thousand threads cannot politely take turns appending.
         Whatever structure we build must be built the GPU way: every thread at once,
         no one waiting.
       </p>
       <p>
         Part one escaped this trap by making the tree implicit — pure arithmetic,
-        nothing to link. The grid version of that escape comes from the sorting
-        department.
+        nothing to link. For the grid, sorting provides the equivalent layout.
       </p>
 
       <!-- ================================================================ -->
@@ -248,7 +246,7 @@ forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
         <summary>Deep dive: losing the box — spatial hashing</summary>
         <div class="fold-body">
           <p>
-            One assumption deserves a confession: our grid is <em>dense</em> — 65,536
+            One assumption matters here: our grid is <em>dense</em> — 65,536
             cells covering a fixed box, most of them empty, each with its own counter.
             For a tank with walls that's the right call. But nothing about the method
             needs walls. Replace "cell index" with a <em>hash</em> of the cell
@@ -375,7 +373,7 @@ acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
         each from scratch.
       </p>
       <p>
-        The staircase continues in every direction. Three dimensions is the same sort
+        The same approach extends in several directions. Three dimensions is the same sort
         with a third coordinate folded into the cell index. Radix sort — counting sort
         applied digit by digit — handles keys when cells alone aren't enough. And
         nothing stops both structures from living in the same simulation: part one's

@@ -20,8 +20,8 @@
       <div class="hero-title">
         <h1>The Lava Lamp</h1>
         <p class="subtitle">
-          A new series begins with the most patient light fixture ever sold. The wax
-          above is a fluid simulation that knows its own temperature; the glow is real
+          A new series begins with a lava lamp. The wax above is a fluid simulation
+          that tracks its own temperature; the glow is real
           two-dimensional light transport, bouncing off things. Stir it with your
           cursor. Then wait — waiting is the whole point of a lava lamp.
         </p>
@@ -44,13 +44,12 @@
       <p>
         This series fixes that, and it starts deliberately small: one lamp, one room,
         two dimensions. A lava lamp is an ideal first subject because it is two
-        problems wearing one brass shell. The wax is a <em>thermodynamics</em> problem
-        — heat in at the coil, heat out at the cap, buoyancy in between. And the look
-        is a <em>light transport</em> problem: a lava lamp is an object in a dark
-        room, and everything you love about it — the bloom around a rising blob, the
-        amber wash on the cold wax above, the shadow a sinking blob drags across the
-        glass — is light leaving one place and arriving at another. We will earn both
-        halves honestly.
+        coupled problems. The wax is a <em>thermodynamics</em> problem
+        — heat in at the coil, heat out at the cap, buoyancy in between. Its appearance
+        is a <em>light transport</em> problem: the bloom around a rising blob, the
+        amber wash on the cold wax above, and the shadow a sinking blob drags across
+        the glass all come from light leaving one place and arriving at another. The
+        demo therefore simulates both the wax motion and the light it emits.
       </p>
 
       <!-- ================================================================ -->
@@ -75,21 +74,19 @@ tFlux   += (T_j − T_i)·w  <span class="cm">// conduction: heat flows along th
       <pre><code>rest_i = ρ₀ · (1 − β·T_i)        <span class="cm">// thermal expansion: hot wax wants more room</span>
 acc.y += buoyancy·T_i − gravity   <span class="cm">// and the unsimulated water lifts what expanded</span></code></pre>
       <p>
-        The first line is honest physics on the cheap: raising a particle's
+        The first line is an inexpensive approximation of thermal expansion: raising a particle's
         temperature lowers the density it is content with, so a warm region pushes
         its neighbours apart and genuinely takes up more space — blobs swell as they
-        heat, exactly as wax does. The second line is a confession. In a real lamp
+        heat, as wax does. The second line is a larger simplification. In a real lamp
         the wax floats in water, and buoyancy is the water's opinion of the wax's
         density. We are not simulating the water, so its job is performed by a single
-        force proportional to temperature. Cold wax sinks, hot wax rises, and the
-        Archimedes of it all is one multiply.
+        force proportional to temperature. Cold wax sinks and hot wax rises.
       </p>
       <div data-demo="temp"></div>
       <p>
-        Watch the cycle find itself: heat pools along the floor until a patch of wax
-        crosses the density it can no longer justify, pinches off, and rides its own
-        warmth upward — cooling as it goes, until the buoyancy term loses the
-        argument with gravity and the blob turns around. No line of code says "make
+        Watch the cycle develop: heat pools along the floor until a patch of wax
+        expands enough to pinch off and rise. It cools on the way up until gravity
+        overcomes the buoyancy term and the blob turns around. No line of code says "make
         blobs circulate." The loop emerges from four numbers you can drag: heat in,
         lift per degree, swelling per degree, heat out.
       </p>
@@ -124,13 +121,13 @@ occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax bloc
         Cold wax is an <em>occluder</em>: nearly black, visible only by what it
         blocks. Hot wax is a <em>light source</em>. The same blob is both at
         different moments of its life, which is why a lava lamp cannot be faked with
-        a glow sprite — the scene's lights move, breathe, split in two, and cast
+        a glow sprite — the scene's lights move, split in two, and cast
         shadows on each other. We now need what no part of any series so far has
         needed: actual light transport.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Light, finally</span>Radiance cascades</h2>
+      <h2><span class="kicker">Step 3 · Light transport</span>Radiance cascades</h2>
       <p>
         The problem, stated plainly: for every pixel of the canvas we want the light
         arriving from every direction — with shadows, in real time. The brute-force
@@ -174,8 +171,8 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         <p>
           Radiance cascades were published by Alexander Sannikov in 2023 and ship in
           <em>Path of Exile 2</em>. If the merge — coarse levels answering for
-          whatever fine levels cannot see — feels familiar, it should: it is the
-          Barnes–Hut bargain from part one of the gravity series, wearing photons.
+          whatever fine levels cannot see — feels familiar, it should: it uses the
+          same hierarchical approximation as Barnes–Hut in part one.
         </p>
       </aside>
       <details class="fold">
@@ -199,8 +196,7 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         paint walls, erase, and watch shadows wrap correctly around corners you just
         drew. The one slider truncates the cascade hierarchy: at one cascade, light
         reaches four pixels and dies. Each additional level lets light leap four
-        times further for the same per-pixel cost — you are watching a geometric
-        series buy the speed of light.
+        times further for the same per-pixel cost.
       </p>
       <div data-demo="paint"></div>
 
@@ -216,26 +212,24 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
       </p>
       <div data-demo="lamp"></div>
       <p>
-        The <em>view</em> button is the honest part of this article. <em>Scene</em>
+        The <em>view</em> button exposes each stage of the renderer. <em>Scene</em>
         shows what the rays actually see — a few glowing shapes on black, the entire
         input to the lighting. <em>Distance field</em> shows the jump flood's contour
         map, warping in real time as blobs split and merge. <em>Light only</em> drops
         the emission boost and shows pure transported light: every photon in that
         view arrived at its pixel from somewhere else. Flip back to <em>final</em>
         and find the moment a cold blob drifts past a hot one and picks up an amber
-        rim on one side only. Nothing in the code draws that rim. It is just what
-        light does — and for the first time in seven articles, light is being asked.
+        rim on one side only. Nothing in the code draws that rim directly; it comes
+        from the transported light.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>A lamp is a small universe</h2>
+      <h2><span class="kicker">Coda</span>What carries over</h2>
       <p>
-        The gravity series ended by admitting that its honest simulations were always
-        patterns of light arranged to make a mind lean closer. This series takes that
-        sentence literally: the light is now the simulation. The inheritance runs
-        deep — the grid sort under the wax is part three's, untouched except that
+        Much of the earlier series carries over. The grid sort under the wax is part
+        three's, untouched except that
         particles grew eight bytes of temperature; the deposit-and-threshold field is
-        part five's two-grid handshake with mass swapped for heat; the cascade merge
+        part five's two-grid exchange with mass swapped for heat; the cascade merge
         is part one's hierarchy, for photons.
       </p>
       <p>

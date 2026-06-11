@@ -6,7 +6,7 @@
     <title>Why Notes Agree — Music in a Browser Tab</title>
     <meta
       name="description"
-      content="Beats, whole-number ratios, and the harmonic handshake. Consonance and dissonance derived from physics, with live two-tone experiments, Lissajous figures, and the Plomp–Levelt dissonance curve you can play."
+      content="Beats, whole-number ratios, and harmonic alignment. Consonance and dissonance explored through physics, with live two-tone experiments, Lissajous figures, and the Plomp–Levelt dissonance curve you can play."
     />
   </head>
   <body>
@@ -15,8 +15,8 @@
       <div class="hero-title">
         <h1>Why Notes Agree</h1>
         <p class="subtitle">
-          Two notes at once is where music starts — and where the physics gets
-          opinionated. The knot above is a musical interval, drawn instead of
+          Two notes at once introduce consonance and dissonance. The knot above is a
+          musical interval, drawn instead of
           played. Tap it to do both.
         </p>
       </div>
@@ -33,22 +33,20 @@
         fundamental (timbre). One note, though, is not yet music — a smoke alarm has
         a pitch. Music begins when notes <em>relate</em>. Play two together and they
         don't just coexist; they interact, physically, in the air and in your inner
-        ear. Some pairs fuse into something smooth and stable. Others buzz like a
-        wasp in a jar.
+        ear. Some pairs fuse into something smooth and stable. Others produce audible
+        beating and roughness.
       </p>
       <p>
         Musicians have names for this — <strong>consonance</strong> for the smooth
         pairs, <strong>dissonance</strong> for the tense ones — and music theory
-        catalogues which intervals are which. This post is about something better
-        than the catalogue: the <em>mechanism</em>. By the end you'll be able to
-        derive the catalogue yourself, from two facts you can hear with your own
-        ears in the first two demos.
+        catalogues which intervals are which. This post focuses on the
+        <em>mechanism</em>, using two facts demonstrated in the first two demos.
       </p>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Fact 1 · Close frequencies fight</span>Beats</h2>
       <p>
-        Take two sine waves — pure tones, no recipe, the vanilla from part one — and
+        Take two sine waves — pure tones, with no additional harmonics — and
         put them almost, but not exactly, on the same frequency. They drift in and
         out of step: in step, they add and the sound swells; out of step, they cancel
         and it dies. The swelling repeats at exactly the frequency
@@ -70,8 +68,8 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
       <div data-demo="beats"></div>
 
       <p>
-        That arc — <strong>smooth → throb → rough → two notes</strong> — is the
-        whole engine of dissonance. The gritty middle zone exists because of the
+        That arc — <strong>smooth → throb → rough → two notes</strong> — explains
+        an important part of dissonance. The gritty middle zone exists because of the
         mechanics of your cochlea: frequencies closer than a <em>critical band</em>
         (roughly a quarter of an octave, wider for low notes) excite overlapping
         patches of the same membrane, and the overlap flutters. Roughness isn't a
@@ -134,7 +132,7 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">The synthesis</span>The harmonic handshake</h2>
+      <h2><span class="kicker">The synthesis</span>Where harmonics align</h2>
       <p>
         Here is the step that turns two curiosities into a theory. Real notes are
         not sine waves — part one showed each carries a ladder of harmonics:
@@ -145,19 +143,19 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
       </p>
       <blockquote>
         <p>
-          Consonance is what happens when two harmonic ladders interleave without
-          collisions. Dissonance is the sum of all the near-misses.
+          Harmonic alignment reduces beating between partials. Near-misses add
+          roughness.
         </p>
       </blockquote>
       <p>
         Play with the figure below. The blue comb is a fixed E3's harmonics; the
         orange comb belongs to the second note, and the interval slider slides it
         along the log-frequency axis. At 3:2, look at the combs: orange rung 2 lands
-        <em>exactly</em> on blue rung 3, orange 4 on blue 6 — white flares, perfect
-        handshakes, the two notes partially fuse. Now drag slightly off: every flare
-        splits into a near-miss that pulses red — a dozen simultaneous beating pairs.
-        That's why an out-of-tune fifth is so much more painful than an out-of-tune
-        anything-else: it has the most handshakes to break.
+        <em>exactly</em> on blue rung 3, orange 4 on blue 6 — white flares mark the
+        alignments, and the two notes partially fuse. Now drag slightly off: every
+        flare splits into a near-miss that pulses red — a dozen simultaneous beating
+        pairs. That is why mistuning is especially audible on a fifth: it disturbs
+        several strong alignments.
       </p>
 
       <div data-demo="comb"></div>
@@ -187,7 +185,7 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
 where s = 0.24 / (0.021·fmin + 19)   // critical band width at this pitch</code></pre>
           <p>
             Sum over all 64 partial pairs of two 8-partial tones, sweep the ratio,
-            and the figure's landscape appears. Two honest footnotes: the model
+            and the figure's landscape appears. Two limitations: the model
             ignores fusion effects and learned expectation, which also shape
             judgement — physics proposes, culture disposes. And because
             <em>fmin</em> appears in the band width, the valleys flatten out at low
@@ -211,14 +209,14 @@ where s = 0.24 / (0.021·fmin + 19)   // critical band width at this pitch</code
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>The catalogue, earned</h2>
+      <h2><span class="kicker">Epilogue</span>The consonance catalogue</h2>
       <p>
         Two facts, one synthesis:
       </p>
       <pre><code>1. partials closer than a critical band beat; beats ~20–35 Hz read as roughness
 2. simple-ratio intervals interleave their harmonic ladders rung-on-rung
 ⇒  the consonance hierarchy: 1:1, 2:1, 3:2, 4:3, 5:4, 6:5, 5:3 …
-   and dissonance everywhere the handshakes near-miss</code></pre>
+   and dissonance where partials narrowly miss</code></pre>
       <p>
         So the intervals music is built from are the deep valleys of a roughness
         landscape that your cochlea computes for free, all day, every day. But look

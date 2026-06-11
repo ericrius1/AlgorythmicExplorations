@@ -15,10 +15,9 @@
       <div class="hero-title">
         <h1>The Sorcerer's Apprentice</h1>
         <p class="subtitle">
-          Part six: nothing new is derived and nothing is measured. Every machine this
-          series built is welded into one instrument, the units are thrown away, and
-          the only remaining question is the oldest one in graphics: does it feel
-          alive? Move your cursor through it. Better — click ✋ and use your hands.
+          Part six combines the series' earlier techniques into an interactive fluid
+          toy. The constants are chosen for visual effect rather than physical
+          accuracy. Move your cursor through it, or click ✋ and use your hands.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -29,19 +28,16 @@
 
     <main>
       <p>
-        Five parts of this series earned their pictures. The galaxy obeyed Newton, the
-        water obeyed pressure, the moons accreted because momentum said they must.
-        Every figure came with a conscience: if it looked wrong, the physics was
-        wrong. This part has no conscience. The simulation above solves real equations
-        on real GPU pipelines — the same advection, the same Poisson equation — but it
-        solves them for a substance that does not exist, with constants chosen by eye.
-        It is not a model of anything. It is an instrument, and you play it.
+        The earlier parts used visual results to explain physical models. This one
+        uses the same advection and Poisson solve for a substance that does not exist,
+        with constants chosen by eye. It is an interactive graphics effect rather
+        than a model of a particular fluid.
       </p>
       <p>
         There is a respectable name for this move: visual effects houses call it
         <em>art direction</em>. The moment a director says "make the smoke angrier,"
         the units come off. The solver stays — the solver is what makes the motion
-        feel inevitable instead of authored — but gravity becomes a slider, viscosity
+        feel coherent instead of arbitrary — but gravity becomes a slider, viscosity
         becomes taste, and color stops pretending to be temperature. This article is
         about that handoff: what survives when you keep the mathematics and discard
         the physics.
@@ -79,7 +75,7 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
         Same operator, third appearance, third meaning. In part one's far field it was
         implicit in every pairwise pull; in part five it turned density into
         potential; here it turns "almost a fluid" into a fluid, sixty times a second.
-        The other half of the loop is just as elegant. To move the field, don't push
+        The other half of the loop moves the field. Do not push
         values forward (that explodes, the way part one's first integrator exploded);
         instead stand at each grid cell, ask <em>where would the fluid here have come
         from?</em>, and walk backward along the velocity to take what you find there:
@@ -87,10 +83,9 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
       <pre><code>u_new(x) = u_old(x − u(x)·dt)   <span class="cm">// semi-Lagrangian: fetch your own past</span></code></pre>
       <p>
         Fetching can never invent a value larger than what exists, so the scheme is
-        unconditionally stable — feed it the violent, units-free stirring of a hand
-        and it shrugs. The price is a little numerical smearing, which a physicist
-        would apologize for and which we, as of this part, declare a feature: it
-        makes the motion buttery.
+        unconditionally stable. Even violent, units-free stirring from a hand does
+        not make it diverge. The price is numerical smearing, which softens the motion
+        in a way that suits this demo.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Stable Fluids, 1999</span>
@@ -112,10 +107,10 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
           </p>
           <p>
             Ten sweeps is nowhere near convergence, and it does not matter. An
-            under-converged projection leaks a whisper of divergence that the next
-            frame's projection mops up, and no eye in history has ever caught it.
-            That is the first art-direction lesson: solve to the tolerance of the
-            retina, not the textbook.
+            under-converged projection leaks a small amount of divergence that the
+            next frame's projection reduces again.
+            For this visual effect, solving only to the point where the remaining
+            error is not visible is sufficient.
           </p>
         </div>
       </details>
@@ -153,20 +148,20 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
         <span class="note-label">Aside · Folklore, written down in 2007</span>
         <p>
           Curl noise was production folklore for years before Bridson, Hourihan and
-          Nordenstam wrote it down formally in 2007. It remains the cheapest miracle
-          in effects work.
+          Nordenstam wrote it down formally in 2007. It remains a particularly cheap
+          way to generate convincing motion.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Paint, not matter</span>Half a million weightless witnesses</h2>
+      <h2><span class="kicker">Step 3 · Paint, not matter</span>Half a million tracers</h2>
       <p>
         Here the series' particles return — demoted, and better for it. In parts one
         through five, particles <em>were</em> the simulation: they carried mass, they
         pulled on each other, losing one would change the answer. The particles in
         this toy carry nothing. They are massless tracers dropped into the grid's
         velocity field, advected by trilinear interpolation exactly the way part
-        five's cloud rode its mesh forces — the same two-grid handshake, except
+        five's cloud used its mesh forces — the same two-grid exchange, except
         nothing is deposited anymore. The fluid does not know the particles exist.
         They are paint on a river.
       </p>
@@ -205,13 +200,12 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The controller you were born with</span>Twenty-one landmarks</h2>
+      <h2><span class="kicker">Step 4 · Hand tracking</span>Twenty-one landmarks</h2>
       <p>
         A toy wants to be touched, and a cursor is a single dry fingertip on glass.
-        The original plan for every fluid interface ever sketched is the one from
-        <em>Fantasia</em>: stand in front of the thing and conduct. That used to
-        require a research lab. It now requires a webcam and seven megabytes of
-        neural network, running — fittingly — on the same WebGPU device as the fluid.
+        Hand tracking gives the interface more degrees of freedom than a cursor. It
+        now requires only a webcam and seven megabytes of neural network, running on
+        the same WebGPU device as the fluid.
       </p>
       <div data-demo="hand"></div>
       <p>
@@ -227,17 +221,17 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
         strings. Each palm is a stirrer with a radius and a velocity; each index
         fingertip is a finer, brighter one — a pen for drawing dye. And the distance
         between thumb-tip and index-tip, normalized by the hand's own scale so it
-        works at any distance from the camera, becomes the toy's one true gesture:
+        works at any distance from the camera, controls a second gesture:
       </p>
       <pre><code>pinch = 1 − |thumb_tip − index_tip| / hand_scale
-<span class="cm">// open hand pushes; pinched fingers conjure a vortex that drinks inward</span></code></pre>
+<span class="cm">// open hand pushes; pinched fingers pull inward and add spin</span></code></pre>
       <p>
         Pinch past half-closed and the stirrer flips sign: instead of pushing fluid
-        away it pulls it in and spins it around the view axis — a tornado held
-        between two fingers. None of this is physics. All of it is mapping — the same
+        away it pulls it in and spins it around the view axis. None of this is
+        physics. All of it is mapping — the same
         job as part two's dome, geometry in the service of where the audience is
-        standing — and tuning the mapping until a stranger's hands understand it in
-        five seconds is, honestly, harder than the Poisson solve.
+        standing. Tuning the mapping until a new user understands it quickly takes
+        more iteration than the Poisson solve.
       </p>
 
       <!-- ================================================================ -->
@@ -245,18 +239,16 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
       <p>
         Everything above, at full size. Hover to stir; drag to orbit the box
         (⌘-scroll zooms); the mode buttons re-dye the same fluid; the ✋ button asks
-        for your camera and hands you the orchestra. Pinch for vortices. Draw with
+        for your camera and enables hand control. Pinch for vortices. Draw with
         your index finger. Try a slow figure-eight in <em>nebula</em> and then stop
         moving entirely — the projection keeps your gesture circulating long after
-        you leave, which is the whole difference between a velocity field and a
-        particle effect.
+        you leave, demonstrating the persistence of a velocity field rather than a
+        stateless particle effect.
       </p>
       <div data-demo="playground"></div>
       <p>
-        If no hand and no cursor touches the box for a few seconds, a ghost stirrer
-        wanders through it on a slow Lissajous path so the fluid never falls asleep —
-        the same courtesy part five's universe extended: the demo should be doing
-        something interesting at the moment you arrive.
+        If no hand and no cursor touches the box for a few seconds, an automatic
+        stirrer follows a slow Lissajous path so the demo remains active.
       </p>
 
       <!-- ================================================================ -->
@@ -269,18 +261,13 @@ u ← u − ∇p       <span class="cm">// and let it push back</span></code></p
         with the n² removed entirely rather than defeated. The billboard renderer and
         orbit camera — part two. The conviction that locality is what makes a fluid a
         fluid — part three. The shameless welding of two solvers that were never
-        introduced — part four's whole personality.
+        introduced — the same composition used in part four.
       </p>
       <p>
-        And count what it discards: every unit, every conservation law it can get
-        away with breaking, and the entire idea of being <em>about</em> something.
-        That discard is not a failure of nerve. The honest simulations earlier in
-        this series were always, secretly, also this — patterns of light arranged to
-        make a mind lean closer — and the discipline of getting Newton right was in
-        service of the lean. Six parts ago, two dots fell toward each other and the
-        first thing anyone did was want to touch them. The series ends by giving in:
-        here is the fluid, here are your hands. The mathematics will hold it
-        together.
+        It also discards physical units and any conservation law that does not help
+        the interaction. The result is still held together by the numerical methods
+        from the earlier posts, but their purpose here is responsiveness and visual
+        continuity rather than physical prediction.
       </p>
       <p>
         ← <a href="/part5.html">Part five: The Music of the Spheres</a> ·

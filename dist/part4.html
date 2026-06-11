@@ -34,12 +34,12 @@
 
     <main>
       <p>
-        Part three ended with a promise. <a href="/index.html">Part one</a> built a
+        <a href="/index.html">Part one</a> built a
         structure for the <em>far field</em> — a pyramid of summarized mass, because in
         a galaxy distant crowds matter in aggregate.
         <a href="/part3.html">Part three</a> built the opposite structure for the
         <em>near field</em> — a sorted grid of buckets, because water only touches its
-        neighbours. The promise: nothing stops both from living in the same
+        neighbours. Nothing stops both from living in the same
         simulation. Gravity from the tree, contacts from the grid — dust attracting,
         colliding, and sticking. The beginnings of a solar system.
       </p>
@@ -48,19 +48,19 @@
         near-circular orbits around a star. Every grain pulls on every other grain
         through part one's pyramid; every grain shoves the grains it actually touches
         through part three's counting sort. Left alone, the ring curdles — clumps
-        condense, collide, and grow into moonlets. This is the mechanism, in miniature
-        and in 2D, by which the floor you are standing on came to exist.
+        condense, collide, and grow into moonlets. It is a simplified, two-dimensional
+        version of planetesimal formation.
       </p>
       <p>
-        Getting there takes three steps: understanding why gravity alone can never
-        build a planet, freeing part three's grid from its box, and the wedding itself
-        — plus one quiet ingredient that turns out to be the entire secret.
+        Getting there takes three steps: understanding why gravity alone cannot build
+        a planet, freeing part three's grid from its box, and combining the two data
+        structures with dissipative collisions.
       </p>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 1 · Ghosts</span>Why gravity can't finish the job</h2>
       <p>
-        A confession about part one. The galaxy's <em>softening</em> parameter was
+        Part one's <em>softening</em> parameter was
         introduced as a fix for division by zero. Its real meaning is physical: it
         declares that bodies have no surface. Below the softening length, gravity
         fades out instead of diverging, and two particles heading straight at each
@@ -142,9 +142,9 @@
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The wedding</span>Two structures, one buffer</h2>
+      <h2><span class="kicker">Step 3 · Combining the solvers</span>Two structures, one buffer</h2>
       <p>
-        Now marry them. The obstacle is not conceptual — the far field and the near
+        Now combine them. The obstacle is not conceptual — the far field and the near
         field don't even speak to each other — it is plumbing. Part three's sort
         <em>permutes the particles every substep</em>: grain #4,071 is somebody else
         after every shuffle. Part one's solver carried a per-body mass array, indexed
@@ -200,7 +200,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The secret ingredient</span>Losing energy on purpose</h2>
+      <h2><span class="kicker">Step 4 · Dissipation</span>Losing energy on purpose</h2>
       <p>
         Here is the part that no data-structure cleverness supplies. Go back to the
         collapsing cloud and try all three buttons:
@@ -224,9 +224,8 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         (in real dust, into heat). Slide the <em>stickiness</em> slider to zero and
         the collapse turns into a bouncing swarm that never settles — gravity plus
         perfectly elastic contact still conserves energy, and conservative systems
-        don't form planets. Energy must leave. That is the whole secret. Galaxies stay
-        gauzy and eternal because they cannot dissipate; dust becomes worlds because
-        it can.
+        do not settle. Galaxies remain diffuse because they cannot dissipate collision
+        energy; dust can form compact bodies because it can.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Newton's pendulums and an unread Russian monograph</span>
@@ -286,7 +285,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         </p>
       </aside>
       <p>
-        An honesty note, in the series tradition: real planet formation is 3D, its
+        An important limitation: real planet formation is 3D, its
         dust is embedded in gas whose drag both saps orbits and — via the
         <em>streaming instability</em> — actively herds grains into clumps, and real
         collisions can shatter as well as stick. This demo has none of that; it is a
@@ -309,9 +308,8 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         <strong>2. Dissipation is where structure comes from.</strong> Every force in
         parts one and two conserved energy, and accordingly nothing in those articles
         ever <em>became</em> anything — the galaxy was a galaxy at the start and the
-        end. One lossy term in the contact force gave time an arrow, and suddenly
-        clouds become planetesimals and rings become moons. The cheapest line of
-        physics in the series is the one doing the creating.
+        end. One lossy term in the contact force lets clouds settle into planetesimals
+        and rings into moonlets.
       </p>
       <p>
         <strong>3. Choose data so the structures can't disagree.</strong> The sort
@@ -321,15 +319,14 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         sort-instead-of-lists: don't manage the hard case, delete it.
       </p>
       <p>
-        The staircase continues. A third coordinate folds into both structures and the
+        There are several clear extensions. A third coordinate folds into both structures and the
         disk becomes a true 3D nebula. Letting colliding grains <em>merge</em> needs
         particles to die and masses to vary — which needs stream compaction and a
         key–value radix sort, both of which are (what else?) scans. Gas drag is one
         more force. And the moonlets this page grows in seconds took the real disk a
-        hundred thousand years — the timestep tricks that close that gap are a
-        staircase of their own. From a galaxy to a glass of water to a newborn solar
-        system, it has been the same climb: find the structure the physics wants, then
-        arrange memory so ten thousand threads can build it without waiting.
+        hundred thousand years, so larger timesteps or multirate integration would
+        also matter. In each case, the implementation starts by finding a structure
+        that matches the physics, then arranging it for parallel construction.
       </p>
       <p>
         <strong>Continued in <a href="/part5.html">Part five: The Music of the Spheres</a></strong> —

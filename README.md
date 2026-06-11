@@ -1,6 +1,6 @@
 # Cosmic Algorithmic Explorations
 
-Two interactive series of articles with live WebGPU demos.
+Three interactive series of articles with live WebGPU demos.
 
 **Gravity in a Browser Tab** — a six-part series that builds particle simulators step by step,
 one data structure per article. Part one (`index.html`) goes from two falling
@@ -33,6 +33,29 @@ particles on curl-noise wind, each a true light source at no added cost;
 multi-bounce color bleeding from a one-frame temporal feedback loop
 (albedo × last frame's fluence); the sky as the top cascade's merge; and
 optional hand tracking so your fingertip sheds embers.
+
+**Music in a Browser Tab** — a six-part music theory series where every figure
+makes real sound (Tone.js) and every visual is a WebGPU fragment shader fed by
+live analyser data. Part one (`vibration.html`) dissects a single note: an
+oscilloscope you can play, a wave-equation string you pluck (audio synthesized
+from its modal decomposition), and additive-synthesis drawbars. Part two
+(`harmony.html`) derives consonance: beats, Lissajous figures of interval
+ratios, and the Plomp–Levelt dissonance curve computed live over two 8-partial
+tones. Part three (`twelve.html`) stacks fifths into a spiral that misses by
+the Pythagorean comma, lets you temper it shut, A/Bs just vs equal-tempered
+chords with beat-rate lights, and charts why 12-TET wins. Part four
+(`scales.html`) treats scales as rotating ring patterns (modes, with a drone)
+and the circle of fifths as a map of key distance. Part five (`chords.html`)
+puts triads under a harmonic-alignment microscope (with a clickable piano) and
+runs four-chord loops through a minimal-motion voice-leading search with a
+live tension lane. Part six (`jukebox.html`) assembles the series into a
+generative band: Euclidean drums, a gravity-guided random-walk melody, a
+seeded progression grammar, and an FFT-driven nebula.
+
+Music-series plumbing: `src/lib/audio.ts` (shared Tone.js master bus +
+analysers, lookahead StepClock, music math), `src/lib/shaderCanvas.ts`
+(fullscreen-shader ShaderView — each figure supplies one WGSL `scene()`
+colocated in its demo file), `src/lib/piano.ts` (DOM keyboard widget).
 
 Site navigation (top bar, post menu, read-next cards) is injected by
 `src/lib/siteNav.ts` from the registry in `src/lib/posts.ts` — adding a post

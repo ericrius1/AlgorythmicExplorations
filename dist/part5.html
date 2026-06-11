@@ -21,8 +21,7 @@
         <p class="subtitle">
           Part five: the n² wall falls a third time — this time to a change of key.
           Gravity solved as waves, a mesh instead of a tree, and the cosmic web
-          condensing out of primordial static. You are watching the universe grow up.
-          Stir it if you must.
+          condensing out of primordial static. Drag through it to perturb the field.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -42,16 +41,15 @@
         smooth, with ripples of one part in a hundred thousand. Left alone, gravity
         amplifies those ripples into knots, the knots link into filaments, the
         filaments fence off voids. Astronomers call the result the <em>cosmic web</em>.
-        It is the largest pattern that exists, and the real one — mapped galaxy by
-        galaxy by the biggest surveys in science — looks exactly like this.
+        It is the largest known pattern in the distribution of matter. Large galaxy
+        surveys reveal the same broad structure.
       </p>
       <p>
         None of the machinery this series has built can run that simulation. Part
         one's tree wants clumps to summarize; the early universe is uniform, and the
         structure is in exquisitely small differences. Part three's grid wants forces
-        with a cutoff; gravity has none. This article builds the third and last great
-        structure of the series, and it is the strangest: it solves gravity by
-        changing what the word "where" means.
+        with a cutoff; gravity has none. This article uses a third structure: a mesh
+        and a Fourier transform that solve gravity in frequency space.
       </p>
 
       <!-- ================================================================ -->
@@ -60,7 +58,7 @@
         Start with what makes cosmology different. A galaxy is a thing in empty space;
         you can put a box around it and the box ends. The universe is not in a box —
         wherever you stand, it continues, statistically the same, in every direction.
-        Simulators handle this the only honest way available: make the box
+        Simulators commonly handle this by making the box
         <em>periodic</em>. Leave through the right wall, re-enter through the left. A
         particle near the edge pulls on its neighbours <em>through</em> the wall.
         Part four freed the grid from its box; cosmology glues the box back together
@@ -69,15 +67,15 @@
       <p>
         For part one's tree this is quietly disastrous. Barnes–Hut walks outward
         until contributions dwindle — but on a torus there is no outward, and the sum
-        over infinite periodic images converges so reluctantly that doing it honestly
-        (Ewald summation, borrowed from crystallography) roughly doubles the cost and
+        over infinite periodic images converges so slowly that using Ewald summation,
+        borrowed from crystallography, roughly doubles the cost and
         triples the code. The deeper problem: in the early universe, density
         contrasts are 0.001%. A tree spends its cleverness deciding which lumps
         matter; here there are no lumps yet.
       </p>
       <p>
-        So here is the pivot, and it is the whole article: stop thinking of gravity
-        as pairs and start thinking of it as a <em>field</em>. Mass density is a
+        The key change is to stop thinking of gravity as pairs and start thinking of
+        it as a <em>field</em>. Mass density is a
         function ρ over the box. The gravitational potential φ is another function,
         and physics relates them with one equation — Poisson's:
       </p>
@@ -90,7 +88,7 @@
         equation for the potential everywhere. Sample the box on a 512×512 mesh and
         Poisson's equation becomes 262,144 simultaneous equations, every unknown
         coupled to its neighbours, sixty times a second. That sounds like a research
-        problem. It is about to become three lines of code.
+        problem. In frequency space, the core solve is three lines of code.
       </p>
 
       <!-- ================================================================ -->
@@ -100,8 +98,8 @@
         exactly as a sum of sine waves. That is Fourier's theorem, and the demo below
         makes it tactile. A signal of 256 samples, rebuilt from its waves, lowest
         frequency first. The bump is cheap — a handful of waves nail it. The square
-        wave fights back: slide the budget up and watch the overshoot at the corners
-        refuse to die. Even the noise surrenders eventually, because 256 samples can
+        wave needs many more components: slide the budget up and watch the overshoot
+        at the corners persist. Even noise can be reconstructed, because 256 samples can
         only hold 128 waves of information — the two representations are the same
         size. Nothing is lost in either direction.
       </p>
@@ -117,9 +115,8 @@
           publish it. Lagrange objected that sums of smooth waves could never make a
           sharp corner. He was nearly right: the corner costs infinitely many waves,
           and they ring where they meet it — the overshoot you just saw is the
-          <em>Gibbs phenomenon</em>, Lagrange's ghost collecting his due. But Fourier
-          was right where it counted, and analysis spent the next century absorbing
-          the shock.
+          <em>Gibbs phenomenon</em>. Fourier's result survived the objection and
+          became foundational to modern analysis.
         </p>
       </aside>
       <p>
@@ -132,7 +129,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The equation dissolves</span>Division instead of differential equations</h2>
+      <h2><span class="kicker">Step 3 · Frequency space</span>Division instead of differential equations</h2>
       <p>
         Take a single wave of density: ρ = sin(<em>k</em>x). Differentiate twice and
         you get −<em>k</em>² sin(<em>k</em>x) — <em>the same wave</em>, scaled. Waves
@@ -143,7 +140,7 @@
         into 262,144 separate one-line problems.
       </p>
       <p>
-        Watch the whole solve happen under your scroll wheel — decompose, divide,
+        Watch the solve happen under your scroll wheel — decompose, divide,
         recombine:
       </p>
 
@@ -177,8 +174,8 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
             subtracts the mean — in a periodic universe only <em>contrast</em>
             gravitates, because the uniform background pulls equally in every
             direction and cancels. Cosmologists argued about the legitimacy of this
-            for decades (it's sometimes called the "Jeans swindle"); the FFT just
-            shrugs and does the right thing.
+            for decades (it's sometimes called the "Jeans swindle"); setting the zero
+            mode to zero implements the required subtraction directly.
           </p>
         </div>
       </details>
@@ -201,7 +198,7 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
         doesn't grind through a differential equation; it carries the problem to an
         alphabet where the equation was never hard. Mathematicians call the pattern
         <em>diagonalization</em>; engineers call it picking the right representation.
-        It is the most valuable move in computational science.
+        This change of representation is a common move in computational science.
       </p>
 
       <!-- ================================================================ -->
@@ -209,8 +206,8 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
       <p>
         One debt outstanding: <code>fft2d</code> itself. Computing one wave's
         coefficient is a weighted sum over all n samples; n coefficients therefore
-        cost n² — and the wall this series has hit three times grins from a new
-        doorway. A 512×512 mesh transformed naively is ~69 billion multiplications
+        cost n², recreating the scaling problem from earlier parts. A 512×512 mesh
+        transformed naively is ~69 billion multiplications
         per transform, four transforms per frame. The scheme dies right here without
         a fast transform.
       </p>
@@ -220,10 +217,10 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
         rotation per output. Applied recursively, that is n log n. The wiring diagram
         below is the <em>butterfly network</em> for 16 points: log₂(16) = 4 layers,
         each layer pairing every value with a partner half the array apart, then a
-        quarter, then an eighth. If the shape tingles your déjà vu, it should: it is
-        part three's prefix-sum ladder wearing complex rotations — the same doubling
-        cascade, which is precisely why the FFT is a perfect GPU citizen. The bars
-        underneath race the honest n² transform against the FFT on your machine,
+        quarter, then an eighth. The shape matches part three's prefix-sum ladder,
+        except that each stage applies complex rotations. The same doubling cascade
+        also maps well to a GPU. The bars
+        underneath race the direct n² transform against the FFT on your machine,
         right now.
       </p>
 
@@ -252,7 +249,7 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
             log₂(512) = 9 times with a barrier between folds — the identical rhythm
             to part three's scan — and writes it back. Rows, then columns: a 2D
             transform is just two rounds of 1D ones. Four such transforms plus one
-            division per cell, and the box's exact periodic gravity costs about as
+            division per cell make the box's exact periodic gravity cost about as
             much as blurring a 512-pixel image — under a millisecond.
           </p>
         </div>
@@ -266,7 +263,7 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
         called <em>particle-mesh</em>, and each step walks one lap:
       </p>
       <pre><code>deposit:  particles paint their mass onto the mesh     // gather → field
-solve:    FFT → divide by -k² → inverse FFT             // the whole of physics
+solve:    FFT → divide by -k² → inverse FFT             // solve for the potential
 gradient: difference neighbouring cells → force mesh    // downhill, per cell
 gather:   particles read the force where they stand     // field → particles
 kick &amp; drift, wrap through the walls, repeat</code></pre>
@@ -291,7 +288,7 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
         blob of dust, reborn in a periodic box. The slider changes nothing about the
         particles and everything about the mesh. At 64×64 the force is a blur and the
         collapse is mush; at 512×512 the same blob shatters into filaments and knots.
-        What you are feeling is the method's one honest price: <strong>below the size
+        The method has one important limit: <strong>below the size
         of a cell, gravity does not exist</strong>. The mesh is the softening. Watch
         the edges of the box while it collapses — the periodic images collapse in
         perfect sympathy, because they are it.
@@ -310,9 +307,9 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · Let there be lumps</span>Seeding and growing a universe</h2>
+      <h2><span class="kicker">Step 6 · Initial conditions</span>Seeding and growing a universe</h2>
       <p>
-        The machine is built. Now feed it the universe. Two ingredients remain.
+        The solver is built. Two ingredients remain for the cosmology demo.
       </p>
       <p>
         <strong>The seeds.</strong> The young universe was almost featureless —
@@ -361,7 +358,7 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       <div data-demo="web"></div>
 
       <p>
-        One honest caveat: this box is 2D, so the growth exponents differ from our
+        One important caveat: this box is 2D, so the growth exponents differ from our
         universe's, and the "web" is really walls and wells seen edge-on. The
         algorithms are the real ones — the dimensions are a display choice. Add the
         third coordinate and this exact pipeline — FFTs, cloud-in-cell, comoving
@@ -370,10 +367,10 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The view from the top of the staircase</h2>
+      <h2><span class="kicker">Coda</span>Three structures</h2>
       <p>
-        Five parts, three structures, one enemy. The n² wall fell three times, to
-        three genuinely different ideas about what a computation is:
+        Across five parts, the n² wall fell three times, using three different
+        computational structures:
       </p>
       <p>
         <strong>1. The tree summarized space.</strong> Far things blur; resolution
@@ -388,8 +385,7 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       <p>
         <strong>3. The transform changed alphabets.</strong> Some equations are only
         hard in the language they were asked in. The FFT carries Poisson's equation
-        to the alphabet where it is division, and pays n log n — the cheapest toll
-        ever charged for solving a planet-sized system exactly.
+        to the alphabet where it is division, and pays n log n.
       </p>
       <p>
         And the real codes — the ones that ran the Millennium Simulation's ten
@@ -403,14 +399,11 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
         into by following the physics.
       </p>
       <p>
-        The staircase continues — a third coordinate, adaptive meshes nested in the
-        deep wells, initial conditions drawn from Planck's actual chains rather than
-        a slider. But this is the step where the series' machines close into a
-        circle: the same butterfly that sharpened a square wave seeds a universe, and
-        the same gravity that flung two dots apart in part one draws the largest
-        structure in existence. Newton needed one law for the apple and the Moon. It
-        turned out to be enough for the web between the galaxies — and, with a tree,
-        a sort, and a change of key, for your browser tab.
+        Further extensions include a third coordinate, adaptive meshes nested in deep
+        wells, and initial conditions drawn from Planck's actual parameter chains
+        rather than a slider. The same FFT used to reconstruct a square wave also
+        generates the initial density field, while the same gravity from part one
+        evolves it into a cosmic web.
       </p>
       <p>
         <strong>Continued in <a href="/part6.html">Part six: The Sorcerer's Apprentice</a></strong> —

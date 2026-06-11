@@ -9,6 +9,13 @@
       "autoPort": true
     },
     {
+      "name": "ableton-viz",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "/Users/eric/codeprojects/ableton-viz/visualizer", "--", "--port", "5198"],
+      "port": 5198,
+      "autoPort": true
+    },
+    {
       "name": "lamp",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "/Users/eric/codeprojects/LavaLamp", "--", "--port", "5199"],

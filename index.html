@@ -39,10 +39,9 @@
         do it in a browser tab, on whatever machine you are holding.
       </p>
       <p>
-        This article is the story of how. There is no single trick — it's a sequence of
-        ideas, each fixing the specific thing the previous one got wrong, with a live
-        demo at every step that you can poke, drag, and break. By the end, you'll know
-        what every part of the galaxy up top is doing and why it was built this way.
+        There is no single trick. Each section fixes a specific limitation in the
+        previous approach, with a live demo you can poke, drag, and break. By the end,
+        every part of the galaxy up top will have a clear job.
       </p>
 
       <!-- ================================================================ -->
@@ -140,7 +139,7 @@ a_i += G * mass[j] * d / (|d|² + ε²)^(3/2)</code></pre>
         </p>
       </aside>
       <p>
-        With an actual computer, the honest implementation is two nested loops:
+        With an actual computer, the direct implementation is two nested loops:
       </p>
       <pre><code>for (let i = 0; i &lt; count; i++) {
   let ax = 0, ay = 0;
@@ -172,7 +171,7 @@ a_i += G * mass[j] * d / (|d|² + ε²)^(3/2)</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · A thousand hands</span>Throw it at the GPU</h2>
+      <h2><span class="kicker">Step 3 · Parallel work</span>Move it to the GPU</h2>
       <p>
         Look at the nested loop again. Body 0's force sum doesn't depend on body 1's —
         every iteration of the <em>outer</em> loop is independent. That is exactly the
@@ -233,7 +232,7 @@ for (var t = 0u; t &lt; numTiles; t++) {
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The beautiful approximation</span>Distant things blur</h2>
+      <h2><span class="kicker">Step 4 · Approximation</span>Distant things blur</h2>
       <p>
         Stand outside on a clear night. Roughly a hundred billion stars in the
         Andromeda galaxy are pulling on you — and your body feels them as <em>one</em>
@@ -280,9 +279,8 @@ if (cellWidth² &lt; θ² × distance²) {
 
       <p>
         Watch the counter while you move: a few dozen cluster terms instead of 3,000
-        body terms, for a force within a fraction of a percent of exact. That's the
-        Barnes–Hut trade — give up accuracy you would never notice for speed you
-        definitely will.
+        body terms, for a force within a fraction of a percent of exact. Barnes–Hut
+        trades a controlled amount of accuracy for a large reduction in work.
       </p>
       <aside class="note">
         <span class="note-label">Aside · A three-page paper and its family tree</span>
@@ -326,7 +324,7 @@ if (cellWidth² &lt; θ² × distance²) {
       </p>
       <p>
         You could port the sequential build to the GPU with atomics and locks (people
-        have; it's heroic and miserable). Or you could ask a sneakier question:
+        have; it is complicated and lock-heavy). Or change the structure:
       </p>
       <blockquote>
         <p>What if the tree had no pointers to build at all?</p>
@@ -402,7 +400,7 @@ atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · Final form</span>The whole loop on the GPU</h2>
+      <h2><span class="kicker">Step 6 · GPU-resident</span>The whole loop on the GPU</h2>
       <p>
         Assemble everything. Each simulation step is a fixed pipeline of ~15 GPU
         dispatches, and <em>nothing</em> touches the CPU:
@@ -414,7 +412,7 @@ reduce   → build the pyramid, level by level            (log₂ passes)
 force    → every body walks the implicit tree           (Barnes-Hut, no pointers)
            …and integrates its own position, in place</code></pre>
       <p>
-        Two details earn their keep. The <em>bounds</em> pass re-fits the grid to the
+        Two details matter. The <em>bounds</em> pass re-fits the grid to the
         bodies every step, so the pyramid always wraps the world even when the galaxy
         drifts or explodes. And the <em>force</em> pass writes each body back
         <strong>in place</strong> — safe, because no kernel ever reads another body's
@@ -447,7 +445,7 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         interactive rates — tens of millions of body-steps per second — where the
         nested loop from Step 2 would need <em>minutes per frame</em>. Same physics,
         same softening, same θ you can verify against the toy demos. The speedup
-        wasn't one idea; it was a staircase:
+        comes from several independent changes:
       </p>
       <pre><code>two loops in JS          ~4,000 bodies        (Step 2)
 + GPU, one thread/body   ~25× more            (Step 3)
@@ -469,10 +467,9 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What the staircase teaches</h2>
+      <h2><span class="kicker">Epilogue</span>What carries over</h2>
       <p>
-        Strip away the gravity and four lessons remain, and they generalize to almost
-        everything you'll ever make fast:
+        Strip away the gravity and four useful lessons remain:
       </p>
       <p>
         <strong>1. Walls are algorithmic before they are mechanical.</strong> The GPU
@@ -496,12 +493,11 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         the bus is often worth more than optimizing either side.
       </p>
       <p>
-        Where does the staircase go next? Sort bodies along a space-filling curve so
+        Possible next steps: sort bodies along a space-filling curve so
         neighbouring GPU threads walk the same part of the tree (Morton order — worth
         another 2–5× from memory coherence alone). Replace the uniform pyramid with a
         parallel-built adaptive tree (LBVH) when clustering gets extreme. Add a third
-        dimension — quadtree to octree, four children to eight. The staircase keeps
-        going as far as you care to climb.
+        dimension — quadtree to octree, four children to eight.
       </p>
       <p>
         The galaxy at the top of the page is still spinning. Scroll back up and you

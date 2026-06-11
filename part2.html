@@ -81,8 +81,8 @@
       </p>
       <blockquote>
         <p>
-          Dimensions are cheap for algorithms and expensive for grids. The <em>ideas</em>
-          port for free; the <em>memory</em> bill arrives exponentiated.
+          The algorithm changes little in 3D, but grid memory grows from a square to
+          a cube.
         </p>
       </blockquote>
       <details class="fold">
@@ -128,7 +128,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));        // Σ m·dz  ←
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · Seeing in depth</span>A renderer with no sort</h2>
       <p>
-        Before the octree earns its keep, we need to <em>see</em> 3D — and 3D
+        Before using the octree, we need to <em>see</em> 3D — and 3D
         rendering of transparent things usually comes with a dreaded word: sorting.
         Blending is order-dependent: paint a near glow before a far one and the
         picture lies. Sorting hundreds of thousands of particles every frame is
@@ -153,8 +153,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));        // Σ m·dz  ←
           per pixel and is baked into every GPU since — but a depth test can only
           discard, not blend, so transparency clawed the sort right back.
           "Order-independent transparency" is a research topic to this day. Space is
-          the rare scene whose physics is additive, and we cash that in as a rendering
-          algorithm.
+          a rare scene whose physics makes additive rendering a reasonable model.
         </p>
       </aside>
       <p>
@@ -336,7 +335,7 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
         a trade (a coarser floor, absorbed by softening), not a redesign.
       </p>
       <p>
-        <strong>2. Commutativity is a free lunch.</strong> Additive blending made
+        <strong>2. Commutativity can remove work.</strong> Additive blending made
         depth sorting simply not exist, because <code>a + b = b + a</code> is true in
         every draw order. When you can choose the math your problem runs on, choose
         math with symmetries and cash them in as deleted code.
@@ -355,11 +354,11 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
         one that isn't.
       </p>
       <p>
-        From here the staircase keeps climbing: Morton-order the bodies so
+        From here, the solver could Morton-order the bodies so
         neighbouring threads walk the same octree branches; swap the uniform pyramid
         for an adaptive tree (LBVH) when clustering outruns 128³; add collision
-        impulses and the dome becomes a glass you can pour galaxies into. The solver
-        won't need to change for any of it.
+        impulses and the dome becomes a container for colliding particles. The core
+        solver would not need to change.
       </p>
       <p>
         <strong>Continued in <a href="/part3.html">Part three: Sorting Water</a></strong> —
