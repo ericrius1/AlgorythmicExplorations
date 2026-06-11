@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Infinite Jukebox — Music in a Browser Tab</title>
+    <meta
+      name="description"
+      content="Euclidean rhythm, random-walk melody, voice-led chords — a generative band assembled from the whole series, playing songs no one has heard before and no one will hear again. The finale of Music in a Browser Tab."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <h1>The Infinite Jukebox</h1>
+        <p class="subtitle">
+          Everything this series built, playing itself. Tap the nebula — that's
+          the live spectrum of a song being written right now, for you, once.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Five posts ago, a note was dissected into three numbers. Since then:
+        intervals from colliding harmonic ladders, twelve notes from a number
+        theory accident, scales as lopsided rings, chords as geometry with
+        feelings. One question remains, and it's the one this series has been
+        quietly building toward: is that machinery <em>descriptive</em> — a way of
+        talking about music humans make — or is it <em>generative</em>, a recipe an
+        algorithm can follow? There's an honest way to find out. Build the
+        algorithm and listen.
+      </p>
+      <p>
+        Two parts are still missing from the engine: something to decide
+        <em>when</em> (rhythm) and something to decide <em>what, exactly</em>
+        (melody). Both turn out to be the most algorithm-shaped objects in all of
+        music.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · When</span>Euclid, drummer</h2>
+      <p>
+        Rhythm starts with a grid in time — a bar of sixteen steps, the temporal
+        cousin of part three's twelve-note octave. A drum pattern is a subset of
+        the grid, and the good ones obey a strange rule discovered by accident:
+        take <em>k</em> hits and spread them over <em>n</em> steps <strong>as
+        evenly as possible</strong>. When k divides n the result is a metronome.
+        When it doesn't, the leftover steps must be distributed — and the
+        distribution algorithm is literally Euclid's GCD construction, the oldest
+        algorithm on record, running on remainders of remainders.
+      </p>
+
+      <div data-demo="euclid"></div>
+
+      <p>
+        Set the kick to E(3,16) and you get the <em>tresillo</em> — the
+        Cuban/New Orleans heartbeat, also the spine of a century of pop.
+        E(5,16) is the bossa nova's cousin. Computer scientist Godfried Toussaint
+        catalogued dozens of traditional rhythms worldwide and found an absurd
+        fraction of them are exactly Euclidean: necessity (spread the strokes,
+        keep the pulse) converging on the same arithmetic everywhere. Note what
+        the sliders teach: a rhythm's character is barely about <em>how many</em>
+        hits — it's about how the inevitable unevenness <em>syncopates</em>
+        against the grid your ear infers. Like part four's scales: the lopsidedness
+        is the information.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · An algorithm for neutron timing</span>
+        <p>
+          The connection was found in 2004, when Toussaint noticed that
+          Bjorklund's algorithm — written for spallation neutron source hardware,
+          to space accelerator timing pulses as evenly as possible — generated,
+          rhythm after rhythm, the patterns ethnomusicologists had spent a century
+          transcribing. Particle physics and Afro-Cuban percussion had
+          independently arrived at the same code. (His paper's title is the best
+          abstract ever written: "The Euclidean Algorithm Generates Traditional
+          Musical Rhythms.")
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · What</span>The drunken singer with a homing instinct</h2>
+      <p>
+        Melody looks like the unautomatable part — surely <em>tunes</em> are where
+        the human lives? Mostly, no. Analyze big melody corpora and two boring
+        statistics dominate: motion is overwhelmingly <strong>stepwise</strong>
+        (small moves on the scale, with occasional leaps that then tend to fill
+        back in), and notes on strong beats are overwhelmingly
+        <strong>chord tones</strong>. Small steps, plus gravity. That's a random
+        walk in a force field — so here is one, walking part four's scale over
+        part five's chords:
+      </p>
+
+      <div data-demo="walk"></div>
+
+      <p>
+        The two sliders are the entire aesthetic. Gravity at maximum: every strong
+        beat snaps to the chord and you've built an arpeggiator — pleasant,
+        obedient, dead. Gravity at zero: the walk ignores the harmony and goes
+        free-jazz; interesting for about eight seconds. Smoothness low: leaps
+        everywhere, bebop dice. The musical zone is the middle — enough gravity
+        that the line <em>means</em> something against the chords, enough freedom
+        that it surprises. Randomness isn't the opposite of music; <em>unweighted</em>
+        randomness is.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: dice music, 1787 — and what's actually new</summary>
+        <div class="fold-body">
+          <p>
+            Generative music is older than the United States.
+            <em>Musikalisches Würfelspiel</em> — dice games assembling minuets
+            from precomposed bars, one popular edition attributed to Mozart —
+            sold briskly in the 1780s; Hiller and Isaacson's Illiac Suite (1957)
+            moved the dice into a computer, and Xenakis, Eno, and every ambient
+            generator since refined the idea. The honest framing: the dice were
+            never the composer. The <em>distribution</em> is the composer — the
+            weights, the gravity, the grammar. What this page automates is the
+            performance of taste, not its construction. (Modern neural music
+            models change the vocabulary — they learn the distribution from
+            corpora instead of taking it from a theory series like this one — but
+            not the framing: still a distribution, still sampled.)
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Everything, everywhere, all at once</span>The jukebox</h2>
+      <p>
+        Assemble the whole series. Pick a tonic and a mode (part four). Generate a
+        four-chord progression with a functional grammar — start home, wander,
+        set up a return (part five) — and voice it lazily. Bass on the roots.
+        Euclidean kick, snare on the backbeat, hats by energy (step 1). A
+        gravity-guided walker for the melody (step 2), through a delay because
+        taste is also a parameter. Tune everything in twelve equal steps (part
+        three) so any tonic works; let every simultaneous interval be the
+        handshake physics of part two; synthesize every voice as a recipe of
+        partials, per part one. One seed number decides it all.
+      </p>
+
+      <div data-demo="jukebox"></div>
+
+      <p>
+        Press <em>new song</em> a few times. Each seed is a song nobody has heard
+        before and nobody will hear again — not a recording, a performance; the
+        nebula you're watching is the actual spectrum of the actual audio, low
+        harmonics at the core, cymbals at the rim, the kick drum arriving as a
+        shockwave. Cycle the modes and hear part four's brightness ladder operate
+        on a whole band at once: mixolydian grins, dorian hopes, aeolian rains.
+      </p>
+      <p>
+        And press <em>new song</em> once more, attentively. Some seeds are better
+        than others. You can hear that — instantly, reliably, without being able
+        to say why. The machinery on this page generates competent music forever;
+        what it cannot do is <em>notice</em> which of its songs matters. That
+        noticing — taste, the weighting of the dice — is the part of music theory
+        nobody has written down, because it lives in the listener. The series
+        hands you the engine; you remain the judge.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>The whole series in one breath</h2>
+      <pre><code>a note     = a repetition rate, a size, and a recipe of harmonics     (1)
+an interval = two recipes interleaving; consonance = clean handshakes  (2)
+the grid    = 12 equal steps, because (3/2)¹² ≈ 2⁷, almost             (3)
+a scale     = 7 of 12, lopsided on purpose, so the ear knows home      (4)
+a chord     = 3 of 7; geometry of thirds = feeling; V7 = bowstring     (5)
+a song      = chords in time + Euclid's drums + a walker with gravity  (6)</code></pre>
+      <p>
+        Where to climb next, if you want to keep going: voice leading in four
+        parts and real counterpoint (the lazy-voice search, made contrapuntal);
+        extended and borrowed harmony (ninths, tritone substitutions — the
+        handshake math still explains them); microtonality and adaptive tuning
+        (un-round part three's rounding in real time); or Sethares' road —
+        redesign timbre itself so that brand-new scales become consonant, and
+        build music theory for instruments that have never existed. The grid was
+        always a choice. Now you know whose.
+      </p>
+      <p>
+        <strong>The other series:</strong>
+        <a href="/index.html">Gravity in a Browser Tab</a> builds half a million
+        gravitating bodies from two falling dots, and
+        <a href="/lava.html">Light in a Browser Tab</a> makes light actually
+        bounce. Same philosophy: the universe, one browser tab at a time.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/chords.html">← Part five: Why Minor Sounds Sad</a> ·
+        <a href="/vibration.html">Back to part one: The Anatomy of a Note</a>
+      </p>
+      <p>
+        Sound by <a href="https://tonejs.github.io/">Tone.js</a>. Standing on the
+        shoulders of:
+        <a href="http://cgm.cs.mcgill.ca/~godfried/publications/banff.pdf">Toussaint (2005)</a> ·
+        Hiller &amp; Isaacson (1957) · a dice game from 1787
+      </p>
+    </footer>
+
+    <script type="module" src="/src/jukebox.ts"></script>
+  </body>
+</html>

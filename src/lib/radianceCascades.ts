@@ -70,7 +70,21 @@ export class RadianceCascades {
   private brushGroups: GPUBindGroup[] = [];
   private brushCursor = 0;
 
-  constructor(dev: GPUDevice, width: number, height: number, interval0 = 4) {
+  // temporal accumulation (opt-in): EMA history of cascade 0
+  private texFull: [number, number];
+  private histTex: GPUTexture | null = null;
+  private histView: GPUTextureView | null = null;
+  private tempTex: GPUTexture | null = null;
+  private temporalPipe: GPURenderPipeline | null = null;
+  private temporalGroup: GPUBindGroup | null = null;
+  private temporalBuf: GPUBuffer | null = null;
+
+  /**
+   * @param temporal blend-in rate per frame for an exponential moving average
+   * over cascade 0 (0 = off). ~0.2 kills most GI noise (flickering point
+   * lights, bounce-feedback boiling) at the cost of ~5 frames of light lag.
+   */
+  constructor(dev: GPUDevice, width: number, height: number, interval0 = 4, temporal = 0) {
     this.dev = dev;
     this.width = width;
     this.height = height;
@@ -94,6 +108,7 @@ export class RadianceCascades {
       dev.createTexture({ size: texFull, format: "rgba16float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING }),
       dev.createTexture({ size: texFull, format: "rgba16float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING }),
     ];
+    this.texFull = texFull;
 
     // enough cascades for the top interval to reach past the diagonal
     const diag = Math.hypot(width, height);
@@ -196,6 +211,31 @@ export class RadianceCascades {
       });
     }
 
+    // temporal history: blend cascade 0 into tempTex, copy back to histTex —
+    // the copy keeps histView a stable binding for callers holding `fluence`
+    if (temporal > 0) {
+      this.histTex = dev.createTexture({
+        size: texFull, format: "rgba16float",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.histView = this.histTex.createView();
+      this.tempTex = dev.createTexture({
+        size: texFull, format: "rgba16float",
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+      this.temporalPipe = pipe("fsTemporal", "rgba16float");
+      this.temporalBuf = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      dev.queue.writeBuffer(this.temporalBuf, 0, new Float32Array([temporal, 0, 0, 0]));
+      this.temporalGroup = dev.createBindGroup({
+        layout: this.temporalPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 8, resource: cascViews[0] },
+          { binding: 11, resource: this.histView },
+          { binding: 12, resource: { buffer: this.temporalBuf } },
+        ],
+      });
+    }
+
     this.compositeBuf = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.compositeGroup = dev.createBindGroup({
       layout: this.compositePipe.getBindGroupLayout(0),
@@ -204,7 +244,7 @@ export class RadianceCascades {
         { binding: 2, resource: distView },
         { binding: 4, resource: linSamp },
         { binding: 7, resource: { buffer: this.compositeBuf } },
-        { binding: 8, resource: cascViews[0] },
+        { binding: 8, resource: this.histView ?? cascViews[0] },
       ],
     });
 
@@ -236,11 +276,11 @@ export class RadianceCascades {
     );
   }
 
-  // Last frame's cascade 0 — sample it in a scene shader (4 direction
-  // blocks, bilinear, average) for one-frame-delayed fluence: the cheap
-  // road to multi-bounce light.
+  // Last frame's cascade 0 (the temporal history, when enabled) — sample it
+  // in a scene shader (4 direction blocks, bilinear, average) for one-frame-
+  // delayed fluence: the cheap road to multi-bounce light.
   get fluence(): { view: GPUTextureView; probes: [number, number] } {
-    return { view: this.casc0View, probes: [this.probes0[0], this.probes0[1]] };
+    return { view: this.histView ?? this.casc0View, probes: [this.probes0[0], this.probes0[1]] };
   }
 
   clearScene(enc: GPUCommandEncoder): void {
@@ -305,6 +345,15 @@ export class RadianceCascades {
       pass.draw(3);
       pass.end();
     }
+
+    if (this.temporalPipe && this.tempTex && this.histTex) {
+      pass = target(this.tempTex.createView());
+      pass.setPipeline(this.temporalPipe);
+      pass.setBindGroup(0, this.temporalGroup!);
+      pass.draw(3);
+      pass.end();
+      enc.copyTextureToTexture({ texture: this.tempTex }, { texture: this.histTex }, this.texFull);
+    }
   }
 
   encodeComposite(enc: GPUCommandEncoder, view: GPUTextureView, opts: CompositeOpts = {}): void {
@@ -329,5 +378,8 @@ export class RadianceCascades {
     for (const b of this.brushBufs) b.destroy();
     this.compositeBuf.destroy();
     this.skyBuf.destroy();
+    this.histTex?.destroy();
+    this.tempTex?.destroy();
+    this.temporalBuf?.destroy();
   }
 }

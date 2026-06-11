@@ -70,9 +70,12 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   const viewScaleY = fire ? 1.0 : 0.98;
   const viewScale: [number, number] = [viewScaleY / aspect, viewScaleY];
 
-  // /3 read soft once the canvas upscaled; /2.5 keeps ember edges crisp
-  // without doubling the GI cost (the smoke sim already eats a chunk)
-  const rc = new RadianceCascades(dev, Math.floor(W / 2.5), Math.floor(Hpx / 2.5));
+  // GI runs at /2.5 — light is low-frequency, so the cascades don't need
+  // more. Geometry doesn't pay this price: the display path re-evaluates the
+  // procedural scene per canvas pixel (fsCompositeB). Temporal 0.2: EMA over
+  // cascade 0 smooths ember flicker and bounce-feedback boil — but not for
+  // the bounce room, whose one fast-moving lamp would smear into ghosts.
+  const rc = new RadianceCascades(dev, Math.floor(W / 2.5), Math.floor(Hpx / 2.5), 4, modeNum === 2 ? 0 : 0.2);
 
   // ---- state ---------------------------------------------------------------------
   let count = opts.mode === "sparks" ? 1024 : opts.mode === "room" ? 0 : opts.mode === "hero" ? 380 : 500;
@@ -89,8 +92,21 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
 
   // ---- GPU resources ---------------------------------------------------------------
   const module = dev.createShaderModule({ code: bonfireShader });
+  // two copies of the uniforms: bp drives the GI path (res = scene texture,
+  // raw emission), bp2 the display path (res = canvas, emitBoost dims raw
+  // emission the way the old composite did)
   const bp = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bp2 = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const linSamp = dev.createSampler({ magFilter: "linear", minFilter: "linear" });
+
+  // display path: full-res HDR target — scene re-eval + fluence, then embers
+  // splatted on top, then one tonemap pass to the canvas
+  const hdrTex = dev.createTexture({
+    size: [W, Hpx],
+    format: "rgba16float",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  });
+  const hdrView = hdrTex.createView();
 
   const embers = dev.createBuffer({ size: MAX * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   {
@@ -132,6 +148,18 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     fragment: { module, entryPoint: "fsScene", targets: [{ format: "rgba16float" }] },
     primitive: { topology: "triangle-list" },
   });
+  const compositePipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullB" },
+    fragment: { module, entryPoint: "fsCompositeB", targets: [{ format: "rgba16float" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const tonemapPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullB" },
+    fragment: { module, entryPoint: "fsTonemapB", targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }] },
+    primitive: { topology: "triangle-list" },
+  });
 
   const simGroup = dev.createBindGroup({
     layout: simPipe.getBindGroupLayout(0),
@@ -153,6 +181,28 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       { binding: 0, resource: { buffer: bp } },
       { binding: 2, resource: rc.fluence.view },
       { binding: 3, resource: linSamp },
+    ],
+  });
+  const splatGroup2 = dev.createBindGroup({
+    layout: splatPipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: bp2 } },
+      { binding: 4, resource: { buffer: embers } },
+    ],
+  });
+  const compositeGroup = dev.createBindGroup({
+    layout: compositePipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: bp2 } },
+      { binding: 2, resource: rc.fluence.view },
+      { binding: 3, resource: linSamp },
+    ],
+  });
+  const tonemapGroup = dev.createBindGroup({
+    layout: tonemapPipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 3, resource: linSamp },
+      { binding: 5, resource: hdrView },
     ],
   });
 
@@ -311,8 +361,11 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     f.set([stir[0], stir[1], stirVel[0], stirVel[1]], 12);
     f.set([0.28, 4.0, bounceOn ? bounce : 0, Math.max(0, 1 - timeOfDay * 2.2)], 16); // stirRadius, stirStrength, bounce, night
     f.set([emit2[0], emit2[1], emit2On, glow], 20);
-    f.set([rc.fluence.probes[0], rc.fluence.probes[1], modeNum, 0], 24);
+    f.set([rc.fluence.probes[0], rc.fluence.probes[1], modeNum, 1], 24); // emitBoost 1: rays see raw emission
     dev.queue.writeBuffer(bp, 0, f);
+    f.set([viewScale[0], viewScale[1], W, Hpx]); // display path: canvas res
+    f[27] = 0.7; // emitBoost, matching the old composite
+    dev.queue.writeBuffer(bp2, 0, f);
   };
 
   const writeSky = (): void => {
@@ -381,11 +434,43 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       }
 
       rc.encodeGI(enc);
-      rc.encodeComposite(enc, ctx.getCurrentTexture().createView(), {
-        exposure: 1.5,
-        debugMode,
-        emitBoost: 0.7,
-      });
+
+      if (debugMode > 0) {
+        // debug views show the GI's actual working resolution, upscaled
+        rc.encodeComposite(enc, ctx.getCurrentTexture().createView(), {
+          exposure: 1.5,
+          debugMode,
+          emitBoost: 0.7,
+        });
+      } else {
+        // display path: re-evaluate the scene per canvas pixel + upsampled
+        // fluence, splat embers full-res on top, tonemap to the canvas
+        pass = enc.beginRenderPass({
+          colorAttachments: [{ view: hdrView, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
+        });
+        pass.setPipeline(compositePipe);
+        pass.setBindGroup(0, compositeGroup);
+        pass.draw(3);
+        pass.end();
+
+        if (count > 0) {
+          pass = enc.beginRenderPass({
+            colorAttachments: [{ view: hdrView, loadOp: "load", storeOp: "store" }],
+          });
+          pass.setPipeline(splatPipe);
+          pass.setBindGroup(0, splatGroup2);
+          pass.draw(6, count);
+          pass.end();
+        }
+
+        pass = enc.beginRenderPass({
+          colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
+        });
+        pass.setPipeline(tonemapPipe);
+        pass.setBindGroup(0, tonemapGroup);
+        pass.draw(3);
+        pass.end();
+      }
       dev.queue.submit([enc.finish()]);
     },
     dispose() {
@@ -393,6 +478,8 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       rc.dispose();
       embers.destroy();
       bp.destroy();
+      bp2.destroy();
+      hdrTex.destroy();
     },
   };
 }

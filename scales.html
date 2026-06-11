@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seven of Twelve — Music in a Browser Tab</title>
+    <meta
+      name="description"
+      content="Scales as step patterns, modes as rotations of the same ring, keys as neighbourhoods on the circle of fifths. Interactive: a rotating scale ring with a live drone, and a clickable map of all twelve keys."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <h1>Seven of Twelve</h1>
+        <p class="subtitle">
+          Music won a perfect grid of twelve notes — and immediately refused to
+          use them all at once. The ring above is every melody you know,
+          rotating. Tap for the drone and listen to the modes change colour.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/twelve.html">Part three</a> ended with twelve equal notes per
+        octave — a flat, frictionless grid where every key works identically. A
+        cynic would predict that music, given a perfectly uniform set of notes,
+        would use them uniformly. Instead, nearly every piece of music you have
+        ever heard picks <strong>seven</strong> of the twelve, builds everything
+        from those, and treats the other five as outsiders — spices, accidents,
+        visitors. Why subset at all? And why this strange, lopsided subset?
+      </p>
+      <pre><code>the major scale, as semitone steps:   2 2 1 2 2 2 1   (W W H W W W H)
+
+seven steps, summing to 12 — five whole steps, two halves,
+and the halves are NOT evenly placed</code></pre>
+      <p>
+        The lopsidedness is the answer, not the bug. A melody is a path through a
+        set of notes, and a path needs landmarks. If the notes are evenly spaced —
+        play the whole-tone scale, six equal steps of 2 — every position sounds
+        like every other; the ear loses its place; the music goes weightless
+        (Debussy used exactly this for dream sequences). The two half steps in the
+        major scale break the symmetry. They sit in unique positions, so every note
+        in the scale has a different pattern of neighbours — every note is
+        <em>addressable</em>. The ear always knows where it is, and above all it
+        knows where <strong>home</strong> is.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The ring</span>Scales are step patterns</h2>
+      <p>
+        Stop thinking of a scale as a list of note names — think of it as a
+        <em>shape</em>: a necklace of twelve positions with seven beads. The demo
+        below draws C at the top and lights the major-scale pattern. The arcs
+        between lit beads are the steps: cool blue-green for whole steps, hot
+        orange for the two half steps. Play the scale, then play the riff, and
+        watch the comet pass the orange arcs — those are the moments the melody
+        feels like it's <em>leaning</em> somewhere.
+      </p>
+
+      <div data-demo="ring"></div>
+
+      <p>
+        Now the move that earns this post its title: press <em>rotate the
+        pattern</em>. The beads jump — same necklace, same seven-bead shape,
+        rotated one scale-degree around a root that refuses to move. With the
+        drone holding C, each rotation puts the half steps in new places relative
+        to home, and the whole emotional weather changes. These rotations are the
+        <strong>modes</strong>, and musicians sort them by brightness — by how
+        high the pattern stacks its notes:
+      </p>
+      <pre><code>Lydian      brightest   (the raised 4th — film-score wonder)
+Ionian      the major scale — bright, settled, default
+Mixolydian  major with a slouch — rock, folk, bagpipes
+Dorian      minor but hopeful — "Scarborough Fair", So What
+Aeolian     natural minor — melancholy proper
+Phrygian    dark, Spanish, urgent — that ♭2 right above home
+Locrian     so unstable it can't even hold its home note</code></pre>
+      <p>
+        Try the pattern button, too: pentatonic (five notes, no half steps at all
+        — which is why you can improvise on the black keys with zero training and
+        zero wrong notes), harmonic minor (with its exotic three-semitone leap),
+        and the placeless whole-tone scale.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · 40,000 years of pentatonic</span>
+        <p>
+          The oldest playable instruments we've found — bone flutes from
+          Geissenklösterle and Divje Babe, tens of thousands of years old — appear
+          to sound pentatonic-ish sets, and the five-note scale turns up
+          essentially everywhere humans made music: Chinese guqin repertoire, West
+          African kora, Celtic ballads, Appalachian banjo, the blues. Bobby
+          McFerrin's famous audience demo (look it up — "World Science Festival,
+          pentatonic") shows a crowd of strangers singing the pattern perfectly,
+          unprompted, jumping to notes he never taught. Whether that universality
+          is hardwired or just the easiest gradient to roll down, no one fully
+          knows — but no-half-steps means nothing clashes, and that travels.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: why the diatonic shape, of all shapes?</summary>
+        <div class="fold-body">
+          <p>
+            Of the 66 ways to pick seven notes from twelve (up to rotation), why
+            did this one conquer? It is bizarrely over-engineered. It is the
+            unique 7-of-12 set that is <em>maximally even</em> — the beads spread
+            as uniformly as possible without being uniform. It contains every
+            interval type a different number of times (deep scale property), which
+            is why each mode sounds distinct. Each scale member is reachable from
+            the last by a fifth — the chain F→C→G→D→A→E→B is six fifths, so the
+            scale is a connected segment of part three's spiral. And it's a
+            Goldilocks point: enough asymmetry to give every note an address,
+            enough evenness that melodies move in similar-sized steps. Pick almost
+            any property a scale could want, and the diatonic set is at or near
+            the optimum. It was less invented than discovered.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Transposition</span>Keys, and the map of them</h2>
+      <p>
+        Rotating the pattern against a fixed root gave modes. The other move:
+        keep the pattern's orientation and slide the whole necklace to start
+        somewhere else. Same shape, new home note — that's a <strong>key</strong>.
+        D major is the major-scale pattern with its "C" relabeled "D". Thanks to
+        part three's equal temperament, it sounds <em>identical</em>, just
+        higher — twelve interchangeable homes, which raises a practical question:
+        if you're in one key, how far away is another?
+      </p>
+      <p>
+        The answer is the most famous diagram in music, and part three already
+        drew it for us. Arrange the twelve keys by fifths — each key one fifth up
+        from the last — and neighbours on the circle share <strong>six of their
+        seven notes</strong>. Click around the map below: the rim glows by
+        overlap with your chosen key. One step away (C → G): change one note.
+        Across the circle (C → F♯): almost total strangers, two notes in common.
+      </p>
+
+      <div data-demo="keys"></div>
+
+      <p>
+        This is why the circle of fifths is on the wall of every practice room:
+        it's not a list, it's a <em>distance metric</em>. Songs modulate to
+        neighbouring keys because the listener barely has to move — six sevenths
+        of their mental furniture stays put. A jump across the circle is a scene
+        change, and composers spend it like the expensive effect it is. The key
+        signatures fall out for free: each clockwise step adds one sharp
+        (F C G D A E B, the same chain of fifths), each counter-clockwise step
+        one flat.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The map predates the theory</span>
+        <p>
+          The earliest known circle-of-fifths diagram is from Nikolai Diletsky's
+          <em>Grammatika</em> (1670s), a composition manual for Muscovite church
+          musicians, a generation before Johann David Heinichen printed the
+          version Western theory descends from. Both were practical documents —
+          "which keys can my choir reach without falling apart" — long before
+          anyone proved theorems about maximally even sets. Musicians, as usual,
+          shipped first and theorized later.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>A landscape with gravity</h2>
+      <p>
+        Put the series so far in one stack: physics gave us intervals (part two),
+        arithmetic forced the twelve-note grid (part three), and now a lopsided
+        seven-note pattern has turned the flat grid into a <em>landscape</em> —
+        a place with landmarks, neighbourhoods, and above all a home that every
+        melody is secretly measuring its distance from. Play the riff in the ring
+        demo one more time and end it on the second note instead of the first:
+        feel the itch? That's the landscape exerting force.
+      </p>
+      <p>
+        So far, that force only acts on one note at a time. The next post stacks
+        notes three-deep — chords — and the gravity gets strong enough to power
+        entire songs: why major lifts and minor aches, why one particular chord
+        (the dominant) acts like a drawn bowstring, and why the three-chord trick
+        has outlived every empire that heard it.
+      </p>
+      <p>
+        <strong>Continued in <a href="/chords.html">Part five: Why Minor Sounds Sad</a></strong> —
+        triads, tension, and the pull of the dominant: harmony as motion.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/twelve.html">← Part three: Twelve Beautiful Lies</a> ·
+        <a href="/chords.html">Part five: Why Minor Sounds Sad →</a>
+      </p>
+      <p>
+        Sound by <a href="https://tonejs.github.io/">Tone.js</a>. Standing on the
+        shoulders of: Clough &amp; Douthett (maximal evenness, 1991) · Diletsky
+        (1670s) · every practice-room wall
+      </p>
+    </footer>
+
+    <script type="module" src="/src/scales.ts"></script>
+  </body>
+</html>

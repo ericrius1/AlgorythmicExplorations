@@ -68,6 +68,48 @@ export const POSTS: Post[] = [
     title: "The Bonfire",
     subtitle: "A thousand ember-lights for one price, multi-bounce from a time loop, the sky as the topmost cascade",
   },
+  {
+    href: "/vibration.html",
+    series: "Music in a Browser Tab",
+    part: 1,
+    title: "The Anatomy of a Note",
+    subtitle: "Pitch is a speed, loudness is a size, timbre is a recipe — one string explains all three",
+  },
+  {
+    href: "/harmony.html",
+    series: "Music in a Browser Tab",
+    part: 2,
+    title: "Why Notes Agree",
+    subtitle: "Beats, ratios, and the harmonic handshake — consonance as physics you can hear",
+  },
+  {
+    href: "/twelve.html",
+    series: "Music in a Browser Tab",
+    part: 3,
+    title: "Twelve Beautiful Lies",
+    subtitle: "Stack twelve perfect fifths and miss — the comma, and the compromise that built the piano",
+  },
+  {
+    href: "/scales.html",
+    series: "Music in a Browser Tab",
+    part: 4,
+    title: "Seven of Twelve",
+    subtitle: "Scales as step patterns, modes as rotations, and the circle of fifths as a map of keys",
+  },
+  {
+    href: "/chords.html",
+    series: "Music in a Browser Tab",
+    part: 5,
+    title: "Why Minor Sounds Sad",
+    subtitle: "Triads, tension, and the pull of the dominant — harmony as motion",
+  },
+  {
+    href: "/jukebox.html",
+    series: "Music in a Browser Tab",
+    part: 6,
+    title: "The Infinite Jukebox",
+    subtitle: "Euclidean rhythm, random-walk melody, a song that writes itself — the series becomes a toy",
+  },
 ];
 
 export function currentPost(): { post: Post | null; index: number } {

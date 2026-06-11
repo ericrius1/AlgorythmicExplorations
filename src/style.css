@@ -460,6 +460,77 @@ header.hero .demo-controls {
   padding: 1rem;
 }
 
+/* ---- music series ---- */
+
+.sound-hint {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.4rem;
+  z-index: 5;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(255, 184, 107, 0.45);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.78);
+  color: var(--accent-warm);
+  font: 600 0.72rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.sound-hint.is-hidden {
+  opacity: 0;
+}
+
+.demo-slider-narrow {
+  min-width: 6.5rem;
+}
+
+.piano {
+  position: relative;
+  height: 86px;
+  margin: 0.7rem 0.1rem 0.1rem;
+  user-select: none;
+  touch-action: none;
+}
+
+.piano-key {
+  position: absolute;
+  top: 0;
+  border: 1px solid #2a2e40;
+  border-radius: 0 0 5px 5px;
+  cursor: pointer;
+}
+
+.piano-white {
+  height: 100%;
+  background: linear-gradient(#e8eaf2, #c9cdda);
+  z-index: 1;
+}
+
+.piano-black {
+  height: 60%;
+  background: linear-gradient(#262a3a, #11131c);
+  z-index: 2;
+}
+
+.piano-white:hover {
+  background: #f5f7ff;
+}
+
+.piano-black:hover {
+  background: #343a52;
+}
+
+.piano-key.is-held {
+  background: var(--accent);
+}
+
+.piano-key.is-root {
+  background: var(--accent-warm);
+}
+
 footer {
   border-top: 1px solid var(--border);
   margin-top: 4rem;

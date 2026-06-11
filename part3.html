@@ -152,11 +152,23 @@ starts[c] = counts[0..c-1] summed    // 2. prefix sum     (the interesting bit)
 slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre>
       <p>
         Step 2 — turning per-cell counts into running totals — looks like the one
-        inherently serial part. A running total is a single accumulator marching left
-        to right; how could a thousand threads help? The answer, from Hillis and
-        Steele in 1986: every element adds the value 1 to its left, then 2, then 4,
-        then 8… after log₂ n rounds, every position holds the sum of everything before
-        it. The serial loop becomes a handful of perfectly parallel sweeps.
+        inherently serial part. A running total seems to demand a single accumulator
+        marching left to right: you can't know the total through cell 100 until
+        you've finished cell 99. How could a thousand threads possibly help?
+      </p>
+      <p>
+        The answer, from Hillis and Steele in 1986, works by doubling. The scan runs
+        in rounds, and in each round <em>every</em> cell updates at once. Round one:
+        each cell adds in the value of its immediate left neighbour, so each cell now
+        holds the sum of two cells — itself and the one before. Round two: each cell
+        reaches <em>two</em> positions left and adds that value in. But that value
+        already covers two cells from round one, so every cell now holds the sum of
+        four. Round three reaches back four positions, and each cell covers eight.
+        The reach doubles each round, and so does the stretch of array each cell has
+        absorbed — after log₂ n rounds (ten rounds for a thousand cells), every
+        position holds the sum of everything up to it. Within a round no thread
+        waits on any other; the serial loop becomes a handful of perfectly parallel
+        sweeps.
       </p>
       <p>
         Here is the whole machine — histogram, scan, scatter — under your scroll

@@ -191,6 +191,12 @@ struct CompositeParams {
 @group(0) @binding(7) var<uniform> CP: CompositeParams;
 @group(0) @binding(8) var cascade0Tex: texture_2d<f32>;
 
+fn hashRC(p: vec2f) -> f32 {
+  var q = fract(p * vec2f(123.34, 456.21));
+  q += dot(q, q + 45.32);
+  return fract(q.x * q.y);
+}
+
 @fragment
 fn fsComposite(in: FullOut) -> @location(0) vec4f {
   let texFull = vec2f(textureDimensions(cascade0Tex));
@@ -218,7 +224,26 @@ fn fsComposite(in: FullOut) -> @location(0) vec4f {
   col *= CP.exposure;
   col = col / (1.0 + col);                 // gentle reinhard
   col = pow(col, vec3f(0.4545));           // to gamma
+  // ±half an 8-bit step of dither breaks banding in slow gradients
+  col += (hashRC(in.pos.xy) - 0.5) / 255.0;
   return vec4f(col, 1.0);
+}
+
+// ---- temporal accumulation ---------------------------------------------------------
+// Exponential moving average over cascade 0. The GI's noise — embers winking
+// in and out of rays, the one-frame bounce feedback — is zero-mean frame to
+// frame, so a short history integrates it away almost free.
+
+struct TemporalParams { alpha: f32, _p0: f32, _p1: f32, _p2: f32 }
+@group(0) @binding(11) var histTex: texture_2d<f32>;
+@group(0) @binding(12) var<uniform> TU: TemporalParams;
+
+@fragment
+fn fsTemporal(in: FullOut) -> @location(0) vec4f {
+  let p = vec2i(in.pos.xy);
+  let cur = textureLoad(cascade0Tex, p, 0);
+  let hist = textureLoad(histTex, p, 0);
+  return mix(hist, cur, TU.alpha);
 }
 
 // ---- brush (paint demo): stamp emission / walls / eraser into the scene -----------

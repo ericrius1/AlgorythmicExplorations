@@ -1,0 +1,20 @@
+import "./style.css";
+import { initNav } from "./lib/siteNav";
+import { mountLazy } from "./lib/demoShell";
+import { mountBeats } from "./demos/beats";
+import { mountLissajous } from "./demos/lissajous";
+import { mountComb } from "./demos/comb";
+
+initNav();
+
+const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
+  hero: (el) => mountLissajous(el, { mode: "hero" }),
+  beats: (el) => mountBeats(el),
+  lissajous: (el) => mountLissajous(el),
+  comb: (el) => mountComb(el),
+};
+
+for (const el of document.querySelectorAll<HTMLElement>("[data-demo]")) {
+  const make = mounts[el.dataset.demo!];
+  if (make) mountLazy(el, () => make(el));
+}

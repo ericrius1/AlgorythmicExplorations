@@ -31,7 +31,7 @@ struct BonfireParams {
   glow: f32,
   probes0: vec2f,   // cascade-0 probe grid, for fluence sampling
   mode: f32,
-  _pad: f32,
+  emitBoost: f32,   // how much raw emission the display path adds (GI path: 1)
 }
 
 struct Ember {
@@ -44,6 +44,7 @@ struct Ember {
 @group(0) @binding(2) var fluenceTex: texture_2d<f32>;
 @group(0) @binding(3) var linSamp: sampler;
 @group(0) @binding(4) var<storage, read> embersR: array<Ember>;        // render (vertex can't take read_write)
+@group(0) @binding(5) var hdrTex: texture_2d<f32>;                     // tonemap input (display path)
 
 // ---- noise -------------------------------------------------------------------
 
@@ -178,6 +179,7 @@ struct EmberOut {
   @builtin(position) pos: vec4f,
   @location(0) local: vec2f,
   @location(1) @interpolate(flat) idx: u32,
+  @location(2) @interpolate(flat) bscale: f32,
 }
 
 @vertex
@@ -194,12 +196,22 @@ fn vsEmber(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     fade = 0.35 + 0.65 * smoothstep(0.0, 0.35, clamp(e.aux.x / max(e.aux.y, 1e-3), 0.0, 1.0));
   }
   let jitter = 0.65 + 0.7 * fract(e.aux.w * 5.7);
-  let size = BP.emberSize * (0.55 + 0.45 * e.aux.z) * alive * fade * jitter;
+  var size = BP.emberSize * (0.55 + 0.45 * e.aux.z) * alive * fade * jitter;
+  // never let a splat shrink under ~1.5 target pixels: sub-pixel quads shimmer
+  // as they drift across pixel centers, and GI rays hit-or-miss them per frame.
+  // Clamp the footprint, dim the color by the area ratio to conserve energy.
+  var bscale = 1.0;
+  let minSize = 3.0 / (BP.viewScale.y * BP.res.y); // 1.5 px in world units
+  if (size > 1e-5 && size < minSize) {
+    bscale = (size / minSize) * (size / minSize);
+    size = minSize;
+  }
   let world = e.pv.xy + corners[vi] * size;
   var out: EmberOut;
   out.pos = vec4f(world * BP.viewScale, 0.0, 1.0);
   out.local = corners[vi];
   out.idx = ii;
+  out.bscale = bscale;
   return out;
 }
 
@@ -223,7 +235,7 @@ fn fsEmber(in: EmberOut) -> @location(0) vec4f {
     let fr = length((e.pv.xy - fc) * vec2f(1.3, 0.75)) / max(0.24 * BP.fireScale, 0.02);
     fade *= mix(0.18, 1.0, smoothstep(0.5, 1.3, fr));
   }
-  let col = emberColor(e.aux.z, e.aux.w) * BP.glow * flick * fade;
+  let col = emberColor(e.aux.z, e.aux.w) * BP.glow * flick * fade * in.bscale * BP.emitBoost;
   // cooled embers also stop occluding — an opaque dim ember reads as a
   // dark speck punched into the glow behind it
   var occA = 1.0;
@@ -284,10 +296,18 @@ fn treeDist(world: vec2f, baseX: f32, h: f32, seed: f32) -> f32 {
   return d;
 }
 
-@fragment
-fn fsScene(in: FullOut) -> @location(0) vec4f {
-  let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
-  let world = clip / BP.viewScale;
+// The world, evaluated at any resolution. The GI path calls this at scene-
+// texture resolution (the rays don't need more); the display path calls it
+// again per *canvas* pixel, so silhouettes stay crisp no matter how far the
+// GI is downscaled. `aa` is one pixel in world units — SDF edges resolve to
+// smooth coverage instead of a hard threshold, which is anti-aliasing for free.
+struct SceneEval {
+  emission: vec3f,
+  albedo: vec3f,
+  occ: f32,
+}
+
+fn evalScene(world: vec2f, aa: f32) -> SceneEval {
   var emission = vec3f(0.0);
   var albedo = vec3f(0.0);
   var occ = 0.0;
@@ -296,11 +316,12 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
   if (mode == 0u) {
     // ---- the bonfire ---------------------------------------------------------
     let gy = groundY(world.x);
-    if (world.y < gy) {
-      occ = 1.0;
+    let gcov = smoothstep(aa, -aa, world.y - gy);
+    if (gcov > 0.0) {
+      occ = gcov;
       // mossy soil, a little lighter right at the surface
       let depth = gy - world.y;
-      albedo = mix(vec3f(0.16, 0.15, 0.09), vec3f(0.07, 0.06, 0.045), smoothstep(0.0, 0.25, depth));
+      albedo = mix(vec3f(0.16, 0.15, 0.09), vec3f(0.07, 0.06, 0.045), smoothstep(0.0, 0.25, depth)) * gcov;
     }
     // trees
     let t1 = treeDist(world, -0.62, 0.55, 1.0);
@@ -308,14 +329,16 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
     let t3 = treeDist(world, 1.28, 0.45, 3.0);
     let t4 = treeDist(world, -1.32, 0.62, 4.0);
     let td = min(min(t1, t2), min(t3, t4));
-    if (td < 0.0) {
-      occ = 1.0;
-      albedo = vec3f(0.05, 0.09, 0.04); // dark needles drink most of the light
+    let tcov = smoothstep(aa, -aa, td);
+    if (tcov > 0.0) {
+      occ = max(occ, tcov);
+      albedo = mix(albedo, vec3f(0.05, 0.09, 0.04), tcov); // dark needles drink most of the light
     }
     // the log
-    if (sdCapsule(world, vec2f(-0.12, gy + 0.012), vec2f(0.12, gy + 0.012), 0.024) < 0.0) {
-      occ = 1.0;
-      albedo = vec3f(0.13, 0.07, 0.04);
+    let lcov = smoothstep(aa, -aa, sdCapsule(world, vec2f(-0.12, gy + 0.012), vec2f(0.12, gy + 0.012), 0.024));
+    if (lcov > 0.0) {
+      occ = max(occ, lcov);
+      albedo = mix(albedo, vec3f(0.13, 0.07, 0.04), lcov);
     }
     // the flame: a licking, noise-eroded teardrop above the log
     let fy = groundY(0.0);
@@ -353,36 +376,48 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
     for (var k = 0; k < 3; k++) {
       let x = -0.5 + f32(k) * 0.5;
       let p = world - vec2f(x, -0.1 + 0.15 * f32(k % 2));
-      if (abs(p.x) < 0.05 && abs(p.y) < 0.38) {
-        occ = 1.0;
-        albedo = vec3f(0.22, 0.24, 0.3);
+      let pd = max(abs(p.x) - 0.05, abs(p.y) - 0.38);
+      let pcov = smoothstep(aa, -aa, pd);
+      if (pcov > 0.0) {
+        occ = max(occ, pcov);
+        albedo = mix(albedo, vec3f(0.22, 0.24, 0.3), pcov);
       }
     }
   } else {
     // ---- the bounce room ------------------------------------------------------
     let b = 0.92;
-    if (abs(world.x) > b || abs(world.y) > b) {
-      occ = 1.0;
-      albedo = vec3f(0.4, 0.38, 0.35);              // neutral plaster
-      if (world.x < -b) { albedo = vec3f(0.75, 0.08, 0.1); }  // crimson
-      if (world.x > b) { albedo = vec3f(0.07, 0.6, 0.52); }   // teal
+    let wcov = smoothstep(-aa, aa, max(abs(world.x), abs(world.y)) - b);
+    if (wcov > 0.0) {
+      occ = max(occ, wcov);
+      var wc = vec3f(0.4, 0.38, 0.35);              // neutral plaster
+      if (world.x < -b) { wc = vec3f(0.75, 0.08, 0.1); }  // crimson
+      if (world.x > b) { wc = vec3f(0.07, 0.6, 0.52); }   // teal
+      albedo = mix(albedo, wc, wcov);
     }
     // the lamp: one warm disk that follows the cursor
     let ld = length(world - BP.stir);
-    if (ld < 0.06) {
-      occ = 1.0;
-      albedo = vec3f(0.0);
+    let lampCov = smoothstep(aa, -aa, ld - 0.06);
+    if (lampCov > 0.0) {
+      occ = max(occ, lampCov);
+      albedo = mix(albedo, vec3f(0.0), lampCov);
       emission = vec3f(1.0, 0.82, 0.6) * 6.0 * BP.glow * smoothstep(0.06, 0.02, ld);
     }
   }
 
-  // multi-bounce: surfaces re-emit a slice of the light they received last frame.
-  // A probe buried inside an occluder sees only its own dark interior, so
-  // ground pixels sample the light a whisker above their own surface.
+  return SceneEval(emission, albedo, occ);
+}
+
+// multi-bounce: surfaces re-emit a slice of the light they received last frame.
+// A probe buried inside an occluder sees only its own dark interior, so
+// ground pixels sample the light a whisker above their own surface.
+fn bounceLight(world: vec2f, uv: vec2f, albedo: vec3f, occ: f32) -> vec3f {
+  // surfaces are never *pure* black even unlit — a whisper of base color
+  // keeps silhouettes readable when the bounce is switched off
+  var out = albedo * 0.012;
   if (occ > 0.5 && BP.bounce > 0.0) {
-    var fuv = in.uv;
+    var fuv = uv;
     var depthFade = 1.0;
-    if (mode == 0u && world.y < groundY(world.x)) {
+    if (u32(BP.mode) == 0u && world.y < groundY(world.x)) {
       let surface = vec2f(world.x, groundY(world.x) + 0.03);
       let sclip = surface * BP.viewScale;
       fuv = vec2f(sclip.x * 0.5 + 0.5, 0.5 - sclip.y * 0.5);
@@ -390,11 +425,57 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
       // dirt under the flame glows like a buried searchlight
       depthFade = smoothstep(0.18, 0.0, groundY(world.x) - world.y);
     }
-    emission += albedo * fluenceAt(fuv) * BP.bounce * depthFade;
+    out += albedo * fluenceAt(fuv) * BP.bounce * depthFade;
   }
-  // and surfaces are never *pure* black even unlit — a whisper of base color
-  // keeps silhouettes readable when the bounce is switched off
-  emission += albedo * 0.012;
+  return out;
+}
 
-  return vec4f(emission, occ);
+@fragment
+fn fsScene(in: FullOut) -> @location(0) vec4f {
+  let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
+  let world = clip / BP.viewScale;
+  let aa = 2.0 / (BP.viewScale.y * BP.res.y); // one pixel, world units
+  let s = evalScene(world, aa);
+  let emission = s.emission + bounceLight(world, in.uv, s.albedo, s.occ);
+  return vec4f(emission, s.occ);
+}
+
+// ---- display path -----------------------------------------------------------------
+//
+// The GI runs on a downscaled scene texture (light is low-frequency; the
+// cascades don't care). But upscaling that texture to the canvas blurs
+// *geometry* too. So the display path re-evaluates the procedural scene per
+// canvas pixel — crisp anti-aliased silhouettes — and adds the upsampled
+// cascade-0 fluence on top. Bound with a uniform buffer whose res/emitBoost
+// are the canvas's, not the scene texture's.
+
+@fragment
+fn fsCompositeB(in: FullOut) -> @location(0) vec4f {
+  let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
+  let world = clip / BP.viewScale;
+  let aa = 2.0 / (BP.viewScale.y * BP.res.y);
+  let s = evalScene(world, aa);
+  // air shows the light field itself; solid pixels show their own shading
+  // (albedo × incident light — bounceLight already computes it). Gating by
+  // the full-res occupancy is what keeps silhouettes crisp: raw fluence's
+  // air/interior boundary only exists at probe resolution and would smear
+  // a blurred halo over every edge.
+  let shade = bounceLight(world, in.uv, s.albedo, s.occ);
+  let solid = smoothstep(0.35, 0.65, s.occ);
+  let col = mix(fluenceAt(in.uv), shade * 4.0, solid) + s.emission * BP.emitBoost;
+  return vec4f(col, 1.0);
+}
+
+// embers are splatted into hdrTex additively between fsCompositeB and this,
+// so they ride the same exposure curve instead of clipping against it
+@fragment
+fn fsTonemapB(in: FullOut) -> @location(0) vec4f {
+  var col = textureSampleLevel(hdrTex, linSamp, in.uv, 0.0).rgb;
+  col *= 1.5;                              // exposure, matching the debug path
+  col = col / (1.0 + col);                 // gentle reinhard
+  col = pow(col, vec3f(0.4545));           // to gamma
+  // ±half an 8-bit step of dither: the night sky's slow gradient otherwise
+  // quantizes into visible bands
+  col += (hash21(in.pos.xy) - 0.5) / 255.0;
+  return vec4f(col, 1.0);
 }
