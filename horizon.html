@@ -21,12 +21,10 @@
       <div class="hero-title">
         <h1>The Horizon</h1>
         <p class="subtitle">
-          This flight does not end. There is no far edge of the map under
-          that fog — chunks of world are being built a few milliseconds at a
+          The terrain streams continuously. There is no stored far edge under
+          the fog: chunks are built a few milliseconds at a
           time, just beyond what you can see, and dismantled just behind
-          you. Five articles of functions were the price of this one
-          sentence: the world exists wherever you look, because looking is
-          what causes it.
+          you. The world is generated around the camera as it moves.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -40,28 +38,27 @@
         Every demo in this series so far has had four walls. A patch of
         mountains 16 units wide, a meadow 56 units wide — generous stages,
         but stages. Meanwhile, from the very first article, every design
-        decision has been quietly auditioning for today:
+        decision has supported this final requirement:
         <a href="/heightfield.html">part one</a> insisted the ground be a
         pure function with no stored map;
         <a href="/biomes.html">part five</a> insisted every tree's
         existence depend only on integers it can compute locally. Those
         constraints were never about the demos that carried them. They
-        were about this article, which finally asks: what does it take to
+        support this article's question: what does it take to
         <em>never run out of world</em>?
       </p>
       <p>
         Memory says you can't keep an infinite world; arithmetic says you
         never need to. If everything visible is a function of coordinates,
         then the world doesn't have to be <em>stored</em> — it has to be
-        <em>summoned</em>, just-in-time, in the moving window around the
-        camera. The machinery of summoning has three parts: chunks (what
+        generated just in time in the moving window around the
+        camera. The streaming system has three parts: chunks (what
         to build), levels of detail (how well to build it), and a budget
-        (when to build it). None of the three is glamorous. Together they
-        are the difference between a diorama and a place.
+        (when to build it). Together they allow continuous movement through the terrain.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The ring</span>A world keyed by integers</h2>
+      <h2><span class="kicker">Step 1 · The ring</span>Chunk coordinates</h2>
       <p>
         Carve the plane into square chunks and key each one by the integer
         pair (⌊x/S⌋, ⌊z/S⌋). The rule of existence: a chunk exists if and
@@ -86,7 +83,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Resolution by distance</span>The pyramid of attention</h2>
+      <h2><span class="kicker">Step 2 · Resolution by distance</span>Distance-based LOD</h2>
       <p>
         A chunk three rings out covers the same screen area as a postage
         stamp; building it at full resolution is generosity nobody sees.
@@ -100,16 +97,15 @@
         The price of mixed resolutions is the seam. Where a 48-segment
         chunk meets a 24-segment neighbor, their edges sample the same
         height function at different spacings — and between samples they
-        disagree, leaving pixel-thin cracks of sky. The honorable fix
+        disagree, leaving pixel-thin cracks of sky. The exact fix
         (stitching edge vertices to match the coarser side) is a
         bookkeeping tax on every border of every LOD pair. The pragmatic
         fix, used by engines you've played, is the <strong>skirt</strong>:
         every chunk wears a short curtain of geometry hanging straight
         down from its border. Cracks don't show sky anymore; they show
         skirt, shaded like the terrain above it, and at any distance where
-        LODs differ the eye reads dirt, not deceit. It's a lie with the
-        same defense as the grass normals two articles ago: choose errors
-        that eyes don't audit.
+        LODs differ the eye reads continuous terrain. As with the grass normals
+        two articles ago, the approximation is placed where it is difficult to notice.
       </p>
       <pre><code>ring 0–1: 48² grid    ring 2–3: 24²    ring 4+: 12²    <span class="cm">// all + skirt, all + margin-sampled normals</span></code></pre>
       <details class="fold">
@@ -124,7 +120,7 @@
             The fix costs almost nothing because the height function is
             pure: sample one extra row of heights <em>beyond</em> each
             edge — heights the chunk doesn't own and will never draw — and
-            every border normal becomes honestly two-sided, identical to
+            every border normal becomes two-sided, identical to
             the one its neighbor computes. Purity pays twice: the margin
             row is guaranteed to match the neighbor's interior, no
             communication required.
@@ -133,18 +129,17 @@
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The budget</span>Milliseconds, not chunks</h2>
+      <h2><span class="kicker">Step 3 · The budget</span>The build budget</h2>
       <p>
-        At sixty frames a second the renderer owes a frame every 16.7 ms,
-        and a chunk costs real money: thousands of height samples, normals,
+        At sixty frames a second the renderer has 16.7 ms per frame, and
+        building a chunk requires thousands of height samples, normals,
         a scatter query, sometimes ten thousand grass blades. Build
-        everything the wish list wants and the world hitches every time
+        everything at once and the world hitches every time
         you crest a ridge. The manager's discipline: each frame it builds
         from the front of the distance-sorted queue <em>until a
         millisecond budget runs out</em>, then stops mid-list and yields.
-        Whatever didn't get built stays wanted — next frame, the same
-        sort, another few milliseconds. The flight never waits for the
-        world; the world owes no frame more than its budget.
+        Anything not built remains in the queue for the next frame. Flight
+        continues while construction stays within its allotted time.
       </p>
       <p>
         The same thrift decides what far chunks deserve. Trees exist out
@@ -159,7 +154,7 @@
         heading, up and down for altitude) and pick a direction you like —
         any direction; they're all infinite. Press
         <strong>freeze streaming</strong> and keep flying to do the
-        forbidden thing: catch up with the edge of the world and look over
+        useful test: catch up with the generated edge and inspect
         it. Unfreeze and watch the machinery sweep the gap closed in front
         of you. <strong>LOD tint</strong> paints each new chunk by its
         resolution class so you can see the pyramid of attention follow
@@ -167,7 +162,7 @@
         work.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The rain didn't make it</span>
+          <span class="note-label">Aside · Why erosion is omitted</span>
         <p>
           One passenger from this series is missing.
           <a href="/erosion.html">Part two's erosion</a> is a history —
@@ -175,35 +170,27 @@
           hundred-thousand-droplet history cannot be replayed per chunk
           in a 6 ms budget, nor chopped into chunks that agree at their
           borders (a river is the ultimate neighbor-dependence). So the
-          infinite world fakes maturity the way part one did, with shaping
-          curves, and keeps the honest rain for bounded scenes. This is
-          the standing trade of procedural worlds: <em>functions scale,
-          history convinces</em>, and engineering is choosing which one
-          each feature gets. Big games run erosion offline and ship the
+          infinite world approximates mature terrain with shaping
+          curves, and keeps simulated rain for bounded scenes. This is
+          a recurring tradeoff in procedural worlds: functions scale, while
+          simulated history adds detail. Large games run erosion offline and ship the
           result as data; the no-download browser version chooses scale.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Ground truth, delivered</h2>
+      <h2><span class="kicker">Coda</span>A streamed procedural world</h2>
       <p>
-        Six articles ago this series promised "a world grown from noise,"
-        and it's worth tallying what that world now contains: mountains
-        from hashed gradients, valleys that remember rain, meadows planted
-        in simulated silt, trees that grew by competing for light and
-        publish their perches, biomes that follow a climate, and now no
-        edges at all. Every part of it reproducible from a seed and a
-        coordinate; none of it drawn by hand.
+        The completed system contains mountains from hashed gradients,
+        valleys shaped by simulated erosion, meadows placed from sediment,
+        trees with published perch data, biome placement, and continuous
+        streaming. Every part is reproducible from a seed and a coordinate.
       </p>
       <p>
-        And it is, deliberately, a world built for someone. Next door in
-        <a href="/wren.html">Feather &amp; Bone</a>, a wren has a body and
-        bones and is working on her wings. The two series were always one
-        story told from two sides: hers ends with flight, and flight needs
-        somewhere worth flying. When she's ready — wingbeats, banking
-        turns, a landing flare onto a branch this series measured for her
-        — the final demo of her series will take place over this ground.
-        The world is finished. It's waiting for its bird.
+        The terrain is also used by the final
+        <a href="/wren.html">Feather &amp; Bone</a> demo. That series adds
+        wingbeats, banking turns, and a landing flare onto one of the
+        generated branches.
       </p>
     </main>
 

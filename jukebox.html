@@ -10,7 +10,7 @@
     <title>The Infinite Jukebox — Living Music</title>
     <meta
       name="description"
-      content="Euclidean rhythm, random-walk melody, voice-led chords — a generative band assembled from the whole series, playing songs no one has heard before and no one will hear again. The finale of Living Music."
+      content="A generative band assembled from Euclidean rhythm, random-walk melody, voice-led chords, and the synthesis methods developed across the series."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -32,11 +32,11 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · When</span>Euclid, drummer</h2>
+      <h2><span class="kicker">Step 1 · Rhythm</span>Euclidean patterns</h2>
       <p>
         Rhythm starts with a grid in time — a bar of sixteen steps, the temporal
         cousin of part three's twelve-note octave. A drum pattern is a subset of
-        the grid, and the good ones obey a strange rule discovered by accident:
+        the grid. Many useful patterns follow a simple rule:
         take <em>k</em> hits and spread them over <em>n</em> steps <strong>as
         evenly as possible</strong>. When k divides n the result is a metronome.
         When it doesn't, the leftover steps must be distributed — and the
@@ -51,8 +51,8 @@
         <em>tresillo</em> — the Cuban/New Orleans heartbeat, also the spine of a
         century of pop (on its native eight-step grid it is exactly E(3,8)).
         E(5,16) is the bossa nova's cousin. Computer scientist Godfried Toussaint
-        catalogued dozens of traditional rhythms worldwide and found an absurd
-        fraction of them are exactly Euclidean: necessity (spread the strokes,
+        catalogued dozens of traditional rhythms worldwide and found that many
+        are exactly Euclidean: necessity (spread the strokes,
         keep the pulse) converging on the same arithmetic everywhere. Note what
         the sliders teach: a rhythm's character is barely about <em>how many</em>
         hits — it's about how the inevitable unevenness <em>syncopates</em>
@@ -112,7 +112,7 @@
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Assembly</span>The jukebox</h2>
+      <h2><span class="kicker">Step 3 · Assembly</span>The complete generator</h2>
       <p>
         Assemble the whole series. Pick a tonic and a mode (part four). Generate a
         four-chord progression with a functional grammar — start home, wander,
@@ -142,7 +142,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>The complete system</h2>
+      <h2><span class="kicker">Epilogue</span>How the parts combine</h2>
       <pre><code>a note     = a repetition rate, a size, and a recipe of harmonics     (1)
 an interval = two recipes interleaving; consonance = aligned partials  (2)
 the grid    = 12 equal steps, because (3/2)¹² ≈ 2⁷, almost             (3)
@@ -174,7 +174,7 @@ a song      = chords in time + Euclid's drums + a walker with gravity  (6)</code
 
     <footer>
       <p>
-        <a href="/chords.html">← Part five: Why Minor Sounds Sad</a> ·
+        <a href="/chords.html">← Part five: Major and Minor</a> ·
         <a href="/vibration.html">Back to part one: The Anatomy of a Note</a>
       </p>
       <p>

@@ -1,10 +1,12 @@
-// The wren's song. A bird's voice box is not our larynx — it is the syrinx,
-// at the fork where the windpipe splits into the two lungs, and it has *two*
-// sound sources, one per branch, that can sing independently. That is why a
-// wren can run two melodies at once and trill faster than your ear can
-// resolve. We model it honestly: two oscillators with their own pitch and
-// volume envelopes, fed by a tiny grammar that strings together the gestures
-// real wren song is built from — whistles, sweeps, and machine-gun trills.
+// The eagle's voice. A bird's voice box is not our larynx — it is the
+// syrinx, at the fork where the windpipe splits into the two lungs, and it
+// has *two* sound sources, one per branch, that can sound independently.
+// Even a bird that doesn't sing carries the dual hardware: an eagle's call
+// stacks both voices a few hertz apart, which is where the metallic shimmer
+// in a raptor scream comes from. The grammar below strings together the
+// gestures real bald-eagle calls are built from — the long descending scream,
+// the staccato kik-kik-kik series, the fast chitter — out of the same four
+// primitives the songbirds use.
 //
 // The sound math is borrowed wholesale from the Living Music series; this
 // file only adds the grammar and the two-voice wiring.
@@ -20,49 +22,74 @@ export interface Syllable {
   f1: number; // end frequency (Hz) — for sweeps
   trillRate?: number; // Hz, for trills/buzzes
   voice: 0 | 1; // which half of the syrinx
+  stack?: boolean; // play together with the previous syllable (both voices at once)
 }
 
-// Wren song lives high — 2 to 8 kHz — and sprints. These ranges keep the
-// generated phrases in that brilliant, slightly frantic register.
-const HI = 7200, LO = 2200;
+// Eagle calls sit lower than songbird song — roughly 1 to 3.5 kHz — and move
+// slower: long gestures, deliberate gaps.
+const HI = 3300, LO = 1150;
 const hash = (n: number): number => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 };
 
-// A phrase is a burst of syllables: wrens sing in discrete, repeatable songs
-// a couple of seconds long. The grammar picks a sequence of gestures with
-// wren-ish proportions — lots of trills, quick whistled transitions, the
-// occasional buzz — and hands the two voices alternating or stacked work.
+// A phrase: usually an opening klee or two, then either the scream (a long
+// downward sweep) or a kik series (a slowish trill, each pulse a separate
+// note), with the occasional chitter. Both voices get work — often stacked
+// on the scream, alternating on the series.
 export function generatePhrase(seed: number): Syllable[] {
   const out: Syllable[] = [];
-  const n = 5 + Math.floor(hash(seed) * 7); // 5–11 syllables
   let k = seed * 13.37;
   const rnd = (): number => hash(k++);
-  const pick = (): Gesture => {
-    const r = rnd();
-    if (r < 0.42) return "trill";
-    if (r < 0.66) return "whistle";
-    if (r < 0.82) return "sweep";
-    if (r < 0.92) return "buzz";
-    return "rest";
-  };
-  let lastF = LO + rnd() * (HI - LO);
-  for (let i = 0; i < n; i++) {
-    const g = pick();
-    const voice: 0 | 1 = rnd() < 0.5 ? 0 : 1;
-    const f0 = lastF;
-    let f1 = LO + rnd() * (HI - LO);
-    let dur = 0.08 + rnd() * 0.16;
-    let trillRate: number | undefined;
-    if (g === "trill") { dur = 0.18 + rnd() * 0.4; trillRate = 22 + rnd() * 30; f1 = f0 + (rnd() - 0.5) * 900; }
-    else if (g === "buzz") { dur = 0.1 + rnd() * 0.18; trillRate = 70 + rnd() * 90; f1 = f0; }
-    else if (g === "sweep") { dur = 0.07 + rnd() * 0.12; }
-    else if (g === "whistle") { dur = 0.06 + rnd() * 0.12; f1 = f0; }
-    else { dur = 0.04 + rnd() * 0.08; } // rest
-    out.push({ gesture: g, dur, f0, f1, trillRate, voice });
-    lastF = f1;
+
+  const klee = (): Syllable => ({
+    gesture: "sweep",
+    dur: 0.13 + rnd() * 0.1,
+    f0: 2300 + rnd() * 700,
+    f1: 1900 + rnd() * 400,
+    voice: rnd() < 0.5 ? 0 : 1,
+  });
+  const scream = (): Syllable => ({
+    gesture: "sweep",
+    dur: 0.5 + rnd() * 0.45,
+    f0: 2500 + rnd() * (HI - 2500),
+    f1: LO + 250 + rnd() * 350,
+    voice: rnd() < 0.5 ? 0 : 1,
+  });
+  const kikSeries = (): Syllable => ({
+    gesture: "trill",
+    dur: 0.4 + rnd() * 0.5,
+    f0: 2400 + rnd() * 700,
+    f1: 2100 + rnd() * 500,
+    trillRate: 9 + rnd() * 5,
+    voice: rnd() < 0.5 ? 0 : 1,
+  });
+  const chitter = (): Syllable => ({
+    gesture: "buzz",
+    dur: 0.18 + rnd() * 0.16,
+    f0: 2000 + rnd() * 800,
+    f1: 2000 + rnd() * 800,
+    trillRate: 24 + rnd() * 16,
+    voice: rnd() < 0.5 ? 0 : 1,
+  });
+  const rest = (): Syllable => ({ gesture: "rest", dur: 0.1 + rnd() * 0.18, f0: LO, f1: LO, voice: 0 });
+
+  const opens = 1 + Math.floor(rnd() * 2);
+  for (let i = 0; i < opens; i++) { out.push(klee()); out.push(rest()); }
+  if (rnd() < 0.55) {
+    out.push(scream());
+    // the second voice doubles the scream a few hertz off — the shimmer
+    const double = { ...out[out.length - 1] };
+    double.voice = double.voice === 0 ? 1 : 0;
+    double.f0 *= 1.006;
+    double.f1 *= 1.006;
+    double.stack = true;
+    out.push(double);
+  } else {
+    out.push(kikSeries());
+    if (rnd() < 0.5) { out.push(rest()); out.push(kikSeries()); }
   }
+  if (rnd() < 0.4) { out.push(rest()); out.push(chitter()); }
   return out;
 }
 
@@ -94,9 +121,11 @@ export class Syrinx {
     await this.ensure();
     const t0 = Tone.now() + 0.05;
     let t = t0;
+    let prevDur = 0;
     for (const syl of phrase) {
+      if (syl.stack) t -= prevDur + gap; // ride on top of the previous syllable
       const { osc, amp } = this.voices[syl.voice];
-      if (syl.gesture === "rest") { t += syl.dur; continue; }
+      if (syl.gesture === "rest") { t += syl.dur; prevDur = 0; continue; }
 
       if (syl.trillRate) {
         // trill/buzz: amplitude-modulate the voice on and off fast
@@ -119,6 +148,7 @@ export class Syrinx {
         amp.gain.linearRampToValueAtTime(0.0001, t + syl.dur);
       }
       t += syl.dur + gap;
+      prevDur = syl.dur;
     }
     return t - t0;
   }

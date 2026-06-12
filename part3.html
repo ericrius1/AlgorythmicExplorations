@@ -20,8 +20,8 @@
       <div class="hero-title">
         <h1>Sorting Water</h1>
         <p class="subtitle">
-          Part three: the particles stop attracting and start colliding. A counting trick
-          from census machinery, the GPU's favourite primitive, and a glass of water in
+          Part three: the particles stop attracting and start colliding. Counting sort,
+          parallel prefix sums, and a glass of water in
           your browser tab. Stir it with your cursor.
         </p>
       </div>
@@ -37,7 +37,7 @@
         bodies, every one attracting every other, made tractable by a tree that
         summarized faraway crowds into single points.
         <a href="/part2.html">Part two</a> lifted it into 3D and bent it over a dome.
-        Both fought the same enemy — gravity reaches across the entire universe, so in
+        Both addressed the same constraint: gravity reaches across the entire universe, so in
         principle everything matters to everything.
       </p>
       <p>
@@ -46,7 +46,7 @@
         push on your neighbours, be pushed back, and the sum of tens of thousands of
         tiny shoves becomes pressure, splashes, and waves. Collisions, flocking birds,
         and molecular dynamics all work this way. Forces with a <em>cutoff radius</em>
-        are everywhere in simulation, and they sound like a gift: surely "check a few
+        are everywhere in simulation, and they sound easier: surely "check a few
         neighbours" is easier than "sum the whole universe"?
       </p>
       <p>
@@ -56,7 +56,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The opposite problem</span>Paying n² for nothing</h2>
+      <h2><span class="kicker">Step 1 · The opposite problem</span>Wasted pair checks</h2>
       <p>
         Start with a box of discs under gravity. Two
         discs push apart when they overlap — a stiff spring plus a little damping, the
@@ -89,9 +89,9 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Buckets</span>Cut space into cells</h2>
+      <h2><span class="kicker">Step 2 · Buckets</span>The spatial hash grid</h2>
       <p>
-        The classic answer is almost embarrassingly direct. Lay a uniform grid over
+        The classic answer is direct. Lay a uniform grid over
         the world, with cells exactly one interaction-radius wide, and drop each
         particle into its cell. Any particle close enough to touch me must sit in my
         cell or one of the eight surrounding it — by construction, since a cell is as
@@ -99,7 +99,7 @@
         their occupants, done. For roughly uniform particles that is O(n) total.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Everyone invented this</span>
+        <span class="note-label">Aside · The same idea across fields</span>
         <p>
           Molecular-dynamics people have leaned on this since the field began —
           <em>cell lists</em> and Loup Verlet's <em>neighbour lists</em> date to the
@@ -134,7 +134,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The oldest trick in computing</span>Counting sort and the parallel for-loop</h2>
+      <h2><span class="kicker">Step 3 · Ordering the grid</span>Counting sort and the parallel for-loop</h2>
       <p>
         Notice what we actually need. Not lists — just each cell's particles sitting
         <em>together</em>, plus, for every cell, the index where its group starts.
@@ -174,7 +174,7 @@ slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre
         sweeps.
       </p>
       <p>
-        Here is the whole machine — histogram, scan, scatter — under your scroll
+        Here is the full process — histogram, scan, scatter — under your scroll
         wheel. Take it slowly; the scan rounds are the part worth rewinding:
       </p>
 
@@ -211,8 +211,7 @@ slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre
         universal primitive: radix sort is scans, stream compaction is a scan, memory
         allocation across threads is a scan. The slogan that stuck:
         <strong>scan is the parallel for-loop</strong> — whenever a loop carries a
-        running quantity forward, a scan runs it in logarithmic depth instead. If you
-        learn one parallel algorithm in your life, this is the one.
+        running quantity forward, a scan may be able to run it in logarithmic depth instead.
       </p>
       <details class="fold">
         <summary>Deep dive: the scan as three GPU dispatches</summary>
@@ -227,7 +226,7 @@ slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>Sand, sorted sixty times a second</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The GPU implementation</h2>
       <p>
         Now assemble the machine. Every simulation step, from scratch — because the
         particles never stop moving:
@@ -348,7 +347,7 @@ acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What part three teaches</h2>
+      <h2><span class="kicker">Epilogue</span>Results and tradeoffs</h2>
       <p>
         <strong>1. On a GPU, data structures become orderings.</strong> The CPU's
         per-cell linked lists were unbuildable in parallel; sorting the particles by

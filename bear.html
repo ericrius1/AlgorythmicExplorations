@@ -21,11 +21,11 @@
       <div class="hero-title">
         <h1>The Bear</h1>
         <p class="subtitle">
-          A new series begins with a new kind of protagonist. Not particles, not
-          light — a <em>character</em>. This bear was never sculpted, never
+          A new series builds a procedural character rather than a physical
+          simulation. This bear was never sculpted or
           exported from anything: it is a few hundred triangles, every vertex
           placed by code in your tab a moment ago. Over four articles it will
-          get a skeleton, learn to want things, and perform qi gong.
+          get a skeleton, inverse kinematics, and a procedural qi gong routine.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -36,8 +36,8 @@
 
     <main>
       <p>
-        The previous series on this site simulated <em>stuff</em>: gravity,
-        light, water, sound. This one simulates <em>somebody</em>. The plan, over
+        The previous series on this site simulated gravity, light, water, and sound.
+        This one covers a procedural character pipeline. The plan, over
         four parts, is the full character pipeline — modeling, rigging,
         animation — built from scratch in the browser with
         <a href="https://threejs.org">three.js</a> and TSL, its shading language
@@ -46,19 +46,15 @@
         next without a single stored animation clip.
       </p>
       <p>
-        But every performer must first exist. There are two ancient roads to a
-        creature made of math. One is to describe it as a <em>field</em> — a
-        function that knows how far any point is from the skin — and harvest a
-        surface from it; that road belongs to
-        <a href="/wren.html">the wren</a>, in this site's bird series. The bear
-        takes the other road, the one video games walked for thirty years
-        because it was the only one that ran: put the triangles down
-        <em>yourself</em>. Every vertex a deliberate act. A character not
-        sculpted but <em>carpentered</em>.
+        There are two common procedural modeling approaches. One describes the
+        creature as a <em>field</em>: a function that returns the distance from
+        any point to the surface, which is the approach used for
+        <a href="/wren.html">the wren</a>. The bear instead places and connects
+        triangles directly.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The parts</span>A bear kit, in tubes</h2>
+      <h2><span class="kicker">Step 1 · The parts</span>A body from tapered tubes</h2>
       <p>
         Look at any stylized animal — a Pixar bear, a Ghibli forest spirit, a
         PS1 mascot — and squint. The body resolves into sausages: a fat one
@@ -71,7 +67,7 @@
         So the bear's single source of truth is a table of twenty-one rows:
         name, parent, head point, tail point, radius at each end. The rows
         chain into nine <em>tubes</em> — torso through head, two arms, two
-        legs, muzzle, two ears, one diplomatic tail. Drag the slider and the
+        legs, muzzle, two ears, and a tail. Drag the slider and the
         kit comes apart.
       </p>
       <div data-demo="parts"></div>
@@ -85,7 +81,7 @@
         split matters later; today everything is just geometry. Notice what the
         kit is <em>not</em>: it is not welded into one blob. The arm tube ends
         inside the shoulder; the ears sink into the skull. Low-poly characters
-        have always been honest overlaps wearing a confident silhouette.
+        are overlapping low-poly forms arranged to produce a clear silhouette.
       </p>
       <aside class="note">
         <span class="note-label">Aside · A budget measured in triangles</span>
@@ -102,7 +98,7 @@
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The skin</span>Rings, stitched</h2>
+      <h2><span class="kicker">Step 2 · Mesh construction</span>Stitching vertex rings</h2>
       <p>
         A mesh, to the GPU, is two flat lists. A <em>vertex buffer</em>: rows
         of floats, one row per vertex — position now, normals and colors and
@@ -119,15 +115,14 @@
         pair contributes N quads, every quad two triangles, wound
         counter-clockwise as seen from outside so their faces point out. The
         open ends get two shrinking rings and a final apex vertex — a
-        hemisphere for the price of a fan. Tube, capped. Repeat nine times,
-        offset the indices, concatenate: bear.
+        hemisphere from a triangle fan. Repeating this for all nine tubes,
+        then offsetting and concatenating their indices, produces the mesh.
       </p>
       <div data-demo="loft"></div>
       <p>
-        The two sliders are the entire polygon economy. Sides per ring is the
-        budget knob: at three the bear is a Cubist accident, at six it is a
-        crystal totem from some lower-polygon afterlife, around ten it relaxes
-        into the animal on the box. Ring density buys smoother bends along the
+        The two sliders control the polygon budget. Sides per ring determines
+        the cross-section resolution; around ten gives the intended shape.
+        Ring density produces smoother bends along the
         limbs — and almost nothing along the straight stretches, which is why
         modelers spend rings at the joints and starve them elsewhere.
       </p>
@@ -142,7 +137,7 @@
             <em>parallel transport</em>: choose a frame once, at the first
             station, then carry it forward, rotating it only by the minimal
             rotation that takes each tangent to the next. No reference axis, no
-            snap, no twist — the frame simply <em>remembers</em> where it was.
+            snap, no twist; each frame derives from the previous one.
             Hanson and Ma published it as a curve-framing technique in 1995;
             every tube modeler since has quietly depended on it.
           </p>
@@ -150,12 +145,10 @@
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The shape</span>Modeling is moving vertices</h2>
+      <h2><span class="kicker">Step 3 · The shape</span>Shaping the mesh</h2>
       <p>
-        A stack of perfect rings is a pipe organ, not a bear. Character lives
-        in the deviations, and in a mesh every deviation is the same move:
-        <em>take a vertex you already own and put it somewhere better</em>.
-        Three deviations turn these pipes into an animal. The skull: where the
+        Perfect rings alone produce a generic tube model. Three local shape
+        adjustments give it the intended anatomy. The skull: where the
         neck's thin rings meet the head bone's fat ones, one extra ring slips
         in early at full radius, so the head reads as a mass instead of a
         cone. The paws: the same trick at the wrists, where the radius jumps
@@ -173,18 +166,18 @@
         vertices are deliberately <em>un</em>-shared: each triangle gets
         private copies of its three corners, normals computed per face, and
         the facets light up flat and crisp. It triples the vertex buffer to
-        keep a style. Flat shading is not a material setting; it is a
-        topology opinion.
+        keep the style. Flat shading therefore depends on topology, not only
+        on the material.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The fur</span>Dressing the bear in TSL</h2>
+      <h2><span class="kicker">Step 4 · The fur</span>TSL fur shading</h2>
       <p>
-        The mesh arrives naked and needs a material. This series writes its
+        The mesh then needs a material. This series writes its
         shaders in TSL — three.js's node-based shading language, where shader
         code is composed as JavaScript expressions and compiled to WGSL for
         WebGPU (or GLSL, if a browser must). The bear's coat is built from
-        whatever the geometry already knows:
+        existing geometry attributes:
       </p>
       <pre><code>const base  = vertexColor();                      <span class="cm">// zone color, stamped at build time</span>
 const grain = mx_noise_float(positionGeometry.mul(scale))  <span class="cm">// rest-pose noise: fur glued to the skin</span>
@@ -196,36 +189,36 @@ material.sheenNode = base.mul(0.5);               <span class="cm">// fuzzy back
         muzzle, belly, paws, ears — and that zone id is baked down to a vertex
         color, so switching the whole animal from cinnamon to panda is one
         buffer rewrite, no re-loft. (The first draft sent the zone <em>index</em>
-        to the shader and looked the color up there — and learned why you
-        don't: the GPU interpolates attributes across each triangle, and an
+        to the shader and looked the color up there, which fails because the
+        GPU interpolates attributes across each triangle and an
         interpolated index sweeps through every palette slot in between,
         drawing rainbow stripes along every border. Indices don't interpolate;
         colors do.) The noise is sampled in <em>rest-pose</em> coordinates
         (<code>positionGeometry</code>), which matters in two articles: when the
         bear bends, the grain must bend with the skin, not swim through it.
-        The glossy eyes and nose are confessed cheats — three little spheres
-        parked on the head, because lofting rings fine enough to grow eyeballs
-        is the wrong kind of heroism.
+        The glossy eyes and nose are separate spheres
+        attached to the head, because resolving them in the lofted mesh would
+        require unnecessary ring density.
       </p>
       <div data-demo="final"></div>
       <p>
         A sheen lobe and a faint fresnel rim do most of the "fur" here —
-        honest strand rendering would be its own article. What matters for this
+        strand rendering would be its own article. What matters for this
         series is on the inside: this is now a triangle mesh with positions,
         face normals, and a zone id per vertex, sitting in GPU buffers. It
         just doesn't <em>do</em> anything yet.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The bear is a statue</h2>
+      <h2><span class="kicker">Coda</span>Preparing the rig</h2>
       <p>
-        A statue with a secret, though: the bone table that lofted it is
+        The model already contains the basis of its rig: the bone table that lofted it is
         also, row for row, a <em>skeleton</em> — heads, tails, parents, a
         hierarchy. Asking "which bone's tube is this vertex from?" is a
         distance query, and the same query, softened, can answer "this vertex
         is 80% forearm, 20% upper arm" — and that sentence, made precise, is
         called <em>skinning</em>. Next time: the bear gets joints, the joints
-        get a hierarchy, and the mesh learns to follow them on the GPU, four
+        get a hierarchy, and the GPU deforms the mesh from them using four
         matrix multiplies per vertex, in the same TSL vertex stage that today
         merely stands still.
       </p>

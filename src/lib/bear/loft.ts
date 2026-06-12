@@ -239,7 +239,7 @@ export function buildParts(options: LoftOptions = {}): PartGeometry[] {
     1 + opts.belly * 0.45 * Math.max(0, dz) ** 1.4 * bump((y - 0.84) / 0.46);
 
   const specs: TubeSpec[] = [
-    { name: "torso", bones: ["hips", "spine", "chest", "neck", "head"], shape: belly, shapeZone: 1, capStart: 0.65 },
+    { name: "torso", bones: ["hips", "spine", "chest", "neck", "head"], shape: belly, shapeZone: 1, capStart: 0.85 },
     { name: "tail", bones: ["tail"], capStart: 0.4 },
     { name: "muzzle", bones: ["muzzle"], capStart: 0.4 },
     { name: "earL", bones: ["earL"], capStart: 0.5 },

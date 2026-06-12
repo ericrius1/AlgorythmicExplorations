@@ -10,7 +10,7 @@
     <title>The Anatomy of a Note — Living Music</title>
     <meta
       name="description"
-      content="Pitch is a speed, loudness is a size, timbre is a recipe. An interactive dissection of a single musical note — with live oscillators, a pluckable string, and additive synthesis you can mix by hand."
+      content="An interactive explanation of pitch, loudness, and timbre using live oscillators, a pluckable string, and additive synthesis."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,8 +18,8 @@
     <main>
       <h1>The Anatomy of a Note</h1>
       <p>
-        This series is about music theory — but it refuses to start where the
-        textbooks start, with staff lines and Italian vocabulary. Music theory is
+        This series approaches music theory through acoustics rather than
+        starting with staff lines and Italian vocabulary. Music theory is
         downstream of physics. Scales, chords, and keys all trace back in part to
         vibrating objects and the ear that evolved to hear them. So we will start
         with sound itself and introduce theory from there.
@@ -32,7 +32,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Pitch is a speed</span>The note under the microscope</h2>
+      <h2><span class="kicker">Step 1 · Pitch is a rate</span>Frequency and pitch</h2>
       <p>
         A sound is a pressure ripple in air. A <em>musical</em> sound — a note — is a
         ripple that <strong>repeats</strong>. Something pushed the air, and pushed it
@@ -69,7 +69,7 @@
           Mersenne) connected vibration counts to perceived pitch. Mersenne measured
           frequency with no electronics at all: he used ropes tens of meters long,
           slow enough to count the swings by eye, then scaled up by the laws he'd
-          found. The numbers in this article are all descendants of that trick.
+          found. The numbers in this article all follow from that method.
         </p>
       </aside>
       <p>
@@ -83,7 +83,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · One string, all of it</span>Pluck</h2>
+      <h2><span class="kicker">Step 2 · One string</span>String vibration</h2>
       <p>
         Now for the machine that makes notes — the oldest one we have. A stretched
         string, fixed at both ends, obeys a single rule: every point accelerates
@@ -149,7 +149,7 @@ for (let i = 1; i &lt; N - 1; i++) {
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Timbre is a recipe</span>The harmonic series</h2>
+      <h2><span class="kicker">Step 3 · Timbre and spectrum</span>The harmonic series</h2>
       <p>
         Here is the claim those bars were making, stated plainly. A string can't
         choose between its standing waves — it does <strong>all of them at
@@ -184,7 +184,7 @@ for (let i = 1; i &lt; N - 1; i++) {
         <summary>Deep dive: the missing fundamental — pitch is an inference</summary>
         <div class="fold-body">
           <p>
-            Strange and important: if you play partials at 220, 330, and 440 Hz with
+            An important detail: if you play partials at 220, 330, and 440 Hz with
             <em>no</em> 110 Hz component at all, you still hear a 110 Hz note. The
             ear notices the spacing of the ladder and reports the rung that
             <em>should</em> be there. This is called the missing fundamental, and
@@ -215,7 +215,7 @@ for (let i = 1; i &lt; N - 1; i++) {
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>Three properties of a note</h2>
+      <h2><span class="kicker">Epilogue</span>Pitch, loudness, and timbre</h2>
       <p>
         Dissection complete. A note is a repeating pressure wave, and your ear cares
         about exactly three things in it:
@@ -232,7 +232,7 @@ spectrum   → timbre   (the recipe of harmonics riding on the fundamental)</cod
         examines which pairs sound consonant and why.
       </p>
       <p>
-        <strong>Continued in <a href="/harmony.html">Part two: Why Notes Agree</a></strong> —
+        <strong>Continued in <a href="/harmony.html">Part two: Consonance and Roughness</a></strong> —
         beats, whole-number ratios, and harmonic alignment: consonance as
         physics you can hear and see.
       </p>
@@ -240,7 +240,7 @@ spectrum   → timbre   (the recipe of harmonics riding on the fundamental)</cod
 
     <footer>
       <p>
-        <a href="/harmony.html">Part two: Why Notes Agree →</a>
+        <a href="/harmony.html">Part two: Consonance and Roughness →</a>
       </p>
       <p>
         Sound by <a href="https://tonejs.github.io/">Tone.js</a>; figures are WebGPU

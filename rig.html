@@ -21,10 +21,10 @@
       <div class="hero-title">
         <h1>The Skeleton</h1>
         <p class="subtitle">
-          Part one carpentered a statue. This article installs the machinery
+          Part one built a static mesh. This article adds the machinery
           under the fur: eighteen joints, read out of the same table of bones
-          that lofted the mesh, and every vertex taught which of them to
-          follow. The ghost above is waving because a few sine waves are
+          that lofted the mesh, and every vertex assigned which of them to
+          follow. The translucent view above is waving because a few sine waves are
           turning a few joints — the twelve hundred vertices of his arm were
           never told anything at all.
         </p>
@@ -37,12 +37,11 @@
 
     <main>
       <p>
-        <a href="/bear.html">Part one</a> ended on a secret: the table of bones
+        <a href="/bear.html">Part one</a> ended with a useful property: the table of bones
         that placed every ring of the bear's skin is also, row for row, a
         <em>skeleton</em>. Each row has a head, a tail, a parent — that is not
-        a modeling convenience, it is an anatomy. This article spends the
-        secret. The plan has two halves, and they are the two halves of every
-        character rig ever shipped: first make the bones move <em>each
+        a modeling convenience; it is also a skeleton. The plan has two halves, shared by
+        every character rig ever shipped: first make the bones move <em>each
         other</em> (rotate a shoulder and the forearm, paw, and claws must all
         come along), then make the skin move with the bones — without tearing
         the mesh apart at the joints.
@@ -56,7 +55,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The hierarchy</span>Bones that move bones</h2>
+      <h2><span class="kicker">Step 1 · The hierarchy</span>Parent-child transforms</h2>
       <p>
         Of the twenty-one rows in the bone table, eighteen carry
         <code>deform: true</code>, and each becomes a <strong>joint</strong>: a
@@ -109,7 +108,7 @@ for (let i = 0; i &lt; joints.length; i++) {
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The weights</span>A weighted vote</h2>
+      <h2><span class="kicker">Step 2 · The weights</span>Proximity-based weights</h2>
       <p>
         Half one done: bones move bones. But the skin is one welded mesh, not
         nine separate tubes — when the forearm joint turns, which of the 5,000
@@ -145,7 +144,7 @@ for (let i = 0; i &lt; joints.length; i++) {
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The blend</span>The matrix that undoes birth</h2>
+      <h2><span class="kicker">Step 3 · The blend</span>Correcting for the rest pose</h2>
       <p>
         There is a trap between the weights and the motion. A joint's world
         matrix maps <em>joint-local</em> points into the world — but the
@@ -206,11 +205,11 @@ skin[i] = world[i] · inverse(restWorld[i])</code></pre>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The vertex stage</span>Four multiplies, sixty times a second</h2>
+      <h2><span class="kicker">Step 4 · The vertex stage</span>Skinning in the vertex shader</h2>
       <p>
         Now the accounting. Where does the blend <em>run</em>? Doing it on the
         CPU means rewriting every vertex position every frame and re-uploading
-        the buffer — exactly the traffic part one was proud to avoid. So the
+        the buffer — exactly the traffic part one was designed to avoid. So the
         blend runs where the vertices already live. The weights and indices
         are baked into the geometry once, as two <code>vec4</code> attributes
         per vertex; the eighteen skin matrices ride in as a uniform array; and
@@ -238,36 +237,33 @@ material.normalNode   = transformNormalToView(blend(vec4(normalGeometry, 0)).xyz
         exactly proportional to what each is good at. (three.js ships a
         <code>SkinnedMesh</code> that does all of this for you — the
         <a href="/bones.html">wren next door</a> uses it. The bear writes the
-        four multiplies out by hand because seeing them <em>is</em> this
-        article.) The glossy eyes and nose, too proud to be skinned, are
+        four multiplies out by hand to make the operation visible.) The glossy
+        eyes and nose do not need skinning, so they are
         simply parented to the head joint's world matrix — three little
         spheres doing forward kinematics the easy way.
       </p>
       <p>
         Everything is now wired: table to joints, joints to matrices, matrices
         to skin. The demo below drives the whole stack with eleven sine
-        waves — hips counter the spine, arms swing opposite, the tail keeps
-        its own time. No keyframes, no clips, nothing recorded; it is not yet
-        <em>animation</em>, but it is unmistakably a bear dancing, and every
-        bit of it is the machinery of this article being fed clock signals.
+        waves — hips counter the spine, arms swing opposite, and the tail uses
+        a separate phase. No keyframes or recorded clips are involved; the
+        motion is generated entirely from the rig and those clock signals.
       </p>
       <div data-demo="dance"></div>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>A machine pointed the wrong way</h2>
+      <h2><span class="kicker">Coda</span>Next: inverse kinematics</h2>
       <p>
-        A confession, before the next part. Forward kinematics is a wonderful
-        machine pointed the wrong way. It answers, flawlessly and instantly,
-        a question nobody on a film set has ever asked: "if the shoulder
+        Forward kinematics solves only one direction of the problem. It efficiently
+        answers: "if the shoulder
         turns 40 degrees and the elbow 60, where does the paw end up?"
         Direction runs opposite. <em>Touch that mark. Look at the firefly.
         Put the paw on the orb.</em> The place is given; the angles are the
         problem. Running this article's machine backwards — angles from
         places — is called <em>inverse kinematics</em>, it is harder in
-        honest and interesting ways, and for a two-bone limb it is solved by
-        a triangle you met in school. Next time the bear stops being dialed
-        and starts being <em>asked</em> — and begins, at last, to want
-        things.
+        meaningful ways, and for a two-bone limb it is solved by
+        a triangle you met in school. The next article replaces manually chosen
+        angles with target positions.
       </p>
     </main>
 

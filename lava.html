@@ -21,9 +21,9 @@
         <h1>The Lava Lamp</h1>
         <p class="subtitle">
           A new series begins with a lava lamp. The wax above is a fluid simulation
-          that tracks its own temperature; the glow is real
-          two-dimensional light transport, bouncing off things. Stir it with your
-          cursor. Then wait — waiting is the whole point of a lava lamp.
+          that tracks its own temperature; the glow comes from
+          two-dimensional light transport. Stir it with your cursor and watch
+          the heat-driven cycle develop.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -35,10 +35,10 @@
     <main>
       <p>
         The <a href="/part1.html">previous series</a> spent six parts simulating
-        matter: gravity, sand, water, dust, the cosmic web, and finally a toy fluid.
+        matter: gravity, sand, water, dust, the cosmic web, and an interactive fluid effect.
         In all that time, light was never once simulated. Every pixel you saw was a
-        particle stating its own color — additively blended, artfully graded, but
-        <em>self-reported</em>. No particle ever lit another. The galaxy's core, half
+        particle carrying its own color, with additive blending and color grading.
+        No particle ever lit another. The galaxy's core, half
         a million suns deep, cast no glow on the arms around it.
       </p>
       <p>
@@ -53,7 +53,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · One scalar per particle</span>Wax that knows how hot it is</h2>
+      <h2><span class="kicker">Step 1 · One scalar per particle</span>Temperature-driven wax</h2>
       <p>
         The fluid is the same smoothed-particle hydrodynamics that
         <a href="/part3.html">part three of the gravity series</a> built for water:
@@ -99,7 +99,7 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// and the unsimulated wat
         Watch the cycle develop: heat pools along the floor until a patch of wax
         expands enough to pinch off and rise. It cools on the way up until gravity
         overcomes the buoyancy term and the blob turns around. No line of code says "make
-        blobs circulate." The loop emerges from four numbers you can drag: heat in,
+        blobs circulate." The loop emerges from four adjustable values: heat in,
         lift per degree, swelling per degree, heat out.
       </p>
 
@@ -107,8 +107,8 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// and the unsimulated wat
       <h2><span class="kicker">Step 2 · Particles become a surface</span>Metaballs, and a temperature-lit skin</h2>
       <p>
         Particles are how the wax <em>moves</em>; they are a terrible way for wax to
-        <em>look</em>. Wax is continuous, and the eye knows it. The fix is the oldest
-        trick in implicit surfaces: every particle splats a smooth radial bump into a
+        <em>look</em>. Wax is continuous, while particles are discrete. A standard
+        implicit-surface method splats a smooth radial bump from every particle into a
         coarse field texture, the bumps sum, and a threshold of that sum defines
         "inside." Two particles drifting together merge into one rounded mass before
         they touch — which is precisely the surface-tension look that real wax has
@@ -124,7 +124,7 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// and the unsimulated wat
       </aside>
       <p>
         The same splat carries temperature along as a second channel, so the surface
-        pass knows the local mean temperature everywhere — and that number decides
+        pass stores the local mean temperature everywhere, and that number determines
         what the wax <em>is</em>, optically:
       </p>
       <pre><code>emission = palette(T) · luminance(T)   <span class="cm">// cold: near-black plum … hot: amber-white, and bright</span>
@@ -135,7 +135,7 @@ occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax bloc
         different moments of its life, which is why a lava lamp cannot be faked with
         a glow sprite — the scene's lights move, split in two, and cast
         shadows on each other. We now need what no part of any series so far has
-        needed: actual light transport.
+        needed: simulated light transport.
       </p>
 
       <!-- ================================================================ -->
@@ -144,9 +144,7 @@ occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax bloc
         The problem, stated plainly: for every pixel of the canvas we want the light
         arriving from every direction — with shadows, in real time. The brute-force
         answer marches a few hundred rays from every pixel, every frame. That is the
-        n² of light transport, and this series opens exactly the way the last one
-        did: with a cost that looks impossible until a structural observation
-        collapses it.
+        n² problem of light transport. A structural observation reduces the cost.
       </p>
       <p>
         The observation is now called the <strong>penumbra condition</strong>: the
@@ -173,7 +171,7 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         A pixel's final light is assembled top-down: each cascade's rays that hit
         nothing inherit the radiance of the matching directions one level up,
         interpolated between the four surrounding coarser probes. The hierarchy meets
-        in cascade 0, which knows, for every 2×2 block of pixels, the light arriving
+        in cascade 0, which stores, for every 2×2 block of pixels, the light arriving
         from everywhere on the canvas — noiselessly, because nothing was ever sampled
         at random. The whole stack costs about as much as 30 rays per pixel; the
         equivalent brute force would be thousands.
@@ -197,7 +195,7 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
             built in logarithmic time by the <em>jump flood</em> algorithm (Rong
             &amp; Tan, 2006): every pixel repeatedly asks neighbours at halving
             offsets "what's the nearest seed <em>you</em> know about?" Nine
-            ping-pong passes and a 450×280 canvas knows its distance to everything.
+            ping-pong passes, while a 450×280 canvas stores distances to all geometry.
             The halving-offset cascade is the same doubling rhythm as part three's
             scan and part five's FFT.
           </p>
@@ -245,13 +243,12 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         is part one's hierarchy, for photons.
       </p>
       <p>
-        What's genuinely new is the direction of travel. Matter simulation asks
+        The main change is the direction of the query. Matter simulation asks
         <em>where do things go?</em> Light transport asks <em>what do things see?</em>
         — and it turns out to compress the same way, hierarchically, by being
-        principled about what you can afford not to know. Next in this series: the
-        glow leaves the lamp. Same cascades, harder rooms — moving occluders in
-        number, colored bounce, and the question of what happens when the light
-        source is the thing your hands are stirring.
+        explicit about what can be approximated. The next article applies the same
+        cascades to a larger scene with many moving emitters, colored bounce, and
+        hand interaction.
       </p>
     </main>
 

@@ -1,26 +1,32 @@
-// The four figures of Feather & Bone part 3: a draggable wingtip with the
-// two-bone solver underneath, the one-slider unfold from sleeping silhouette
-// to full span, the wingbeat cycle with its knobs out and the tip drawing
-// its own diagram, and the whole bird flapping with tail and body joining in.
+// The figures of Feather & Bone part 3: a draggable wingtip with the
+// two-bone solver underneath (feathers following live), the one-slider
+// unfold from folded silhouette to full span, the wingbeat cycle with its
+// knobs out and the tip drawing its own diagram, and the whole eagle
+// flapping with tail, body, and feather slots joining in.
 
 import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../lib/demoShell";
 import { createStage3D, addGroundDisc, type Stage3D } from "../lib/stage3d";
-import { buildBirdMesh, addFace } from "../lib/bird/build";
-import { createSkinnedWren, attachRider, SkeletonViz } from "../lib/bird/rig";
+import { buildEagleBody } from "../lib/bird/body";
+import { createSkinnedBird, bakeSkin, SkeletonViz } from "../lib/bird/rig";
+import { FeatherCoat, COAT_POSE_REST, type CoatPose } from "../lib/bird/feathers";
+import { createEagle } from "../lib/bird/bird";
 import {
   WINGS,
   applyWingTip,
   unfoldTarget,
   applyFlap,
+  coatPoseFromFlap,
   setTail,
+  wingReach,
   FLAP_DEFAULTS,
+  freshFlapSample,
   type FlapSample,
   type WingSolveResult,
 } from "../lib/bird/wing";
-import { WREN_STAGE } from "./birdModel";
+import { EAGLE_STAGE } from "./birdModel";
 
-const WING_STAGE = { ...WREN_STAGE, distance: 2.1, target: [0, 0.45, 0] as [number, number, number] };
+const WING_STAGE = { ...EAGLE_STAGE, distance: 2.9, target: [0, 0.5, 0] as [number, number, number] };
 
 function ghostMaterial(opacity = 0.3): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
@@ -33,11 +39,16 @@ function ghostMaterial(opacity = 0.3): THREE.MeshStandardMaterial {
   });
 }
 
-function solidMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+// a skinned ghost body + live feather coat — the part-3 workbench bird
+function makeBench(opacity?: number): { mesh: THREE.SkinnedMesh; rig: ReturnType<typeof createSkinnedBird>["rig"]; coat: FeatherCoat; coatPose: CoatPose } {
+  const built = buildEagleBody();
+  bakeSkin(built.geometry, built.components);
+  const { mesh, rig } = createSkinnedBird(built.geometry, opacity === undefined ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide }) : ghostMaterial(opacity));
+  const coat = new FeatherCoat();
+  return { mesh, rig, coat, coatPose: { ...COAT_POSE_REST } };
 }
 
-// shared orb-dragging: returns cleanup-free helper, orbit pauses while held
+// shared orb-dragging: orbit pauses while held
 function draggable(stage: Stage3D, shell: Shell, orb: THREE.Mesh, onMove?: () => void): void {
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -92,26 +103,25 @@ function draggable(stage: Stage3D, shell: Shell, orb: THREE.Mesh, onMove?: () =>
 export async function mountWingIK(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
   const stage = await createStage3D(shell.canvas, WING_STAGE);
-  addGroundDisc(stage.scene, { radius: 1.4, shadowRadius: 0.3 });
+  addGroundDisc(stage.scene, { radius: 1.7, shadowRadius: 0.35 });
 
-  const built = buildBirdMesh({ res: 56, skin: true });
-  const { mesh, rig } = createSkinnedWren(built.geometry, ghostMaterial());
-  stage.scene.add(mesh);
+  const { mesh, rig, coat, coatPose } = makeBench(0.3);
+  stage.scene.add(mesh, coat.group);
   const viz = new SkeletonViz();
   stage.scene.add(viz.group);
 
   const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.035, 16, 12),
+    new THREE.SphereGeometry(0.05, 16, 12),
     new THREE.MeshStandardMaterial({ color: 0xffc163, emissive: 0xa86a18, roughness: 0.4 }),
   );
-  orb.position.set(0.42, 0.62, 0.06);
+  orb.position.set(0.75, 0.7, 0.05);
   stage.scene.add(orb);
   draggable(stage, shell, orb);
 
   // joint beads so the article can point at "shoulder, elbow, wrist"
   const beadMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0, depthTest: false });
   const beads = [0, 1].map(() => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 8), beadMat);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), beadMat);
     m.renderOrder = 12;
     stage.scene.add(m);
     return m;
@@ -135,6 +145,14 @@ export async function mountWingIK(container: HTMLElement): Promise<Demo> {
       clamped = solve.clamped;
       beads[0].position.copy(solve.elbow);
       beads[1].position.copy(solve.wrist);
+
+      // feathers follow: fan opens with how far out the tip actually is
+      const spread = Math.min(1, Math.abs(orb.position.x - WINGS.L.shoulder.x) / (wingReach(WINGS.L) * 0.8));
+      coatPose.spread = spread;
+      coatPose.tailSpread = 0.25;
+      rig.root.updateWorldMatrix(true, true);
+      coat.update(rig.bones, coatPose);
+
       viz.update(rig);
       stage.render();
       shell.tick();
@@ -148,19 +166,14 @@ export async function mountWingIK(container: HTMLElement): Promise<Demo> {
 export async function mountUnfold(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
   const stage = await createStage3D(shell.canvas, WING_STAGE);
-  addGroundDisc(stage.scene, { radius: 1.4, shadowRadius: 0.3 });
+  addGroundDisc(stage.scene, { radius: 1.7, shadowRadius: 0.35 });
 
-  const built = buildBirdMesh({ res: 64, skin: true });
-  const solid = solidMaterial();
-  const { mesh, rig } = createSkinnedWren(built.geometry, solid);
-  stage.scene.add(mesh);
+  const eagle = createEagle();
+  stage.scene.add(eagle.group);
   const viz = new SkeletonViz();
   viz.group.visible = false;
   stage.scene.add(viz.group);
-
-  const face = new THREE.Group();
-  addFace(face); // children at rest-pose world positions; attachRider re-bases the group
-  attachRider(rig, "head", face);
+  const solid = eagle.mesh.material as THREE.MeshStandardMaterial;
 
   let f = 0;
   const tL = new THREE.Vector3();
@@ -179,13 +192,12 @@ export async function mountUnfold(container: HTMLElement): Promise<Demo> {
     solid.depthWrite = !viz.group.visible;
     solid.needsUpdate = true;
   });
-  shell.setInfo(() => `span ${span().toFixed(2)} body-units · the same three segments, redistributed`);
+  shell.setInfo(() => `span ${span().toFixed(2)} m — the same three segments, redistributed, and ${eagle.coat.featherCount} feathers fanning to fill them`);
 
   return {
     frame() {
-      applyWingTip(rig, WINGS.L, unfoldTarget(WINGS.L, f, tL), { twist: 0.1 * f });
-      applyWingTip(rig, WINGS.R, unfoldTarget(WINGS.R, f, tR), { twist: 0.1 * f });
-      if (viz.group.visible) viz.update(rig);
+      eagle.pose({ phase: 0, spread: f, flap: 0, tailFan: 0.2 + f * 0.4, beak: 0, theta: 0 });
+      if (viz.group.visible) viz.update(eagle.rig);
       stage.render();
       shell.tick();
     },
@@ -197,12 +209,11 @@ export async function mountUnfold(container: HTMLElement): Promise<Demo> {
 
 export async function mountFlapCycle(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const stage = await createStage3D(shell.canvas, { ...WING_STAGE, azimuth: 1.2 });
-  addGroundDisc(stage.scene, { radius: 1.4, shadowRadius: 0.3 });
+  const stage = await createStage3D(shell.canvas, { ...WING_STAGE, azimuth: 1.2, distance: 3.1 });
+  addGroundDisc(stage.scene, { radius: 1.7, shadowRadius: 0.35 });
 
-  const built = buildBirdMesh({ res: 56, skin: true });
-  const { mesh, rig } = createSkinnedWren(built.geometry, solidMaterial());
-  stage.scene.add(mesh);
+  const { mesh, rig, coat, coatPose } = makeBench();
+  stage.scene.add(mesh, coat.group);
 
   const fp = { ...FLAP_DEFAULTS };
   let slow = false;
@@ -219,15 +230,16 @@ export async function mountFlapCycle(container: HTMLElement): Promise<Demo> {
   stage.scene.add(trail);
   let trailHead = 0;
 
-  shell.slider({ label: "beats / s", min: 0.5, max: 9, step: 0.1, value: fp.rate, onInput: (v) => (fp.rate = v) });
-  shell.slider({ label: "amplitude", min: 0.05, max: 0.26, step: 0.005, value: fp.amp, onInput: (v) => (fp.amp = v) });
+  shell.slider({ label: "beats / s", min: 0.4, max: 6, step: 0.1, value: fp.rate, onInput: (v) => (fp.rate = v) });
+  shell.slider({ label: "amplitude", min: 0.08, max: 0.45, step: 0.005, value: fp.amp, onInput: (v) => (fp.amp = v) });
   shell.slider({ label: "downstroke %", min: 0.35, max: 0.75, step: 0.01, value: fp.downFrac, onInput: (v) => (fp.downFrac = v) });
   shell.slider({ label: "wrist fold", min: 0, max: 1, step: 0.01, value: fp.foldUp, onInput: (v) => (fp.foldUp = v) });
   shell.slider({ label: "twist", min: 0, max: 0.7, step: 0.01, value: fp.twistAmp, onInput: (v) => (fp.twistAmp = v) });
+  shell.slider({ label: "feather lag", min: 0, max: 0.5, step: 0.01, value: fp.lagAmp, onInput: (v) => (fp.lagAmp = v) });
   shell.button("slow motion", () => (slow = !slow));
 
-  let sample: FlapSample = { tip: new THREE.Vector3(), twist: 0, theta: 0, down: true };
-  shell.setInfo(() => `${slow ? "0.15× · " : ""}${sample.down ? "downstroke — the working half" : "upstroke — folded, feathered, cheap"}`);
+  let sample: FlapSample = freshFlapSample();
+  shell.setInfo(() => `${slow ? "0.15× · " : ""}${sample.down ? "downstroke — sealed, splayed, paying the bills" : "upstroke — folded, slotted open, cheap"}`);
 
   return {
     frame() {
@@ -236,13 +248,15 @@ export async function mountFlapCycle(container: HTMLElement): Promise<Demo> {
       last = t;
       phase = (phase + dt * fp.rate * (slow ? 0.15 : 1)) % 1;
       sample = applyFlap(rig, phase, fp);
-      setTail(rig, 0.25, -6 + 5 * Math.cos(sample.theta), 0);
+      setTail(rig, -6 + 5 * Math.cos(sample.theta), 0);
+      coatPoseFromFlap(sample, 0.96, 0.3, 1, coatPose);
+      rig.root.updateWorldMatrix(true, true);
+      coat.update(rig.bones, coatPose);
 
       trailPos[trailHead * 3] = sample.tip.x;
       trailPos[trailHead * 3 + 1] = sample.tip.y;
       trailPos[trailHead * 3 + 2] = sample.tip.z;
       trailHead = (trailHead + 1) % TRAIL;
-      // draw oldest→newest so the line doesn't jump the seam
       trailGeo.setDrawRange(0, TRAIL);
       trailGeo.attributes.position.needsUpdate = true;
 
@@ -257,29 +271,23 @@ export async function mountFlapCycle(container: HTMLElement): Promise<Demo> {
 
 export async function mountFlapAll(container: HTMLElement, opts: { hero?: boolean } = {}): Promise<Demo> {
   const shell = new Shell(container, opts.hero ? 0.5 : 0.62);
-  const stage = await createStage3D(shell.canvas, { ...WING_STAGE, distance: opts.hero ? 1.9 : 2.1 });
-  addGroundDisc(stage.scene, { radius: 1.4, shadowRadius: 0.3 });
+  const stage = await createStage3D(shell.canvas, { ...WING_STAGE, distance: opts.hero ? 2.7 : 2.9 });
+  addGroundDisc(stage.scene, { radius: 1.7, shadowRadius: 0.35 });
 
-  const built = buildBirdMesh({ res: opts.hero ? 64 : 56, skin: true });
-  const { mesh, rig } = createSkinnedWren(built.geometry, solidMaterial());
-  stage.scene.add(mesh);
-
-  const face = new THREE.Group();
-  addFace(face); // children at rest-pose world positions; attachRider re-bases the group
-  attachRider(rig, "head", face);
+  const eagle = createEagle();
+  stage.scene.add(eagle.group);
 
   const fp = { ...FLAP_DEFAULTS };
-  let tailSpread = 0.45;
-  let speed = opts.hero ? 0.45 : 1;
+  let tailFan = 0.45;
+  let speed = opts.hero ? 0.5 : 1;
   let phase = 0;
   let last = performance.now() / 1000;
-  const bodyRest = rig.bone("body").position.clone();
 
   if (!opts.hero) {
-    shell.slider({ label: "beats / s", min: 0.5, max: 9, step: 0.1, value: fp.rate, onInput: (v) => (fp.rate = v) });
-    shell.slider({ label: "tail fan", min: 0, max: 1, step: 0.01, value: tailSpread, onInput: (v) => (tailSpread = v) });
+    shell.slider({ label: "beats / s", min: 0.4, max: 6, step: 0.1, value: fp.rate, onInput: (v) => (fp.rate = v) });
+    shell.slider({ label: "tail fan", min: 0, max: 1, step: 0.01, value: tailFan, onInput: (v) => (tailFan = v) });
     shell.slider({ label: "time ×", min: 0.1, max: 1, step: 0.05, value: 1, onInput: (v) => (speed = v) });
-    shell.setInfo(() => "wings, tail, body, head — one phase drives all of it");
+    shell.setInfo(() => "wings, slots, splay, tail, body, head — one phase drives all of it");
   }
 
   return {
@@ -288,19 +296,7 @@ export async function mountFlapAll(container: HTMLElement, opts: { hero?: boolea
       const dt = Math.min(t - last, 0.05);
       last = t;
       phase = (phase + dt * fp.rate * speed) % 1;
-      const s = applyFlap(rig, phase, fp);
-
-      // the body rides the reaction: pushed up through the downstroke, sagging
-      // through the recovery — and the head counter-pitches to hold its gaze
-      // steady, because a bird's head is a camera gimbal with feathers
-      const heave = -Math.cos(s.theta) * 0.012;
-      const bodyPitch = Math.sin(s.theta) * 0.05;
-      const body = rig.bone("body");
-      body.position.set(bodyRest.x, bodyRest.y + heave, bodyRest.z);
-      body.rotation.set(bodyPitch, 0, 0);
-      rig.bone("head").rotation.set(-bodyPitch * 1.6, 0, 0);
-      setTail(rig, tailSpread, -8 + 7 * Math.cos(s.theta), 0);
-
+      eagle.pose({ phase, spread: 1, flap: 1, tailFan, beak: 0, fp });
       stage.render();
       if (!opts.hero) shell.tick();
     },

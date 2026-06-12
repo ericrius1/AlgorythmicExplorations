@@ -10,7 +10,7 @@
     <title>The Reach — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Inverse kinematics from first principles: the law of cosines solves a two-bone arm in closed form, a pole vector picks the elbow, one clamped rotation is all a gaze ever is, and FABRIK handles chains of any length. The bear learns to want things."
+      content="Inverse kinematics from first principles: a closed-form two-bone solve, pole vectors, clamped gaze rotation, and FABRIK for longer chains."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -37,15 +37,14 @@
 
     <main>
       <p>
-        Part two ended with a confession: forward kinematics is a wonderful
-        machine pointed the wrong way. Give it joint angles and it produces
+        Part two ended with forward kinematics: give it joint angles and it produces
         world positions — one matrix pass, parents first, no ambiguity, no
         failure. But nobody directing a character thinks in shoulder
         quaternions. Direction happens in the world: <em>put the paw on the
         orb. Look at the firefly.</em> The animator names the destination; the
         angles are the machine's problem. Computing angles from places is
         <em>inverse kinematics</em>, and it is harder than the forward kind for
-        an honest reason: running a function backwards inherits none of its
+        a structural reason: running a function backwards inherits none of its
         guarantees.
       </p>
       <p>
@@ -58,7 +57,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · One triangle</span>The law of cosines, employed</h2>
+      <h2><span class="kicker">Step 1 · One triangle</span>Solving two-bone reach</h2>
       <p>
         Strip the arm to its skeleton: an upper bone of length
         <code>L1</code> (shoulder to elbow), a lower bone of length
@@ -66,7 +65,7 @@
         <code>d</code> from the shoulder. The shoulder, the elbow, and the
         wrist-on-target form a triangle with side lengths <code>L1</code>,
         <code>L2</code>, <code>d</code> — and a triangle with three known sides
-        has no secrets. The law of cosines, the one from school, hands over the
+        is fully determined. The law of cosines gives the
         angle at the shoulder directly:
       </p>
       <pre><code>// angle at the shoulder between "toward the target" and the upper bone
@@ -104,7 +103,7 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The circle of elbows</span>A pole vector picks the plane</h2>
+      <h2><span class="kicker">Step 2 · The elbow plane</span>Using a pole vector</h2>
       <p>
         The triangle fixes the elbow's <em>angle</em> but not its
         <em>position</em>: the whole triangle is free to spin around the
@@ -154,7 +153,7 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The gaze</span>All "look at" ever is</h2>
+      <h2><span class="kicker">Step 3 · The gaze</span>Clamped gaze rotation</h2>
       <p>
         The bear's eyes never leave the firefly, and that behavior costs almost
         nothing: aiming a joint is <em>one</em> shortest-arc rotation — from
@@ -175,9 +174,9 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Longer chains</span>Reach and re-root</h2>
+      <h2><span class="kicker">Step 4 · Longer chains</span>Re-rooting the chain</h2>
       <p>
-        The law of cosines is a two-bone trick — a triangle has three sides,
+        The law of cosines solves two-bone chains because a triangle has three sides,
         no more. Tails, spines, tentacles, and anything with more joints than
         an arm need a different idea, and the prettiest one in the toolbox is
         <strong>FABRIK</strong> — <em>Forward And Backward Reaching Inverse
@@ -202,7 +201,7 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
         Note what FABRIK trades away: the two-bone solver's directness and the
         pole vector's precise taste. Iterative reachers go where the iteration
         happens to settle, which is why this series uses the triangle for the
-        bear's arms — wants are precise — and keeps FABRIK in the drawer for
+        bear's arms, where targets are precise, and reserves FABRIK for
         floppier anatomy.
       </p>
       <aside class="note">
@@ -223,16 +222,16 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Wanting, on demand</h2>
+      <h2><span class="kicker">Coda</span>Targets instead of angles</h2>
       <p>
         Take stock of the bear's vocabulary. Part one: a body. Part two: joints
-        under the skin, and dials that bend it. This article: <em>wants</em> —
+        under the skin, and dials that bend it. This article adds targets:
         put the paw there, look at that — compiled into the same dials by a
         triangle, a tiebreaker, and a clamp. What is still missing is
         <em>composition</em>: a whole-body shape held with intent, and a way to
         move from one such shape to the next so the journey looks like
         practice rather than interpolation. Next time the dials get a memory:
-        poses as targets, springs as blends — and the bear finally begins its
+        poses as targets and springs as blends, producing the bear's
         qi gong form.
       </p>
     </main>

@@ -10,7 +10,7 @@
     <title>The Grass — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A hundred thousand instanced grass blades, planted where simulated rain left soil and bent by a wind that lives entirely in the vertex shader — the terrain series grows its first skin."
+      content="A hundred thousand instanced grass blades, placed from simulated sediment and bent by procedural wind in the vertex shader."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -21,11 +21,10 @@
       <div class="hero-title">
         <h1>The Grass</h1>
         <p class="subtitle">
-          Three hundred thousand blades, and not one of them is being managed.
-          The CPU planted the meadow once and walked away; every gust you see
+          Three hundred thousand blades are drawn as instances.
+          The CPU builds the meadow once; every gust you see
           is the GPU bending seven vertices at a time, a hundred million times
-          a second. The mountains were geology — this is the first thing that
-          looks alive.
+          a second.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -40,9 +39,7 @@
         mountains out of noise, <a href="/erosion.html">part two</a> rained
         on them until they had drainage and soil. Both articles end with the
         same kind of object — a landscape you look <em>at</em>. This one
-        starts making a world you could be <em>in</em>, and the difference
-        is mostly grass. Bare terrain reads as a model; ground cover reads
-        as a place. The problem is that "ground cover" means a number with
+        adds dense ground cover. The problem is that "ground cover" means a number with
         five zeros, and that number forces every decision in this article.
       </p>
       <p>
@@ -58,7 +55,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The blade</span>Seven vertices, honestly spent</h2>
+      <h2><span class="kicker">Step 1 · The blade</span>Seven vertices per blade</h2>
       <p>
         A believable blade of grass is a tapered ribbon with a curve. The
         curve matters more than the count: grass is a cantilever, anchored
@@ -84,11 +81,11 @@ y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip d
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Planting</span>The ledger pays out</h2>
+      <h2><span class="kicker">Step 2 · Planting</span>Placement from sediment</h2>
       <p>
         Where does grass go? Part two left us the answer in writing. The
-        erosion simulation kept a ledger — at every cell, how much material
-        the rain removed or deposited — and that ledger is a soil map.
+        erosion simulation recorded how much material was removed or deposited
+        at every cell, producing a soil map.
         Deposition zones are exactly the flat, wet, silt-rich valley floors
         where real meadows happen. So the planter walks candidate points
         (hashed positions, same determinism as everything else in this
@@ -133,9 +130,9 @@ y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip d
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Wind</span>A storm in the vertex shader</h2>
+      <h2><span class="kicker">Step 3 · Wind</span>Procedural wind</h2>
       <p>
-        Now the part that makes it alive. Simulating wind honestly —
+        Next is wind. Simulating airflow in detail
         pressure fields, turbulence, blade-on-blade collision — is absurd
         for scenery. What eyes actually verify is much weaker:
         <em>coherence</em>. Gusts should be patches, not pixels; they
@@ -161,9 +158,9 @@ sway = (gust · 0.5 + 0.62) · strength · t² · flex   <span class="cm">// nev
         <div class="fold-body">
           <p>
             A real blade's normal points sideways, perpendicular to the
-            ribbon. Light a hundred thousand ribbons honestly and the
+            ribbon. Light a hundred thousand ribbons geometrically and the
             meadow turns into glitter — every blade a razor flashing as it
-            moves. The standard cheat: lie about the normals. Every vertex
+            moves. A standard approximation keeps the normals fixed. Every vertex
             here claims its normal points nearly straight up, with a slight
             sideways tilt for variety, so the lighting model sees not a
             ribbon but a fuzzy green carpet that happens to have blade
@@ -185,7 +182,7 @@ sway = (gust · 0.5 + 0.62) · strength · t² · flex   <span class="cm">// nev
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Taller things</h2>
+      <h2><span class="kicker">Coda</span>Next: trees</h2>
       <p>
         The meadow proves out the pipeline that the rest of the series
         lives on: <em>decide at build time, bake into vertices, animate in

@@ -10,7 +10,7 @@
     <title>Two Falling Dots — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="An interactive journey from two falling dots to a GPU-resident Barnes-Hut simulation of hundreds of thousands of gravitating bodies — with live, modifiable demos at every step."
+      content="An interactive guide to building a GPU-resident Barnes-Hut simulation, from two falling dots to hundreds of thousands of gravitating bodies."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -41,16 +41,16 @@
       <p>
         Naïvely, three hundred thousand mutually attracting bodies means three hundred
         thousand <em>squared</em> force calculations per step — ninety billion. We will
-        do it in a browser tab, on whatever machine you are holding.
+        do it in a browser tab on a typical WebGPU-capable machine.
       </p>
       <p>
-        There is no single trick. Each section fixes a specific limitation in the
+        There is no single optimization that gets us there. Each section fixes a specific limitation in the
         previous approach, with a live demo you can poke, drag, and break. By the end,
         every part of the galaxy up top will have a clear job.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · One force</span>Gravity, by hand</h2>
+      <h2><span class="kicker">Step 1 · One force</span>Direct gravity integration</h2>
       <p>
         Every optimization in this article exists to evaluate one formula faster.
         Here it is — the only physics we will ever need:
@@ -117,7 +117,7 @@ a_i += G * mass[j] * d / (|d|² + ε²)^(3/2)</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Everyone pulls on everyone</span>The quadratic wall</h2>
+      <h2><span class="kicker">Step 2 · Everyone pulls on everyone</span>Pairwise complexity</h2>
       <p>
         A real star cluster has no fixed central star. Every body pulls on every other
         body — the disk holds itself together with its own gravity. And for three or
@@ -237,7 +237,7 @@ for (var t = 0u; t &lt; numTiles; t++) {
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Approximation</span>Distant things blur</h2>
+      <h2><span class="kicker">Step 4 · Approximation</span>Grouping distant particles</h2>
       <p>
         Stand outside on a clear night. Roughly a hundred billion stars in the
         Andromeda galaxy are pulling on you — and your body feels them as <em>one</em>
@@ -292,7 +292,7 @@ if (cellWidth² &lt; θ² × distance²) {
         <p>
           The Barnes–Hut paper in <em>Nature</em> combined two existing ideas: the
           quadtree, invented by Finkel and Bentley in 1974 for database queries, and
-          the oldest trick in celestial mechanics — treating a distant cluster as a
+          a standard approximation from celestial mechanics — treating a distant cluster as a
           point at its centre of mass.
         </p>
         <p>
@@ -311,7 +311,7 @@ if (cellWidth² &lt; θ² × distance²) {
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · The wrong residence</span>A tree the GPU can't build</h2>
+      <h2><span class="kicker">Step 5 · CPU bottleneck</span>Building the tree on the CPU</h2>
       <p>
         The textbook Barnes–Hut tree is built by inserting bodies <em>one at a
         time</em>: find the body's leaf; if it's occupied, split it and push the old
@@ -382,7 +382,7 @@ atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))
         mipmap chain.
       </p>
       <details class="fold">
-        <summary>Deep dive: fixed-point atomics — three tricks in three lines</summary>
+        <summary>Deep dive: fixed-point atomics — three techniques in three lines</summary>
         <div class="fold-body">
           <p>
             WGSL has no atomic <em>float</em> add, so the scatter uses fixed-point
@@ -391,12 +391,12 @@ atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))
             overflow 32 bits.
           </p>
           <p>
-            Second trick: the offsets are stored relative to each cell's centre. They
+            Second, the offsets are stored relative to each cell's centre. They
             are bounded by half a cell width, so every fixed-point bit goes to
             precision instead of range.
           </p>
           <p>
-            Third: negative values ride through unsigned atomics via two's-complement
+            Third, negative values pass through unsigned atomics via two's-complement
             bit patterns — u32 wrap-around addition <em>is</em> signed addition. After
             the reduce, each cell's centre of mass is recovered as
             COM = Σm·dx / Σm.
@@ -429,7 +429,7 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         <div class="fold-body">
           <p>
             The bounds pass needs an atomic min/max over floats, which WGSL also
-            doesn't have. The trick: map each float to an unsigned integer whose
+            doesn't have. The solution is to map each float to an unsigned integer whose
             ordering matches the float's. For positive floats the IEEE-754 bit pattern
             already sorts correctly; for negative floats you flip all the bits. After
             the reduction, the same mapping run backwards recovers the float bounds.
@@ -438,7 +438,7 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         </div>
       </details>
       <p>
-        Here is the result. The same θ slider you dragged on a 3,000-body toy now
+        Here is the result. The same θ slider you used in the 3,000-body demo now
         governs hundreds of thousands of bodies. Steps-per-frame multiplies simulation
         speed independent of your display's refresh rate.
       </p>
@@ -449,7 +449,7 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         On a recent laptop GPU this sustains three hundred thousand bodies at
         interactive rates — tens of millions of body-steps per second — where the
         nested loop from Step 2 would need <em>minutes per frame</em>. Same physics,
-        same softening, same θ you can verify against the toy demos. The speedup
+        same softening, same θ you can verify against the smaller demos. The speedup
         comes from several independent changes:
       </p>
       <pre><code>two loops in JS          ~4,000 bodies        (Step 2)
@@ -482,9 +482,9 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         you're hitting before you buy hardware at it.
       </p>
       <p>
-        <strong>2. Approximation is a resource.</strong> θ converts imperceptible
-        accuracy into very perceptible speed. Most systems have a θ hiding somewhere —
-        find the precision nobody can see, and spend it.
+        <strong>2. Approximation is a resource.</strong> θ trades a controlled amount
+        of accuracy for a substantial speed increase. Many systems have a similar
+        tolerance; the useful question is how much precision the result actually needs.
       </p>
       <p>
         <strong>3. Data structures choose your hardware.</strong> The pointer quadtree

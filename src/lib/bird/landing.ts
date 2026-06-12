@@ -31,14 +31,16 @@ export interface LandingTuning {
   cruiseSpeedMul: number;
 }
 
+// Distances sized for an eagle arriving near 13 m/s — everything roughly 2.5×
+// the songbird numbers this controller was first tuned on.
 export const LANDING_TUNING: LandingTuning = {
-  approachDist: 11,
+  approachDist: 30,
   // the flare capture radius must exceed the bird's minimum turn radius, or
   // she orbits the perch forever without ever getting close enough to flare
-  flareDist: 4.5,
-  grabDist: 0.7,
+  flareDist: 13,
+  grabDist: 1.6,
   glideSlope: 0.2,
-  bankGain: 2.2,
+  bankGain: 1.7,
   cruiseSpeedMul: 1.0,
 };
 
@@ -147,7 +149,7 @@ export class LandingController {
       stepFlight(s, this.params, dt, 3);
 
       // home: pull the velocity toward the perch and brake it, hard near the end
-      const want = toTarget.clone().setLength(Math.max(0.6, this.speed * (1 - flareAmt)));
+      const want = toTarget.clone().setLength(Math.max(1.2, this.speed * (1 - flareAmt)));
       s.vel.lerp(want, Math.min(1, dt * (3 + 9 * flareAmt)));
       s.pos.addScaledVector(toTarget.normalize(), Math.min(dist, this.speed * dt * flareAmt));
       return;

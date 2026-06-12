@@ -20,10 +20,9 @@
       <div class="hero-title">
         <h1>The Wingbeat</h1>
         <p class="subtitle">
-          Two articles of patience and the wing finally opens. One triangle
+          The folded wing now opens. One triangle
           identity does the unfolding, one warped clock does the beating, and
-          the wren above is doing both right now — slowly, so you can watch
-          the machinery think. Drag to orbit her.
+          the wren above is doing both slowly enough to inspect. Drag to orbit her.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -49,9 +48,9 @@
         "given these rotations, where does the wingtip end up?" we say
         "the wingtip should be <strong>there</strong> — derive the rotations."
         For a limb of two main segments the answer isn't even iterative; it
-        falls straight out of a triangle identity you met in school. With it,
+        follows directly from the law of cosines. With it,
         the entire wingbeat — the unfold, the stroke, the recovery — becomes
-        one moving target and a solver that never gets tired of catching it.
+        one moving target evaluated by the solver each frame.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The arm in the wing</span>
@@ -67,7 +66,7 @@
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Wingtip, be there</span>One triangle, no iteration</h2>
+      <h2><span class="kicker">Step 1 · Two-bone IK</span>Closed-form wing placement</h2>
       <p>
         Fix the shoulder S, pick a target T, and call the two segment lengths
         a and b. If the wing is to touch the target, the elbow must sit at
@@ -111,7 +110,7 @@
       </p>
       <div data-demo="unfold"></div>
       <p>
-        One slider, and the readout tells the story: the span more than
+        One slider, and the readout shows that the span more than
         doubles, from a teardrop to a glider, using <em>the same three
         segments</em> — nothing is created, only redistributed. Toggle the
         x-ray and watch the elbow: mid-unfold it kinks backward into a
@@ -119,7 +118,7 @@
         seam, too — the mesh smears a little where body weights and wing
         weights blend. Our weights were computed against the folded pose;
         production rigs bind with wings spread for exactly this reason. We
-        keep the smear: it's honest, it's small, and at part six's camera
+        keep the smear: it is small and not visible at part six's camera
         distances it's invisible.
       </p>
       <details class="fold">
@@ -171,7 +170,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · All together</span>The rest of the bird joins</h2>
+      <h2><span class="kicker">Step 4 · Full-body motion</span>Coupling the wingbeat to the body</h2>
       <p>
         Wings don't beat in isolation; the whole bird is the mechanism. Three
         cheap couplings, all driven by the same phase. The <strong>body</strong>
@@ -193,7 +192,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The air owes her</h2>
+      <h2><span class="kicker">Coda</span>From motion to force</h2>
       <p>
         Next time, physics. The wing is an airfoil and the wingbeat is a
         force generator: lift that scales with speed and angle of attack,
@@ -209,7 +208,7 @@
         Truth</a> has been busy — rain has carved its mountains, grass is
         growing, and <a href="/trees.html">trees</a> are publishing their
         branches like landing pads with coordinates. Two more articles each.
-        One demo at the end: a wren, a world, and you.
+        Both series feed into the final flight demo.
       </p>
     </main>
 

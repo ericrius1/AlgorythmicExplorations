@@ -20,8 +20,8 @@
       <div class="hero-title">
         <h1>Leaving Flatland</h1>
         <p class="subtitle">
-          Part four: a sculpture that exists nowhere. No triangles, no vertices,
-          no file — one function answers "how far is the surface?" and a camera
+          Part four: an implicit sculpture with no triangles, vertices,
+          or model file. One function answers "how far is the surface?" and a camera
           full of rays does the rest. Drag to walk around it.
         </p>
       </div>
@@ -50,17 +50,17 @@ fn sdTorus(p, t)   =  length(vec2(length(p.xz) − t.x, p.y)) − t.y</code></pr
         The whole scene becomes one function, <code>map(p)</code>: the minimum
         of every shape's distance, because the nearest surface of a world is
         the nearest surface of its nearest thing. The renderings on this page
-        contain no geometry whatsoever — no mesh, no triangles — just
+        contain no stored geometry — no mesh, no triangles — just
         <code>map</code>, called about a hundred times per pixel.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Sculpting</span>min() builds worlds, smooth min() builds creatures</h2>
+      <h2><span class="kicker">Step 1 · Sculpting</span>Combining distance functions</h2>
       <p>
         Combining shapes with <code>min()</code> gives the hard weld of machine
         parts: surfaces intersect in a crease. Replace it with a <em>smooth
         minimum</em> — a min with a soft elbow — and surfaces within distance k
-        of each other fuse like droplets:
+        of each other blend smoothly:
       </p>
       <pre><code>h = clamp(0.5 + 0.5·(b − a)/k, 0, 1)
 smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of persuasion</span></code></pre>
@@ -73,20 +73,20 @@ smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of
       </p>
       <div data-demo="blend"></div>
       <p>
-        Drag k to zero and the three shapes are strangers sharing a floor —
+        Drag k to zero and the three shapes meet with hard intersections —
         every contact a hard crease. Raise it and they begin to negotiate: at
-        0.2 the orbiting sphere drags a tendril of box along with it; at 0.5
-        the trio is one creature. Nothing about the shapes changed. Only the
+        0.2 the orbiting sphere pulls a smooth extension from the box; at 0.5
+        the three shapes form one blended surface. Nothing about the shapes changed. Only the
         definition of "nearest."
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Sphere tracing</span>Leaping through certified emptiness</h2>
+      <h2><span class="kicker">Step 2 · Sphere tracing</span>Advancing by distance</h2>
       <p>
         A camera makes one ray per pixel, and each ray must find the first
         surface in its way. The brute force is to inch forward in fixed steps —
         thousands of evaluations, and still no guarantee against stepping
-        clean through a thin wall. The distance function offers a better deal,
+        clean through a thin wall. The distance function provides a better bound,
         the same one the jump-flood texture offered the cascades in part one:
         <code>map(p)</code> is a <em>certificate</em>. If the nearest surface
         is d away, a sphere of radius d around you touches nothing, and you may
@@ -98,8 +98,7 @@ smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of
       <p>
         That algorithm is <em>sphere tracing</em>, named by John Hart in 1996.
         Far from everything it leaps in great bounds; near a surface it brakes,
-        geometrically, to a stop exactly on the skin. Its cost is honest and
-        visible — and worth staring at, because it is the first cost in this
+        geometrically, to a stop on the surface. Its cost is visible, because it is the first cost in this
         series that depends on <em>where you look</em>:
       </p>
       <div data-demo="steps"></div>
@@ -126,7 +125,7 @@ smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Light, on a budget</span>What the gradient knows</h2>
+      <h2><span class="kicker">Step 3 · Surface shading</span>Normals from the gradient</h2>
       <p>
         Shading needs surface normals, and the distance function hands them
         over too: the <em>gradient</em> of a distance field — which way
@@ -150,16 +149,14 @@ smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of
       </p>
       <div data-demo="shade"></div>
       <p>
-        Both knobs are lies a photographer would recognize. Shadow sharpness k
-        pretends the light has area (drag it to "overcast" and watch the
-        sculpture sit in a cloudy day); ambient occlusion pretends the sky is
-        an even dome that crevices see less of. Toggle AO to zero and the
-        sculpture's folds go flat and weightless — that grounding you just
-        lost is what the trick buys, for five distance calls.
+        Both controls are approximations. Shadow sharpness k approximates an area
+        light, while ambient occlusion approximates a uniform sky that crevices see
+        less of. Toggle AO to zero and the sculpture's folds lose contrast; five
+        additional distance calls restore much of that depth cue.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The garden at your light's mercy</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete scene</h2>
       <p>
         Everything at once, with the light handed to you: move your cursor and
         the key light orbits with it, dragging penumbras across the pedestal.
@@ -175,29 +172,29 @@ smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of
         background color, not the scattering medium part three built; the sky
         lights nothing but the haze. Each of those was <em>solved</em> in
         flatland, where light genuinely traveled. Here in three dimensions we
-        are back to point lights and clever lies, because honest transport
+        use point lights and local approximations, because full light transport
         got left behind with the textures.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The debt comes due</h2>
+      <h2><span class="kicker">Coda</span>What the approximations omit</h2>
       <p>
-        This part bought the third dimension by trading away the thing parts
-        one through three were proudest of. Radiance cascades answered "what
+        This part adds the third dimension by trading away the feature parts
+        one through three computed. Radiance cascades answered "what
         does every point see?" — light arrived, bounced, scattered. Sphere
-        tracing answers only "what does the camera see?", and every photons-
-        bouncing question got replaced by a heuristic: shadows from near
-        misses, skylight from a dot product, contact darkness from five probes
-        up the normal. Good lies, fast lies — load-bearing lies.
+        tracing answers only "what does the camera see?", and every query about
+        bouncing photons was replaced by a heuristic: shadows from near
+        misses, skylight from a dot product, and contact darkness from five probes
+        up the normal.
       </p>
       <p>
-        There is an equation that states exactly what the lies are
+        There is an equation that states exactly what these approximations are
         approximating: the light leaving any point is what it emits plus the
         integral, over every direction, of the light arriving — the rendering
         equation, written down by James Kajiya in 1986. Two parts of this
         series solved it in 2D by brute hierarchy. In 3D there is no such
-        luxury, but there is an older, stranger tool: dice. The next part
-        builds a renderer whose every pixel is a gambling den — and aims it at
+        equivalent hierarchy, but Monte Carlo integration provides another approach.
+        The next part builds a path tracer and aims it at
         the most photographed cardboard box in computer science.
       </p>
     </main>

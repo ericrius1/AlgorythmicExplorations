@@ -88,17 +88,30 @@ export function solveTwoBone(
   rig.update();
 }
 
-// Aim a joint's tail direction at a world target, clamped to a cone of
-// `maxDeg` around the rest direction, blended by `weight`. Used for the head
-// (gaze) — and it is all "look at" ever is: one shortest-arc rotation.
-export function aimJoint(rig: Rig, name: string, target: THREE.Vector3, maxDeg: number, weight = 1): void {
+// The bear models face +z; gaze joints aim this, not their bone axis.
+export const GAZE_FORWARD = new THREE.Vector3(0, 0, 1);
+
+// Aim a joint at a world target, clamped to a cone of `maxDeg` around rest,
+// blended by `weight`. `restDir` is the rest-pose direction that should end up
+// pointing at the target — the bone's own axis by default (leaning a spine),
+// but for a gaze it must be the *face* direction: the head bone runs up
+// through the skull, and aiming that at a target tips the crown, not the
+// eyes. This is all "look at" ever is: one shortest-arc rotation.
+export function aimJoint(
+  rig: Rig,
+  name: string,
+  target: THREE.Vector3,
+  maxDeg: number,
+  weight = 1,
+  restDir?: THREE.Vector3,
+): void {
   const i = rig.index(name);
   const j = rig.joints[i];
   rig.jointPos(name, _a);
   _dir.copy(target).sub(_a).normalize();
   rig.parentQuat(name, _pq).invert();
   const desiredLocal = _dir.applyQuaternion(_pq);
-  const rest = _r.copy(j.tailOffset).normalize();
+  const rest = _r.copy(restDir ?? j.tailOffset).normalize();
   _q.setFromUnitVectors(rest, desiredLocal);
   // clamp: limit rotation angle to the cone
   const angle = 2 * Math.acos(Math.min(1, Math.abs(_q.w)));

@@ -10,7 +10,7 @@
     <title>Flight — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The wingbeat becomes an engine: lift, drag, weight, and flap thrust as real forces, integrated every frame. Flight stops being an animation and becomes an outcome — gliding, stalling, and banking turns nobody scripted."
+      content="The wingbeat becomes an engine: lift, drag, weight, and flap thrust are integrated every frame to produce gliding, stalling, and banking turns."
     />
   </head>
   <body>
@@ -20,10 +20,9 @@
       <div class="hero-title">
         <h1>Flight</h1>
         <p class="subtitle">
-          Three articles built a bird that could flap. This one makes the air
-          notice. Four forces, integrated every frame — and the wren above is
-          not playing an animation, she is falling forward and being caught by
-          her own wings, lap after lap, because the physics says she must.
+          Three articles built a bird that could flap. This one adds aerodynamic
+          forces. Their integration produces the repeated flight path above
+          without a scripted trajectory.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -34,23 +33,21 @@
 
     <main>
       <p>
-        <a href="/wingbeat.html">Part three</a> gave the wren a beautiful,
-        useless wingbeat. Useless because the air in that article was
+        <a href="/wingbeat.html">Part three</a> gave the wren a visual wingbeat,
+        but the air in that article was
         decorative — the wing pushed against nothing, so the flapping was a
         looping animation that left her standing exactly where she started.
-        This article removes the floor. From here she is a point mass in a
-        sky that pushes back, and everything she does is a consequence of
+        This article makes the bird a point mass acted on by air, and its motion follows from
         four forces, summed and integrated, frame after frame.
       </p>
       <p>
-        The forces are the famous four. <strong>Weight</strong> pulls straight
-        down, always. <strong>Lift</strong> is the wing's reward for moving
+        The model uses four forces. <strong>Weight</strong> pulls straight
+        down, always. <strong>Lift</strong> results from moving
         through air at an angle — perpendicular to the flight path, and the
-        thing that holds her up. <strong>Drag</strong> is the tax on all of
-        it, opposing motion. And <strong>thrust</strong> is what the wingbeat
-        was secretly for: the twisted downstroke from part three, now cashed
-        in as a forward push. Add them, divide by mass, integrate twice, and
-        you have flight — not a script of where she goes, but a derivation.
+        thing that holds her up. <strong>Drag</strong> opposes motion. And
+        <strong>thrust</strong> comes from the twisted downstroke from part three.
+        Adding them, dividing by mass, and integrating produces the flight path
+        without scripting it.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Why not just keyframe it?</span>
@@ -60,20 +57,20 @@
           dive because gravity says so, sinks when it slows because lift fell
           off with the square of speed, and recovers when it flaps because
           thrust restored the speed. None of those behaviors are authored;
-          they're emergent. You get the whole envelope of flight from one
-          force balance, and — the payoff of the whole series — you can later
+          they emerge from the force model. One force balance produces a range
+          of flight behavior, and you can later
           hand the controls to a player or an AI and the bird stays a bird,
           because the physics, not a clip, is in charge.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The balance</span>Four arrows on a bird</h2>
+      <h2><span class="kicker">Step 1 · The balance</span>Four forces</h2>
       <p>
         Start static, so the forces hold still long enough to see. A wing of
         area A moving at speed v through air of density ρ has a
-        <em>dynamic pressure</em> ½ρv² to spend, and two coefficients decide
-        how it's spent: the lift coefficient C<sub>L</sub> and drag
+        <em>dynamic pressure</em> ½ρv², and two coefficients determine the
+        resulting forces: the lift coefficient C<sub>L</sub> and drag
         coefficient C<sub>D</sub>. Lift grows with the wing's
         <em>angle of attack</em> — the tilt between the wing and the oncoming
         air — until, abruptly, it doesn't:
@@ -89,16 +86,16 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         instead of climbing and the wing simply lets go of the air. That cliff
         is real aerodynamics, not a safety rail: a wing tilted too steeply
         stops working all at once, which is why a landing bird flares to the
-        edge of it and not past. The <strong>speed</strong> slider shows the
-        v² in the equations biting — double the speed, quadruple every
+        edge of it and not past. The <strong>speed</strong> slider demonstrates
+        the v² term: double the speed and every
         aerodynamic force.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The glide</span>Trading height for distance</h2>
+      <h2><span class="kicker">Step 2 · The glide</span>Gliding dynamics</h2>
       <p>
         Cut the engine. With no flapping, a bird is a glider, and a glider
-        does one trick supremely well: it converts altitude into distance at
+        is optimized for one task: converting altitude into distance at
         a fixed exchange rate. That rate — the <em>glide ratio</em> — is just
         lift divided by drag, and it's why the angle of attack matters so
         much. Too shallow and lift is weak; too steep and induced drag
@@ -112,7 +109,7 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         the running glide ratio. Hunt the <strong>angle of attack</strong>
         slider for the flattest trail — that's her best-glide angle, found by
         the same physics a paper airplane obeys. Push past it toward stall and
-        the trail steepens into a mush; pull below it and she's diving. No
+        the trail steepens; pull below it and the bird dives. No
         part of this path was drawn. It's lift and drag and gravity, resolved
         sixty times a second.
       </p>
@@ -137,7 +134,7 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The turn</span>Nobody scripted the circle</h2>
+      <h2><span class="kicker">Step 3 · The turn</span>Banking turns</h2>
       <p>
         Here is the most satisfying thing in the article, and it costs one
         line. To turn, a bird does not yaw like a car. It <em>banks</em> —
@@ -146,23 +143,22 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         fights gravity; the new horizontal slice points sideways, into the
         turn, and pulls the flight path into a curve. Roll angle in, circle
         out. We never compute a turn rate or a heading; we just roll the lift
-        vector and let the integrator discover the circle.
+        vector and let the integrator produce the circular path.
       </p>
       <div data-demo="bank"></div>
       <p>
         Drag the <strong>bank</strong> slider and the trail coils tighter as
         the lean steepens — exactly the geometry, because a bigger bank gives
         a bigger sideways slice. Bank the other way and she circles the other
-        way. This is the whole secret of why banking turns look so right in
+        way. This is why banking turns look convincing in
         good flight games and so wrong in bad ones: the right ones turn
         <em>because</em> they bank, and here you can see there's nothing else
         going on. Steepen the bank toward vertical and she has to flap harder
-        to hold height — the vertical lift slice shrank, and the physics sends
-        the bill.
+        to hold height because the vertical lift component shrinks.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Free flight</span>An autopilot with a chase cam</h2>
+      <h2><span class="kicker">Step 4 · Free flight</span>The flight controller</h2>
       <p>
         Put it together and let her go. The wings flap (part three), the flap
         makes thrust (step one), the forces integrate (step two), and a small
@@ -180,27 +176,26 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         and watch the autopilot pitch up and pour on flap to climb, then
         settle; turn up <strong>wander</strong> and she roams. She is, for the
         first time, going somewhere — though "somewhere" is still a bare plane
-        with a scatter of posts. Two articles left to make it a world worth the
-        wings.
+        with a scatter of posts. The remaining articles add landing and terrain.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The hardest thing a bird does</h2>
+      <h2><span class="kicker">Coda</span>Preparing to land</h2>
       <p>
         Flying is easy; <em>stopping</em> is hard. The next article is about
         landing — the approach, the flare that trades speed for a heartbeat of
         lift at the stall's edge, and the toes-on-branch problem of arriving
         at a precise point with zero speed left. It's the angle-of-attack
-        cliff from step one, used on purpose. And she'll land on something
-        real at last: <a href="/trees.html">Ground Truth's trees</a> publish
+        cliff from step one, used on purpose. She'll land on
+        <a href="/trees.html">Ground Truth's trees</a>, which publish
         their branches as perches with positions and thicknesses, so her
         landing controller can read them like an instrument. She'll also,
-        finally, <a href="/vibration.html">sing</a> — two oscillators and a
+        <a href="/vibration.html">sing</a> using two oscillators and a
         grammar, borrowed wholesale from the music series.
       </p>
       <p>
-        Then part six: the controls come to you, over the whole living world
-        the sister series built. A wren, a world, and you — one article away.
+        Part six exposes the same controls over the procedural terrain built by
+        the sister series.
       </p>
     </main>
 

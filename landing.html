@@ -10,7 +10,7 @@
     <title>The Landing — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The hardest thing a bird does: arriving. A guidance controller flies the flight physics onto a real tree's branch — approach, glide slope, the flare at the edge of the stall — and then she sings, with a two-voiced syrinx."
+      content="A guidance controller flies the simulated bird onto a procedural tree branch using an approach, glide slope, and flare, followed by a two-voiced syrinx model."
     />
   </head>
   <body>
@@ -20,9 +20,8 @@
       <div class="hero-title">
         <h1>The Landing</h1>
         <p class="subtitle">
-          Flying is the easy part. This article is about <em>stopping</em> —
-          arriving at one twig in a whole tree with no speed left, caught by a
-          flare at the edge of the stall — and then, perched, singing with a
+          This article adds landing: approaching one twig in a whole tree,
+          reducing speed with a flare near the stall, and then singing with a
           voice box that has two throats. The wren above is landing on a tree
           the sister series grew, over and over. Watch her pick her spot.
         </p>
@@ -42,7 +41,7 @@
         tight: the last few meters of an arrival, where she must hit a precise
         point in space, pointed the right way, with her speed bled to almost
         nothing — and do it by flying the same physics, not by snapping to a
-        pose. Then, having landed, she finally gets a voice.
+        pose. It also adds a procedural voice.
       </p>
       <p>
         And she lands on something real. The sister series,
@@ -54,21 +53,20 @@
         merge entirely.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Why landing is the boss level</span>
+        <span class="note-label">Aside · Why landing is difficult</span>
         <p>
           A cruising bird that's off by a meter is still cruising. A landing
           bird that's off by a meter is in a bush. Landing has no margin: the
           target is a point, the acceptable speed is near zero, and the
           approach is flown in the worst corner of the envelope — slow, where
-          lift is weakest and the stall is one twitch away. Every aircraft's
-          trickiest minutes are its last ones, and it's the same physics here.
-          We don't cheat it with a scripted arc; we build a guidance law that
-          flies the forces down to the branch.
+          lift is weakest and the stall margin is small. Rather than using a
+          scripted arc, the demo uses guidance laws to control the simulated
+          forces through touchdown.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The approach</span>Guidance, not a path</h2>
+      <h2><span class="kicker">Step 1 · The approach</span>Approach guidance</h2>
       <p>
         The controller never plans a trajectory. Each frame it looks at where
         the perch is relative to where she is and issues three commands, each a
@@ -76,7 +74,7 @@
         between her heading and the direction to the perch, and bank in
         proportion — she rolls toward the target and the part-four physics
         curves her path there (banking turns, reused). <strong>Glide slope:</strong>
-        compare her sink rate to the gentle descent the approach wants, and
+        compare her sink rate to the target descent rate, and
         pitch to close the gap. <strong>Speed:</strong> schedule the throttle
         by distance, easing off as she nears so she arrives slow.
       </p>
@@ -91,18 +89,15 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The flare</span>The stall, used on purpose</h2>
+      <h2><span class="kicker">Step 2 · The flare</span>Landing flare</h2>
       <p>
-        Here is the trick that makes a landing soft, and it's the
-        angle-of-attack cliff from <a href="/flight.html">part four</a> turned
-        from hazard into tool. Approaching the branch, she pitches her wings
+        The landing flare uses the high-angle-of-attack behavior from
+        <a href="/flight.html">part four</a>. Approaching the branch, the bird pitches its wings
         sharply nose-up — toward the stall. For an instant before the stall,
         lift <em>spikes</em>: she's still moving, and the steep angle wrings
-        every last newton out of the air. That spike arrests her descent —
-        the cushion — while the drag of the steep wing kills her remaining
-        speed. A heartbeat later the wing stalls fully and lets go, but by
-        then she's at the branch with nothing left to give. Spike, cushion,
-        stall, stop.
+        maximum lift from the remaining airspeed. That increase arrests the
+        descent while the drag of the steep wing removes the remaining
+        forward speed. The wing then stalls near touchdown.
       </p>
       <div data-demo="flare"></div>
       <p>
@@ -115,25 +110,24 @@
         every bird.
       </p>
       <details class="fold">
-        <summary>Deep dive: a controller is the seed of a brain</summary>
+        <summary>Deep dive: proportional control</summary>
         <div class="fold-body">
           <p>
             The three feedback laws here — bank from heading error, pitch from
             sink-rate error, throttle from distance — are the simplest members
-            of a family that runs all the way up to animal intelligence. Each
-            is a <em>proportional controller</em>: measure an error, push back
+            of a broad family of control systems. Each is a
+            <em>proportional controller</em>: measure an error, push back
             in proportion. String a few together with a phase machine
             (cruise → approach → flare → perched) and you have something that
-            looks goal-directed without any planning at all. Part six will let
-            <em>you</em> supply the errors instead — your steering becomes her
-            heading command — and the very same laws will fly your intentions.
-            The reflex and the pilot share a wire.
+            produces goal-directed behavior without trajectory planning. Part
+            six replaces the autonomous commands with manual steering while
+            retaining the same control laws.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The song</span>A voice box with two throats</h2>
+      <h2><span class="kicker">Step 3 · The song</span>A two-source syrinx model</h2>
       <p>
         Perched, she sings — and birdsong deserves its own physics. Birds don't
         have our larynx. They have a <em>syrinx</em>, sitting deep at the fork
@@ -158,13 +152,12 @@
         brilliant 2–8 kHz register where wrens live. Her beak isn't animated to
         the song — it's driven <em>by</em> it: the demo reads the actual
         loudness coming out of the speakers and opens her beak to match, the
-        same reading the <a href="/vibration.html">music series</a> takes off
-        its master bus. Two systems we built separately, snapped together: a
-        rig that can open a beak, and a synth that can fill it.
+        same reading the <a href="/vibration.html">music series</a> takes from
+        its master bus. This connects the beak rig to the procedural synth.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The whole act</span>Land, sing, leave</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete behavior sequence</h2>
       <p>
         Put it on a loop over a real tree. She circles in, the controller
         picks a perch from the tree's published list and flies her onto it,
@@ -175,29 +168,25 @@
       </p>
       <div data-demo="act"></div>
       <p>
-        That tree is not decoration — it's an actual Ground Truth tree, grown
-        by space colonization, its branches found and ranked as perches by the
-        sister series' own code. The wren is choosing real twigs. This little
-        scene is a preview of the finale: a bird with a full behavioral
-        repertoire, loose in a world that was grown, not drawn.
+        The tree is generated by Ground Truth's space-colonization model, with
+        branches found and ranked as perches by the sister series' own code.
+        The scene previews the final integration of the bird's behavior with
+        the procedural world.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>The keys</h2>
+      <h2><span class="kicker">Coda</span>Integration with terrain</h2>
       <p>
-        One article left, and it's the one the whole series was walking toward.
-        Everything is built: a wren modeled from a function, rigged by
+        The remaining article combines a wren modeled from a function, rigged by
         distances, flapped by inverse kinematics, flown by forces, and landed
         by guidance laws — and a whole world next door with mountains, rivers
         carved by rain, grass, trees, and a horizon that never ends. Part six
-        hands you the controls and turns the bird loose in that world, with the
-        option to let an AI fly instead. The reflexes you just watched become
-        the thing that answers your steering.
+        exposes manual controls in that world, with the option to use the
+        autopilot instead. Both control modes use the same flight model.
       </p>
       <p>
         It is also <a href="/horizon.html">Ground Truth's</a> finale — the two
-        series have been one demo apart since the beginning, and that demo is
-        next. A wren, a world, and you.
+        series conclude with the same combined demo.
       </p>
     </main>
 

@@ -12,7 +12,7 @@ import { createStage, Face } from "../lib/bear/stage";
 import { buildBearMesh } from "../lib/bear/build";
 import { createBearMaterial, paintZones } from "../lib/bear/material";
 import { Rig, SkeletonViz } from "../lib/bear/rig";
-import { solveTwoBone, aimJoint } from "../lib/bear/ik";
+import { solveTwoBone, aimJoint, GAZE_FORWARD } from "../lib/bear/ik";
 
 export interface ReachStudioOptions {
   hero?: boolean;
@@ -76,6 +76,9 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
     fly.add(bulb, halo, light);
     scene.add(fly);
     stage.orbit.distance = 3.0;
+    // gaze demo: hold a mostly-frontal view so the tracking reads; no idle spin
+    stage.orbit.azimuth = 0.3;
+    stage.orbit.autoSpin = 0;
 
     const flyPos = new THREE.Vector3();
     const shoulder = new THREE.Vector3();
@@ -95,13 +98,15 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
         halo.scale.setScalar(1 + Math.sin(time * 7) * 0.15);
 
         breathe();
-        // reach when the firefly wanders into range of the left paw
+        // reach when the firefly wanders into range of the left paw — and on
+        // the left-front side, so the arm never sweeps across the torso
         rig.update();
         rig.jointPos("upperArmL", shoulder);
         const dist = shoulder.distanceTo(flyPos);
         const maxReach = rig.joints[rig.index("forearmL")].restOffset.length()
           + rig.joints[rig.index("handL")].restOffset.length();
-        const want = dist < maxReach * 1.15 ? 1 : 0;
+        const onReachableSide = flyPos.x > 0.05 && flyPos.z > 0.25;
+        const want = onReachableSide && dist < maxReach * 1.15 ? 1 : 0;
         reachAmount += (want - reachAmount) * Math.min(1, dt * 2.2);
 
         rig.setEulerDeg("upperArmL", -4, 0, -14);
@@ -112,9 +117,11 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
           pole.set(shoulder.x + 0.3, shoulder.y - 0.8, shoulder.z + 0.45);
           solveTwoBone(rig, ["upperArmL", "forearmL", "handL"], flyPos, pole, reachAmount);
         }
-        // the gaze never stops tracking, reach or no reach
-        aimJoint(rig, "neck", flyPos, 26, 0.3);
-        aimJoint(rig, "head", flyPos, 44, 0.6);
+        // the gaze never stops tracking, reach or no reach: aim the *face*
+        // direction, not the bone axis (which runs up through the skull)
+        aimJoint(rig, "neck", flyPos, 26, 0.4, GAZE_FORWARD);
+        rig.update();
+        aimJoint(rig, "head", flyPos, 44, 0.8, GAZE_FORWARD);
         rig.update();
         face.update(rig);
         stage.render();
@@ -127,6 +134,7 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
   // ---- reach: the lab ---------------------------------------------------------------
   const viz = new SkeletonViz();
   scene.add(viz.group);
+  stage.orbit.autoSpin = 0; // you're aiming an orb; the camera holds still
 
   const orb = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 16, 12),
@@ -217,8 +225,9 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
       clamped = shoulder.distanceTo(orb.position) > maxReach;
 
       if (gazeOn) {
-        aimJoint(rig, "neck", orb.position, 26, 0.3);
-        aimJoint(rig, "head", orb.position, 44, 0.6);
+        aimJoint(rig, "neck", orb.position, 26, 0.4, GAZE_FORWARD);
+        rig.update();
+        aimJoint(rig, "head", orb.position, 44, 0.8, GAZE_FORWARD);
       }
       rig.update();
       viz.update(rig);

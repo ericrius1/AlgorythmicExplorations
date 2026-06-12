@@ -1,20 +1,30 @@
-// The four figures of Feather & Bone part 1: the capsule parts list (with an
-// explode slider), the field sliced like an MRI, the surface-nets polygonizer
-// with its resolution and shading exposed, and the finished low-poly wren on
-// a turntable.
+// The figures of Feather & Bone part 1: the station scaffold (rings in space,
+// explodable into components), the loft stitching one component live, the
+// feather workbench with every shape parameter on a slider, the feather coat
+// fanning over the wing skeleton, and the finished eagle on a turntable.
 
 import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../lib/demoShell";
 import { createStage3D, addGroundDisc } from "../lib/stage3d";
-import { BIRD_BONES } from "../lib/bird/skeleton";
-import { birdField, FIELD_BOUNDS } from "../lib/bird/field";
-import { buildBirdMesh, addFace, ZONE_COLORS } from "../lib/bird/build";
+import {
+  eagleLofts,
+  loftRings,
+  buildLoftGeometry,
+  buildEagleBody,
+  addFace,
+  ZONE_COLORS,
+  type Loft,
+} from "../lib/bird/body";
+import { makeFeatherGeometry, FeatherCoat, COAT_POSE_REST, type FeatherShape } from "../lib/bird/feathers";
+import { createEagle } from "../lib/bird/bird";
+import { createBirdRig } from "../lib/bird/rig";
+import { WINGS, applyWingTip, unfoldTarget } from "../lib/bird/wing";
 
-export const WREN_STAGE = {
-  target: [0, 0.38, 0] as [number, number, number],
-  distance: 1.9,
-  minDistance: 0.8,
-  maxDistance: 5,
+export const EAGLE_STAGE = {
+  target: [0, 0.42, 0] as [number, number, number],
+  distance: 2.4,
+  minDistance: 0.9,
+  maxDistance: 7,
   elevation: 0.12,
   azimuth: 0.6,
   hemi: { sky: 0x9db8d6, ground: 0x4a4035, intensity: 1.0 },
@@ -22,78 +32,66 @@ export const WREN_STAGE = {
   rim: { color: 0x86a8ff, intensity: 1.1, position: [-2, 2.2, -2.6] as [number, number, number] },
 };
 
-// ---- the parts list: one lathe mesh per capsule, exploded on demand ---------------
+// ---- the scaffold: every station ring, before any skin -----------------------------
 
-export async function mountBirdParts(container: HTMLElement): Promise<Demo> {
+export async function mountBirdStations(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const stage = await createStage3D(shell.canvas, WREN_STAGE);
-  addGroundDisc(stage.scene, { radius: 1.3, shadowRadius: 0.3 });
+  const stage = await createStage3D(shell.canvas, EAGLE_STAGE);
+  addGroundDisc(stage.scene, { radius: 1.5, shadowRadius: 0.35 });
 
-  const palette = ZONE_COLORS.map(
-    (hex) =>
-      new THREE.MeshStandardMaterial({
-        color: new THREE.Color().setHex(hex, THREE.SRGBColorSpace),
-        roughness: 0.8,
-        flatShading: true,
-      }),
-  );
+  const palette = ZONE_COLORS.map((hex) => new THREE.Color().setHex(hex, THREE.SRGBColorSpace));
+  const centroid = new THREE.Vector3(0, 0.42, 0);
 
-  const centroid = new THREE.Vector3(0, 0.42, -0.02);
-  const up = new THREE.Vector3(0, 1, 0);
-  const parts: { mesh: THREE.Mesh; base: THREE.Matrix4; dir: THREE.Vector3 }[] = [];
-  for (const b of BIRD_BONES) {
-    const a = new THREE.Vector3(...b.head);
-    const t = new THREE.Vector3(...b.tail);
-    const dir = t.clone().sub(a);
-    const len = dir.length();
+  interface Part {
+    group: THREE.Group;
+    home: THREE.Vector3;
+    dir: THREE.Vector3;
+  }
+  const parts: Part[] = [];
+  const lofts = eagleLofts();
+  let ringCount = 0;
 
-    // lathe profile: hemisphere of r0, tapered flank, hemisphere of r1
-    const pts: THREE.Vector2[] = [];
-    const N = 8;
-    for (let i = 0; i <= N; i++) {
-      const u = (i / N) * Math.PI * 0.5;
-      pts.push(new THREE.Vector2(Math.cos(u - Math.PI / 2) * b.r0, Math.sin(u - Math.PI / 2) * b.r0));
+  const addPart = (loft: Loft, flip: boolean): void => {
+    const group = new THREE.Group();
+    const color = palette[loft.zone].clone().lerp(new THREE.Color(1, 1, 1), 0.25);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 });
+    const center = new THREE.Vector3();
+    let n = 0;
+    for (const ring of loftRings(loft, flip)) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i < ring.length; i += 3) {
+        pts.push(new THREE.Vector3(ring[i], ring[i + 1], ring[i + 2]));
+        center.add(pts[pts.length - 1]);
+        n++;
+      }
+      pts.push(pts[0].clone());
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+      ringCount++;
     }
-    for (let i = 0; i <= N; i++) {
-      const u = (i / N) * Math.PI * 0.5;
-      pts.push(new THREE.Vector2(Math.cos(u) * b.r1, len + Math.sin(u) * b.r1));
-    }
-    const mesh = new THREE.Mesh(new THREE.LatheGeometry(pts, 14), palette[b.zone]);
+    // spine: connect station centers so the path reads
+    const spine = loft.stations.map((s) => new THREE.Vector3((flip ? -1 : 1) * s.c[0], s.c[1], s.c[2]));
+    group.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(spine),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 }),
+      ),
+    );
+    center.multiplyScalar(1 / Math.max(n, 1));
+    const part: Part = { group, home: new THREE.Vector3(), dir: center.clone().sub(centroid) };
+    parts.push(part);
+    stage.scene.add(group);
+  };
 
-    // world matrix: translate ∘ squash-along-world-axis ∘ rotate-into-bone
-    const R = new THREE.Matrix4();
-    if (len > 1e-6) R.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize()));
-    const S = new THREE.Matrix4();
-    if (b.flat) {
-      const [nx, ny, nz] = b.flat.axis;
-      const e = b.flat.s - 1;
-      S.set(
-        1 + e * nx * nx, e * nx * ny, e * nx * nz, 0,
-        e * nx * ny, 1 + e * ny * ny, e * ny * nz, 0,
-        e * nx * nz, e * ny * nz, 1 + e * nz * nz, 0,
-        0, 0, 0, 1,
-      );
-    }
-    const base = new THREE.Matrix4().multiplyMatrices(S, R);
-    mesh.matrixAutoUpdate = false;
-    parts.push({ mesh, base, dir: a.clone().add(t).multiplyScalar(0.5).sub(centroid) });
-    stage.scene.add(mesh);
+  for (const loft of lofts) {
+    addPart(loft, false);
+    if (loft.mirror) addPart(loft, true);
   }
 
   const apply = (explode: number): void => {
-    for (let i = 0; i < parts.length; i++) {
-      const { mesh, base, dir } = parts[i];
-      const head = BIRD_BONES[i].head;
-      mesh.matrix.copy(
-        new THREE.Matrix4()
-          .makeTranslation(head[0] + dir.x * explode, head[1] + dir.y * explode, head[2] + dir.z * explode)
-          .multiply(base),
-      );
-    }
+    for (const p of parts) p.group.position.copy(p.dir).multiplyScalar(explode);
   };
-  apply(0);
-  shell.slider({ label: "explode", min: 0, max: 0.9, step: 0.01, value: 0, onInput: apply });
-  shell.setInfo(() => `${BIRD_BONES.length} capsules, ${BIRD_BONES.filter((b) => b.deform).length} of them future joints`);
+  shell.slider({ label: "explode", min: 0, max: 1.1, step: 0.01, value: 0, onInput: apply });
+  shell.setInfo(() => `${parts.length} lofts · ${ringCount} stationed rings — no triangles yet, just hoops on paths`);
 
   return {
     frame() {
@@ -104,114 +102,141 @@ export async function mountBirdParts(container: HTMLElement): Promise<Demo> {
   };
 }
 
-// ---- the field, sliced: signed distance on a plane of constant x ------------------
+// ---- the loft, stitching one component live ------------------------------------------
 
-export function mountBirdSlice(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.72);
-  const ctx = shell.canvas.getContext("2d")!;
+export async function mountBirdLoft(container: HTMLElement): Promise<Demo> {
+  const shell = new Shell(container);
+  const stage = await createStage3D(shell.canvas, { ...EAGLE_STAGE, distance: 1.6, target: [0, 0.55, 0.1] });
+  addGroundDisc(stage.scene, { radius: 1.5, shadowRadius: 0.35 });
 
-  const RW = 280, RH = 224; // sample resolution; upscaled smoothly to the canvas
-  const off = document.createElement("canvas");
-  off.width = RW;
-  off.height = RH;
-  const octx = off.getContext("2d")!;
-  const img = octx.createImageData(RW, RH);
+  const lofts = eagleLofts();
+  const choices = ["torso", "beak-upper", "sleeve-humL", "thighL", "tarsusL", "tail-root"];
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
 
-  const zMin = FIELD_BOUNDS.min[2], zMax = FIELD_BOUNDS.max[2];
-  const yMin = FIELD_BOUNDS.min[1], yMax = FIELD_BOUNDS.max[1];
+  let mesh: THREE.Mesh | null = null;
+  let ringGroup: THREE.Group | null = null;
+  let pick = 0;
+  let stitch = 1;
+  let triTotal = 0;
 
-  let sliceX = 0;
-  let blend = 1;
-  let dirty = true;
-
-  const draw = (): void => {
-    const data = img.data;
-    let p = 0;
-    for (let row = 0; row < RH; row++) {
-      const y = yMax - ((row + 0.5) / RH) * (yMax - yMin);
-      for (let col = 0; col < RW; col++) {
-        const z = zMin + ((col + 0.5) / RW) * (zMax - zMin);
-        const d = birdField(sliceX, y, z, { blendScale: blend });
-        const band = 0.5 + 0.5 * Math.cos((d * Math.PI * 2) / 0.05);
-        let r: number, g: number, b: number;
-        if (Math.abs(d) < 0.004) {
-          r = 255; g = 214; b = 150; // the zero contour — the skin itself
-        } else if (d < 0) {
-          const k = 0.75 + band * 0.25;
-          r = 156 * k; g = 102 * k; b = 62 * k;
-        } else {
-          const fade = Math.max(0, 1 - d * 2.2);
-          const k = (0.5 + band * 0.5) * fade;
-          r = 28 + 38 * k; g = 32 + 48 * k; b = 46 + 66 * k;
-        }
-        data[p++] = r; data[p++] = g; data[p++] = b; data[p++] = 255;
-      }
+  const rebuild = (): void => {
+    const loft = lofts.find((l) => l.name === choices[pick])!;
+    const geo = buildLoftGeometry(loft);
+    triTotal = geo.getAttribute("position").count / 3;
+    if (mesh) {
+      mesh.geometry.dispose();
+      mesh.geometry = geo;
+    } else {
+      mesh = new THREE.Mesh(geo, material);
+      stage.scene.add(mesh);
     }
-    octx.putImageData(img, 0, 0);
-
-    const cw = shell.canvas.width, ch = shell.canvas.height;
-    ctx.fillStyle = "#0a0b10";
-    ctx.fillRect(0, 0, cw, ch);
-    const scale = Math.min(cw / RW, ch / RH);
-    const dw = RW * scale, dh = RH * scale;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(off, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-    shell.readout.textContent = `slice x = ${sliceX.toFixed(2)} · smooth-union width × ${blend.toFixed(2)}`;
+    if (ringGroup) {
+      stage.scene.remove(ringGroup);
+      ringGroup.traverse((o) => {
+        if (o instanceof THREE.Line) o.geometry.dispose();
+      });
+    }
+    ringGroup = new THREE.Group();
+    const mat = new THREE.LineBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.85, depthTest: false });
+    for (const ring of loftRings(loft)) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i < ring.length; i += 3) pts.push(new THREE.Vector3(ring[i], ring[i + 1], ring[i + 2]));
+      pts.push(pts[0].clone());
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
+      line.renderOrder = 5;
+      ringGroup.add(line);
+    }
+    stage.scene.add(ringGroup);
+    applyStitch();
   };
 
-  shell.slider({ label: "slice x", min: -0.24, max: 0.24, step: 0.005, value: 0, onInput: (v) => { sliceX = v; dirty = true; } });
-  shell.slider({ label: "blend ×", min: 0, max: 2, step: 0.05, value: 1, onInput: (v) => { blend = v; dirty = true; } });
+  const applyStitch = (): void => {
+    if (!mesh) return;
+    const verts = Math.floor((triTotal * stitch)) * 3;
+    mesh.geometry.setDrawRange(0, verts);
+  };
+
+  shell.slider({
+    label: "component",
+    min: 0,
+    max: choices.length - 1,
+    step: 1,
+    value: 0,
+    format: (v) => choices[Math.round(v)],
+    onInput: (v) => {
+      pick = Math.round(v);
+      rebuild();
+    },
+  });
+  shell.slider({ label: "stitch", min: 0, max: 1, step: 0.005, value: 1, onInput: (v) => { stitch = v; applyStitch(); } });
+  shell.button("wireframe", () => (material.wireframe = !material.wireframe));
+  shell.setInfo(() => `ring pairs become quad strips, quads become triangles — ${Math.floor(triTotal * stitch)} of ${triTotal}`);
+  rebuild();
 
   return {
     frame() {
-      if (dirty) {
-        dirty = false;
-        draw();
-      }
+      stage.render();
+      shell.tick();
     },
+    dispose: () => stage.dispose(),
   };
 }
 
-// ---- the polygonizer, with its knobs showing --------------------------------------
+// ---- the feather workbench -----------------------------------------------------------
 
-export async function mountBirdNets(container: HTMLElement): Promise<Demo> {
+export async function mountFeather(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const stage = await createStage3D(shell.canvas, WREN_STAGE);
-  addGroundDisc(stage.scene, { radius: 1.3, shadowRadius: 0.3 });
+  const stage = await createStage3D(shell.canvas, {
+    ...EAGLE_STAGE,
+    target: [0, 0.42, 0.45],
+    distance: 1.5,
+    elevation: 0.35,
+    azimuth: 0.15,
+  });
 
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
-  let mesh: THREE.Mesh | null = null;
-  let stats = "";
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    color: new THREE.Color().setHex(0x6b5436, THREE.SRGBColorSpace),
+    roughness: 0.8,
+    side: THREE.DoubleSide,
+    flatShading: true,
+  });
 
-  let res = 48;
-  let blend = 1;
-  let style: "faceted" | "smooth" = "faceted";
-  let timer = 0;
+  const shape: Required<FeatherShape> = {
+    rows: 5,
+    peak: 0.42,
+    baseW: 0.42,
+    fold: 0.5,
+    droop: 0.1,
+    emarginate: 0,
+    tip: "round",
+  };
+  const tips: FeatherShape["tip"][] = ["round", "point", "square"];
+  let tipIdx = 0;
 
+  const mesh = new THREE.Mesh(makeFeatherGeometry(shape), material);
+  mesh.scale.setScalar(0.9);
+  mesh.position.set(0, 0.42, 0);
+  stage.scene.add(mesh);
+
+  let tris = 0;
   const rebuild = (): void => {
-    const built = buildBirdMesh({ res, blendScale: blend, style });
-    if (mesh) {
-      mesh.geometry.dispose();
-      mesh.geometry = built.geometry;
-    } else {
-      mesh = new THREE.Mesh(built.geometry, material);
-      stage.scene.add(mesh);
-    }
-    stats = `${style} · res ${res} · ${built.triangleCount.toLocaleString()} tris · built in ${built.buildMs.toFixed(0)} ms`;
+    mesh.geometry.dispose();
+    mesh.geometry = makeFeatherGeometry(shape);
+    tris = mesh.geometry.getAttribute("position").count / 3;
   };
   rebuild();
 
-  const queueRebuild = (): void => {
-    stats = "building…";
-    clearTimeout(timer);
-    timer = window.setTimeout(rebuild, 180);
-  };
-
-  shell.slider({ label: "resolution", min: 16, max: 96, step: 4, value: res, onInput: (v) => { res = v; queueRebuild(); } });
-  shell.slider({ label: "blend ×", min: 0, max: 2, step: 0.05, value: blend, onInput: (v) => { blend = v; queueRebuild(); } });
-  shell.button("smooth ⇄ faceted", () => { style = style === "faceted" ? "smooth" : "faceted"; queueRebuild(); });
-  shell.button("wireframe", () => { material.wireframe = !material.wireframe; });
-  shell.setInfo(() => stats);
+  shell.slider({ label: "widest at", min: 0.2, max: 0.7, step: 0.01, value: shape.peak, onInput: (v) => { shape.peak = v; rebuild(); } });
+  shell.slider({ label: "tent fold", min: 0, max: 1, step: 0.01, value: shape.fold, onInput: (v) => { shape.fold = v; rebuild(); } });
+  shell.slider({ label: "droop", min: 0, max: 0.35, step: 0.01, value: shape.droop, onInput: (v) => { shape.droop = v; rebuild(); } });
+  shell.slider({ label: "emarginate", min: 0, max: 0.6, step: 0.01, value: 0, onInput: (v) => { shape.emarginate = v < 0.05 ? 0 : 1 - v; rebuild(); } });
+  shell.button("tip: round / point / square", () => {
+    tipIdx = (tipIdx + 1) % 3;
+    shape.tip = tips[tipIdx]!;
+    rebuild();
+  });
+  shell.setInfo(() => `${tris} triangles — a shaft ridge, two vanes, and a width profile`);
 
   return {
     frame() {
@@ -222,51 +247,84 @@ export async function mountBirdNets(container: HTMLElement): Promise<Demo> {
   };
 }
 
-// ---- the finished wren -------------------------------------------------------------
+// ---- the coat: feathers fanning over the wing skeleton --------------------------------
+
+export async function mountCoat(container: HTMLElement): Promise<Demo> {
+  const shell = new Shell(container);
+  const stage = await createStage3D(shell.canvas, { ...EAGLE_STAGE, distance: 2.9, target: [0, 0.5, 0] });
+  addGroundDisc(stage.scene, { radius: 1.6, shadowRadius: 0.35 });
+
+  // body as a ghost so the feathers read as the subject
+  const build = buildEagleBody();
+  const ghost = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.9,
+    transparent: true,
+    opacity: 0.25,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const body = new THREE.Mesh(build.geometry, ghost);
+  stage.scene.add(body);
+
+  const rig = createBirdRig();
+  stage.scene.add(rig.root);
+  const coat = new FeatherCoat();
+  stage.scene.add(coat.group);
+
+  const pose = { ...COAT_POSE_REST };
+  let spread = 1;
+  const tL = new THREE.Vector3();
+  const tR = new THREE.Vector3();
+
+  shell.slider({ label: "wing spread", min: 0, max: 1, step: 0.005, value: 1, onInput: (v) => (spread = v) });
+  shell.slider({ label: "tail fan", min: 0, max: 1, step: 0.01, value: 0.5, onInput: (v) => (pose.tailSpread = v) });
+  shell.slider({ label: "splay", min: 0, max: 1, step: 0.01, value: 0, onInput: (v) => (pose.splay = v) });
+  shell.slider({ label: "slot open", min: 0, max: 1, step: 0.01, value: 0, onInput: (v) => (pose.slot = v) });
+  shell.setInfo(() => `${coat.featherCount} feathers, every one a rigid plane on a bone — zero of them skinned`);
+
+  return {
+    frame() {
+      applyWingTip(rig, WINGS.L, unfoldTarget(WINGS.L, spread, tL), { twist: 0.1 * spread });
+      applyWingTip(rig, WINGS.R, unfoldTarget(WINGS.R, spread, tR), { twist: 0.1 * spread });
+      pose.spread = spread;
+      rig.root.updateWorldMatrix(true, true);
+      coat.update(rig.bones, pose);
+      stage.render();
+      shell.tick();
+    },
+    dispose: () => stage.dispose(),
+  };
+}
+
+// ---- the finished eagle ----------------------------------------------------------------
 
 export async function mountBirdFull(container: HTMLElement, opts: { hero?: boolean } = {}): Promise<Demo> {
   const shell = new Shell(container, opts.hero ? 0.5 : 0.62);
-  const stage = await createStage3D(shell.canvas, { ...WREN_STAGE, distance: opts.hero ? 1.7 : 1.9 });
-  addGroundDisc(stage.scene, { radius: 1.3, shadowRadius: 0.3 });
+  const stage = await createStage3D(shell.canvas, { ...EAGLE_STAGE, distance: opts.hero ? 2.2 : 2.4 });
+  addGroundDisc(stage.scene, { radius: 1.6, shadowRadius: 0.35 });
 
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
-  const group = new THREE.Group();
-  stage.scene.add(group);
-  addFace(group);
+  const eagle = createEagle();
+  stage.scene.add(eagle.group);
 
-  let mesh: THREE.Mesh | null = null;
-  let fluff = 1;
-  let timer = 0;
-  const rebuild = (): void => {
-    const built = buildBirdMesh({ res: 64, radiusScale: fluff });
-    if (mesh) {
-      mesh.geometry.dispose();
-      mesh.geometry = built.geometry;
-    } else {
-      mesh = new THREE.Mesh(built.geometry, material);
-      group.add(mesh);
-    }
-  };
-  rebuild();
-
+  let tailFan = 0.25;
+  let spread = 0;
   if (!opts.hero) {
-    shell.slider({
-      label: "fluff",
-      min: 0.85,
-      max: 1.2,
-      step: 0.01,
-      value: 1,
-      onInput: (v) => {
-        fluff = v;
-        clearTimeout(timer);
-        timer = window.setTimeout(rebuild, 180);
-      },
-    });
-    shell.setInfo(() => "one number, scaled into every radius — a cold wren fluffs up exactly like this");
+    shell.slider({ label: "wing spread", min: 0, max: 1, step: 0.005, value: 0, onInput: (v) => (spread = v) });
+    shell.slider({ label: "tail fan", min: 0, max: 1, step: 0.01, value: tailFan, onInput: (v) => (tailFan = v) });
+    shell.setInfo(
+      () =>
+        `${eagle.build.triangleCount.toLocaleString()} body triangles + ${eagle.coat.featherCount} feathers · lofted in ${eagle.build.buildMs.toFixed(1)} ms`,
+    );
   }
 
   return {
     frame() {
+      const t = performance.now() / 1000;
+      const breath = Math.sin(t * Math.PI * 2 * 0.4) * 0.4;
+      eagle.pose({ phase: 0, spread, flap: 0, tailFan, beak: 0, theta: breath });
+      // idle: slow head scan so she reads alive even at rest
+      eagle.rig.bone("head").rotation.y = Math.sin(t * 0.5) * 0.35;
       stage.render();
       if (!opts.hero) shell.tick();
     },

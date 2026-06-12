@@ -10,7 +10,7 @@
     <title>The Prism — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The series finale: glass, rainbows, caustics, and focus. One random wavelength per ray turns Snell's law into Newton's spectrum, and the path tracer becomes a toy box of optics."
+      content="The series finale: glass, rainbows, caustics, and focus. One random wavelength per ray adds dispersion and spectral color to the path tracer."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -22,8 +22,7 @@
         <p class="subtitle">
           Part six: a glass prism, a glass sphere, one small lamp — and no
           color anywhere in the scene description. Every hue you see was
-          manufactured in flight, by geometry, out of white light. The series
-          ends where optics began.
+          produced by dispersion as white light passes through the geometry.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -35,13 +34,11 @@
     <main>
       <p>
         Every scene in this series has been opaque. Light bounced; it never
-        <em>entered</em>. But the phenomena that made people fall in love with
-        light — rainbows, the bright lace at the bottom of a swimming pool,
+        <em>entered</em>. Rainbows, the bright patterns at the bottom of a swimming pool,
         the way a lens gathers the sun to a point — all live inside
         transparent things. The finale adds exactly one physical event to the
-        path tracer, refraction, and then stops lying about one number it has
-        quietly rounded off since part one: <em>which</em> light, exactly, is
-        being bent.
+        path tracer, refraction, and then models a quantity simplified since part
+        one: the wavelength of the light being bent.
       </p>
 
       <!-- ================================================================ -->
@@ -53,15 +50,14 @@
         finale: n is not a constant of the glass. It depends on the
         wavelength — blue, the shorter wave, drags more and bends harder. The
         empirical curve is Cauchy's, from 1836: <code>n(λ) ≈ A + B/λ²</code>.
-        White light is a crowd of wavelengths that happens to be walking in
-        step; a prism is two refractions that make each member of the crowd
-        take a slightly different turn.
+        White light contains many wavelengths; a prism separates them because
+        each wavelength refracts at a slightly different angle.
       </p>
       <div data-demo="bench"></div>
       <p>
         Newton's tabletop, in your browser tab. With dispersion at zero the
-        prism merely kinks the white beam — one n, one turn, no color. Raise
-        it and the beam unravels into a fan, red stubborn, violet eager. Now
+        prism bends the white beam — one n, one turn, no color. Raise
+        it and the beam separates into a fan. Now
         rotate the prism until a face catches the inner beam too shallowly:
         the fan vanishes and the beam ricochets inside instead — total
         internal reflection, the same trapping that makes optical fiber
@@ -71,25 +67,25 @@
       <aside class="note">
         <span class="note-label">Aside · The crucial experiment</span>
         <p>
-          Newton's 1666 trick was not splitting white light — prisms were
-          carnival toys — it was the <em>second</em> prism. A red beam picked
+          Newton's crucial 1666 experiment was not splitting white light; it used
+          a <em>second</em> prism. A red beam picked
           out of the first fan and sent through another prism bends but does
           not split further. Color is not added by the glass; it was in the
-          light all along, and the prism merely sorts it. He published in
+          light all along, and the prism separates it. He published in
           <em>Opticks</em> in 1704, and the rendering equation's λ subscript
           is that result, still load-bearing.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Glass in the tracer</span>Fresnel's coin flip</h2>
+      <h2><span class="kicker">Step 2 · Glass in the tracer</span>Reflection or refraction</h2>
       <p>
         In the path tracer, glass is a fork: part of the light reflects off
         the surface, part refracts through, in proportions given by the
         Fresnel equations (graphics uses Schlick's 1994 shortcut). A
         deterministic renderer would split the path and trace both — and
-        double its work at every interface. Monte Carlo shrugs: <em>flip a
-        weighted coin</em>. Reflect with probability F, refract otherwise;
+        double its work at every interface. Monte Carlo samples one branch:
+        reflect with probability F, refract otherwise;
         across thousands of samples the average honors the exact proportions,
         because that is what averages do. The dice that integrated the
         rendering equation in part five absorb a new physical law without a
@@ -109,7 +105,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · One λ per ray</span>Color stops being three numbers</h2>
+      <h2><span class="kicker">Step 3 · One λ per ray</span>Spectral sampling</h2>
       <p>
         Every renderer so far in this series carried color as RGB — three
         floats along every ray. But n(λ) makes that a lie: a "white" ray
@@ -128,11 +124,11 @@ trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth
         moment n spreads, the caustics fringe into rainbows: red and violet
         rays left the same lamp, hit the same prism face, and landed in
         different places. The renderer never contains the concept "rainbow."
-        It contains Snell, Cauchy, and an honest average.
+        It contains Snell, Cauchy, and an unbiased average.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The toy</span>An optics bench with a render budget</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete optics renderer</h2>
       <p>
         The full instrument. Drag the lamp and watch caustics crawl across
         the floor; push dispersion past anything real glass could do; then
@@ -155,7 +151,7 @@ trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>What does it see?</h2>
+      <h2><span class="kicker">Coda</span>What spectral rendering adds</h2>
       <p>
         Six parts ago this series asked its question for the first time: not
         <em>where do things go</em>, which the gravity series spent six parts
@@ -171,12 +167,9 @@ trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth
         The lava lamp's glow, the bonfire's thousand embers, the fog's
         slanting shafts, the sculpture that exists nowhere, the box that
         converges out of static, the rainbow assembled from dice rolls — all
-        of it ran live, in this browser, in the time it took to read. Light
-        is the fastest thing there is and the hardest to fake; the joy of it
-        is that the faking keeps turning out to be physics after all. Both
-        series end the same way on purpose: the simulation becomes a toy,
-        because a toy is what an idea looks like when it finally costs
-        nothing to play with.
+        of it ran live in this browser. The series moved from approximate
+        two-dimensional transport to a spectral path tracer while keeping every
+        stage interactive enough to inspect directly.
       </p>
     </main>
 

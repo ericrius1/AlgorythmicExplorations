@@ -1,5 +1,5 @@
 // Flight as a balance of forces. Until now the wingbeat was choreography —
-// the wing moved and nothing came of it. Here the air pushes back. The wren
+// the wing moved and nothing came of it. Here the air pushes back. The eagle
 // becomes a point mass with an orientation, and four forces decide where she
 // goes: gravity always down, lift perpendicular to her path, drag opposing
 // it, and thrust from the flap stolen out of the downstroke. Integrate those
@@ -22,18 +22,22 @@ export interface FlightParams {
   airDensity: number;
 }
 
+// An eagle's numbers, not a songbird's: four and a third kilos on more than
+// half a square meter of wing. Trim works out near 13 m/s — she flies fast,
+// and everything downstream (turn radii, approach distances, the size of the
+// world) is scaled to that.
 export const FLIGHT_DEFAULTS: FlightParams = {
-  mass: 0.011,
+  mass: 4.3,
   gravity: 9.81,
-  wingArea: 0.006,
+  wingArea: 0.55,
   liftSlope: 5.0,
-  cl0: 0.25,
-  clStall: 1.5,
+  cl0: 0.30,
+  clStall: 1.6,
   cd0: 0.05,
   inducedK: 0.06,
-  // tuned so a half-effort flap holds roughly the trim speed (~7 m/s) rather
+  // tuned so a half-effort flap holds roughly the trim speed (~13 m/s) rather
   // than accelerating without bound — thrust must balance drag near cruise
-  thrustPerFlap: 0.035,
+  thrustPerFlap: 9.0,
   airDensity: 1.225,
 };
 

@@ -22,10 +22,8 @@
         <h1>The Biomes</h1>
         <p class="subtitle">
           Forests hold the wet ground, meadows take the middle, scree and
-          snow divide the heights — and not one decision in sight. Two noise
-          fields and a slope test are doing all the ecology under this
-          camera. The world stops being decorated and starts being
-          inhabited.
+          snow divide the heights. Two noise fields and a slope test determine
+          the distribution under this camera.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -40,12 +38,11 @@
         <a href="/erosion.html">drainage</a>,
         <a href="/grass.html">grass</a>, <a href="/trees.html">trees</a> —
         but so far every demo has assembled them by hand: this grove here,
-        that meadow there. A real landscape doesn't get assembled. Its
-        pattern <em>is</em> information: where trees stop tells you the
+        that meadow there. In a real landscape, the
+        pattern <em>is</em> information: where trees stop indicates the
         temperature, where green turns tan tells you the rainfall, and a
-        glance at any hillside reads as a climate report. Fake that pattern
-        badly — uniform trees sprinkled like parsley — and terrain that
-        survived four articles of care instantly looks like a video game.
+        glance at a hillside reveals its climate. Uniform placement, by contrast,
+        makes procedural terrain visibly artificial.
       </p>
       <p>
         Ecologists compressed the real rules into one famous picture.
@@ -61,11 +58,11 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Climate</span>A second weather, broader than the first</h2>
+      <h2><span class="kicker">Step 1 · Climate</span>The moisture field</h2>
       <p>
         The terrain already gives us altitude and slope at any point — both
-        pure functions. The missing axis is moisture, and the trick is the
-        same one that made the mountains: fractal noise, but much
+        pure functions. For the missing moisture axis, we use the
+        same method that made the mountains: fractal noise, but much
         <em>broader</em> — climate varies over kilometers, not meters. Three
         octaves at a fiftieth of the terrain's frequency produce wet
         regions and rain shadows that sprawl across many hills, which is
@@ -90,7 +87,7 @@ biome(h, slope, m): slope &gt; 0.55 → cliff
       <aside class="note">
         <span class="note-label">Aside · The missing river</span>
         <p>
-          The honest version of moisture isn't noise — it's drainage.
+          A more physically grounded moisture model would use drainage.
           Water flows downhill and collects, so valley floors are wet
           because of the <em>shape of the terrain</em>, and part two
           computed precisely that. But erosion's output is a stored grid,
@@ -104,7 +101,7 @@ biome(h, slope, m): slope &gt; 0.55 → cliff
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Placement</span>The grid that never needs its neighbors</h2>
+      <h2><span class="kicker">Step 2 · Placement</span>Deterministic placement</h2>
       <p>
         Knowing forest-or-meadow at a point is not the same as knowing
         where each individual tree stands. Tree spacing has texture —
@@ -177,7 +174,7 @@ keep if: hash(ci, cj) &lt; P(biome at candidate)     <span class="cm">// the cli
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>One article left</h2>
+      <h2><span class="kicker">Coda</span>Preparing for streaming</h2>
       <p>
         Stand back and audit what the series now owns. Ground:
         h(x, z), a pure function. Climate: moisture(x, z), a pure

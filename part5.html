@@ -7,10 +7,10 @@
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0a0b10" />
-    <title>The Music of the Spheres — Algorythmic Explorations</title>
+    <title>Gravity in Frequency Space — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part five: the cosmic web. Gravity solved as music — an FFT Poisson solver, Zel'dovich initial conditions, and an expanding universe condensing out of primordial static, live in a browser tab."
+      content="Part five: the cosmic web. An FFT Poisson solver, Zel'dovich initial conditions, and an expanding universe evolving from small primordial density variations."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,11 +18,11 @@
     <header class="hero">
       <div data-demo="hero-web"></div>
       <div class="hero-title">
-        <h1>The Music of the Spheres</h1>
+        <h1>Gravity in Frequency Space</h1>
         <p class="subtitle">
-          Part five: the n² wall falls a third time — this time to a change of key.
-          Gravity solved as waves, a mesh instead of a tree, and the cosmic web
-          condensing out of primordial static. Drag through it to perturb the field.
+          Part five solves gravity in frequency space, using a mesh instead of a tree,
+          and grows the cosmic web from small primordial density variations. Drag
+          through it to perturb the field.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -35,7 +35,7 @@
       <p>
         Every part of this series so far has simulated something you could point a
         telescope at: a galaxy, a dome of stars, a glass of water, a ring of dust
-        becoming moons. The simulation above is pointed at everything. Each glowing
+        becoming moons. The simulation above models matter on cosmological scales. Each glowing
         fleck is not a star but a parcel of matter the size of a galaxy cluster, half
         a million of them filling a box that stands in for the whole universe —
         starting from the universe's actual starting condition: almost perfectly
@@ -47,14 +47,14 @@
       </p>
       <p>
         None of the machinery this series has built can run that simulation. Part
-        one's tree wants clumps to summarize; the early universe is uniform, and the
-        structure is in exquisitely small differences. Part three's grid wants forces
+        one's tree is efficient when it can summarize clumps; the early universe is uniform, and the
+        structure is in very small differences. Part three's grid assumes forces
         with a cutoff; gravity has none. This article uses a third structure: a mesh
         and a Fourier transform that solve gravity in frequency space.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · A third kind of problem</span>The universe has no edge</h2>
+      <h2><span class="kicker">Step 1 · A third kind of problem</span>Periodic boundaries</h2>
       <p>
         Start with what makes cosmology different. A galaxy is a thing in empty space;
         you can put a box around it and the box ends. The universe is not in a box —
@@ -82,10 +82,9 @@
       </p>
       <pre><code>∇²φ = 4πG ρ        // the potential's curvature equals the density</code></pre>
       <p>
-        Forces are then just the downhill direction: <code>F = -∇φ</code>. No pairs
-        anywhere. A particle doesn't ask "who pulls me?" — it asks "how steep is the
-        floor where I stand?", and the floor already knows about everyone, periodic
-        images included. The price: given the density everywhere, we must solve that
+        Forces are then the downhill direction: <code>F = -∇φ</code>. There are no
+        particle pairs. Each particle samples the local gradient of a field that
+        already includes every mass and periodic image. Given the density everywhere, we must solve that
         equation for the potential everywhere. Sample the box on a 512×512 mesh and
         Poisson's equation becomes 262,144 simultaneous equations, every unknown
         coupled to its neighbours, sixty times a second. That sounds like a research
@@ -93,7 +92,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Everything is waves</span>Fourier's claim</h2>
+      <h2><span class="kicker">Step 2 · Fourier decomposition</span>Representing a field with waves</h2>
       <p>
         The key fact: any function over the box — however jagged — can be written
         exactly as a sum of sine waves. That is Fourier's theorem, and the demo below
@@ -130,7 +129,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Frequency space</span>Division instead of differential equations</h2>
+      <h2><span class="kicker">Step 3 · Frequency space</span>Solving Poisson's equation</h2>
       <p>
         Take a single wave of density: ρ = sin(<em>k</em>x). Differentiate twice and
         you get −<em>k</em>² sin(<em>k</em>x) — <em>the same wave</em>, scaled. Waves
@@ -156,15 +155,12 @@ for (each wave k) {
 }
 potential = inverse_fft2d(spectrum); // change back</code></pre>
       <p>
-        The middle line is the entire physics. In the position alphabet, Poisson's
-        equation couples every cell to every cell; in the wave alphabet it is
-        diagonal — pure elementwise division. Division by k² is gravity saying it
-        cares about bulk, not detail: a long lazy ripple makes a deep wide well, a
-        rapid flutter barely dents the potential. And notice what the periodic box
-        bought us: sines only fit a torus if they close on themselves, so on a
-        periodic box the wave alphabet isn't an approximation — it is the native
-        script. The boundary condition that crippled the tree is the one the
-        transform gets for free.
+        The middle line completes the physical solve. In position space,
+        Poisson's equation couples every cell to every other cell; in frequency
+        space it becomes elementwise division. Dividing by k² suppresses short
+        wavelengths relative to long ones. Periodic boundaries are a natural fit
+        because the basis waves close across the torus exactly, so the transform
+        handles the boundary condition directly.
       </p>
       <details class="fold">
         <summary>Deep dive: the k = 0 wave, or why only contrast gravitates</summary>
@@ -192,8 +188,7 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
       <div data-demo="paint"></div>
 
       <p>
-        Stop and notice the shape of the trick, because it is the third one this
-        series has pulled. The tree didn't make gravity cheaper; it changed the
+        This is the third change of representation in the series. The tree didn't make gravity cheaper; it changed the
         question to one a tree answers fast. The sort didn't find neighbours faster;
         it rearranged memory so neighbours found themselves. And the transform
         doesn't grind through a differential equation; it carries the problem to an
@@ -203,9 +198,9 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The fast in Fourier</span>n log n</h2>
+      <h2><span class="kicker">Step 4 · Fast Fourier transform</span>O(n log n)</h2>
       <p>
-        One debt outstanding: <code>fft2d</code> itself. Computing one wave's
+        One performance problem remains: <code>fft2d</code> itself. Computing one wave's
         coefficient is a weighted sum over all n samples; n coefficients therefore
         cost n², recreating the scaling problem from earlier parts. A 512×512 mesh
         transformed naively is ~69 billion multiplications
@@ -228,14 +223,14 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
       <div data-demo="butterfly"></div>
 
       <aside class="note">
-        <span class="note-label">Aside · Gauss's notebook and the bomb detectors</span>
+          <span class="note-label">Aside · Early and modern FFTs</span>
         <p>
           The fast transform was found by the right man absurdly early. In 1805 Carl
           Friedrich Gauss — interpolating the orbit of the asteroid Pallas, which is
           to say, <em>doing gravity</em> — needed exactly these sums, noticed the
           even/odd split, scribbled it in a notebook in Latin, and never published.
-          The idea slept for 160 years. It woke in 1965, when Cooley and Tukey
-          reinvented it so seismometer arrays could tell Soviet underground nuclear
+          The idea went unpublished for 160 years. In 1965, Cooley and Tukey
+          independently developed it so seismometer arrays could distinguish Soviet underground nuclear
           tests from earthquakes — a treaty-verification problem with a budget. Within
           a decade the FFT was running everywhere signals were. Every phone call,
           every image, every MRI scan passes through Gauss's notebook; by operation
@@ -257,7 +252,7 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · The mesh machine</span>Particles meet the field</h2>
+      <h2><span class="kicker">Step 5 · Particle-mesh method</span>Coupling particles to the field</h2>
       <p>
         The solver speaks fields; the matter is particles. The bridge is the last new
         idea, and after parts three and four it will feel familiar. The scheme is
@@ -308,7 +303,7 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · Initial conditions</span>Seeding and growing a universe</h2>
+      <h2><span class="kicker">Step 6 · Initial conditions</span>Evolving the density field</h2>
       <p>
         The solver is built. Two ingredients remain for the cosmology demo.
       </p>
@@ -368,7 +363,7 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Three structures</h2>
+      <h2><span class="kicker">Coda</span>Comparing the three spatial methods</h2>
       <p>
         Across five parts, the n² wall fell three times, using three different
         computational structures:
@@ -396,8 +391,8 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
         fast; the tree (part one) carries the near field, sharp and adaptive where
         matter clumps. Part four married the tree to the sort; the professionals
         marry the tree to the mesh. Every structure in this series is load-bearing in
-        production cosmology, today, in the same combinations this series stumbled
-        into by following the physics.
+        production cosmology, in combinations chosen to match the physics at different
+        scales.
       </p>
       <p>
         Further extensions include a third coordinate, adaptive meshes nested in deep
@@ -407,10 +402,9 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
         evolves it into a cosmic web.
       </p>
       <p>
-        <strong>Continued in <a href="/part6.html">Part six: The Sorcerer's Apprentice</a></strong> —
-        the series becomes a toy: a 3D stable-fluids solver, curl noise, half a
-        million paint particles, and your actual hands conducting the whole thing
-        through the webcam.
+        <strong>Continued in <a href="/part6.html">Part six: The Fluid Instrument</a></strong> —
+        a 3D stable-fluids solver, curl noise, half a million paint particles, and
+        optional webcam hand tracking.
       </p>
       <p>
         ← <a href="/part4.html">Part four: Worlds from Dust</a> ·

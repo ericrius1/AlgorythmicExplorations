@@ -20,10 +20,10 @@
       <div class="hero-title">
         <h1>The Cornell Box</h1>
         <p class="subtitle">
-          Part five: the picture above is being computed by gambling. Every
+          Part five: the picture above is being estimated with random sampling. Every
           pixel fires random rays into the room and averages what they find;
-          the static you see at first <em>is</em> the honest uncertainty of an
-          estimate mid-converge. Wait, and watch noise become light.
+          the static you see at first is the variance of an
+          estimate that has not yet converged.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -34,10 +34,9 @@
 
     <main>
       <p>
-        Part four ended in debt. Soft shadows from near misses, skylight from a
-        dot product, darkness from five probes — fast lies standing in for a
-        truth nobody had stated yet. Here is the truth, from James Kajiya in
-        1986, and it fits in a line:
+        Part four approximated soft shadows, skylight, and contact darkness with
+        local heuristics. The rendering equation, formalized by James Kajiya in
+        1986, describes the full problem in one line:
       </p>
       <pre><code>L(x, ω) = Le(x, ω) + ∫ f·L(x', ω')·cosθ dω'   <span class="cm">// leaving = emitted + arriving, over all directions</span></code></pre>
       <p>
@@ -48,16 +47,16 @@
         scene: every bounce count, every route, every detour off the red wall.
         Two parts of this series solved it in 2D by hierarchy. In 3D, the
         integral's dimensionality explodes — and the tool that survives the
-        explosion is the strangest one in numerical analysis.
+        explosion is Monte Carlo integration.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Monte Carlo</span>Integration by gambling</h2>
+      <h2><span class="kicker">Step 1 · Monte Carlo</span>Random-sample integration</h2>
       <p>
         To integrate a function you cannot afford to evaluate everywhere,
-        evaluate it <em>somewhere, at random</em> — and weight the answer
-        honestly. The average of many random evaluations converges to the true
-        integral; that is the law of large numbers wearing a lab coat. For the
+        evaluate it <em>somewhere, at random</em> and weight the answer
+        appropriately. The average of many random evaluations converges to the true
+        integral by the law of large numbers. For the
         rendering equation, "evaluate at random" means: follow one random path
         of light, all the way through its bounces, and report what it found.
       </p>
@@ -72,7 +71,7 @@
       <div data-demo="noise"></div>
       <p>
         Hit <em>pause</em> early, while the room is still a blizzard. That
-        frozen frame is what a handful of dice rolls knows about the scene —
+        frozen frame is an estimate from a small number of random samples —
         some pixels got lucky paths, most didn't. Resume and the law grinds
         forward: smooth at 64 samples, refined at 256, and the last subtle
         gradients still creeping in past 4,000. Nothing about the algorithm
@@ -112,23 +111,23 @@
         light sampling <em>off</em>, the room at one second is a cave of
         fireflies — bright speckles where a lucky path stumbled into the lamp.
         With it <em>on</em>, the same one second of work produces a smooth,
-        plausible room. Same scene, same number of rays, same honest
+        plausible room. Same scene, same number of rays, same unbiased
         average — the variance went into a different variable. The general
         principle is called <em>importance sampling</em>, and the modern
         renderer is mostly a tower of it.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Paying the debt</span>Bounce by bounce</h2>
+      <h2><span class="kicker">Step 3 · Indirect light</span>Bounce by bounce</h2>
       <p>
-        Part four faked three things: soft shadows, ambient light, and contact
-        darkness. Watch all three stop being fake, one bounce at a time:
+        Part four approximated soft shadows, ambient light, and contact
+        darkness. Here they emerge from additional light bounces:
       </p>
       <div data-demo="bounces"></div>
       <p>
         At one bounce the box is direct light only — hard geometry of lit and
         unlit, the ceiling black because no lamp shines up. Two bounces and the
-        debt starts clearing: the red wall <em>bleeds onto the white sphere</em>,
+        indirect effects appear: the red wall <em>bleeds onto the white sphere</em>,
         the ceiling glows with floor-light, shadows fill with ambience that
         comes from somewhere instead of a constant. By six, the corners hold
         that soft contact darkness AO could only impersonate — emerging here as
@@ -138,11 +137,11 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The box as instrument</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete renderer</h2>
       <p>
-        The full toy. Drag to carry the lamp — and notice the renderer's
-        honesty: the moment anything moves, the accumulated past becomes a lie
-        and the image restarts from static. Shrink the light to a point and
+        The complete demo. Drag to carry the lamp. The moment anything moves,
+        the accumulated samples no longer match the scene, so the image restarts
+        from static. Shrink the light to a point and
         shadows go knife-edged; stretch it wide and they melt, the soft shadow
         part four approximated with one clever multiply now arising from
         actual area, actually sampled. Set the sphere to <em>mirror</em> and
@@ -161,7 +160,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>What the dice still owe</h2>
+      <h2><span class="kicker">Coda</span>Remaining limitations</h2>
       <p>
         This is the algorithm behind every film frame rendered this century —
         Kajiya's equation, Monte Carlo, and forty years of increasingly loaded

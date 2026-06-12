@@ -10,7 +10,7 @@
     <title>The Bonfire — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part two: a thousand lights for the price of one. Embers on curl-noise wind, multi-bounce color bleeding from a one-frame time loop, the sky as the topmost cascade — and a fire you can stir with your bare hands."
+      content="Part two: thousands of ember lights at fixed rendering cost, with curl-noise wind, multi-bounce color bleeding, an environment-lit top cascade, and hand interaction."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -21,9 +21,9 @@
         <h1>The Bonfire</h1>
         <p class="subtitle">
           Part two: every ember above is a real light source, and there are thousands
-          of them. The trees cast their shadows, the ground blushes with bounced fire,
-          the sky is whatever the topmost cascade says it is. Stir the smoke with your
-          cursor — or click ✋ in the last demo and feed the fire by hand.
+          of them. The trees cast shadows, the ground receives bounced firelight,
+          and the topmost cascade supplies the sky. Stir the smoke with your
+          cursor, or click ✋ in the last demo to use hand tracking.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -42,7 +42,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Fixed rendering cost</span>A thousand lights, one price</h2>
+      <h2><span class="kicker">Step 1 · Fixed rendering cost</span>Many-light rendering</h2>
       <p>
         Recall the shape of the algorithm. Radiance cascades never ask "where are the
         lights?" — they ask every probe "what do you <em>see</em>?", marching rays
@@ -55,7 +55,7 @@
         Forward rendering pays per light, per pixel —
         film and game lighting departments have spent forty years budgeting
         <em>light counts</em>. The gravity series spent six parts reducing an n²
-        between bodies. Light transport has the same n² — every pixel wants light
+        between bodies. Light transport has the same n² — every pixel needs light
         from every source — and radiance cascades dissolve it by changing the
         question: stop enumerating sources and sample the field they create. It is
         similar to the particle-mesh approach from part five.
@@ -64,14 +64,14 @@
       <p>
         Drag the slider from sixteen lights to eight thousand and watch the only
         number that matters: the frame rate, which does not care. Each spark is a
-        genuine emitter <em>and</em> a genuine occluder — sparks shadow each other,
+        emitter <em>and</em> an occluder — sparks shadow each other,
         visible when a dense cloud drifts behind a pillar. The wind is part six's
         curl noise, four lines of it, because divergence-free drift is still the
-        cheapest way to make particles look alive.
+        inexpensive way to give particles continuous, non-repeating motion.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The time loop</span>Bounce from the previous frame</h2>
+      <h2><span class="kicker">Step 2 · Temporal feedback</span>Bounce from the previous frame</h2>
       <p>
         Everything so far is <em>direct</em> light: source to surface, one hop. Real
         rooms are mostly lit by the second hop — light that hit a wall and left
@@ -94,7 +94,7 @@
         <p>
           The textbook approach is radiosity, published in 1984 — the year Cornell
           built the box that every graphics paper since has photographed. It solves
-          the full surface-to-surface coupling as a matrix. The time-loop trick above
+          the full surface-to-surface coupling as a matrix. The time-loop method above
           computes the same geometric series, one term per frame, for the cost of a
           texture read.
         </p>
@@ -111,17 +111,17 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The biggest light</span>The sky is a cascade</h2>
+      <h2><span class="kicker">Step 3 · Environment light</span>The sky is a cascade</h2>
       <p>
         One light has been missing from this series, and it is the big one. Daylight
         is not a source in the scene — it is what the world looks like when rays
         escape the scene entirely. The cascade hierarchy has a precise slot for
-        exactly that idea. When a top-cascade ray finishes its interval having hit
+        that case. When a top-cascade ray finishes its interval having hit
         nothing, part one merged it with darkness. But "what does a ray see when it
         leaves the world?" has a better answer: <em>the environment</em>. Replace the
         black with a function of direction — dark blue overhead, ember-orange at the
         horizon, a bright smear where the sun sits — and every probe, every pixel,
-        every shadow now agrees about the sky, for free.
+        every shadow now uses the same environment light without an additional pass.
       </p>
       <pre><code>if (top cascade ray escapes):
     radiance = sky(direction)   <span class="cm">// the horizon is just the merge nobody claimed</span></code></pre>
@@ -144,7 +144,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>Feed the fire</h2>
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete bonfire</h2>
       <p>
         Everything at once, plus the part six controller: click ✋, let the camera
         find your hand, and use it to control the fire. Your palm stirs the wind that carries
@@ -155,7 +155,7 @@
       </p>
       <div data-demo="fire"></div>
       <p>
-        The debug views tell the same story as part one, with better scenery.
+        The debug views expose the same stages as part one.
         <em>Scene</em> is a few silhouettes and a swarm of bright dots — the entire
         input. <em>Distance field</em> shows the jump flood rippling as embers fly
         through it, a thousand moving holes in space. <em>Light only</em> shows the
@@ -164,7 +164,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>What the question costs</h2>
+      <h2><span class="kicker">Coda</span>Current limitations</h2>
       <p>
         This part adds a thousand lights, repeated bounce, and an environment map
         with three small edits, none of which touch the cascade march, merge, or
@@ -172,7 +172,7 @@
         many light sources the scene contains.
       </p>
       <p>
-        What it cannot do yet is also visible above, if you look for it. The smoke
+        One limitation is visible above: the smoke
         doesn't scatter — rays pass through empty space untouched, so there are no
         god rays slanting through the trees, no glow trapped in haze. Light in this
         world is binary: it travels free or it stops dead. The next part is about the

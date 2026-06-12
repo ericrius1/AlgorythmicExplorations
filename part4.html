@@ -20,9 +20,9 @@
       <div class="hero-title">
         <h1>Worlds from Dust</h1>
         <p class="subtitle">
-          Part four: the series' two machines meet. Gravity from part one's pyramid,
+          Part four combines the series' two data structures. Gravity comes from part one's pyramid,
           collisions from part three's grid, one buffer between them — and a ring of dust
-          that clumps into moons. Stir it and watch it heal.
+          that clumps into moons. Stir it and watch the ring reform.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -46,7 +46,7 @@
         That is this article. The ring above is sixty thousand grains of dust on
         near-circular orbits around a star. Every grain pulls on every other grain
         through part one's pyramid; every grain shoves the grains it actually touches
-        through part three's counting sort. Left alone, the ring curdles — clumps
+        through part three's counting sort. Left alone, the ring develops clumps that
         condense, collide, and grow into moonlets. It is a simplified, two-dimensional
         version of planetesimal formation.
       </p>
@@ -57,7 +57,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Ghosts</span>Why gravity can't finish the job</h2>
+      <h2><span class="kicker">Step 1 · Collisionless bodies</span>Why collisions matter</h2>
       <p>
         Part one's <em>softening</em> parameter was
         introduced as a fix for division by zero. Its real meaning is physical: it
@@ -78,17 +78,17 @@
       <p>
         The cloud falls inward, as it must. And then it <em>misses</em>. Every grain
         sails through the centre, out the far side, and back up to nearly the height
-        it fell from — the cloud breathes in and out forever. It cannot settle, and
+        it fell from, so the cloud repeatedly contracts and expands. It cannot settle, and
         the reason is bookkeeping: gravity is a conservative force. Whatever kinetic
         energy the collapse gains, the re-expansion spends, exactly. A cloud that
         interacts only through gravity has no way to get rid of the energy of its own
         fall. Press the <em>both</em> button and the same cloud does something a
-        galaxy never does — but that's Step 4's story. First the contacts have to
+        galaxy never does. First the contacts have to
         survive leaving their box.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Losing the box</span>A grid with no walls</h2>
+      <h2><span class="kicker">Step 2 · Unbounded space</span>A sparse hash grid</h2>
       <p>
         Part three's grid had a hidden load-bearing wall — four of them. The cell
         index was computed from position inside a fixed box, and the box made the cell
@@ -148,7 +148,7 @@
         <em>permutes the particles every substep</em>: grain #4,071 is somebody else
         after every shuffle. Part one's solver carried a per-body mass array, indexed
         by particle number. Bolt them together naively and the masses stay put while
-        the particles dance — every grain inherits a stranger's weight, sixty times a
+        the particles move — every grain inherits another grain's weight, sixty times a
         second.
       </p>
       <p>
@@ -162,7 +162,7 @@
         is sampled.
       </p>
       <p>
-        With that, the two structures snap together, every substep, on the same
+        With that change, the two structures can operate every substep on the same
         buffer:
       </p>
       <pre><code>sort     → hash, count, scan, scatter        // part three (4 dispatches + scan)
@@ -187,7 +187,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         just forces" move as part two's dome.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The professionals do it this way too</span>
+        <span class="note-label">Aside · Production planet-formation codes</span>
         <p>
           The workhorse codes of planetary science — Derek Richardson and colleagues'
           <em>pkdgrav</em> (2000) is the standard citation — are tree codes for
@@ -199,7 +199,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Dissipation</span>Losing energy on purpose</h2>
+      <h2><span class="kicker">Step 4 · Dissipation</span>Dissipative collisions</h2>
       <p>
         Here is the part that no data-structure cleverness supplies. Go back to the
         collapsing cloud and try all three buttons:
@@ -211,7 +211,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         <em>Gravity only</em> is Step 1's ghost: collapse, miss, re-expand, forever.
         <em>Contacts only</em> is a handful of marbles tossed in space: they bump,
         drift, and disperse, because nothing binds them. But <em>both</em> produces
-        something new — the cloud collapses, and this time the fall <em>lands</em>.
+        a bound result — the cloud collapses and remains compact.
         Grains pile onto grains; the swirl tightens into a dense, slowly-spinning ball
         with debris settling around it. A planetesimal.
       </p>
@@ -248,7 +248,7 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · The disk</span>Moons from a ring</h2>
+      <h2><span class="kicker">Step 5 · The disk</span>Accretion from a debris ring</h2>
       <p>
         The collapse demo is planet formation with the difficulty turned down — a
         cloud with nowhere to go but inward. The real nursery is a <em>disk</em>, and
@@ -259,13 +259,13 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       <div data-demo="disk"></div>
 
       <p>
-        The antagonist in a disk is <em>shear</em>. Orbits are faster on the inside
+        The competing effect in a disk is <em>shear</em>. Orbits are faster on the inside
         lane — Kepler's third law — so any clump that starts to gather is constantly
         smeared into a spiral arc by its own halves orbiting at different rates. Watch
         the early frames: the ring doesn't clot evenly, it grows tight spiral streaks
-        — self-gravity winning locally while shear stretches the winnings. Where
+        as self-gravity gathers material locally while shear stretches it. Where
         enough grains crowd together, a knot condenses out of a streak, collisions
-        kill its internal motion, and a moonlet is born. From then on it sweeps its
+        reduce its internal motion, and a moonlet forms. From then on it sweeps its
         lane, scattering or swallowing what it meets, and the survivors space
         themselves out like teeth on a comb.
       </p>
@@ -279,8 +279,8 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
           self-gravity keeps trying to make moons and whose shear keeps tearing them
           apart. Cassini photographed the stalemate — ephemeral elongated clumps
           (<em>self-gravity wakes</em>, the spiral streaks above) and hundred-metre
-          "propeller" moonlets that won their local fight but not the war. The
-          stickiness slider moves the front line of that battle.
+          "propeller" moonlets that remain locally bound without becoming full moons.
+          The stickiness slider changes the balance between aggregation and shear.
         </p>
       </aside>
       <p>
@@ -288,17 +288,17 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         dust is embedded in gas whose drag both saps orbits and — via the
         <em>streaming instability</em> — actively herds grains into clumps, and real
         collisions can shatter as well as stick. This demo has none of that; it is a
-        cartoon. But the cartoon's skeleton — a tree for the far field, a sorted grid
-        for the near field, dissipation doing the creating — is the production
-        skeleton, and every refinement is one more force or one more sorted array
+        simplified model. But its basic structure — a tree for the far field, a sorted grid
+        for the near field, and dissipative collisions — also appears in production
+        simulations, and every refinement is one more force or one more sorted array
         away.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What part four teaches</h2>
+      <h2><span class="kicker">Epilogue</span>Composing spatial structures</h2>
       <p>
-        <strong>1. Structures compose.</strong> The pyramid never learned about the
-        hash grid; the hash grid never learned about the pyramid. Each answers exactly
+        <strong>1. Structures compose.</strong> The pyramid and hash grid remain
+        independent. Each answers exactly
         one question — "what does everything far away add up to?", "who is touching
         me?" — and the force kernel just asks both. Production simulations are not one
         clever structure; they are libraries of single-purpose ones, composed.
@@ -328,8 +328,8 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         that matches the physics, then arranging it for parallel construction.
       </p>
       <p>
-        <strong>Continued in <a href="/part5.html">Part five: The Music of the Spheres</a></strong> —
-        the n² wall falls a third time, to a change of key: gravity solved by FFT,
+        <strong>Continued in <a href="/part5.html">Part five: Gravity in Frequency Space</a></strong> —
+        gravity is solved with an FFT,
         Poisson's equation collapsing to a single division, and the cosmic web
         condensing out of measured primordial ripples.
       </p>

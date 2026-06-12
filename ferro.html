@@ -21,8 +21,8 @@
       <div class="hero-title">
         <h1>The Ferrofluid</h1>
         <p class="subtitle">
-          A new series begins with a liquid that should not exist: ink-black,
-          glossy, and magnetic. Your cursor is the magnet. Hold it near the pool
+          A new series begins with an ink-black, glossy, magnetic liquid.
+          Your cursor is the magnet. Hold it near the pool
           and the fluid climbs; the surface you see is rebuilt from the particles,
           from scratch, every frame.
         </p>
@@ -35,10 +35,10 @@
 
     <main>
       <p>
-        Ferrofluid is a real substance with a science-fiction résumé: an oil
+        Ferrofluid is an oil
         crowded with magnetite grains so small (about ten nanometers) that thermal
         jostling keeps them suspended forever, so the liquid as a whole responds
-        to a magnet while staying honestly liquid. Hold a magnet underneath a dish
+        to a magnet while remaining liquid. Hold a magnet underneath a dish
         of it and the surface breaks into a regular crown of spikes — the
         <em>Rosensweig instability</em>, the signature image of the stuff.
       </p>
@@ -46,8 +46,8 @@
         This article builds one in a browser tab. The fluid machinery is borrowed
         whole from the <a href="/part3.html">water</a> and
         <a href="/lava.html">lava lamp</a> articles — particles, grid sort,
-        double-density relaxation. What's new is the antagonist (a magnet, stated
-        as a force) and the rendering: instead of thresholding a blurry field into
+        double-density relaxation. The additions are a magnetic force and a new
+        rendering method: instead of thresholding a blurry field into
         pixels, the surface is <em>extracted as geometry</em> — line segments,
         meshed on the GPU every frame by the two-dimensional cousin of one of the
         most-used algorithms in graphics.
@@ -58,28 +58,27 @@
           Ferrofluid was invented at NASA. In 1963, Steve Papell was working on a
           problem of weightlessness — rocket propellant floats away from the pump
           inlet in zero g — and proposed grinding magnetic particles into the fuel
-          so a magnetic field could herd it where the plumbing needed it. The
+          so a magnetic field could move it toward the pump inlet. The
           propellant idea lost out to other solutions; the liquid escaped the
-          space program and built an industry of loudspeaker coolants, rotary
-          seals, and mesmerizing desk toys. Ronald Rosensweig, who developed the
+          space program and found uses in loudspeaker coolants, rotary
+          seals, and display objects. Ronald Rosensweig, who developed the
           theory (and the word <em>ferrohydrodynamics</em>), explained the spikes
           the fluid grows in a field — and they now carry his name.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Three forces</span>Why spikes, of all shapes</h2>
+      <h2><span class="kicker">Step 1 · Three forces</span>Why spikes form</h2>
       <p>
-        The spike crown is a three-way fight, and the simulation needs exactly the
-        three fighters:
+        The spike crown results from three competing forces:
       </p>
       <p>
-        <strong>Gravity</strong> wants the surface flat. <strong>Surface
+        <strong>Gravity</strong> favors a flat surface. <strong>Surface
         tension</strong> — the Akinci-style cohesion force the
         <a href="/lava.html">lava lamp</a> added to keep its wax in one piece —
-        wants the surface <em>small</em>: it charges for every extra centimeter of
-        interface, so it too votes flat, and rounds off anything that tries to be
-        pointy. The <strong>magnet</strong> disagrees. A magnetizable fluid is
+        penalizes additional interface area, so
+        it also favors a flat surface and rounds sharp features. The <strong>magnet</strong>
+        pulls in the opposite direction. A magnetizable fluid is
         pulled toward where the field is strongest — the force is the gradient of
         the field's energy density, F ∝ ∇|B|² — and for a dipole that gradient
         has a useful anatomy:
@@ -88,10 +87,10 @@
 F = ∇|B|²                     <span class="cm">// toward the magnet — and sideways, toward its axis</span></code></pre>
       <p>
         The radial part pulls fluid toward the magnet. The angular part is the
-        spike-maker: off-axis fluid is pushed <em>toward the axis</em>, so instead
+        source of the spike: off-axis fluid is pushed <em>toward the axis</em>, so instead
         of a broad mound the fluid gathers into a column aligned with the field.
-        Tension fights the column's sharp tip, gravity fights its height, and the
-        standoff is a spike of definite size. (In a real dish the fight repeats
+        Surface tension limits the sharp tip, gravity limits the height, and the
+        balance produces a spike of definite size. (In a real dish the balance repeats
         across the whole surface and the spikes space themselves out — their
         spacing is set by the same gravity-versus-tension balance, the capillary
         length. With one moving magnet, this demo grows them one or two at a
@@ -100,7 +99,7 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
       <p>
         In the force kernel the magnet is six lines — the same
         "constraints are forces" move as the dome, the tank walls, and the lamp's
-        buoyancy. Nothing else in the SPH stack learned anything about magnetism.
+        buoyancy. Nothing else in the SPH implementation changes.
       </p>
 
       <!-- ================================================================ -->
@@ -109,18 +108,18 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         The lava lamp rendered its wax by splatting particles into a blurry
         density field and shading every pixel past a threshold. That worked
         because wax is soft and the lamp is dim. A ferrofluid spike is the
-        opposite client: glossy, ink-dark, with a silhouette so crisp it's the
-        whole show. For that, we want the surface itself — as geometry, not as a
+        opposite case: glossy, ink-dark, with a silhouette that defines its
+        appearance. For that, we need the surface itself — as geometry, not as a
         smoothstep.
       </p>
       <p>
-        The field already knows where the surface is: it's the contour where the
-        splat sum crosses the threshold. <em>Marching squares</em> extracts it.
+        The surface is the contour where the splat sum crosses the threshold.
+        <em>Marching squares</em> extracts it.
         Walk every 2×2 cell of field texels and ask the four corners: above the
         threshold or below? Sixteen possible answers, and each one dictates how
         the contour crosses the cell — through this edge and that one, with the
-        crossing point interpolated from the corner values. Each cell volunteers
-        its zero, one, or two little line segments; together they chain into the
+        crossing point interpolated from the corner values. Each cell contributes
+        zero, one, or two line segments; together they chain into the
         complete surface.
       </p>
       <div data-demo="mesh"></div>
@@ -135,7 +134,7 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         hearing the number.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The most litigated triangles in graphics</span>
+        <span class="note-label">Aside · The history of marching cubes</span>
         <p>
           The 3D version — <em>marching cubes</em>, 256 corner cases instead of
           16 — was published by Lorensen and Cline in 1987 and became the default
@@ -147,7 +146,7 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: the saddle, or sixteen cases minus two honest ones</summary>
+        <summary>Deep dive: resolving the two saddle cases</summary>
         <div class="fold-body">
           <p>
             Fourteen of the sixteen corner patterns are unambiguous. The two
@@ -156,8 +155,8 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
             touching. The cell's four corners genuinely cannot tell the
             difference; the demo breaks the tie by sampling the field once more at
             the cell's center. Watch a blob split in the mesh view and you are
-            watching saddle cases change their minds frame by frame — for a
-            pinching ferrofluid neck, that tie-break <em>is</em> the moment of
+            watching the selected topology change frame by frame. For a
+            pinching ferrofluid neck, that tie-break determines the moment of
             separation.
           </p>
         </div>
@@ -167,12 +166,12 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
       <h2><span class="kicker">Step 3 · Assembly</span>The dish</h2>
       <p>
         Everything together: the SPH pool, the cursor-magnet, and the per-frame
-        mesh — filled and shaded this time. The shading cheats honestly: the
+        mesh — filled and shaded this time. The shading uses an approximation: the
         field's gradient stands in for a surface normal (dense interior = tall),
-        which buys the glossy highlight that makes the liquid read as ferrofluid
+        which produces the glossy highlight that makes the liquid read as ferrofluid
         rather than tar. Drag the tension to zero and the spikes dissolve into
         spray; drag it high and the fluid balls up and resists the magnet; find
-        the middle and you get the standoff the real liquid lives at. The
+        the middle and you get the balance observed in the real liquid. The
         <em>view</em> button exposes each stage — final, mesh, the raw field with
         its threshold contour, and the particles underneath it all.
       </p>
@@ -180,27 +179,26 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
       <p>
         Worth noticing while you play: the mesh view's segment count (in the
         readout) holds roughly steady while the fluid is calm, then spikes when
-        the surface grows spikes — geometry is being created exactly where the
-        surface buys complexity. And nothing remembers the mesh between frames.
+        the surface grows spikes, because more detailed surfaces require more segments.
+        Nothing retains the mesh between frames.
         Like the gravity series' trees, rebuilt from scratch every step because
         rebuilding parallelizes and updating doesn't, the surface is cheaper to
         re-derive than to maintain.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Where this series goes</h2>
+      <h2><span class="kicker">Coda</span>Possible extensions</h2>
       <p>
         This article is the 2D proof of a pipeline: particles → field →
-        <em>geometry</em>, every frame, all on the GPU. Each arrow has an obvious
-        next rung. The fluid wants a second phase (the lava lamp's water,
-        actually simulated, so buoyancy emerges instead of being decreed). The
-        meshing wants a third dimension — marching squares becomes marching
+        <em>geometry</em>, every frame, all on the GPU. Several extensions follow
+        directly. A second simulated phase could replace the lava lamp's
+        prescribed buoyancy. Moving the
+        meshing to three dimensions changes marching squares into marching
         cubes, segments become triangles, and the prefix-sum machinery from the
-        gravity series already knows how to allocate them. And sharp features
-        want a sharper extractor: marching cubes rounds off exactly the spike
-        tips this fluid is proudest of, which is the problem <em>dual
-        contouring</em> exists to solve. Particles first, then surfaces, then —
-        as always in these series — light.
+        gravity series can allocate them. Sharp features also benefit from a
+        sharper extractor: marching cubes rounds off exactly the spike
+        tips that define this fluid, which is the problem <em>dual
+        contouring</em> exists to solve.
       </p>
     </main>
 

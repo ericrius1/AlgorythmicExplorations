@@ -14,7 +14,7 @@
 
 import * as THREE from "three/webgpu";
 import { Rig } from "./rig";
-import { solveTwoBone, aimJoint } from "./ik";
+import { solveTwoBone, aimJoint, GAZE_FORWARD } from "./ik";
 import { MOVES, WUJI, sampleMove, type Move, type Pose } from "./poses";
 
 const DEG = Math.PI / 180;
@@ -218,8 +218,9 @@ export class Animator {
       this.gazePoint.set(gazeWanted[0], gazeWanted[1], gazeWanted[2]);
       // the gaze itself is eased so glances feel intentional, not servo-driven
       this.gazeCurrent.lerp(this.gazePoint, Math.min(1, dt * 3.5));
-      aimJoint(rig, "neck", this.gazeCurrent, 28, 0.35);
-      aimJoint(rig, "head", this.gazeCurrent, 45, 0.55);
+      aimJoint(rig, "neck", this.gazeCurrent, 28, 0.45, GAZE_FORWARD);
+      rig.update();
+      aimJoint(rig, "head", this.gazeCurrent, 45, 0.75, GAZE_FORWARD);
       rig.update();
     }
   }

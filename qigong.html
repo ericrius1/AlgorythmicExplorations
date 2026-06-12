@@ -10,7 +10,7 @@
     <title>The Form — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The bear performs qi gong without a single animation clip: poses as joint-angle targets, critically damped springs as the only notion of time, breath and foot-planting and gaze as layers. Call the moves in any order and every transition just works."
+      content="A procedural qi gong routine built without animation clips: joint-angle targets, critically damped springs, breathing, foot planting, and gaze layers."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -23,10 +23,9 @@
         <p class="subtitle">
           The bear above is practicing right now — Lifting the Sky, Drawing the
           Bow, Swaying the Head and Wagging the Tail — and none of it is a
-          recording. There is no animation clip anywhere in this series. There
+          recording. There are no animation clips in this series. There
           are tables of joint angles, and springs that chase them. This final
-          article builds the whole performance: poses as targets, springs as
-          blends, and a form you can conduct.
+          article combines poses as targets, springs as blends, and user-controlled sequencing.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -37,10 +36,9 @@
 
     <main>
       <p>
-        Take stock of what three articles bought. A body lofted, ring by
-        ring, around a table of bones; a skeleton with skin weights, bending on the GPU; and
-        wants — put the paw there, watch the firefly — compiled into joint
-        angles by a triangle and a clamp. What is still missing is the thing
+        The previous three articles produced a body lofted around a table of
+        bones, a GPU-skinned skeleton, and target-based inverse kinematics.
+        What is still missing is the thing
         audiences actually call <em>animation</em>: whole-body intent,
         sustained over seconds, one shape flowing into the next.
       </p>
@@ -50,14 +48,12 @@
         crossfade. Clips are wonderful right up until someone interactive
         touches them — interrupt a crossfade with a new request and you need a
         blend of blends, then a tree of those, and the tree grows arbitration
-        logic of its own. This article takes the other road, the one this
-        site always takes, and it turns out to dissolve the blending problem
-        entirely: <em>never store motion at all</em>. Store destinations. Let
-        physics do the traveling.
+        logic of its own. This article instead stores target poses and uses
+        dynamics to move between them.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The vocabulary</span>Poses as places</h2>
+      <h2><span class="kicker">Step 1 · The vocabulary</span>Pose targets</h2>
       <p>
         A <strong>pose</strong> here is nothing but a table: joint name →
         three Euler angles, plus an optional whole-body lift. The qi gong
@@ -98,18 +94,18 @@
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The time machine</span>Springs as blends</h2>
+      <h2><span class="kicker">Step 2 · Temporal blending</span>Springs as blends</h2>
       <p>
-        Here is the idea the whole article stands on. The move player never
+        The move player never
         rotates a joint. It only writes <em>targets</em> — and every joint
         chases its target with a <strong>critically damped spring</strong>:
         acceleration proportional to the remaining error, damping tuned to the
         exact value where the joint arrives as fast as possible <em>without
         overshooting</em>. The spring owns two numbers per channel — position
-        and velocity — and the velocity is the magic. When a new move
+        and velocity. Preserving velocity is the important part. When a new move
         interrupts an old one, the spring does not restart; it carries its
-        momentum into the new chase. The result reads as a performer changing
-        their mind, not a video changing its frame.
+        momentum toward the new target. This avoids a visible restart when a
+        move is interrupted.
       </p>
       <p>
         Watch the three philosophies race. The grey line is a hard cut — what
@@ -132,11 +128,10 @@
 vel += k·err·dt − c·vel·dt               <span class="cm">// k from the stiffness, c = 2√k (ζ = 1)</span>
 current = exp(vel·dt) · current          <span class="cm">// physics that refuses to teleport</span></code></pre>
       <p>
-        One knob falls out of the math: the spring frequency, in honest hertz —
-        the bear's <em>muscle speed</em>. Around 1.3&nbsp;Hz it moves like a
-        large, calm animal. Crank it to 3&nbsp;Hz and it snaps to its stances
-        like a drill sergeant; drop it to half a hertz and it underwater-dreams
-        through the same form, every keypose arriving late and soft. Same
+        One control follows from the math: the spring frequency, in hertz —
+        the bear's response speed. Around 1.3&nbsp;Hz it moves like a
+        large, calm animal. At 3&nbsp;Hz it snaps quickly to each stance; at
+        half a hertz it moves slowly through the same form. The same
         tables, same schedule — one number changes the character's apparent
         mass.
       </p>
@@ -148,15 +143,13 @@ current = exp(vel·dt) · current          <span class="cm">// physics that refu
           <em>inertialization</em> made the case that transitions should be
           physical decays rather than crossfades — Gears of War shipped on it —
           and Daniel Holden's writing catalogued the critically damped spring
-          as the single most useful object in a gameplay animator's toolbox
-          (cameras, aim offsets, IK targets, everything). The thirty-line
-          version in this article's animator is the same animal, just with the
-          fur visible.
+          as a broadly useful tool for gameplay animation, including cameras,
+          aim offsets, and IK targets. The animator here uses the same method.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The layers</span>Breath, ground, gaze</h2>
+      <h2><span class="kicker">Step 3 · The layers</span>Layered procedural motion</h2>
       <p>
         Springs chasing keyposes already look like motion, but not yet like a
         <em>body</em>. Three layers, applied in order each frame, close the
@@ -177,7 +170,7 @@ current = exp(vel·dt) · current          <span class="cm">// physics that refu
         subtlety worth the italics: <em>pinning the feet is what turns bent
         knees into a crouch</em>. The animator measures how much the pose
         moved the ankles relative to the hips and sinks the hips by the same
-        amount; the IK then makes the legs honest. Horse stance comes out as
+        amount; the IK then keeps the feet planted. Horse stance comes out as
         an actual descent, not a levitation with folded legs.
       </p>
       <p>
@@ -188,22 +181,19 @@ current = exp(vel·dt) · current          <span class="cm">// physics that refu
         else carries on.
       </p>
       <p>
-        The order — pose targets, breath, springs, feet, gaze — is a pipeline,
-        and like the GPU pipelines earlier in this site's history, each stage
-        only ever <em>improves</em> the numbers the previous stage wrote. No
-        stage knows the others exist. That ignorance is the architecture.
+        The order — pose targets, breath, springs, feet, gaze — is a pipeline.
+        Each stage modifies the output of the previous one without requiring
+        direct coupling between stages.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · The toy</span>Conduct the form</h2>
+      <h2><span class="kicker">Step 4 · Interaction</span>Interactive controls</h2>
       <p>
-        Everything assembled. Nine moves from the Brocade, bear edition — call
-        them in any order, as rudely as you like. Interrupt the archer
-        mid-draw with a bounce; demand the owl while the bear is still deep in
-        horse stance. There is no transition code to confuse, because there
-        are no transitions — only springs discovering they have somewhere new
-        to be. Then turn <em>feet: planted</em> off and watch the marionette
-        problem come back; turn the gaze off and watch the practice go vacant.
+        The demo combines nine moves from the Brocade. They can be selected in
+        any order or interrupted mid-motion. There is no transition-specific
+        code; the springs simply receive new targets. Turning
+        <em>feet: planted</em> off exposes the foot-sliding problem, while
+        turning gaze off shows the contribution of the aim layer.
       </p>
 
       <div data-demo="form"></div>
@@ -212,34 +202,31 @@ current = exp(vel·dt) · current          <span class="cm">// physics that refu
         The muscle-speed slider is worth a slow minute: at 0.6&nbsp;Hz the
         same nine tables read as tai chi; at 3&nbsp;Hz they read as calisthenics.
         Tempo scales the schedule without touching the physics, so a slow form
-        still <em>arrives</em> — late targets, honest travel.
+        still arrives because targets change late while the springs preserve motion.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>One table, four articles</h2>
+      <h2><span class="kicker">Coda</span>The complete animation system</h2>
       <p>
-        The series is over, so audit the spend. One table of twenty-one
+        One table of twenty-one
         bones — two points and two radii each — was, in order: a body (the
         lofted tubes of part one), a paint job (color zones stamped per
-        part), a skeleton (the deform rows became joints), a skinning (the
+        part), a skeleton (the deform rows became joints), skinning data (the
         distances to those same bones became weights), a set of bone lengths for the IK
         triangle of part three, and finally the address space the qi gong
-        tables write their angles into. Every later system leaned on the same
-        twenty-four rows the first article typed in.
+        tables write their angles into. Every later system uses the same
+        twenty-four rows defined in the first article.
       </p>
       <p>
-        And the moral that generalizes, the one worth taking to systems that
-        have nothing to do with bears: <em>storing destinations is more
+        The general result is that <em>storing destinations is more
         composable than storing journeys</em>. Clips are journeys; they fight
         when combined. Targets plus dynamics compose by construction — which
-        is why the same trick keeps surfacing as camera smoothing, cursor
-        inertia, UI transitions, and a bear that can be interrupted
-        mid-brocade without ever once looking embarrassed.
+        is why the same method keeps surfacing as camera smoothing, cursor
+        inertia, UI transitions, and interruptible procedural animation.
       </p>
       <p>
-        The bear at the top of this page is still practicing. It will not
-        repeat itself exactly, ever — and nobody taught it any of those
-        in-betweens.
+        The bear at the top of the page continues to vary because its
+        transitions are generated dynamically rather than stored as clips.
       </p>
     </main>
 
