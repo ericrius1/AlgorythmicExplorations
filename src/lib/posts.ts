@@ -97,6 +97,13 @@ export const POSTS: Post[] = [
     subtitle: "Glass, rainbows, caustics, focus — light becomes color, and the series becomes a toy",
   },
   {
+    href: "/ferro.html",
+    series: "Matter in a Browser Tab",
+    part: 1,
+    title: "The Ferrofluid",
+    subtitle: "A magnetic liquid that grows spikes — and a surface meshed from scratch every frame",
+  },
+  {
     href: "/vibration.html",
     series: "Music in a Browser Tab",
     part: 1,

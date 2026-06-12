@@ -12,9 +12,10 @@
 // angular detail, not spatial detail.
 //
 // Layout is direction-first: cascade n's texture is a 2ⁿ⁺¹ × 2ⁿ⁺¹ grid of
-// blocks, one per direction, each block holding the whole probe grid — so a
-// single hardware bilinear tap inside a block interpolates the 4 nearest
-// probes of one direction for free.
+// blocks, one per direction, each block holding the whole probe grid. The
+// composite still gets the 4 nearest cascade-0 probes from one hardware
+// bilinear tap per block; the cascade merge itself uses the "bilinear fix"
+// (see fsCascade) and point-loads the four corner probes instead.
 
 struct FullOut {
   @builtin(position) pos: vec4f,
@@ -132,6 +133,58 @@ fn skyRadiance(dir: vec2f) -> vec3f {
   return col * strength;
 }
 
+// One ray interval, sphere-marched against the distance field. With media
+// on, each leap also integrates fog along the segment: extinction multiplies
+// `trans` down (Beer–Lambert), and the fog's own glow — last frame's light
+// scattered toward this ray — accumulates into `inscat`.
+struct RayResult {
+  radiance: vec3f,
+  inscat: vec3f,
+  trans: f32,
+  hit: bool,
+}
+
+fn marchInterval(start: vec2f, dir: vec2f, maxLen: f32, sceneRes: vec2f) -> RayResult {
+  var r: RayResult;
+  r.radiance = vec3f(0.0);
+  r.inscat = vec3f(0.0);
+  r.trans = 1.0;
+  r.hit = false;
+  var t = 0.0;
+  // fog varies smoothly, so cap the leap: ~12 samples across the interval
+  let fogStep = max(maxLen / 12.0, 3.0);
+  for (var s = 0; s < 32; s++) {
+    let pos = start + dir * t;
+    if (pos.x < 0.0 || pos.y < 0.0 || pos.x >= sceneRes.x || pos.y >= sceneRes.y) {
+      break; // off the canvas: a miss — let the cascade above (or the sky) answer
+    }
+    let uv = pos / sceneRes;
+    let d = textureSampleLevel(distTex, linSamp, uv, 0.0).r;
+    if (d < 1.0) {
+      r.radiance = textureSampleLevel(sceneTex, linSamp, uv, 0.0).rgb;
+      r.hit = true;
+      break;
+    }
+    var step = max(d, 1.0);
+    if (MU.enabled > 0.5) {
+      step = min(step, fogStep);
+      let segLen = min(step, maxLen - t);
+      let m = textureSampleLevel(mediaTex, linSamp, uv, 0.0);
+      let sigT = m.a * MU.sigma;
+      let segT = exp(-sigT * segLen);
+      // the segment swallows (1 − segT) of the beam; the same fraction of
+      // the local light field (m.rgb, scaled by the albedo) is re-emitted
+      // toward us. Source-term integral ∫ σ·J·e^(−σs) ds = J·(1 − e^(−σL)).
+      r.inscat += r.trans * m.rgb * MU.scatter * (1.0 - segT);
+      r.trans *= segT;
+      if (r.trans < 0.004) { r.hit = true; r.radiance = vec3f(0.0); break; } // optically thick
+    }
+    t += step;
+    if (t >= maxLen) { break; }
+  }
+  return r;
+}
+
 @fragment
 fn fsCascade(in: FullOut) -> @location(0) vec4f {
   let texel = vec2u(in.pos.xy);
@@ -148,70 +201,55 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
 
   let ang = 6.28318530718 * (f32(dirIdx) + 0.5) / dirCount;
   let dir = vec2f(cos(ang), sin(ang));
+  let start = origin + dir * CU.intervalStart;
 
-  // sphere-march the interval against the distance field. With media on,
-  // each leap also integrates fog along the segment: extinction multiplies
-  // `trans` down (Beer–Lambert), and the fog's own glow — last frame's light
-  // scattered toward this ray — accumulates into `inscat`.
-  var t = CU.intervalStart;
-  var radiance = vec3f(0.0);
-  var hit = false;
-  var trans = 1.0;
-  var inscat = vec3f(0.0);
-  let tEnd = CU.intervalStart + CU.intervalLen;
-  // fog varies smoothly, so cap the leap: ~12 samples across the interval
-  let fogStep = max(CU.intervalLen / 12.0, 3.0);
-  for (var s = 0; s < 32; s++) {
-    let pos = origin + dir * t;
-    if (pos.x < 0.0 || pos.y < 0.0 || pos.x >= sceneRes.x || pos.y >= sceneRes.y) {
-      break; // off the canvas: a miss — let the cascade above (or the sky) answer
-    }
-    let uv = pos / sceneRes;
-    let d = textureSampleLevel(distTex, linSamp, uv, 0.0).r;
-    if (d < 1.0) {
-      radiance = textureSampleLevel(sceneTex, linSamp, uv, 0.0).rgb;
-      hit = true;
-      break;
-    }
-    var step = max(d, 1.0);
-    if (MU.enabled > 0.5) {
-      step = min(step, fogStep);
-      let segLen = min(step, tEnd - t);
-      let m = textureSampleLevel(mediaTex, linSamp, uv, 0.0);
-      let sigT = m.a * MU.sigma;
-      let segT = exp(-sigT * segLen);
-      // the segment swallows (1 − segT) of the beam; the same fraction of
-      // the local light field (m.rgb, scaled by the albedo) is re-emitted
-      // toward us. Source-term integral ∫ σ·J·e^(−σs) ds = J·(1 − e^(−σL)).
-      inscat += trans * m.rgb * MU.scatter * (1.0 - segT);
-      trans *= segT;
-      if (trans < 0.004) { hit = true; radiance = vec3f(0.0); break; } // optically thick
-    }
-    t += step;
-    if (t >= tEnd) { break; }
+  // top cascade: nothing above to merge with — one ray, sky on a miss
+  if (CU.isTop > 0.5) {
+    let r = marchInterval(start, dir, CU.intervalLen, sceneRes);
+    var radiance = r.radiance;
+    if (!r.hit) { radiance = skyRadiance(dir); }
+    return vec4f(r.inscat + r.trans * radiance, 1.0);
   }
 
-  // miss → this interval saw nothing; defer to the cascade above
-  if (!hit) {
-    if (CU.isTop > 0.5) {
-      radiance = skyRadiance(dir);
-    } else {
-      let texFull = vec2f(textureDimensions(upperTex));
-      let probeUV = (vec2f(probe) + 0.5) / CU.probes;
-      let local = clamp(probeUV, vec2f(0.5) / CU.upperProbes, 1.0 - vec2f(0.5) / CU.upperProbes);
-      let ublocks = u32(CU.upperBlocks);
+  // Bilinear fix (radiance-cascades.com / Osborne & Hanika). Vanilla merging
+  // interpolates the four upper probes' pre-merged results, but those probes
+  // see a nearby emitter from different angles than this probe does — that
+  // parallax draws concentric rings around small bright sources. Instead,
+  // trace one interval per upper corner probe, each ray bridging exactly
+  // from this probe's interval start to where that corner's own rays begin,
+  // merge each with that corner alone, and only then blend the four merged
+  // results with the bilinear weights. 4× the rays, no rings — and occlusion
+  // along the actual bridge path kills light leaks through thin walls too.
+  let upSpacing = sceneRes / CU.upperProbes;
+  let g = origin / upSpacing - 0.5;     // position in the upper probe grid
+  let baseIdx = floor(g);
+  let fw = g - baseIdx;                 // bilinear fractions
+  let t1 = CU.intervalStart + CU.intervalLen; // = upper cascade's interval start
+  let ublocks = u32(CU.upperBlocks);
+  var merged = vec3f(0.0);
+  for (var k = 0u; k < 4u; k++) {
+    let corner = vec2f(f32(k & 1u), f32(k >> 1u));
+    let w = mix(1.0 - fw.x, fw.x, corner.x) * mix(1.0 - fw.y, fw.y, corner.y);
+    let cornerIdx = clamp(vec2i(baseIdx + corner), vec2i(0), vec2i(CU.upperProbes) - 1);
+    let upPos = (vec2f(cornerIdx) + 0.5) * upSpacing;
+    let bridge = upPos + dir * t1 - start;
+    let len = max(length(bridge), 1e-4);
+    let r = marchInterval(start, bridge / len, len, sceneRes);
+    var radiance = r.radiance;
+    if (!r.hit) {
+      // merge with this corner probe alone: point-load its 4 child directions
       var sum = vec3f(0.0);
-      for (var k = 0u; k < 4u; k++) {
-        let child = dirIdx * 4u + k;
-        let cb = vec2f(f32(child % ublocks), f32(child / ublocks));
-        let uv = (cb + local) * CU.upperProbes / texFull;
-        sum += textureSampleLevel(upperTex, linSamp, uv, 0.0).rgb;
+      for (var c = 0u; c < 4u; c++) {
+        let child = dirIdx * 4u + c;
+        let cb = vec2i(i32(child % ublocks), i32(child / ublocks));
+        sum += textureLoad(upperTex, cb * vec2i(CU.upperProbes) + cornerIdx, 0).rgb;
       }
       radiance = sum * 0.25;
     }
+    // whatever the far end answered arrives attenuated by this interval's fog
+    merged += w * (r.inscat + r.trans * radiance);
   }
-  // whatever the far end answered arrives attenuated by this interval's fog
-  return vec4f(inscat + trans * radiance, 1.0);
+  return vec4f(merged, 1.0);
 }
 
 // ---- composite -------------------------------------------------------------------

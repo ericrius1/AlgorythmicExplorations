@@ -19,6 +19,7 @@ export default defineConfig({
         flatland: fileURLToPath(new URL("flatland.html", import.meta.url)),
         cornell: fileURLToPath(new URL("cornell.html", import.meta.url)),
         prism: fileURLToPath(new URL("prism.html", import.meta.url)),
+        ferro: fileURLToPath(new URL("ferro.html", import.meta.url)),
         vibration: fileURLToPath(new URL("vibration.html", import.meta.url)),
         harmony: fileURLToPath(new URL("harmony.html", import.meta.url)),
         twelve: fileURLToPath(new URL("twelve.html", import.meta.url)),
