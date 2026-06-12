@@ -104,6 +104,20 @@ struct SkyParams {
 @group(0) @binding(4) var linSamp: sampler;
 @group(0) @binding(10) var<uniform> SU: SkyParams;
 
+// Participating media (part three). The caller renders fog into mediaTex:
+// a = extinction density, rgb = the fog's glow — density × last frame's
+// fluence × the fog's albedo, so the in-scattered light rides the same
+// one-frame time loop as the bounce. enabled = 0 binds a 1×1 dummy and the
+// march reduces to the vanilla recipe.
+struct MediaParams {
+  sigma: f32,   // extinction per scene px at density 1 (how fast light dies)
+  scatter: f32, // in-scatter strength applied to mediaTex.rgb
+  enabled: f32,
+  _p0: f32,
+}
+@group(0) @binding(13) var mediaTex: texture_2d<f32>;
+@group(0) @binding(14) var<uniform> MU: MediaParams;
+
 fn skyRadiance(dir: vec2f) -> vec3f {
   let strength = SU.sunColor.w;
   if (strength <= 0.0) { return vec3f(CU.ambient); }
@@ -133,12 +147,19 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
   let ang = 6.28318530718 * (f32(dirIdx) + 0.5) / dirCount;
   let dir = vec2f(cos(ang), sin(ang));
 
-  // sphere-march the interval against the distance field
+  // sphere-march the interval against the distance field. With media on,
+  // each leap also integrates fog along the segment: extinction multiplies
+  // `trans` down (Beer–Lambert), and the fog's own glow — last frame's light
+  // scattered toward this ray — accumulates into `inscat`.
   var t = CU.intervalStart;
   var radiance = vec3f(0.0);
   var hit = false;
+  var trans = 1.0;
+  var inscat = vec3f(0.0);
   let tEnd = CU.intervalStart + CU.intervalLen;
-  for (var s = 0; s < 28; s++) {
+  // fog varies smoothly, so cap the leap: ~20 samples across the interval
+  let fogStep = max(CU.intervalLen / 20.0, 2.0);
+  for (var s = 0; s < 40; s++) {
     let pos = origin + dir * t;
     if (pos.x < 0.0 || pos.y < 0.0 || pos.x >= sceneRes.x || pos.y >= sceneRes.y) {
       break; // off the canvas: a miss — let the cascade above (or the sky) answer
@@ -150,7 +171,20 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
       hit = true;
       break;
     }
-    t += max(d, 1.0);
+    var step = max(d, 1.0);
+    if (MU.enabled > 0.5) {
+      step = min(step, fogStep);
+      let segLen = min(step, tEnd - t);
+      let m = textureSampleLevel(mediaTex, linSamp, uv, 0.0);
+      let sigT = m.a * MU.sigma;
+      let segT = exp(-sigT * segLen);
+      // source term ∫ J·e^(−σs) ds over the segment, J constant: J·(1−e^(−σL))/σ
+      // (the max() keeps the density→0 limit exact: contribution → 0)
+      inscat += trans * (m.rgb * MU.scatter) * (1.0 - segT) / max(sigT, 1e-5);
+      trans *= segT;
+      if (trans < 0.004) { hit = true; radiance = vec3f(0.0); break; } // optically thick
+    }
+    t += step;
     if (t >= tEnd) { break; }
   }
 
@@ -173,7 +207,8 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
       radiance = sum * 0.25;
     }
   }
-  return vec4f(radiance, 1.0);
+  // whatever the far end answered arrives attenuated by this interval's fog
+  return vec4f(inscat + trans * radiance, 1.0);
 }
 
 // ---- composite -------------------------------------------------------------------
@@ -217,6 +252,10 @@ fn fsComposite(in: FullOut) -> @location(0) vec4f {
   if (mode == 3u) {
     let d = textureSampleLevel(distTex, linSamp, in.uv, 0.0).r;
     return vec4f(vec3f(fract(d / 32.0)) * vec3f(0.6, 0.75, 1.0), 1.0);
+  }
+  if (mode == 5u) {
+    let dens = textureSampleLevel(mediaTex, linSamp, in.uv, 0.0).a;
+    return vec4f(pow(vec3f(dens), vec3f(0.4545)) * vec3f(0.75, 0.8, 0.95), 1.0);
   }
 
   var col = fluence;

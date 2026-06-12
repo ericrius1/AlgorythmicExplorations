@@ -79,12 +79,18 @@ export class RadianceCascades {
   private temporalGroup: GPUBindGroup | null = null;
   private temporalBuf: GPUBuffer | null = null;
 
+  private mediaBuf: GPUBuffer;
+  private mediaEnabled: boolean;
+
   /**
    * @param temporal blend-in rate per frame for an exponential moving average
    * over cascade 0 (0 = off). ~0.2 kills most GI noise (flickering point
    * lights, bounce-feedback boiling) at the cost of ~5 frames of light lag.
+   * @param media optional fog texture, scene-sized (a = extinction density,
+   * rgb = glow: density × fluence × fog albedo, rendered by the caller).
+   * Rays attenuate through the density and pick up the glow on the way.
    */
-  constructor(dev: GPUDevice, width: number, height: number, interval0 = 4, temporal = 0) {
+  constructor(dev: GPUDevice, width: number, height: number, interval0 = 4, temporal = 0, media?: GPUTextureView) {
     this.dev = dev;
     this.width = width;
     this.height = height;
@@ -174,42 +180,9 @@ export class RadianceCascades {
     // sky uniform: zeroed = old behaviour (top cascade merges with darkness)
     this.skyBuf = dev.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
-    // cascade uniforms + bind groups (a "top" variant merges with the sky)
     const distView = this.dist.createView();
     const cascViews = [this.casc[0].createView(), this.casc[1].createView()];
     this.casc0View = cascViews[0];
-    for (let n = 0; n < this.cascadeCount; n++) {
-      const probes: [number, number] = [Math.max(this.probes0[0] >> n, 1), Math.max(this.probes0[1] >> n, 1)];
-      const upProbes: [number, number] = [Math.max(this.probes0[0] >> (n + 1), 1), Math.max(this.probes0[1] >> (n + 1), 1)];
-      const blocks = 2 << n;
-      const start = (interval0 * (Math.pow(4, n) - 1)) / 3;
-      const len = interval0 * Math.pow(4, n);
-      const mkBuf = (isTop: number): GPUBuffer => {
-        const b = dev.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-        dev.queue.writeBuffer(
-          b, 0,
-          new Float32Array([probes[0], probes[1], upProbes[0], upProbes[1], blocks, blocks * 2, start, len, isTop, 0, 0, 0]),
-        );
-        return b;
-      };
-      const mkGroup = (buf: GPUBuffer): GPUBindGroup =>
-        dev.createBindGroup({
-          layout: this.cascadePipe.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: buf } },
-            { binding: 1, resource: this.sceneView },
-            { binding: 2, resource: distView },
-            { binding: 3, resource: cascViews[(n + 1) % 2] },
-            { binding: 4, resource: linSamp },
-            { binding: 10, resource: { buffer: this.skyBuf } },
-          ],
-        });
-      this.cascGroups.push({
-        main: mkGroup(mkBuf(0)),
-        top: mkGroup(mkBuf(1)),
-        region: [probes[0] * blocks, probes[1] * blocks],
-      });
-    }
 
     // temporal history: blend cascade 0 into tempTex, copy back to histTex —
     // the copy keeps histView a stable binding for callers holding `fluence`
@@ -236,6 +209,53 @@ export class RadianceCascades {
       });
     }
 
+    // participating media: a fog texture the rays attenuate through (a =
+    // density, rgb = glow), or a 1×1 dummy when off (enabled = 0 short-
+    // circuits the march's fog work)
+    this.mediaEnabled = !!media;
+    const dummyMedia = dev.createTexture({
+      size: [1, 1], format: "rgba16float",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    const mediaView = media ?? dummyMedia.createView();
+    this.mediaBuf = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+    // cascade uniforms + bind groups (a "top" variant merges with the sky)
+    for (let n = 0; n < this.cascadeCount; n++) {
+      const probes: [number, number] = [Math.max(this.probes0[0] >> n, 1), Math.max(this.probes0[1] >> n, 1)];
+      const upProbes: [number, number] = [Math.max(this.probes0[0] >> (n + 1), 1), Math.max(this.probes0[1] >> (n + 1), 1)];
+      const blocks = 2 << n;
+      const start = (interval0 * (Math.pow(4, n) - 1)) / 3;
+      const len = interval0 * Math.pow(4, n);
+      const mkBuf = (isTop: number): GPUBuffer => {
+        const b = dev.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        dev.queue.writeBuffer(
+          b, 0,
+          new Float32Array([probes[0], probes[1], upProbes[0], upProbes[1], blocks, blocks * 2, start, len, isTop, 0, 0, 0]),
+        );
+        return b;
+      };
+      const mkGroup = (buf: GPUBuffer): GPUBindGroup =>
+        dev.createBindGroup({
+          layout: this.cascadePipe.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: buf } },
+            { binding: 1, resource: this.sceneView },
+            { binding: 2, resource: distView },
+            { binding: 3, resource: cascViews[(n + 1) % 2] },
+            { binding: 4, resource: linSamp },
+            { binding: 10, resource: { buffer: this.skyBuf } },
+            { binding: 13, resource: mediaView },
+            { binding: 14, resource: { buffer: this.mediaBuf } },
+          ],
+        });
+      this.cascGroups.push({
+        main: mkGroup(mkBuf(0)),
+        top: mkGroup(mkBuf(1)),
+        region: [probes[0] * blocks, probes[1] * blocks],
+      });
+    }
+
     this.compositeBuf = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.compositeGroup = dev.createBindGroup({
       layout: this.compositePipe.getBindGroupLayout(0),
@@ -245,6 +265,7 @@ export class RadianceCascades {
         { binding: 4, resource: linSamp },
         { binding: 7, resource: { buffer: this.compositeBuf } },
         { binding: 8, resource: this.histView ?? cascViews[0] },
+        { binding: 13, resource: mediaView },
       ],
     });
 
@@ -273,6 +294,16 @@ export class RadianceCascades {
         dir[0], dir[1], s.sunSharpness ?? 24, s.sunIntensity ?? 0,
         ...sc, s.strength ?? 1,
       ]),
+    );
+  }
+
+  // Fog knobs. sigma = extinction per scene pixel at density 1 (how fast
+  // light dies in fog); scatter = how brightly the fog's glow (mediaTex.rgb)
+  // is re-emitted along rays. No-op without a media texture.
+  setMedia(opts: { sigma: number; scatter: number }): void {
+    this.dev.queue.writeBuffer(
+      this.mediaBuf, 0,
+      new Float32Array([opts.sigma, opts.scatter, this.mediaEnabled ? 1 : 0, 0]),
     );
   }
 
@@ -378,6 +409,7 @@ export class RadianceCascades {
     for (const b of this.brushBufs) b.destroy();
     this.compositeBuf.destroy();
     this.skyBuf.destroy();
+    this.mediaBuf.destroy();
     this.histTex?.destroy();
     this.tempTex?.destroy();
     this.temporalBuf?.destroy();
