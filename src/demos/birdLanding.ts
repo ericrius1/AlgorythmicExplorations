@@ -86,15 +86,27 @@ export async function mountApproach(container: HTMLElement): Promise<Demo> {
   slope.computeLineDistances();
   stage.scene.add(slope);
 
-  const trailPts: THREE.Vector3[] = [];
+  const TRAIL_MAX = 600;
+  const trailArr = new Float32Array(TRAIL_MAX * 3);
   const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute("position", new THREE.BufferAttribute(trailArr, 3));
+  trailGeo.setDrawRange(0, 0);
+  let trailLen = 0;
+  const pushTrail = (pt: THREE.Vector3): void => {
+    if (trailLen === TRAIL_MAX) { trailArr.copyWithin(0, 3); trailLen--; }
+    trailArr[trailLen * 3] = pt.x; trailArr[trailLen * 3 + 1] = pt.y; trailArr[trailLen * 3 + 2] = pt.z;
+    trailLen++;
+    trailGeo.setDrawRange(0, trailLen);
+    trailGeo.attributes.position.needsUpdate = true;
+  };
   const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xffc163 }));
   trail.frustumCulled = false;
   stage.scene.add(trail);
 
   const reset = (): void => {
     ctrl = new LandingController(inboundState(start, BRANCH_PERCH.position, p), BRANCH_PERCH, p);
-    trailPts.length = 0;
+    trailLen = 0;
+    trailGeo.setDrawRange(0, 0);
   };
   shell.button("launch approach", reset);
 
@@ -129,9 +141,7 @@ export async function mountApproach(container: HTMLElement): Promise<Demo> {
       eagle.pose({ phase, spread, flap: flapping, tailFan, beak: 0, theta: phase * Math.PI * 2, splay: ctrl.phase === "flare" ? 1 : 0 });
 
       if (ctrl.phase !== "perched") {
-        trailPts.push(s.pos.clone());
-        if (trailPts.length > 600) trailPts.shift();
-        trailGeo.setFromPoints(trailPts);
+        pushTrail(s.pos);
       }
       stage.render();
       shell.tick();

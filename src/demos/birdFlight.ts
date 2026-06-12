@@ -155,16 +155,29 @@ export async function mountGlide(container: HTMLElement): Promise<Demo> {
     state.pos.set(0, 18, -10);
     state.vel.set(0, 0, trimSpeed(p) * 1.1);
     startPos.copy(state.pos);
-    trailPts.length = 0;
+    trailLen = 0;
+    trailGeo.setDrawRange(0, 0);
   };
 
   let aoa = 4.6;
   shell.slider({ label: "angle of attack°", min: 0, max: 14, step: 0.2, value: aoa, onInput: (v) => { aoa = v; state.pitchCmd = (v * Math.PI) / 180; } });
   shell.button("release again", reset);
 
-  // a trail polyline showing the descending path; glide ratio = horiz/vert
-  const trailPts: THREE.Vector3[] = [];
+  // a trail polyline showing the descending path; glide ratio = horiz/vert.
+  // Preallocated — growing a geometry every frame is a slow leak of warnings.
+  const TRAIL_MAX = 900;
+  const trailArr = new Float32Array(TRAIL_MAX * 3);
   const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute("position", new THREE.BufferAttribute(trailArr, 3));
+  trailGeo.setDrawRange(0, 0);
+  let trailLen = 0;
+  const pushTrail = (p: THREE.Vector3): void => {
+    if (trailLen === TRAIL_MAX) { trailArr.copyWithin(0, 3); trailLen--; }
+    trailArr[trailLen * 3] = p.x; trailArr[trailLen * 3 + 1] = p.y; trailArr[trailLen * 3 + 2] = p.z;
+    trailLen++;
+    trailGeo.setDrawRange(0, trailLen);
+    trailGeo.attributes.position.needsUpdate = true;
+  };
   const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xffc163 }));
   trail.frustumCulled = false;
   stage.scene.add(trail);
@@ -185,9 +198,7 @@ export async function mountGlide(container: HTMLElement): Promise<Demo> {
       state.pitchCmd = (aoa * Math.PI) / 180;
       if (state.pos.y > 0.6) {
         stepFlight(state, p, dt);
-        trailPts.push(state.pos.clone());
-        if (trailPts.length > 900) trailPts.shift();
-        trailGeo.setFromPoints(trailPts);
+        pushTrail(state.pos);
         const dropped = startPos.y - state.pos.y;
         const ran = Math.hypot(state.pos.x - startPos.x, state.pos.z - startPos.z);
         glideRatio = dropped > 0.2 ? ran / dropped : 0;
@@ -231,8 +242,19 @@ export async function mountBankedTurn(container: HTMLElement): Promise<Demo> {
   shell.slider({ label: "bank°", min: -55, max: 55, step: 1, value: bankDeg, onInput: (v) => (bankDeg = v) });
   shell.slider({ label: "flap effort", min: 0.2, max: 1, step: 0.01, value: 0.55, onInput: (v) => (state.flapEffort = v) });
 
-  const trailPts: THREE.Vector3[] = [];
+  const TRAIL_MAX = 1000;
+  const trailArr = new Float32Array(TRAIL_MAX * 3);
   const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute("position", new THREE.BufferAttribute(trailArr, 3));
+  trailGeo.setDrawRange(0, 0);
+  let trailLen = 0;
+  const pushTrail = (pt: THREE.Vector3): void => {
+    if (trailLen === TRAIL_MAX) { trailArr.copyWithin(0, 3); trailLen--; }
+    trailArr[trailLen * 3] = pt.x; trailArr[trailLen * 3 + 1] = pt.y; trailArr[trailLen * 3 + 2] = pt.z;
+    trailLen++;
+    trailGeo.setDrawRange(0, trailLen);
+    trailGeo.attributes.position.needsUpdate = true;
+  };
   const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xffc163 }));
   trail.frustumCulled = false;
   stage.scene.add(trail);
@@ -252,9 +274,7 @@ export async function mountBankedTurn(container: HTMLElement): Promise<Demo> {
       // hold altitude loosely: nudge angle of attack toward level flight
       state.pitchCmd += (0.09 - state.pitchCmd) * 0.05 - state.vel.y * 0.02;
       stepFlight(state, p, dt);
-      trailPts.push(state.pos.clone());
-      if (trailPts.length > 1000) trailPts.shift();
-      trailGeo.setFromPoints(trailPts);
+      pushTrail(state.pos);
 
       group.position.copy(state.pos);
       flightQuaternion(state, q);

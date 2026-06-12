@@ -53,6 +53,7 @@ export class LandingController {
   perchProgress = 0; // 0 on touchdown, climbs to 1 as she settles (for the fold)
   speed = 0;
   distance = 0;
+  private grabFrom = new THREE.Vector3(); // where the grab began — eased to the perch
 
   constructor(
     public state: FlightState,
@@ -75,6 +76,12 @@ export class LandingController {
 
     if (this.phase === "perched") {
       this.perchProgress = Math.min(1, this.perchProgress + dt * 2.2);
+      // the grab is a reach-and-pull over a quarter second, not a teleport:
+      // ease the last arm's-length of position while the body settles
+      // (perchProgress also drives the wing fold upstream)
+      const u = Math.min(1, this.perchProgress / 0.6);
+      const ease = 1 - Math.pow(1 - u, 3);
+      s.pos.lerpVectors(this.grabFrom, this.target.position, ease);
       s.vel.multiplyScalar(0); // sitting still, gripping
       this.speed = 0;
       this.distance = s.pos.distanceTo(this.target.position);
@@ -86,10 +93,11 @@ export class LandingController {
     this.distance = dist;
     this.speed = s.vel.length();
 
-    // touchdown test: close and slow enough to grab
-    if (dist < t.grabDist && this.speed < trimSpeed(this.params) * 0.7) {
+    // touchdown test: close and slow enough to grab. Position is NOT
+    // snapped — the perched branch above eases it in from here.
+    if (dist < t.grabDist && this.speed < trimSpeed(this.params) * 0.6) {
       this.phase = "perched";
-      s.pos.copy(this.target.position);
+      this.grabFrom.copy(s.pos);
       s.vel.set(0, 0, 0);
       this.perchProgress = 0;
       return;
@@ -158,9 +166,9 @@ export class LandingController {
     stepFlight(s, this.params, dt, 3);
     // never sink through the world before the perch
     if (s.pos.y < this.target.position.y - 0.05 && dist > t.grabDist) {
-      // missed low — gentle recovery so the demo doesn't bury her
-      s.pos.y = this.target.position.y - 0.05;
-      if (s.vel.y < 0) s.vel.y = 0.2;
+      // missed low — shove her back up over a few frames, never snap
+      s.pos.y += (this.target.position.y - 0.05 - s.pos.y) * Math.min(1, dt * 8);
+      if (s.vel.y < 0) s.vel.y = 0.4;
     }
   }
 }

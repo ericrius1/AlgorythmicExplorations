@@ -4,7 +4,7 @@
 // competition for space, the way it does outdoors. Radii come from the pipe
 // model (a parent carries the cross-section of its children), the mesh is
 // deliberately faceted to match this site's creatures, and every tree ships
-// a list of perches — because a wren from the sister series is going to need
+// a list of perches — because the eagle from the sister series is going to need
 // somewhere to land.
 
 import * as THREE from "three/webgpu";
@@ -182,7 +182,7 @@ export function growTree(params: TreeParams): TreeSkeleton {
 
 // What a landing bird needs to know about a branch: where, pointing which
 // way, how thick, and how much open air sits above it. Computed from the
-// skeleton, not the mesh — the wren will ask the tree, not the triangles.
+// skeleton, not the mesh — the bird will ask the tree, not the triangles.
 export interface Perch {
   position: THREE.Vector3;
   tangent: THREE.Vector3; // along the branch, horizontal-ish

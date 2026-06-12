@@ -1,7 +1,7 @@
 // Shared three.js stage for the creature and terrain series: a WebGPURenderer
 // bound to the Shell's canvas (three falls back to WebGL2 on its own), the
 // site's orbit feel (drag to turn, ctrl/⌘+wheel to zoom, slow auto-spin when
-// idle), a gradient-sky background, and configurable lights/fog — so a wren
+// idle), a gradient-sky background, and configurable lights/fog — so a bird
 // turntable and a mountain flyover can share one chassis.
 
 import * as THREE from "three/webgpu";

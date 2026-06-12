@@ -10,7 +10,7 @@
     <title>The Wingbeat — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The wren's folded wing opens: two-bone inverse kinematics by the law of cosines, a one-slider unfold to full span, and a wingbeat cycle with asymmetric strokes, folding wrists, and twisting blades."
+      content="The eagle's folded wing opens: two-bone inverse kinematics by the law of cosines, a one-slider unfold to full span, and a wingbeat cycle with asymmetric strokes, folding wrists, twisting blades — and a feather coat that slots, splays, and lags."
     />
   </head>
   <body>
@@ -20,9 +20,11 @@
       <div class="hero-title">
         <h1>The Wingbeat</h1>
         <p class="subtitle">
-          The folded wing now opens. One triangle
-          identity does the unfolding, one warped clock does the beating, and
-          the wren above is doing both slowly enough to inspect. Drag to orbit her.
+          The folded wing now opens. One triangle identity does the unfolding,
+          one warped clock does the beating, and a hundred feathers fly the
+          stroke — slotting open on the way up, splaying wide at the bottom.
+          The eagle above is doing all of it slowly enough to inspect. Drag to
+          orbit her.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -48,9 +50,10 @@
         "given these rotations, where does the wingtip end up?" we say
         "the wingtip should be <strong>there</strong> — derive the rotations."
         For a limb of two main segments the answer isn't even iterative; it
-        follows directly from the law of cosines. With it,
-        the entire wingbeat — the unfold, the stroke, the recovery — becomes
-        one moving target evaluated by the solver each frame.
+        follows directly from the law of cosines. With it, the entire
+        wingbeat — the unfold, the stroke, the recovery — becomes one moving
+        target evaluated by the solver each frame. And riding on the bones,
+        the feather coat turns each solved pose into an actual wing.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The arm in the wing</span>
@@ -58,10 +61,10 @@
           A bird's wing is the same arm you have. Humerus to the elbow,
           radius-and-ulna to the wrist, and then the hand — fused, stretched,
           and flying the biggest feathers. When the wing folds, all that arm
-          collapses into the neat teardrop silhouette part one sculpted; the
-          fold lives in the <em>angles</em>, hidden under plumage. Unfolding
-          is just those angles relaxing toward straight — which is exactly
-          what an IK solver does as its target moves away from the shoulder.
+          collapses into the neat silhouette part one lofted; the fold lives
+          in the <em>angles</em>, hidden under plumage. Unfolding is just
+          those angles relaxing toward straight — which is exactly what an IK
+          solver does as its target moves away from the shoulder.
         </p>
       </aside>
 
@@ -94,7 +97,10 @@
         anywhere: inside her reach the wing folds and unfolds to track it;
         past her reach the chain goes straight and points, which is the
         dignified thing to do. The <strong>elbow lift</strong> slider is the
-        pole made visible — same wingtip, a whole family of wings.
+        pole made visible — same wingtip, a whole family of wings. And notice
+        what you never asked the feathers to do: the fan tracks the bones on
+        its own, because each quill's angle is a function of how far out the
+        tip actually is.
       </p>
 
       <!-- ================================================================ -->
@@ -102,24 +108,28 @@
       <p>
         With the solver in place, the wing's biggest transformation needs
         embarrassingly little code. The folded tip position is in the table
-        (it's the hand capsule's far end); the spread tip is one wing-reach
-        out from the shoulder, level and slightly forward. Slide the target
-        from one to the other along an arc and the solver fills in everything
+        (it's the hand bone's far end); the spread tip is one wing-reach out
+        from the shoulder, level and slightly forward. Slide the target from
+        one to the other along an arc and the solver fills in everything
         between — shoulder opening, elbow passing through every angle of the
-        fold, blade rolling from flat-against-the-body to flat-against-the-sky.
+        fold, blade rolling from flat-against-the-body to
+        flat-against-the-sky.
       </p>
       <div data-demo="unfold"></div>
       <p>
-        One slider, and the readout shows that the span more than
-        doubles, from a teardrop to a glider, using <em>the same three
-        segments</em> — nothing is created, only redistributed. Toggle the
-        x-ray and watch the elbow: mid-unfold it kinks backward into a
-        genuine Z before straightening into span. And watch the shoulder
-        seam, too — the mesh smears a little where body weights and wing
-        weights blend. Our weights were computed against the folded pose;
-        production rigs bind with wings spread for exactly this reason. We
-        keep the smear: it is small and not visible at part six's camera
-        distances it's invisible.
+        One slider, and the readout shows the span more than doubling, from a
+        teardrop to a glider, using <em>the same three segments</em> — nothing
+        is created, only redistributed. The feathers do most of the visible
+        work: every fan angle interpolates between its folded and spread
+        values with this same slider, so the secondaries swing through nearly
+        ninety degrees of base rotation while the bones rotate far less.
+        Toggle the x-ray and watch the elbow kink backward into a genuine Z
+        mid-unfold before straightening into span. And watch the shoulder
+        seam — the mesh smears a little where body weights and wing weights
+        blend. Our weights were computed against the folded pose; production
+        rigs bind with wings spread for exactly this reason. We keep the
+        smear: under the scapulars, at part six's camera distances, it's
+        invisible.
       </p>
       <details class="fold">
         <summary>Deep dive: a bone is an arrow, a wing is a blade</summary>
@@ -142,7 +152,7 @@
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The cycle</span>An asymmetric clock</h2>
+      <h2><span class="kicker">Step 3 · The cycle</span>An asymmetric clock, and the coat that flies it</h2>
       <p>
         A wingbeat is a loop, so the obvious move is a phase p running 0→1
         and a tip target riding a tilted ellipse — down-and-forward, then
@@ -153,20 +163,34 @@
         giving the downstroke its share of the period first and hurrying the
         upstroke home. And during that hurried half the wrist <em>folds</em>:
         span pulls in by a third, because hauling a full wing back up through
-        the air would refund most of the downstroke. Less span up than down —
-        watch slow-motion footage of any songbird and it's the first thing
-        you'll see.
+        the air would refund most of the downstroke.
+      </p>
+      <p>
+        Then the feathers take over, with three signals read off the same
+        clock. <strong>Slot</strong>: on the upstroke the primaries rotate
+        about their own shafts and the wing becomes a louver — air pours
+        through the gaps instead of being pushed down, which is how a real
+        bird gets its wing back up almost for free. <strong>Splay</strong>:
+        at the bottom of the power stroke the fingers spread, the wingtip
+        grabbing its maximum area exactly when the push peaks.
+        <strong>Lag</strong>: the fan is dragged a few degrees against the
+        stroke in proportion to its speed, outer feathers most — a whip
+        running down the hand that your eye reads as flexibility, even though
+        every feather is rigid.
       </p>
       <div data-demo="cycle"></div>
       <p>
         The orange trail is the wingtip's own diagram — the tilted loop,
-        fatter on the downstroke side, pinched where the wrist folds. The
-        last slider is the twist knob from the deep dive doing its real job:
-        on the downstroke the blade pitches leading-edge-down so the push has
-        a forward component, on the upstroke it feathers flat to slip through.
-        Right now that's choreography — the air in this article is purely
-        decorative. The next article makes the air push back, and this twist
-        becomes thrust with a number on it.
+        fatter on the downstroke side, pinched where the wrist folds, with a
+        small scoop at the bottom where the tip carves its figure-eight. The
+        twist slider is the knob from the deep dive doing its real job: on
+        the downstroke the blade pitches leading-edge-down so the push has a
+        forward component, on the upstroke it feathers flat. Slow motion is
+        the way to watch the slots: the upstroke wing goes venetian-blind for
+        a third of a second, every beat. Right now all of this is
+        choreography — the air in this article is purely decorative. The next
+        article makes the air push back, and this twist becomes thrust with a
+        number on it.
       </p>
 
       <!-- ================================================================ -->
@@ -179,16 +203,17 @@
         against the body's bobbing, because a bird's head is a gimbal that
         holds its gaze level while everything behind it heaves (the part-two
         saccade system will plug straight into this). And the <strong>tail
-        fans</strong>: one capsule, scaled sideways along its bone, and the
-        skinned vertices spread into a fan for free — the same trick as every
-        deformation so far, just with scale instead of rotation in the matrix.
+        fans</strong>: twelve rectrices, each one rectrix rotated about the
+        tail bone's normal by its share of a single spread parameter — the
+        same machinery as the wing fans, pointed backward.
       </p>
       <div data-demo="all"></div>
       <p>
-        Turn the beat rate up and she's a wren in a hurry; down to one beat
-        per second and she's a crow. The shapes of flight are all here now —
-        what's missing is consequence. She flaps and nothing happens, because
-        nothing yet says it should.
+        Turn the beat rate up past five and she flaps like a panicked pigeon;
+        down toward one beat per second and she's a condor coming in heavy.
+        The default — two point three — is an eagle in no particular hurry.
+        The shapes of flight are all here now. What's missing is consequence:
+        she flaps and nothing happens, because nothing yet says it should.
       </p>
 
       <!-- ================================================================ -->
@@ -197,7 +222,7 @@
         Next time, physics. The wing is an airfoil and the wingbeat is a
         force generator: lift that scales with speed and angle of attack,
         drag taxing everything, the downstroke's twisted blade converting
-        beats into thrust. Give the wren a velocity and let those forces
+        beats into thrust. Give the eagle a velocity and let those forces
         integrate, and flight stops being an animation and becomes an
         <em>outcome</em> — including banking turns, which fall out of rolling
         the lift vector sideways rather than being scripted. The flapping you
@@ -224,7 +249,8 @@
       <p>
         Standing on the shoulders of:
         <a href="https://doi.org/10.1145/325334.325244">Girard &amp; Maciejewski, "Computational Modeling for the Computer Animation of Legged Figures" (1985)</a> ·
-        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a>
+        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a> ·
+        <a href="https://doi.org/10.1242/jeb.00857">Tucker, on wingtip slots — the fingers are drag control, not decoration</a>
       </p>
     </footer>
 

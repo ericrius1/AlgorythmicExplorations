@@ -141,6 +141,13 @@
         Anything not built remains in the queue for the next frame. Flight
         continues while construction stays within its allotted time.
       </p>
+      <pre><code>wanted.sort((a, b) => a.ring - b.ring);              <span class="cm">// distance-sorted queue</span>
+const t0 = performance.now();
+for (const w of wanted) {
+  if (!needsWork(w)) continue;
+  if (performance.now() - t0 &gt; budgetMs) continue;  <span class="cm">// over budget — yield, try next frame</span>
+  buildOneStep(w);                                   <span class="cm">// terrain, then scatter, then grass</span>
+}</code></pre>
       <p>
         The same thrift decides what far chunks deserve. Trees exist out
         to ring three (a forest's silhouette carries); grass exists only
@@ -188,7 +195,7 @@
       </p>
       <p>
         The terrain is also used by the final
-        <a href="/wren.html">Feather &amp; Bone</a> demo. That series adds
+        <a href="/eagle.html">Feather &amp; Bone</a> demo. That series adds
         wingbeats, banking turns, and a landing flare onto one of the
         generated branches.
       </p>
@@ -197,7 +204,7 @@
     <footer>
       <p>
         Ground Truth, part six — series complete ·
-        the finale belongs to <a href="/wren.html">Feather &amp; Bone</a> ·
+        the finale belongs to <a href="/eagle.html">Feather &amp; Bone</a> ·
         built from <a href="/heightfield.html">one</a>,
         <a href="/erosion.html">two</a>, <a href="/grass.html">three</a>,
         <a href="/trees.html">four</a>, and <a href="/biomes.html">five</a>
