@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Fluid Instrument — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="Part six: an interactive 3D stable-fluids effect with curl noise, half a million paint particles, cursor input, and on-device WebGPU hand tracking."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero-toy"></div>
+      <div class="hero-title">
+        <h1>The Fluid Instrument</h1>
+        <p class="subtitle">
+          Part six combines the series' earlier techniques into an interactive fluid
+          instrument. The constants are chosen for visual effect rather than physical
+          accuracy. Move your cursor through it, or click ✋ and use your hands.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        The earlier parts used visual results to explain physical models. This one
+        uses the same advection and Poisson solve for a substance that does not exist,
+        with constants chosen by eye. It is an interactive graphics effect rather
+        than a model of a particular fluid.
+      </p>
+      <p>
+        Visual-effects teams call this <em>art direction</em>. The solver keeps the
+        motion coherent, but its parameters are adjusted for appearance rather than
+        measurement, and color no longer represents temperature. This article examines
+        what remains useful when the numerical method is retained without a predictive
+        physical model.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Incompressible flow</span>Advection and projection</h2>
+      <p>
+        Start with what makes fluid <em>read</em> as fluid. It is not splashing — sand
+        splashes. It is that fluid <em>goes around</em>. Push a hand through smoke and
+        the smoke does not pile into a wall in front of your palm; it slips sideways,
+        curls behind your wrist, and closes back in a pair of vortices. That single
+        behavior — flow refusing to pile up — is the visual signature of
+        incompressibility, and it comes from a familiar constraint: a Poisson
+        equation.
+      </p>
+      <p>
+        Part five solved <code>∇²φ = 4πG ρ</code> on a mesh because gravity demanded
+        it. Fluids demand the same equation with the names changed. Evolve a velocity
+        field <code>u</code> however you like — advect it, stir it, add wind — and it
+        comes out slightly illegal, with places where flow converges (a sink) or
+        diverges (a source). Real incompressible fluid allows neither: the divergence
+        <code>∇·u</code> must be zero everywhere. The fix is to find a pressure field
+        whose gradient exactly cancels the illegal part:
+      </p>
+      <pre><code>∇²p = ∇·u        <span class="cm">// find the pressure that objects to the pile-up</span>
+u ← u − ∇p       <span class="cm">// and let it push back</span></code></pre>
+      <p>
+        Here is that projection, step by step, under your scroll wheel:
+      </p>
+
+      <div data-scrolly="projection"></div>
+
+      <p>
+        Same operator, third appearance, third meaning. In part one's far field it was
+        implicit in every pairwise pull; in part five it turned density into
+        potential; here it turns "almost a fluid" into a fluid, sixty times a second.
+        The other half of the loop moves the field. Do not push
+        values forward (that explodes, the way part one's first integrator exploded);
+        instead stand at each grid cell, ask <em>where would the fluid here have come
+        from?</em>, and walk backward along the velocity to take what you find there:
+      </p>
+      <pre><code>u_new(x) = u_old(x − u(x)·dt)   <span class="cm">// semi-Lagrangian: fetch your own past</span></code></pre>
+      <p>
+        Fetching can never invent a value larger than what exists, so the scheme is
+        unconditionally stable. Even violent, units-free stirring from a hand does
+        not make it diverge. The price is numerical smearing, which softens the motion
+        in a way that suits this demo.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Stable Fluids, 1999</span>
+        <p>
+          Jos Stam's 1999 paper <em>Stable Fluids</em> assembled this loop — move the
+          field, then project it back to legality — into the algorithm that still
+          runs underneath most of the smoke you have ever seen in a game.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: solving the projection only as well as the eye can see</summary>
+        <div class="fold-body">
+          <p>
+            The demo runs this loop on a 64³ grid — a quarter of a million cells,
+            advected and projected every frame. Part five solved its Poisson equation
+            exactly, with an FFT, in a periodic box. This box is not periodic (the
+            fluid stops at the glass), so it runs ten sweeps of Jacobi
+            relaxation instead — each cell repeatedly averaging its six neighbours.
+          </p>
+          <p>
+            Ten sweeps is nowhere near convergence, and it does not matter. An
+            under-converged projection leaks a small amount of divergence that the
+            next frame's projection reduces again.
+            For this visual effect, solving only to the point where the remaining
+            error is not visible is sufficient.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Divergence-free wind</span>Curl noise</h2>
+      <p>
+        A projected grid behaves like a fluid, but without a continuing force it soon becomes still: stir it,
+        watch the vortices fade, and within seconds the box is still. Films and games
+        keep their volumes moving with ambient wind. A direct way to generate wind —
+        sample smooth random noise and push particles along its gradient — fails in
+        an instructive way:
+      </p>
+      <div data-demo="flow"></div>
+      <p>
+        Follow the gradient and every tracer slides to the nearest peak of the noise
+        and parks. The picture clots. A gradient field is the most divergent field
+        there is — it is <em>all</em> sources and sinks — and divergence is death for
+        flow. But rotate that same gradient a quarter turn and the flow runs
+        <em>along</em> the contour lines of the noise instead of across them. Every
+        level set becomes a closed path; no point in the plane gains or loses
+        fluid. In 2D the rotation is one swap and a minus sign; in 3D the same
+        construction is the curl of a noisy vector potential:
+      </p>
+      <pre><code>v = ∇ × ψ        <span class="cm">// ψ: three channels of smooth noise</span>
+∇·(∇×ψ) ≡ 0      <span class="cm">// divergence-free, by identity, forever</span></code></pre>
+      <p>
+        This is <em>curl noise</em>: procedural turbulence that requires no pressure solve,
+        never decays, and never pools. The demo feeds a slow-drifting curl field into
+        the grid as a body force every frame — the breathing you see when you aren't
+        touching anything is six noise lookups per cell, rotated into legality by a
+        vector identity from the eighteenth century.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Folklore, written down in 2007</span>
+        <p>
+          Curl noise was production folklore for years before Bridson, Hourihan and
+          Nordenstam wrote it down formally in 2007. It remains a particularly cheap
+          way to generate convincing motion.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Tracer particles</span>Half a million tracers</h2>
+      <p>
+        Here the series' particles return in a simpler role. In parts one
+        through five, particles <em>were</em> the simulation: they carried mass, they
+        pulled on each other, losing one would change the answer. The particles in
+        this demo carry nothing. They are massless tracers dropped into the grid's
+        velocity field, advected by trilinear interpolation exactly the way part
+        five's cloud used its mesh forces — the same two-grid exchange, except
+        nothing is deposited anymore. The fluid does not know the particles exist;
+        they only visualize its motion.
+      </p>
+      <p>
+        Everything you actually <em>see</em> is decided after the physics:
+      </p>
+      <p>
+        <strong>Stretch.</strong> Each particle renders as a capsule elongated along
+        its velocity — part two's camera-facing billboard, given a tail. Fast paint
+        becomes streaks, slow paint becomes dots, and the eye reads speed without
+        being told.
+      </p>
+      <p>
+        <strong>Persistence.</strong> The renderer never clears the screen. It draws
+        into a high-dynamic-range buffer that is dimmed a few percent each frame
+        instead of erased, so every particle leaves a cooling wake — the
+        long-exposure technique, the same reason star-trail photographs show motion
+        rather than positions. Trail length is one number: how much of last frame
+        survives into this one.
+      </p>
+      <p>
+        <strong>Palette.</strong> Color is speed, mapped through a three-stop
+        gradient chosen the way a colorist chooses. <em>Ink</em> runs abyss-blue to
+        white the way dye blooms in water; <em>embers</em> runs blood-orange to gold
+        and adds buoyancy, so the dye your hand injects actually rises;
+        <em>nebula</em> slows the field and pulls it gently toward the centre — a
+        weak version of part one's gravity.
+      </p>
+      <p>
+        Half a million of these tracers cost less than a tenth of what part one's
+        half-million <em>bodies</em> cost, because nothing is n². No tree, no sort,
+        no FFT — every particle reads eight grid cells and writes itself, in perfect
+        parallel. The cleverness all lives upstream, in the 64³ field that tells the
+        paint where to go.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Hand tracking</span>Twenty-one landmarks</h2>
+      <p>
+        Hand tracking gives the interface more degrees of freedom than a cursor. It
+        now requires only a webcam and seven megabytes of neural network, running on
+        the same WebGPU device as the fluid.
+      </p>
+      <div data-demo="hand"></div>
+      <p>
+        The model (micro-handpose, a compact WebGPU reimplementation of the MediaPipe
+        hand pipeline) finds palms in the frame, then regresses twenty-one landmarks
+        per hand — four joints per finger plus the wrist — at a couple of
+        milliseconds per frame, entirely in the tab. No video leaves your machine;
+        the camera only starts when you click; the inference shares the GPU with a
+        quarter-million-cell fluid solve and neither notices the other.
+      </p>
+      <p>
+        Landmarks become an instrument the same way the cursor did, just with more
+        strings. Each palm is a stirrer with a radius and a velocity; each index
+        fingertip is a finer, brighter one — a pen for drawing dye. And the distance
+        between thumb-tip and index-tip, normalized by the hand's own scale so it
+        works at any distance from the camera, controls a second gesture:
+      </p>
+      <pre><code>pinch = 1 − |thumb_tip − index_tip| / hand_scale
+<span class="cm">// open hand pushes; pinched fingers pull inward and add spin</span></code></pre>
+      <p>
+        Pinch past half-closed and the stirrer flips sign: instead of pushing fluid
+        away it pulls it in and spins it around the view axis. None of this is
+        physics. All of it is mapping — the same
+        job as part two's dome, geometry in the service of where the audience is
+        standing. Tuning the mapping until a new user understands it quickly takes
+        more iteration than the Poisson solve.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 5 · Complete interaction</span>Interactive controls</h2>
+      <p>
+        Everything above, at full size. Hover to stir; drag to orbit the box
+        (⌘-scroll zooms); the mode buttons re-dye the same fluid; the ✋ button asks
+        for your camera and enables hand control. Pinch for vortices. Draw with
+        your index finger. Try a slow figure-eight in <em>nebula</em> and then stop
+        moving entirely — the projection keeps your gesture circulating long after
+        you leave, demonstrating the persistence of a velocity field rather than a
+        stateless particle effect.
+      </p>
+      <div data-demo="playground"></div>
+      <p>
+        If no hand and no cursor touches the box for a few seconds, an automatic
+        stirrer follows a slow Lissajous path so the demo remains active.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Series summary</h2>
+      <p>
+        The instrument inherits several earlier techniques. The grid of cells with values deposited
+        and interpolated — part five's particle-mesh, with the mass turned to dye.
+        The Poisson projection — part five's solver, with gravity turned to pressure.
+        The per-particle parallel update over a shared field — part one's GPU lesson,
+        with the n² removed entirely rather than defeated. The billboard renderer and
+        orbit camera — part two. The conviction that locality is what makes a fluid a
+        fluid — part three. The composition of two solvers that were introduced
+        separately — the same approach used in part four.
+      </p>
+      <p>
+        It also discards physical units and any conservation law that does not help
+        the interaction. The result is still held together by the numerical methods
+        from the earlier posts, but their purpose here is responsiveness and visual
+        continuity rather than physical prediction.
+      </p>
+      <p>
+        ← <a href="/pages/particle-worlds/part5.html">Part five: Gravity in Frequency Space</a> ·
+        <a href="/pages/particle-worlds/part4.html">Part four: Worlds from Dust</a> ·
+        <a href="/pages/particle-worlds/part3.html">Part three: Sorting Water</a> ·
+        <a href="/pages/particle-worlds/part2.html">Part two: Gravity on a Dome</a> ·
+        <a href="/pages/particle-worlds/part1.html">Part one: Two Falling Dots</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part six of the WebGPU particle series ·
+        <a href="/pages/particle-worlds/part1.html">Part one</a> ·
+        <a href="/pages/particle-worlds/part2.html">Part two</a> ·
+        <a href="/pages/particle-worlds/part3.html">Part three</a> ·
+        <a href="/pages/particle-worlds/part4.html">Part four</a> ·
+        <a href="/pages/particle-worlds/part5.html">Part five</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/311535.311548">Stam, "Stable Fluids" (1999)</a> ·
+        <a href="https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/GDC03.pdf">Stam, "Real-Time Fluid Dynamics for Games" (2003)</a> ·
+        <a href="https://doi.org/10.1145/1276377.1276435">Bridson, Hourihan &amp; Nordenstam, "Curl-Noise for Procedural Fluid Flow" (2007)</a> ·
+        <a href="https://arxiv.org/abs/2006.10214">Zhang et al., "MediaPipe Hands" (2020)</a> ·
+        <a href="https://github.com/svenflow/micro-handpose">micro-handpose</a> ·
+        <a href="https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-30-real-time-simulation-and-rendering-3d-fluids">GPU Gems 3, ch. 30</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/particle-worlds/part6.ts"></script>
+  </body>
+</html>

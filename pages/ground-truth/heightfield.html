@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Heightfield — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A procedural terrain series begins with hashed gradients, Perlin noise, fractal octave sums, ridges, domain warping, and a generated mesh."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/heightfield.ts -->
+    <header class="hero">
+      <div data-demo="hero-terrain"></div>
+      <div class="hero-title">
+        <h1>The Heightfield</h1>
+        <p class="subtitle">
+          A new series builds terrain from arithmetic. Nobody drew the mountains
+          under this camera — they are a sum of waves read off a grid of hashed
+          gradients, and by the end of the series there will be no edge to
+          them, grass on their flanks, and trees for a certain bird to land in.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This series builds a landscape the way the rest of the site builds
+        everything: from functions, live, on your machine. The plan runs from
+        this article's mountains through erosion (rain as an algorithm), a
+        hundred thousand blades of wind-bent grass, trees grown branch by
+        branch, and finally a world that streams in around you with no border
+        fence — terrain you could fly over for hours and never see repeat.
+      </p>
+      <p>
+        And something will be flying over it. A sister series,
+        <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a>, starts in parallel with
+        this one: an eagle lofted ring by ring and feathered quill by quill, on her way to being
+        rigged, flapped, and handed to a pilot. The two series converge on one
+        final demo — her sky is this ground. When this series plants trees,
+        it is planting her runways.
+      </p>
+      <p>
+        The first question is: where is the ground? The
+        answer this article builds is a <em>heightfield</em> — a function
+        h(x, z) that returns an elevation for any point you ask about, with no
+        stored map behind it. The mountains exist only at the moment of
+        asking, which is exactly the property that will make them infinite
+        later.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Structured randomness</span>Gradient noise</h2>
+      <p>
+        Pure randomness makes terrible terrain. White noise assigns every
+        point an independent height — the result is static, not landscape,
+        because real ground is <em>correlated</em>: the elevation here is a
+        strong hint about the elevation one step away. What terrain needs is
+        randomness with a wavelength.
+      </p>
+      <p>
+        The classic recipe is Ken Perlin's. Put randomness only at the
+        integer lattice points — not random <em>heights</em> but random
+        <em>slopes</em> (gradients). Between lattice points, the function is
+        forced to pass through zero at every corner with exactly the corner's
+        slope, blended by a curve chosen so that nothing — not the value, not
+        the curvature — betrays where the grid lines are:
+      </p>
+      <pre><code>fade(t) = 6t⁵ − 15t⁴ + 10t³       <span class="cm">// zero 1st *and* 2nd derivative at the lattice</span>
+corner(c, p) = grad(hash(c)) · (p − c)   <span class="cm">// each corner's opinion: its slope, extrapolated</span>
+noise(p) = blend of the four corners' opinions by fade</code></pre>
+      <p>
+        The <code>hash</code> is the key operation: a few rounds of
+        integer multiply-and-xor that turn a lattice point into an apparently
+        random gradient — <em>deterministically</em>. The mountain at
+        coordinates (1402, 88) is random in every statistical sense, and it is
+        also the same mountain every time anyone looks. No table of stored
+        heights, no seed file: the entire landscape is the hash function,
+        evaluated on demand. That determinism is the foundation the final
+        article will stand on when the world becomes infinite — you can't
+        stream terrain in and out of memory unless the terrain is guaranteed
+        to come back identical.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The fractal sum</span>Octaves</h2>
+      <p>
+        One octave of gradient noise is a smooth, rolling swell — pleasant,
+        and incomplete. Real terrain has detail at every scale: ridgelines
+        kilometers long, gullies meters wide, both at once. Mandelbrot's
+        observation — coastlines and mountain profiles look statistically the
+        same whether you view them from orbit or from a hiking trail — gives
+        the recipe: add the noise to itself at higher frequency and lower
+        amplitude, again and again. The result is <em>fractional Brownian
+        motion</em>, and each layer is an octave.
+      </p>
+      <div data-demo="octaves"></div>
+      <p>
+        The faint lines are the octaves alone; the cyan line is their sum.
+        Two dials control the character of the world.
+        <strong>Lacunarity</strong> is the frequency step between octaves
+        (usually 2 — hence "octave"). <strong>Persistence</strong> is the
+        amplitude step, and it is the roughness dial of the universe: at 0.3
+        the high frequencies barely whisper and you get the Scottish
+        Highlands, worn smooth; at 0.7 they shout and you get the Dolomites.
+        One number, geology.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The Oscar for arithmetic</span>
+        <p>
+          Perlin invented his noise working on <em>Tron</em> (1982), out of
+          frustration with how relentlessly clean computer imagery looked —
+          he wanted a "salt" that could roughen any surface procedurally. The
+          function escaped into every renderer, every game engine, and every
+          texture ever described as "procedural," and in 1997 the Academy of
+          Motion Picture Arts and Sciences gave him a Technical Achievement
+          Award for it — an Oscar for a math function, which remains a very
+          short list.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Ridges and warps</span>Ridges and domain warping</h2>
+      <p>
+        In two dimensions the same sum makes a map — but plain fBm has a
+        tell: it is too <em>even-tempered</em>. Statistically symmetric noise
+        makes hills and valleys with the same rounded character, and real
+        mountains are not symmetric — crests are sharp, valleys are broad.
+        Two standard distortions fix the temperament:
+      </p>
+      <p>
+        <strong>Ridging</strong> folds each octave at zero: take 1 − 2|n|,
+        and the smooth crossings through zero become creases pointing up —
+        instant ridgelines, a method popularized by Musgrave. <strong>Domain warping</strong>
+        attacks the other tell, the directionlessness: instead of sampling
+        the noise at your coordinates, sample it at coordinates that have
+        themselves been pushed around by another, lower-frequency noise —
+        h = fbm(p + warp·fbm(p)). The grid of features shears into flows and
+        sweeps, the way rock strata bend, and nothing lines up with any axis
+        anymore.
+      </p>
+      <div data-demo="map"></div>
+      <p>
+        White is high. Slide <strong>ridge</strong> up and watch valleys
+        broaden while crests tighten into bright threads; slide
+        <strong>warp</strong> and watch the whole map shear sideways into
+        something with apparent tectonics. Between the two, the noise stops
+        looking like noise — which is the entire job.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: keeping the octaves from conspiring</summary>
+        <div class="fold-body">
+          <p>
+            Stacking octaves on the same lattice has a subtle failure: every
+            octave's grid lines coincide at the origin and along axes, and at
+            high octave counts their agreement becomes faintly visible as
+            axis-aligned structure. The fix costs two multiplies: rotate the
+            coordinate frame by a fixed angle between octaves, so no two
+            octaves share a lattice orientation. The same trick — decorrelate
+            by rotation — shows up in dithering, in shadow sampling, and
+            anywhere else repeated patterns need to forget they're related.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Mesh construction</span>The heightfield mesh</h2>
+      <p>
+        The third dimension is the cheapest step in the article: take a flat
+        grid of vertices, set every y to h(x, z), done. The interesting work
+        is everything that makes the lifted grid <em>read</em> as terrain.
+        First, shaping: raw fBm is symmetric around zero, so the height
+        function pushes it through a power curve. Valleys spread and flatten
+        while peaks remain narrow, approximating some of gravity's effect on
+        real landscapes. The erosion article models that process explicitly.
+      </p>
+      <p>
+        Second, <strong>normals</strong>. We already paid for the height grid,
+        so each vertex takes its slope from its neighbors by central
+        differences — the same move the <a href="/pages/strange-matter/ferro.html">ferrofluid</a>
+        used on its density field:
+      </p>
+      <pre><code>normal(i, j) = normalize( (H[i−1,j] − H[i+1,j]) / 2Δ,  1,  (H[i,j−1] − H[i,j+1]) / 2Δ )</code></pre>
+      <p>
+        Third, paint — and here altitude and slope vote on every vertex.
+        Grass holds the low ground. Steep faces shed their soil and show
+        rock, whatever their elevation. Snow takes the high ground but
+        is absent from steep slopes because it slides off, which is why snowlines in the
+        demo trace the shape of the crests instead of being a flat altitude
+        cut — one comparison per vertex doing the work of a climate model.
+      </p>
+      <div data-demo="relief"></div>
+      <p>
+        All four dials from the flat map, now with consequences and lighting.
+        Toggle the wireframe to see how humble the geometry under the
+        mountains really is — a bent bedsheet, about eighty thousand
+        triangles. The drama is entirely in the height function and the
+        normals. Reroll the seed for a new range; the dials keep their
+        settings because the <em>character</em> of a world and the
+        <em>identity</em> of a world are different inputs, which is exactly
+        how the infinite version will let you explore without ever
+        regenerating the same hill twice.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Next steps</h2>
+      <p>
+        These mountains have not yet been eroded. Real
+        terrain is noise <em>plus history</em> — every gully is a record of
+        water finding a way down. The next article simulates that history:
+        hydraulic erosion, thousands of droplets carving the fBm into
+        drainage networks, depositing sediment into the flats. After that the
+        world gets instanced grass bending in procedural wind, then
+        trees — grown by space colonization, branch by branch, which matters
+        beyond scenery because branches are <em>destinations</em>: the
+        <a href="/pages/feather-bone/eagle.html">eagle next door</a> will need their positions,
+        thicknesses, and headroom for landing. Then placement and
+        biomes (what grows where, decided by the same hash), and finally the
+        horizon problem: chunks, levels of detail, and a world that generates
+        itself in a ring around wherever you happen to be flying.
+      </p>
+      <p>
+        Every one of those articles leans on what this one established: a
+        deterministic function answering "where is the ground?" for any
+        coordinate, no map required. The rest of the series is just asking
+        better follow-up questions.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Ground Truth, part one ·
+        written in parallel with <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a> ·
+        built on the <a href="/pages/particle-worlds/part1.html">gravity</a>,
+        <a href="/pages/bounced-light/lava.html">light</a>, and
+        <a href="/pages/strange-matter/ferro.html">matter</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/325165.325247">Perlin, "An Image Synthesizer" (1985)</a> ·
+        <a href="https://doi.org/10.1145/566654.566636">Perlin, "Improving Noise" (2002)</a> ·
+        <a href="https://doi.org/10.1145/74333.74337">Musgrave, Kolb &amp; Mace, "The Synthesis and Rendering of Eroded Fractal Terrains" (1989)</a> ·
+        <a href="https://www.google.com/books/edition/The_Fractal_Geometry_of_Nature/0R2LkE3N7-oC">Mandelbrot, "The Fractal Geometry of Nature" (1982)</a> ·
+        <a href="https://iquilezles.org/articles/warp/">Quilez, "domain warping"</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/ground-truth/heightfield.ts"></script>
+  </body>
+</html>

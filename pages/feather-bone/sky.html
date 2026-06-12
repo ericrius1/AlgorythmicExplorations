@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Sky — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The finale of both series combines the lofted, feathered, rigged, and simulated eagle with a grown procedural world. Fly manually or use the autopilot."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/sky.ts -->
+    <header class="hero">
+      <div data-demo="hero-sky"></div>
+      <div class="hero-title">
+        <h1>The Sky</h1>
+        <p class="subtitle">
+          Eleven articles and two series combine in one demo: an eagle built
+          from tables and a world built from noise. Fly her over the mountains
+          with A/D · W/S · Space — or scroll down to let the autopilot land
+          on trees and scream from them.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This article combines the work of both series.
+        <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a> built an eagle from two
+        tables — lofted rings for the body, a roster of feathers for the
+        wings — then added motion: a skeleton weighted by distance, a wing
+        unfolded by inverse kinematics, flight as a balance of forces, a
+        landing flown by guidance laws.
+        <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>, in parallel, grew a
+        world: mountains from noise, valleys carved by simulated rain, grass,
+        and trees raised branch by branch. The two projects now share one demo.
+      </p>
+      <p>
+        Nothing in this article is new machinery. It is <em>assembly</em>. The
+        bird's flight model meets the terrain's height function (now her
+        ground); her landing controller meets the trees' perch lists (now her
+        targets); her syrinx fills the air. The only genuinely new line of code
+        is the one that reads your keyboard. Everything else is eleven articles
+        of components connected through shared data.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why structured representations matter</span>
+        <p>
+          A downloaded bird and a downloaded landscape would not compose like
+          this. They would be frozen meshes with no shared structure. Because
+          the eagle is a flight model and the terrain is a height
+          <em>function</em> and the trees publish their branches as data, the
+          systems can exchange height and perch data directly.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The world</span>Terrain and perches</h2>
+      <p>
+        First, the stage. The terrain is the sister series' height function,
+        stood up as a mesh — domain-warped ridged noise, colored by altitude
+        and slope — and sized for an eagle this time: the patch is nearly
+        three times wider and the relief three times taller than the songbird
+        drafts, because at thirteen meters per second a small world goes by in
+        seconds. Onto its gentler, lower ground we scatter big trees, each one
+        grown by space colonization with its own seed, so no two are alike;
+        the steep peaks and snowfields stay bare, the way real treelines work.
+        Every tree also returns its <em>perches</em> — the boughs a bird could
+        actually stand on, found by the same code that drew them.
+      </p>
+      <div data-demo="world"></div>
+      <p>
+        Orbit the world. The faint gold motes are the perches: every place the
+        eagle is allowed to land, computed from the trees' own geometry, not
+        placed by hand. This is the list read by the landing controller.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · You fly</span>Manual control</h2>
+      <p>
+        Here is the one new wire. The keyboard sets the same three commands the
+        autopilot did in <a href="/pages/feather-bone/flight.html">part four</a> — bank, pitch,
+        flap effort — and the identical force model flies them. You are not
+        moving the bird directly; you set bank and climb commands, and the
+        aerodynamic model determines the result. Steer too slowly and she
+        sinks; dive and she gains the speed back; bank and she carves. She
+        responds according to the same physics used by the autopilot.
+      </p>
+      <div data-demo="pilot"></div>
+      <p>
+        Hover the demo and fly: <strong>A/D</strong> to bank, <strong>W/S</strong>
+        to climb and dive, <strong>Space</strong> to pour on the flap. The
+        ground is the terrain's real height under her — fly low and she'll skim
+        it; fly into a hill and the physics pushes back. The same height
+        function that colored the mountains is now the thing she can't fall
+        through.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: the controller and the pilot are the same socket</summary>
+        <div class="fold-body">
+          <p>
+            Notice that "you fly" and "AI flies" plug into the exact same hole.
+            The flight model doesn't know or care whether its bank command came
+            from a proportional controller chasing a perch or from your finger
+            on the D key — it's the same three numbers either way. That's why
+            the autopilot from <a href="/pages/feather-bone/landing.html">part five</a> and your
+            keyboard are interchangeable: an autonomous agent and a human pilot
+            are, to a physics simulation, both just sources of intent. Swap one
+            for the other mid-flight and the bird never notices. The whole
+            series was quietly building toward that socket.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The sandbox</span>Autopilot</h2>
+      <p>
+        Leave it on autopilot and it repeats the complete behavior loop:
+        wander the valley, pick a tree, fly the approach, flare onto a bough,
+        scream a phrase from her two-voiced syrinx, launch, and go again. Take
+        the controls and the same bird is yours to fly through the same world,
+        past the same trees, with the option to hand her back whenever you
+        like.
+      </p>
+      <div data-demo="sandbox"></div>
+      <p>
+        The combined demo connects the procedural bird, terrain, and trees to
+        either an autonomous controller or manual input.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The combined demo</h2>
+      <p>
+        The eagle was lofted from rings, feathered from a roster, rigged by
+        proximity, flapped by the law of cosines, flown by lift and drag, and
+        landed by feedback. The world was hashed into noise, summed into
+        mountains, carved by rain, planted with grass, and grown into trees.
+        Their structured representations make the final integration
+        straightforward.
+      </p>
+      <p>
+        The terrain-streaming implementation is covered in
+        <a href="/pages/ground-truth/horizon.html">Ground Truth's finale</a>.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part six — the finale ·
+        converged with <a href="/pages/ground-truth/horizon.html">Ground Truth</a> ·
+        built on every series before it:
+        <a href="/pages/particle-worlds/part1.html">gravity</a>,
+        <a href="/pages/bounced-light/lava.html">light</a>,
+        <a href="/pages/strange-matter/ferro.html">matter</a>,
+        <a href="/pages/living-music/vibration.html">music</a>, and the
+        <a href="/pages/ground-truth/heightfield.html">world</a>
+      </p>
+      <p>
+        Standing on the shoulders of the whole series:
+        <a href="/pages/feather-bone/eagle.html">modeling</a> ·
+        <a href="/pages/feather-bone/bones.html">rigging</a> ·
+        <a href="/pages/feather-bone/wingbeat.html">the wingbeat</a> ·
+        <a href="/pages/feather-bone/flight.html">flight</a> ·
+        <a href="/pages/feather-bone/landing.html">landing &amp; the scream</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/feather-bone/sky.ts"></script>
+  </body>
+</html>

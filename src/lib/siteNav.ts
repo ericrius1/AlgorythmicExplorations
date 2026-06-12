@@ -76,7 +76,7 @@ export function initNav(): void {
   }
 
   const contact = el("a", "site-nav-github", "Contact");
-  contact.href = "/contact.html";
+  contact.href = "/pages/core/contact.html";
   contact.title = "Get in touch";
   right.appendChild(contact);
 

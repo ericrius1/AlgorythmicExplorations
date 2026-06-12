@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Eagle — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A new series builds a bald eagle the honest way: a body lofted from rings of vertices, stitched into faceted triangles, and 128 individual feathers hung on the wing bones. By the end of the series she will fly, land on trees, and scream."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/eagle.ts -->
+    <header class="hero">
+      <div data-demo="hero-bird"></div>
+      <div class="hero-title">
+        <h1>The Eagle</h1>
+        <p class="subtitle">
+          A new series builds a bird you can fly — and this time the mesh is
+          laid down by hand: rings of vertices stationed along curves, stitched
+          into a faceted body, and dressed in a hundred and twenty-eight
+          individual feathers. Drag to inspect her.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This series builds a bird you can fly. Not a downloaded model with
+        someone else's animations — a creature that exists because a table of
+        numbers says so, rigged by arithmetic, and flapped by physics. The
+        final demo lets you fly her above a procedural world. This first
+        article does the modeling: it turns a description of a bald eagle into
+        an actual mesh, live, in your browser tab.
+      </p>
+      <p>
+        The world she'll fly over is its own project. A sister series,
+        <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>, runs in parallel with
+        this one and grows the terrain — mountains first, then erosion, grass,
+        and (importantly for a bird) trees. The two series are written to
+        converge: her final article and its final article are the same demo.
+        The pipeline here is also a close cousin of the one that built
+        <a href="/pages/waking-bodies/bear.html">the bear</a> — this site's other creature — and
+        the kinship is now exact: he lays his triangles down by hand, and so
+        does she. Where the bear lofts one body, though, the eagle splits the
+        problem in two: a lofted core, and a coat of feathers that are not
+        part of the skin at all.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why a bald eagle</span>
+        <p>
+          Because every part of the silhouette is doing identifiable work. The
+          white head and tail against the dark body mean the color zones read
+          from any distance; the two-meter span with slotted, fingered tips is
+          the most legible wing shape in the sky; the hooked beak and the brow
+          ridge over the eye turn "bird" into "raptor" with two small lofts.
+          And an eagle moves slowly enough to watch — two and a bit wingbeats
+          a second, long glides, deliberate landings. Everything this series
+          wants to teach happens at a speed your eye can follow.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The scaffold</span>Stations and rings</h2>
+      <p>
+        The eagle's first source of truth is a parts list of <em>lofts</em>.
+        A loft is a path through space with <em>stations</em> along it, and at
+        every station a ring: an oval of vertices, so wide across and so tall,
+        sitting in the plane perpendicular to the path. The torso-neck-head is
+        one loft of eleven stations; the upper beak is five; each wing wears
+        three short sleeves (one per bone); legs, toes, and talons are little
+        lofts of their own. Left parts are written once and mirrored by
+        flipping the sign of x.
+      </p>
+      <div data-demo="stations"></div>
+      <p>
+        This is the entire model before any skin exists — hoops on wires.
+        Drag the explode slider and the eagle decomposes into her components.
+        Two things are worth noticing while she's apart. First, the
+        <strong>folded wing is a Z</strong>: humerus swept back, forearm
+        forward, hand back again, pressed flat against the body — the same
+        three segments that will unfold into a full wingspan in part three.
+        Birds don't have less arm than we do; they keep it folded under the
+        plumage. Second, the rings are not all simple ovals: a station can
+        carry a <em>shape function</em>, a radial multiplier that dents or
+        bulges the ring as a function of angle. The chest keel, the culmen
+        ridge on the beak, and the brow shelf that gives her the glare are
+        each one such function — a cosine bump, three lines of code.
+      </p>
+      <p>
+        Alongside the lofts sits a second table: the <em>bones</em> — one
+        segment per future joint, each with a position and a flesh radius.
+        Part one only reads it for placement, but the whole series feeds on
+        it. Part two will ask, for every vertex, "which bones are you near?"
+        — and the answer becomes skin weights. Part three reads segment
+        lengths out of the same rows to unfold the wing with inverse
+        kinematics. Change one number — a longer beak, a deeper chest — and
+        the bird is re-lofted, re-rigged, and re-animated to match, because
+        nothing downstream ever stores its own copy.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The skin</span>Stitching the loft</h2>
+      <p>
+        Triangles come from the oldest trick in shipbuilding: march along the
+        path, and between every pair of adjacent rings connect vertex
+        <em>i</em> of one to vertex <em>i</em> of the next. Each ring pair
+        becomes a strip of quads; each quad splits into two triangles; the
+        ends get capped with a fan. There is no lookup table, no grid, no
+        ambiguity — the entire polygonizer is one nested loop:
+      </p>
+      <pre><code>for each pair of rings (A, B):
+  for s in 0..segments:
+    quad( A[s], A[s+1], B[s+1], B[s] )   <span class="cm">// two triangles, wound outward</span></code></pre>
+      <div data-demo="loft"></div>
+      <p>
+        The stitch slider replays the loop slowly: watch the quad strips climb
+        the torso ring by ring, then check the wireframe — clean quads flowing
+        along the body like clinker planks. The segment count is the whole
+        economics of the technique: nine vertices around a thigh, fourteen
+        around the torso, six around a toe. Nothing is wasted on smoothness we
+        don't want anyway, because every triangle keeps one flat normal and
+        one flat color — the faceted look this site ships everywhere, chosen
+        so the silhouette stays crisp when she's a speck banking over a
+        valley in the finale.
+      </p>
+ 
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The quill</span>One feather, parameterized</h2>
+      <p>
+        Here is the real departure. A bird's flight surface isn't skin — it
+        is on the order of fifty overlapping blades per wing, each one stiff
+        along its shaft and flexible at its base. So the model gives feathers
+        their own geometry: a <em>tent-folded plane</em>. Five vertices across
+        — edge, mid, ridge, mid, edge — with the ridge raised, so the cross
+        section is a shallow roof rather than a flat card. That fold is what
+        catches light: one vane brightens while the other shades, and a wing
+        of them reads as plumage instead of paper.
+      </p>
+      <div data-demo="feather"></div>
+      <p>
+        Everything else is a width profile along the shaft. It swells from
+        the calamus to a peak, tapers to a tip that can be round (a
+        secondary), pointed (a primary), or square (a tail feather), sags
+        toward the tip like a real quill under gravity — and, for the outer
+        primaries, takes a sudden step down past sixty percent of the length.
+        That step is <em>emargination</em>, and it is the single most
+        recognizable feature of a soaring raptor: the notch turns the wingtip
+        into separated "fingers", each a little winglet that spills its own
+        vortex. Slide it in and watch a generic feather become unmistakably
+        an eagle's.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The coat</span>A hundred feathers on six rails</h2>
+      <p>
+        One feather is a geometry; a wing is a <em>roster</em>. Ten primaries
+        hang off the hand bone, a dozen secondaries and their covert rows off
+        the forearm, tertials and scapulars smooth the wing into the back, an
+        alula — the bird's thumb — guards the leading edge at the wrist, and
+        twelve white rectrices fan off the tail bone. Every slot in the
+        roster is a row in a table: which bone, how far along it, how long,
+        how wide, and two fan angles — one for the folded wing, one for full
+        span.
+      </p>
+      <div data-demo="coat"></div>
+      <p>
+        None of these feathers are skinned. Each is a <strong>rigid instance</strong>
+        whose matrix is recomputed every frame: anchor on the bone, rotate by
+        the fan angle (interpolated between folded and spread), cant a few
+        degrees about its own shaft so the coat louvers like window blinds,
+        lift by a stack height so neighbors layer instead of z-fighting, then
+        multiply by the bone's world matrix. The whole coat is six instanced
+        draw calls. And the fan angles are where the anatomy hides: a folded
+        secondary sits at nearly 160° to its own bone, because when the
+        forearm folds forward the feathers still have to point back along the
+        body. Feathers rotate at the base far more than bones ever do — slide
+        the spread back and forth and you can watch the table do what a real
+        wing's smooth muscle does.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why not skin the feathers?</span>
+        <p>
+          Skinning blends each vertex between nearby bones — exactly right
+          for a continuous hide, exactly wrong for a stack of stiff quills.
+          A skinned feather inherits a weighted average of its neighbors'
+          motion and goes rubbery; worse, spreading a fan is not a rotation
+          any bone performs, so there is nothing to weight against. Rigid
+          instances with per-feather fan angles cost one matrix multiply each
+          and stay knife-sharp at every spread. Part three will pay this
+          choice back with interest: slot, splay, and lag — the three signals
+          that make a wingbeat look alive — are all just additions to that
+          fan angle.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 5 · Plumage</span>Zones, mottle, and the face</h2>
+      <p>
+        Color needs no texture map. The loft table tags each component with a
+        zone — chocolate body, white head, near-black flight feathers, white
+        tail, yellow beak and tarsus, charcoal talons — and every triangle
+        takes its zone's color, dimmed or brightened a few percent by a hash
+        of its own index. That per-facet <em>mottle</em> is the cheapest
+        texture in graphics and the reason low-poly reads as crafted instead
+        of unfinished. The feather classes carry their own colors the same
+        way, plus a per-vertex touch: a pale stripe down the rachis, darker
+        vane edges.
+      </p>
+      <div data-demo="bird-full"></div>
+      <p>
+        The eyes are riders, not loft: a yellow iris, a black pupil, and a
+        white glint, parented to where the head will be — when part two gives
+        the skeleton joints, the face rides the head joint for free. They sit
+        deliberately in the shadow of the brow loft, which is most of why she
+        looks like she's deciding whether you're edible. The
+        <strong>wing spread</strong> slider above is a preview of part
+        three's machinery doing its resting pose; even frozen, the coat
+        explains the bird.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Preparing for rigging</h2>
+      <p>
+        The mesh is currently frozen in rest pose. Part two gives the bone
+        table its second life as a <em>skeleton</em> — each body vertex
+        weighted to the bones it lives near, so the hide deforms when joints
+        rotate, while beak and talons are pinned rigid and the feather coat
+        simply rides along. Part three unfolds the wing Z with inverse
+        kinematics and finds the wingbeat — and the feathers earn their keep:
+        slots opening on the upstroke, fingers splaying at the bottom of the
+        power stroke. Part four stops faking it: lift, drag, and flapping
+        thrust as actual forces, at four kilograms and thirteen meters per
+        second. Part five adds landing — the approach, the flare, the
+        talons-on-bough problem — and the scream, because a syrinx is two
+        oscillators and a grammar, and we have a whole
+        <a href="/pages/living-music/vibration.html">music series</a> of parts to borrow. Part
+        six hands you the controls.
+      </p>
+      <p>
+        And under all of it, the other series is building the place. <a
+        href="/pages/ground-truth/heightfield.html">Ground Truth</a> raises mountains from
+        noise; by its middle parts there will be grass to skim and trees with
+        actual branches — branches whose positions her landing controller
+        will read like an instrument. Two series, one demo at the end.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part one ·
+        written in parallel with <a href="/pages/ground-truth/heightfield.html">Ground Truth</a> ·
+        built on the <a href="/pages/particle-worlds/part1.html">gravity</a>,
+        <a href="/pages/bounced-light/lava.html">light</a>,
+        <a href="/pages/strange-matter/ferro.html">matter</a>, and
+        <a href="/pages/living-music/vibration.html">music</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://en.wikipedia.org/wiki/Lofting">the loftsmen — ships and aircraft were faired from stationed cross-sections long before graphics borrowed the word</a> ·
+        <a href="https://doi.org/10.1017/CBO9780511610196">Videler, "Avian Flight" (2005)</a> ·
+        <a href="https://doi.org/10.1242/jeb.00857">Tucker, "Gliding birds: the effect of wingtip slots on drag" — why emarginated primaries exist</a> ·
+        <a href="https://doi.org/10.1186/1742-9994-4-23">Bachmann et al., on the measured architecture of real flight feathers</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/feather-bone/eagle.ts"></script>
+  </body>
+</html>

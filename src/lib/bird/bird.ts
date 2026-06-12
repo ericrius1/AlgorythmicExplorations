@@ -36,18 +36,22 @@ export interface EaglePoseOpts {
 
 // Eagles fly with legs tucked; they drop only on final approach. `extend`
 // lerps from the tucked pose to the rest hang; `crouch` folds for a perch.
+// Rotations are tuned on this rig's world-aligned joints: positive thigh X
+// swings the hanging leg up and back under the tail; positive tarsus X folds
+// the shank against the thigh (rest talon tip ≈ y 0.01 → tucked ≈ y 0.53).
 function applyLegPose(rig: BirdRig, extend: number, crouch = 0): void {
   const e = THREE.MathUtils.clamp(extend, 0, 1);
   const c = THREE.MathUtils.clamp(crouch, 0, 1);
-  const tuckThighX = -62;
-  const tuckThighZL = -7;
-  const tuckTarsusX = 88;
-  const thighX = tuckThighX * (1 - e) + 30 * c;
-  const tarsusX = tuckTarsusX * (1 - e) - 36 * c;
-  rig.setEulerDeg("thighL", thighX, 0, tuckThighZL * (1 - e));
-  rig.setEulerDeg("thighR", thighX, 0, -tuckThighZL * (1 - e));
+  const tuck = 1 - e;
+  const thighX = 85 * tuck + 30 * c;
+  const thighZL = -8 * tuck;
+  const tarsusX = 80 * tuck - 36 * c;
+  rig.setEulerDeg("thighL", thighX, 0, thighZL);
+  rig.setEulerDeg("thighR", thighX, 0, -thighZL);
   rig.setEulerDeg("tarsusL", tarsusX, 0, 0);
   rig.setEulerDeg("tarsusR", tarsusX, 0, 0);
+  rig.setEulerDeg("footL", 0, 0, 0);
+  rig.setEulerDeg("footR", 0, 0, 0);
 }
 
 export interface Eagle {

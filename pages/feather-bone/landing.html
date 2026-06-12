@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Landing — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A guidance controller flies the simulated eagle onto a procedural bough using an approach, glide slope, and flare, followed by a two-voiced syrinx model of the raptor scream."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/landing.ts -->
+    <header class="hero">
+      <div data-demo="hero-landing"></div>
+      <div class="hero-title">
+        <h1>The Landing</h1>
+        <p class="subtitle">
+          This article adds landing: approaching one bough in a whole tree,
+          killing thirteen meters per second with a flare at the stall's edge,
+          and then screaming with a voice box that has two throats. The eagle
+          above is landing on a tree the sister series grew, over and over.
+          Watch her pick her spot.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/pages/feather-bone/flight.html">Part four</a> gave the eagle an engine and a sky,
+        and an autopilot that could hold a cruise and wander through lazy
+        turns. But cruising is the easy regime — the forces are gentle, the
+        margins wide. This article tackles the regime where everything is
+        tight: the last few meters of an arrival, where she must hit a precise
+        point in space, pointed the right way, with her speed bled to almost
+        nothing — and do it by flying the same physics, not by snapping to a
+        pose. It also adds a procedural voice.
+      </p>
+      <p>
+        And she lands on something real. The sister series,
+        <a href="/pages/ground-truth/trees.html">Ground Truth</a>, finished growing its trees —
+        and those trees publish their branches as <em>perches</em>: a
+        position, a tangent along the bough, a radius, and the headroom above.
+        Her landing controller reads that list like a menu — filtered for
+        radius first, because four kilograms of eagle does not perch on a
+        twig. This is the first place the two series actually touch; in
+        <a href="/pages/ground-truth/horizon.html">part six</a> they merge entirely.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why landing is difficult</span>
+        <p>
+          A cruising bird that's off by a meter is still cruising. A landing
+          bird that's off by a meter is in a bush. Landing has no margin: the
+          target is a point, the acceptable speed is near zero, and the
+          approach is flown in the worst corner of the envelope — slow, where
+          lift is weakest and the stall margin is small. Rather than using a
+          scripted arc, the demo uses guidance laws to control the simulated
+          forces through touchdown.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The approach</span>Approach guidance</h2>
+      <p>
+        The controller never plans a trajectory. Each frame it looks at where
+        the perch is relative to where she is and issues three commands, each a
+        simple feedback law. <strong>Steering:</strong> measure the angle
+        between her heading and the direction to the perch, and bank in
+        proportion — she rolls toward the target and the part-four physics
+        curves her path there (banking turns, reused). <strong>Glide slope:</strong>
+        compare her sink rate to the target descent rate, and
+        pitch to close the gap. <strong>Speed:</strong> schedule the throttle
+        by distance, easing off as she nears so she arrives slow.
+      </p>
+      <div data-demo="approach"></div>
+      <p>
+        Launch the approach and watch the phases in the readout: she lines up
+        in <em>cruise</em>, settles onto the dashed glide slope in
+        <em>approach</em>, and at the last moment enters <em>flare</em>. The
+        orange trail is the path the guidance laws actually flew — never drawn,
+        only fed back, frame after frame. Nothing tells her where to be; she's
+        told only where the branch is, and corrects her way onto it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The flare</span>Landing flare</h2>
+      <p>
+        The landing flare uses the high-angle-of-attack behavior from
+        <a href="/pages/feather-bone/flight.html">part four</a>. Approaching the branch, the bird pitches its wings
+        sharply nose-up — toward the stall. For an instant before the stall,
+        lift <em>spikes</em>: she's still moving, and the steep angle wrings
+        maximum lift from the remaining airspeed. That increase arrests the
+        descent while the drag of the steep wing removes the remaining
+        forward speed. The wing then stalls near touchdown.
+      </p>
+      <div data-demo="flare"></div>
+      <p>
+        This is the flare in slow motion, plotted: the blue speed line bleeding
+        toward zero, and the green sink-rate line — watch it lift toward level
+        right in the shaded flare zone, the cushion arresting her fall just
+        before touchdown. No part of those curves is keyframed. They're what
+        the force balance does when you point a slow wing steeply up at the
+        right moment, which is precisely what "flare" means to every pilot and
+        every bird.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: proportional control</summary>
+        <div class="fold-body">
+          <p>
+            The three feedback laws here — bank from heading error, pitch from
+            sink-rate error, throttle from distance — are the simplest members
+            of a broad family of control systems. Each is a
+            <em>proportional controller</em>: measure an error, push back
+            in proportion. String a few together with a phase machine
+            (cruise → approach → flare → perched) and you have something that
+            produces goal-directed behavior without trajectory planning. Part
+            six replaces the autonomous commands with manual steering while
+            retaining the same control laws.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The scream</span>A two-source syrinx model</h2>
+      <p>
+        Perched, she calls — and bird sound deserves its own physics. Birds
+        don't have our larynx. They have a <em>syrinx</em>, sitting deep at
+        the fork where the windpipe splits toward the two lungs, and it has
+        <strong>two independent sound sources</strong>, one per branch.
+        Suthers proved in 1990 that a bird can drive the two halves
+        separately. Songbirds use that to run two melodies at once; an eagle
+        uses it more bluntly — the two voices stack on the same gesture a few
+        hertz apart, and the beat between them is the metallic shimmer that
+        makes a raptor call sound like it's cutting through something. We
+        model exactly that: two oscillators, each with its own pitch and
+        volume envelope, summed.
+      </p>
+      <p>
+        On top of the two voices sits a little <em>grammar</em>. Eagle calls
+        are built from fewer gestures than song — an opening <em>klee</em> or
+        two, the long descending scream, the staccato kik-kik-kik series, the
+        occasional fast chitter — strung into short phrases with deliberate
+        gaps. The generator picks a sequence with eagle-ish proportions, hands
+        the gestures to one voice or the other (and stacks both on the
+        scream), and schedules the whole burst at once.
+      </p>
+      <div data-demo="song"></div>
+      <p>
+        Tap for sound and she calls a freshly generated phrase in the 1–3.5
+        kHz band where the big raptors live. Her beak isn't animated to the
+        call — it's driven <em>by</em> it: the demo reads the actual loudness
+        coming out of the speakers and opens her gape to match (the pinned
+        lower mandible from part two, earning its hinge), with the head
+        thrown back on the loud gestures. The same loudness reading the
+        <a href="/pages/living-music/vibration.html">music series</a> takes from its master bus.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The Hollywood eagle</span>
+        <p>
+          The piercing scream every movie dubs over a bald eagle actually
+          belongs to a red-tailed hawk; real bald eagles mostly produce a
+          surprisingly modest chitter. Our grammar splits the difference —
+          the kik series is honest bald eagle, the long scream is the one the
+          movies taught you — because a procedural bird may as well sound the
+          way the audience already believes she does.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Assembly</span>The complete behavior sequence</h2>
+      <p>
+        Put it on a loop over a real tree — scaled to eagle country, because
+        the sister series grew its timber for songbirds. She circles in, the
+        controller picks a bough from the tree's published list and flies her
+        onto it, she settles and screams a phrase, then launches — a burst of
+        full-power flapping — and lines up for the next branch. Approach,
+        flare, perch, scream, takeoff: the whole vocabulary of this series
+        running as one behavior, with nothing scripted but the order of the
+        phases.
+      </p>
+      <div data-demo="act"></div>
+      <p>
+        The tree is generated by Ground Truth's space-colonization model, with
+        branches found and ranked as perches by the sister series' own code.
+        The scene previews the final integration of the bird's behavior with
+        the procedural world.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Integration with terrain</h2>
+      <p>
+        The remaining article combines an eagle lofted from rings, feathered
+        quill by quill, rigged by distances, flapped by inverse kinematics,
+        flown by forces, and landed by guidance laws — and a whole world next
+        door with mountains, rivers carved by rain, grass, trees, and a
+        horizon that never ends. Part six
+        exposes manual controls in that world, with the option to use the
+        autopilot instead. Both control modes use the same flight model.
+      </p>
+      <p>
+        It is also <a href="/pages/ground-truth/horizon.html">Ground Truth's</a> finale — the two
+        series conclude with the same combined demo.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part five ·
+        written in parallel with <a href="/pages/ground-truth/heightfield.html">Ground Truth</a> ·
+        the eagle lands on <a href="/pages/ground-truth/trees.html">its trees</a>, screams with the
+        <a href="/pages/living-music/vibration.html">music series'</a> voice
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1038/347473a0">Suthers, "Contributions to Birdsong from the Left and Right Sides of the Intact Syrinx" (1990)</a> ·
+        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/feather-bone/landing.ts"></script>
+  </body>
+</html>
