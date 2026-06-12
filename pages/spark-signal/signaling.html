@@ -18,133 +18,429 @@
     <main>
       <h1>How Neurons Signal</h1>
       <p>
-        A neuron is not a wire. It is a sealed bag of salty water — the
-        <em>cytoplasm</em> — wrapped in an oily membrane that is selectively
-        permeable to ions. Most of the time it sits at a steady electrical
-        voltage, the <strong>resting potential</strong>, roughly −70 millivolts
-        inside relative to outside. Thought, sensation, and movement all begin
-        when that voltage shifts enough to trigger a brief, stereotyped pulse
-        called an <strong>action potential</strong>, which then hands the
-        message to the next cell across a <strong>synapse</strong>.
+        This series approaches neuroscience through biophysics rather than
+        starting with brain regions and Latin vocabulary. Most of what we call
+        "thinking" is downstream of a much older mechanism: a cell membrane that
+        holds a voltage, briefly flips it, and passes the flip to its neighbours.
+        Memory, emotion, and language all ride on top of that — but the spike is
+        the atom. So we start with the spike and build outward.
       </p>
       <p>
-        This post walks through that chain with four live simulations. Each one
-        isolates a layer of the mechanism so you can see what changes when you
-        turn a conductance knob or poke a cell.
+        A neuron is not a wire. It is a sealed bag of salty water — the
+        <em>cytoplasm</em> — wrapped in an oily lipid bilayer pierced by protein
+        pores called <strong>ion channels</strong>. Most of the time the inside
+        sits about <strong>70 millivolts negative</strong> relative to the fluid
+        outside. That steady voltage, the <strong>resting potential</strong>, is
+        not idle — it is stored energy, like a compressed spring. Sensation,
+        thought, and movement all begin when something releases that spring far
+        enough to trigger a brief, stereotyped pulse called an
+        <strong>action potential</strong>, which then hands the message to the
+        next cell across a <strong>synapse</strong>.
+      </p>
+      <p>
+        Four live simulations below walk through that chain. Each one isolates a
+        layer of the mechanism so you can see what changes when you turn a
+        conductance knob, click an axon, or stimulate a neuron in a small
+        circuit. The numbers in the prose match the models running in your
+        browser.
       </p>
 
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Prologue · The parts</span>Anatomy of a neuron</h2>
+      <p>
+        Before the physics, the geography. A typical neuron has three functional
+        zones, and each zone does a different job in the signaling pipeline:
+      </p>
+      <pre><code>dendrites   → receive input from other neurons (graded potentials)
+soma        → integrate input; decide whether to fire
+axon        → broadcast an all-or-none spike to downstream targets
+terminal    → convert the electrical spike into a chemical message</code></pre>
+      <p>
+        The <em>dendritic tree</em> is an antenna farm — thousands of thin
+        branches covered in synapses where other neurons whisper in. Those whispers
+        are small voltage blips, not spikes. They <strong>sum</strong> in the
+        soma. If the sum crosses a line called <strong>threshold</strong>, the
+        soma launches an action potential down the <em>axon</em>, a cable that
+        can stretch from your spine to your toe. At the <em>axon terminal</em>,
+        the electrical event becomes chemistry: neurotransmitter molecules dumped
+        into a gap, received by the next neuron, and the whole cycle repeats.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · 100 billion is a misleading number</span>
+        <p>
+          Textbooks often say the human brain has ~86 billion neurons. The more
+          important fact for signaling is the connection count: each neuron
+          receives input from hundreds to tens of thousands of others. The brain
+          is not a collection of cells — it is a collection of
+          <em>graphs</em>. Part four of this post is already a tiny one.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
       <h2><span class="kicker">Step 1 · The charged membrane</span>Resting potential</h2>
       <p>
-        The inside of a neuron is rich in K⁺ and poor in Na⁺; the extracellular
-        fluid is the opposite. Ion channels in the membrane leak mostly potassium,
-        so K⁺ diffuses out until its negative charge pulls it back — an equilibrium
-        near −77 mV for K⁺ alone. Sodium channels are mostly closed at rest, but a
-        small leak still pulls the resting voltage to about <strong>−70 mV</strong>.
+        Where does −70 mV come from? Two forces tug on every ion: a
+        <strong>concentration gradient</strong> (ions diffuse from where they're
+        crowded to where they're scarce) and an <strong>electrical gradient</strong>
+        (opposite charges attract, like charges repel). At equilibrium those forces
+        cancel. For potassium alone, with the inside rich in K⁺, the balance
+        point is about <strong>−77 mV</strong> — the Nernst potential for K⁺.
+      </p>
+      <p>
+        The resting membrane is not at −77 mV, because sodium leaks in too.
+        Na⁺ is scarce inside and abundant outside; even the small number of open
+        leak channels lets it creep in, pulling the voltage upward (less
+        negative). The sodium–potassium pump actively trades 3 Na⁺ out for 2 K⁺
+        in, spending ATP to maintain the gradients that make the resting potential
+        possible. The compromise voltage — what you actually measure at rest — is
+        about <strong>−70 mV</strong>.
       </p>
       <pre><code>resting potential ≈ −70 mV     (inside relative to outside)
-threshold       ≈ −55 mV     (voltage that triggers a spike)
-peak of spike   ≈  +40 mV     (brief reversal, then recovery)</code></pre>
+K⁺ equilibrium    ≈ −77 mV     (if only potassium channels were open)
+Na⁺ equilibrium   ≈  +58 mV     (if only sodium channels were open)
+threshold         ≈ −55 mV     (voltage that triggers a spike)
+peak of spike     ≈  +40 mV     (brief reversal, then recovery)</code></pre>
       <p>
-        The demo below is a scrolling voltage trace. Adjust Na⁺ and K⁺
-        conductance and watch how the resting line moves. Hit
-        <strong>inject current</strong> to mimic synaptic input: if you push the
-        membrane past threshold, the full action potential unfolds — sodium rushes
-        in (depolarization), then potassium rushes out (repolarization).
+        The demo below is a scrolling voltage trace of a patch of membrane. The
+        cell diagram on the right brightens when the interior depolarizes. Adjust
+        the Na⁺ and K⁺ conductance sliders and watch the resting line drift: more
+        K⁺ conductance pulls toward −77 mV; more Na⁺ leak pulls upward. Hit
+        <strong>inject current</strong> to mimic synaptic input arriving at the
+        soma. A small pulse produces a small bump — a <em>graded</em> response.
+        Push past threshold and the full action potential unfolds: voltage-gated
+        Na⁺ channels snap open (rapid depolarization), then voltage-gated K⁺
+        channels open (repolarization), then the cell overshoots slightly
+        negative (hyperpolarization) before settling back.
       </p>
 
       <div data-demo="membrane"></div>
 
+      <p>
+        Things worth trying. Lower K⁺ conductance and inject current: the cell is
+        harder to repolarize — spikes get wider and stranger. Raise Na⁺
+        conductance at rest: the resting line creeps toward threshold and the cell
+        becomes excitable, firing with smaller inputs. The shape of the spike —
+        how fast it rises, how fast it falls — is not decorative. It is the
+        fingerprint of which channels opened, in what order, for how long.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: the membrane as a capacitor</summary>
+        <div class="fold-body">
+          <p>
+            The lipid bilayer is an insulator roughly 5 nm thick. Cytoplasm and
+            extracellular fluid are conductors. That geometry makes the membrane a
+            <strong>capacitor</strong>: charge piled on one side produces voltage
+            across the barrier without ions necessarily crossing. Ion channels are
+            the resistors — each conductance is a path for charge to flow and
+            equalize. The time constant of a neuron (how fast voltage changes
+            when current arrives) is τ = R × C: membrane capacitance times
+            channel resistance.
+          </p>
+          <p>
+            This is why dendrites can integrate slowly: their capacitance is
+            large and their input resistance is high. A synaptic input delivers a
+            brief current pulse; the voltage rises, then leaks back down. If
+            another input arrives before the leak finishes, the voltages add.
+            That temporal summation — plus spatial summation from many branches —
+            is how a neuron counts votes before deciding to fire.
+          </p>
+        </div>
+      </details>
       <aside class="note">
         <span class="note-label">Aside · Not electricity in a wire</span>
         <p>
           The signal is a <em>voltage wave</em> caused by ion movement across a
-          capacitor (the membrane), not electrons sluicing through a conductor.
-          That is why neurons are slow (up to ~120 m/s in myelinated axons) yet
-          extraordinarily versatile: the same physical principle encodes touch,
-          vision, and the decision to reach for coffee.
+          capacitor, not electrons sluicing through a copper conductor. That is
+          why neurons are slow — unmyelinated axons conduct at roughly 1 m/s;
+          myelinated ones reach ~120 m/s — yet extraordinarily versatile: the
+          same physical principle encodes the touch of a key, the colour of the
+          sky, and the decision to reach for coffee. Speed was never the point.
+          Conditional computation was.
         </p>
       </aside>
 
+      <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · The spike</span>Action potential propagation</h2>
       <p>
-        Once one patch of membrane fires, local current spreads to neighboring
-        patches. Each region has its own voltage-gated Na⁺ and K⁺ channels; when
-        the depolarization front arrives, that region fires too. The result is a
-        <strong>traveling pulse</strong> — unidirectional because the region
-        behind is briefly refractory (channels recovering).
+        An action potential is <strong>all-or-none</strong>. Weak input that
+        fails to reach threshold produces nothing; input that barely reaches
+        threshold produces a full-sized spike. There is no "small" action
+        potential. This is why the spike is a digital bit riding on an analog
+        world — the dendrites do analog summation; the axon commits to a binary
+        event.
       </p>
       <p>
-        Myelin sheaths (not modeled here) insulate the axon and let the pulse
-        jump between gaps called nodes of Ranvier, greatly increasing speed. In
-        the demo, each colored segment is a patch of axon membrane. Click anywhere
-        along the axon to stimulate, or use the button. Brighter segments are
-        depolarized; orange ticks above show local voltage.
+        Once one patch of axon membrane fires, local current spreads to
+        neighbouring patches. Each region has its own complement of voltage-gated
+        Na⁺ and K⁺ channels. When the depolarization front arrives, Na⁺ channels
+        in that region open too, and that region fires. The result is a
+        <strong>traveling pulse</strong> — self-regenerating, like a burning fuse
+        made of voltage.
+      </p>
+      <p>
+        The pulse travels in one direction because the region behind it is
+        briefly <strong>refractory</strong>: Na⁺ channels are inactivated and
+        cannot reopen for a millisecond or two. Forward is fresh membrane; backward
+        is spent. This absolute refractory period also sets a maximum firing rate
+        — a typical neuron cannot spike much faster than ~500 Hz, and most fire
+        far slower.
+      </p>
+      <pre><code>unmyelinated axon   ≈   1 m/s conduction
+myelinated axon     ≈ 120 m/s conduction   (saltatory jumping at nodes of Ranvier)
+refractory period   ≈   1–2 ms             (limits max firing rate)</code></pre>
+      <p>
+        Myelin sheaths — fatty insulation wrapped around many axons — are not
+        modeled in the demo, but they matter enormously. Myelin increases
+        membrane resistance and decreases capacitance, so the pulse
+        <strong>jumps</strong> between exposed gaps called nodes of Ranvier
+        rather than fighting through insulated cable. Multiple sclerosis is, in
+        part, myelin destruction: signals slow, distort, or fail.
+      </p>
+      <p>
+        In the demo, each coloured segment is a patch of axon membrane. Click
+        anywhere along the axon to stimulate at that point, or use the button.
+        Brighter segments are depolarized; the orange ticks above show local
+        voltage. Drag the conduction speed slider: you are changing how quickly
+        depolarization spreads to neighbours, not how fast ions move inside a
+        single channel (that is fixed by biophysics).
       </p>
 
       <div data-demo="action-potential"></div>
 
+      <p>
+        Watch what happens when you stimulate near the soma versus near the
+        terminal. The spike shape at each segment is identical — all-or-none
+        again — but the arrival time at the far end depends on distance and
+        myelination. The nervous system encodes some information in
+        <em>timing</em> (when the spike arrives), not just <em>whether</em> it
+        arrives. Sound localization in the brainstem compares arrival times from
+        the two ears at microsecond resolution.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: why the spike shape is conserved</summary>
+        <div class="fold-body">
+          <p>
+            Every patch of membrane on the axon runs the same channel program.
+            That is why the action potential looks the same at the cell body and
+            at the fingertip — the waveform is a property of the membrane
+            machinery, not of the stimulus that triggered it. The stimulus only
+            decides <em>if</em> and <em>when</em>; the channels decide
+            <em>what</em>.
+          </p>
+          <p>
+            This conservation is what lets axons be long. A sensory neuron from
+            your toe has one axon that can be over a meter long, yet the spike
+            that arrives in your spinal cord is the same shape as the one that
+            left your skin. The alternative — graded signals decaying with
+            distance, as in dendrites — would not survive the trip.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · The gap</span>Synaptic transmission</h2>
       <p>
-        Neurons rarely touch. At a chemical synapse the action potential reaches
-        the presynaptic terminal, voltage-gated Ca²⁺ channels open, and calcium
-        triggers <strong>vesicles</strong> of neurotransmitter to fuse with the
-        membrane. Molecules diffuse across the ~20 nm synaptic cleft and bind
-        postsynaptic receptors, opening ion channels and producing a small graded
-        potential — an <strong>EPSP</strong> (excitatory) or
-        <strong>IPSP</strong> (inhibitory).
+        Neurons rarely touch. The synaptic cleft — the gap between cells — is
+        about <strong>20 nanometres</strong> wide. An action potential arriving
+        at the presynaptic terminal opens voltage-gated
+        <strong>Ca²⁺ channels</strong>. Calcium rushes in (it is far more
+        concentrated outside than inside). Calcium does not directly change the
+        postsynaptic voltage; instead it triggers the fusion of
+        <strong>synaptic vesicles</strong> with the membrane, dumping
+        neurotransmitter into the cleft.
       </p>
       <p>
-        One vesicle release does not fire the next neuron. Summation does: many
-        small EPSPs arriving close in time add. The demo shows vesicle depletion
-        and refill, transmitter cloud in the cleft, and the postsynaptic voltage
-        trace below. Press <strong>presynaptic spike</strong> repeatedly to see
-        summation build an action potential in the receiving cell.
+        Neurotransmitter diffuses across the gap in microseconds, binds
+        postsynaptic receptors, and opens ion channels. If the channels pass Na⁺
+        or depolarizing current, the postsynaptic cell gets a small upward bump —
+        an <strong>EPSP</strong> (excitatory postsynaptic potential). If they pass
+        Cl⁻ or K⁺ in a hyperpolarizing configuration, you get an
+        <strong>IPSP</strong> (inhibitory). These are <em>graded</em> again: more
+        transmitter, more channels open, bigger bump. One vesicle releases only a
+        fraction of the transmitter needed to fire the next cell.
+      </p>
+      <pre><code>synaptic cleft width     ≈  20 nm
+vesicle contents         ≈ 5,000 molecules of transmitter (order of magnitude)
+EPSP size (one vesicle)  ≈  0.1–1 mV   (too small to reach threshold alone)
+typical threshold gap    ≈ 15 mV from rest to spike</code></pre>
+      <p>
+        So a single synaptic event is a whisper. The postsynaptic neuron listens
+        to thousands of whispers at once. <strong>Spatial summation</strong>:
+        many EPSPs from different synapses add. <strong>Temporal summation</strong>:
+        EPSPs arriving in quick succession add before the membrane leaks back.
+        Only when the combined depolarization crosses threshold does the
+        postsynaptic cell fire its own action potential.
+      </p>
+      <p>
+        The demo shows the presynaptic terminal (left), the cleft with a
+        transmitter cloud, and the postsynaptic dendrite (right). Purple vesicles
+        deplete on release and slowly refill. Press
+        <strong>presynaptic spike</strong> once: a small EPSP appears in the
+        trace below. Press it five times in a row: watch summation build until
+        the postsynaptic cell fires. Drag the synaptic weight slider to make each
+        release louder or quieter.
       </p>
 
       <div data-demo="synapse"></div>
 
+      <p>
+        Excitation and inhibition are not opposites in a moral sense — they are
+        opposite <em>signs</em> of current. Inhibition is not "off"; it is active
+        shoving the membrane away from threshold. Many circuits use inhibition to
+        sculpt timing: feedforward inhibition can narrow the window in which a
+        cell is allowed to fire; lateral inhibition sharpens contrast (this is how
+        the retina begins edge detection).
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Glutamate and GABA</span>
+        <p>
+          The brain's main excitatory neurotransmitter is <strong>glutamate</strong>;
+          the main inhibitory one is <strong>GABA</strong>. Dozens of others
+          (dopamine, serotonin, acetylcholine, …) modulate circuits on slower
+          timescales — changing gain, mood, attention — but fast point-to-point
+          signaling is mostly glutamate and GABA. Every psychedelic, every
+          antidepressant, every cup of coffee eventually touches this chemistry;
+          the details are for later posts.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: electrical synapses — when cells touch directly</summary>
+        <div class="fold-body">
+          <p>
+            Not all synapses are chemical. <strong>Gap junctions</strong> —
+            electrical synapses — connect the cytoplasm of two cells directly
+            through pores called connexons. Current flows instantly, with no
+            vesicle delay. They are common in cardiac muscle (so your heart beats
+            as one unit) and in some brain circuits that need sub-millisecond
+            synchrony. This post focuses on chemical synapses because they are
+            slower, amplifiable, and chemically reconfigurable — the basis for
+            learning.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
       <h2><span class="kicker">Step 4 · The circuit</span>Networks</h2>
       <p>
-        Brains are not single neurons — they are graphs. A spike in one cell
-        weighted by synaptic strength contributes to the input of another. Some
-        connections are excitatory (glutamate → depolarization), others
-        inhibitory (GABA → hyperpolarization). Inhibition shapes timing: it can
-        prevent runaway excitation or create precise windows for firing.
+        A single neuron in isolation is a curiosity. A network of neurons is a
+        computer — or at least, the substrate on which whatever the brain is
+        doing gets done. Each spike in one cell contributes weighted input to
+        every cell it connects to. The weight can be positive (excitatory) or
+        negative (inhibitory). The receiving cell integrates all inputs and
+        decides whether to fire.
       </p>
       <p>
-        The network below uses simplified integrate-and-fire neurons (faster than
-        full Hodgkin–Huxley, but the logic is the same). Click any neuron to
-        stimulate it. Blue edges are excitatory; the red edge is inhibitory
-        feedback. Turn up background noise to see spontaneous chatter.
+        The graph structure matters as much as the weights. Feedforward layers
+        transform input to output. Recurrent loops hold state — a trace of the
+        recent past — in the ongoing activity of the circuit. Inhibitory
+        interneurons (small, fast, GABAergic) are the clock and the sculptor:
+        without them, excitatory networks tend toward epilepsy-like runaway
+        firing.
+      </p>
+      <pre><code>typical cortical neuron   ≈ 10,000 synaptic inputs
+cortical firing rate      ≈   0.1–10 Hz average (bursts can be higher)
+energy cost of a spike    ≈ 10⁸ ATP molecules (mostly pump work to restore gradients)</code></pre>
+      <p>
+        The network below uses simplified <strong>integrate-and-fire</strong>
+        neurons — faster to simulate than full Hodgkin–Huxley, but the logic is
+        identical: graded input sums, threshold commits to a spike, refractory
+        enforces a brief pause. Click any neuron to stimulate it manually. Blue
+        edges are excitatory; the red edge is inhibitory feedback from the lower
+        right neuron back to the centre. Turn up background noise to see
+        spontaneous near-threshold chatter.
       </p>
 
       <div data-demo="network"></div>
 
+      <p>
+        Things worth trying. Stimulate the leftmost neuron and trace the wave
+        forward. Then stimulate the centre and watch inhibition suppress the
+        feedback loop. Crank noise until cells fire on their own: you are
+        simulating the constant random synaptic bombardment real neurons live in.
+        No cortical neuron is ever truly silent — it is always being pushed and
+        pulled by thousands of unrelated inputs.
+      </p>
       <aside class="note">
         <span class="note-label">Aside · Hodgkin and Huxley, 1952</span>
         <p>
           The membrane demo uses simplified Hodgkin–Huxley kinetics — the equations
           Alan Hodgkin and Andrew Huxley fitted to the giant squid axon, for which
-          they shared the Nobel Prize in 1963. Their model is still the textbook
+          they shared the Nobel Prize in 1963. They voltage-clamped the membrane
+          (holding it at set voltages with a feedback circuit) and measured the
+          ionic currents that flowed — decomposing the action potential into
+          sodium entry and potassium exit. Their model is still the textbook
           account of how voltage-gated channels produce the spike shape.
         </p>
       </aside>
+      <details class="fold">
+        <summary>Deep dive: the spike as a design constraint</summary>
+        <div class="fold-body">
+          <p>
+            Why all-or-none? Why not send graded voltages down the axon, as
+            dendrites do? Because graded signals decay exponentially with
+            distance. The action potential is an expensive fix: spend energy
+            regenerating the signal at every patch of membrane so it arrives
+            intact a metre away. Evolution paid that cost wherever long-range
+            reliable transmission mattered.
+          </p>
+          <p>
+            Why chemical synapses? They add latency (~0.5 ms per synapse) but
+            gain amplification and flexibility. A small presynaptic spike can
+            release enough transmitter to depolarize a large postsynaptic cell;
+            the sign and strength of the connection can be tuned by receptor
+            type and channel count; and the synapse can change with experience —
+            the physical basis of learning, which this series will take up in
+            part two.
+          </p>
+        </div>
+      </details>
 
-      <h2>What this leaves out</h2>
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>The signaling pipeline</h2>
       <p>
-        Real synapses also have short-term plasticity, neuromodulators, glial
-        regulation, dendritic computation, and thousands of channel types. But the
-        skeleton is always the same: <strong>graded potentials</strong> integrate
-        input, <strong>threshold</strong> converts to an all-or-none spike,
-        <strong>propagation</strong> carries it down the axon, and
-        <strong>chemical transmission</strong> passes it to the next cell. Every
-        sensation you have ever had rode that pipeline.
+        Dissection complete. A neural signal is not one thing — it is a sequence
+        of transformations, each with its own physics:
+      </p>
+      <pre><code>dendrites     → graded potentials     (analog input, summation)
+soma          → threshold decision    (analog → digital conversion)
+axon          → action potential      (digital broadcast, all-or-none)
+synapse       → chemical transmission (digital → analog again, with gain)
+next neuron   → repeat</code></pre>
+      <p>
+        Every sensation you have ever had rode that pipeline. Light hit your
+        retina; photoreceptors changed their glutamate release; bipolar and
+        ganglion cells summed the result; ganglion cells fired spikes down the
+        optic nerve; the lateral geniculate relayed them to cortex; and somewhere
+        in the chain the physical world became seeing. Strip away the myelin, the
+        neurotransmitters, the Latin names, and the skeleton is always what you
+        simulated today: voltage, threshold, propagation, chemistry.
+      </p>
+      <p>
+        What this post left out is as important as what it included. Real
+        synapses change strength with use (<strong>plasticity</strong>). Glial
+        cells feed and modulate neurons. Dendrites are not passive wires — they
+        can compute locally. Neuromodulators reconfigure entire circuits on
+        second-to-hour timescales. And the graph is not a generic network — it
+        has a wiring diagram shaped by genes and experience. Part two of this
+        series takes up the first of those: how repeated firing at a synapse
+        makes the connection stronger, and what that has to do with memory.
+      </p>
+      <p>
+        <strong>Continued in Part two: The Synapse That Learns</strong> —
+        long-term potentiation, spike-timing-dependent plasticity, and the
+        chemistry of remembering. (Coming soon.)
       </p>
     </main>
     <footer>
       <p>
-        Spark &amp; Signal · Part 1 · Neurons, action potentials, synapses, and
-        small circuits — simulated live in your browser.
+        Spark &amp; Signal · Part 1 · Resting potential, action potentials,
+        synaptic transmission, and small circuits — simulated live in your
+        browser.
+      </p>
+      <p>
+        Membrane model: simplified Hodgkin–Huxley kinetics. Network model:
+        integrate-and-fire. Standing on the shoulders of: Hodgkin &amp; Huxley
+        (1952) · Katz (quantal release, 1950s) · Eccles (EPSP/IPSP, 1960s)
       </p>
     </footer>
     <script type="module" src="/src/pages/spark-signal/signaling.ts"></script>

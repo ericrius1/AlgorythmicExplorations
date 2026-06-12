@@ -1,4 +1,4 @@
-import "../style.css";
+import "../../style.css";
 import { initNav } from "../../lib/siteNav";
 import { mountLazy } from "../../lib/demoShell";
 import { mountWingIK, mountUnfold, mountFlapCycle, mountFlapAll } from "../../demos/bird/birdWing";

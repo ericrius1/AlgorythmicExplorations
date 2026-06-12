@@ -31,8 +31,6 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
   "Spark & Signal":
     "Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.",
-  Clinamen:
-    "Eight hundred ceramic bowls drift on hidden currents, collide, and ring — a living instrument built from chance.",
 };
 
 export const POSTS: Post[] = [
@@ -294,27 +292,6 @@ export const POSTS: Post[] = [
     part: 1,
     title: "How Neurons Signal",
     subtitle: "Resting potential, action potentials, synaptic transmission, and neural circuits",
-  },
-  {
-    href: "/pages/clinamen/swerve.html",
-    series: "Clinamen",
-    part: 1,
-    title: "The Swerve",
-    subtitle: "Lucretius, atomic chance, and the philosophy behind eight hundred drifting bowls",
-  },
-  {
-    href: "/pages/clinamen/pools.html",
-    series: "Clinamen",
-    part: 2,
-    title: "The Pools",
-    subtitle: "Hidden currents, floating ceramics, and the slow choreography of collision-free drift",
-  },
-  {
-    href: "/pages/clinamen/chimes.html",
-    series: "Clinamen",
-    part: 3,
-    title: "The Chimes",
-    subtitle: "Elastic collisions, resonant bowls, and music that composes itself from chance",
   },
 ];
 
