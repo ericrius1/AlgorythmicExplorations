@@ -1,4 +1,4 @@
-import{g as W,S as $,a as H,c as V,i as X,m as Y}from"./gpu-BLPsBJnk.js";import{m as J,P as u,l as L,c as G,p as I}from"./scrolly-CD69uhsv.js";const K=`// Part five: a progressive path tracer, aimed at the Cornell box.
+import{g as W,S as $,a as H,c as V,i as X,m as Y}from"./gpu-fVucxd0a.js";import{m as J,P as u,l as L,c as G,p as I}from"./scrolly-CD69uhsv.js";const K=`// Part five: a progressive path tracer, aimed at the Cornell box.
 // fsTrace adds \`spp\` fresh Monte Carlo samples per pixel per frame on top of
 // the running sum in prevTex (rgba32float: rgb = radiance sum, a = sample
 // count); fsDisplay divides, tonemaps, and shows the estimate so far.

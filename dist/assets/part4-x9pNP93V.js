@@ -1,4 +1,4 @@
-import{g as re,S as te,a as ae,c as ie,i as le,m as ce}from"./gpu-BLPsBJnk.js";import{P as Q}from"./particleRenderer-LiyiEjJ-.js";import{s as Z,c as ue,a as de,i as fe,d as he}from"./contactsCpu-CPaXehhf.js";import{m as ge,P as U,a as K,l as H,p as Y,r as me}from"./scrolly-CD69uhsv.js";const pe=`// Part four's whole point in one file: both structures over one buffer.
+import{g as re,S as te,a as ae,c as ie,i as le,m as ce}from"./gpu-fVucxd0a.js";import{P as Q}from"./particleRenderer-LiyiEjJ-.js";import{s as Z,c as ue,a as de,i as fe,d as he}from"./contactsCpu-GQtl7is6.js";import{m as ge,P as U,a as K,l as H,p as Y,r as me}from"./scrolly-CD69uhsv.js";const pe=`// Part four's whole point in one file: both structures over one buffer.
 //
 // The pyramid passes (clear_grid -> reduce_bounds -> scatter_mass ->
 // resolve -> reduce per level) are part one's tree, with every grain

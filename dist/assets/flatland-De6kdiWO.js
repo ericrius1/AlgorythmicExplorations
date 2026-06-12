@@ -1,4 +1,4 @@
-import{g as I,S as P,a as q,i as O,m as L}from"./gpu-BLPsBJnk.js";import{S as Y}from"./shaderCanvas-B9soO7i5.js";import{m as B,P as y,a as F,l as S,p as A,c as T}from"./scrolly-CD69uhsv.js";const E=["final","normals","step count"];function W(s){return`
+import{g as I,S as P,a as q,i as O,m as L}from"./gpu-fVucxd0a.js";import{S as Y}from"./shaderCanvas-B9soO7i5.js";import{m as B,P as y,a as F,l as S,p as A,c as T}from"./scrolly-CD69uhsv.js";const E=["final","normals","step count"];function W(s){return`
 const MODE: i32 = ${s};
 
 fn rotY(p: vec3f, a: f32) -> vec3f {

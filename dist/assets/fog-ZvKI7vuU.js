@@ -1,4 +1,4 @@
-import{g as W,S as K,a as j,c as J,i as Q,m as Z}from"./gpu-BLPsBJnk.js";import{R as ee}from"./radianceCascades-DbYxrb4l.js";const ne=`// Part three: participating media. The world here is mostly inherited — the
+import{g as W,S as K,a as j,c as J,i as Q,m as Z}from"./gpu-fVucxd0a.js";import{R as ee}from"./radianceCascades-DbYxrb4l.js";const ne=`// Part three: participating media. The world here is mostly inherited — the
 // scene pass paints emission + occlusion exactly as the bonfire did. What's
 // new is the media pass: it renders the fog itself into a second texture,
 // a = extinction density, rgb = the fog's *glow* (density × last frame's

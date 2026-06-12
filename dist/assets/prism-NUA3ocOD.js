@@ -1,4 +1,4 @@
-import{S as H,g as $,a as V,c as Y,i as j,m as X}from"./gpu-BLPsBJnk.js";const J=`// Part six: the spectral path tracer. Same progressive engine as part five,
+import{S as H,g as $,a as V,c as Y,i as j,m as X}from"./gpu-fVucxd0a.js";const J=`// Part six: the spectral path tracer. Same progressive engine as part five,
 // three upgrades: rays refract through glass (Fresnel-weighted dice), every
 // sample carries one random wavelength (so dispersion and rainbow caustics
 // are just Snell's law told the truth), and the camera is a thin lens

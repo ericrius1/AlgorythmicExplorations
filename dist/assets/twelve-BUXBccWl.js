@@ -1,4 +1,4 @@
-import{g as F,S as C,a as P,i as J,m as X}from"./gpu-BLPsBJnk.js";import{S as R}from"./shaderCanvas-B9soO7i5.js";import{s as j,S as z,m as L,f as B,u as b,N as V,G as _,O as A}from"./audio-C03jcV_H.js";import{P as W}from"./PolySynth-DXCA2ES0.js";const T=1200*Math.log2(3/2),k=13,K=130.81,Q=`
+import{g as F,S as C,a as P,i as J,m as X}from"./gpu-fVucxd0a.js";import{S as R}from"./shaderCanvas-B9soO7i5.js";import{s as j,S as z,m as L,f as B,u as b,N as V,G as _,O as A}from"./audio-C03jcV_H.js";import{P as W}from"./PolySynth-DXCA2ES0.js";const T=1200*Math.log2(3/2),k=13,K=130.81,Q=`
 fn scene(uv: vec2f) -> vec3f {
   let t = uf(0u);
   let aspect = uf(1u);

@@ -1,4 +1,4 @@
-import{g as q,S as A,a as G,c as U,i as j,m as $}from"./gpu-BLPsBJnk.js";import{O as Y}from"./camera3d-_003W6Cq.js";import{G as F,T as B}from"./seed-DVlONlXS.js";import{m as Q,P as p,l as z,a as C,p as E}from"./scrolly-CD69uhsv.js";const X=`// The part-one tiled O(n²) kernel, in 3D. Mass rides in pos.w, so a tile is
+import{g as q,S as A,a as G,c as U,i as j,m as $}from"./gpu-fVucxd0a.js";import{O as Y}from"./camera3d-_003W6Cq.js";import{G as F,T as B}from"./seed-DVlONlXS.js";import{m as Q,P as p,l as z,a as C,p as E}from"./scrolly-CD69uhsv.js";const X=`// The part-one tiled O(n²) kernel, in 3D. Mass rides in pos.w, so a tile is
 // a single vec4 per body: position and mass in one fetch.
 
 struct SimParams {

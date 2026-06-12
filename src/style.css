@@ -113,6 +113,11 @@ main {
   padding: 1rem 1.2rem 6rem;
 }
 
+/* pages without a hero: main is the first content under the fixed nav */
+.site-nav + main {
+  padding-top: 3.5rem;
+}
+
 h2 {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 1.7rem;

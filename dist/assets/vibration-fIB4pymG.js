@@ -1,4 +1,4 @@
-import{g as D,S as q,a as I,i as G,m as U}from"./gpu-BLPsBJnk.js";import{S as L}from"./shaderCanvas-B9soO7i5.js";import{s as O,G as V,m as F,O as N,f as P,u as A,R,U as W,V as X,X as j,n as B}from"./audio-C03jcV_H.js";const k=512,J=`
+import{g as D,S as q,a as I,i as G,m as U}from"./gpu-fVucxd0a.js";import{S as L}from"./shaderCanvas-B9soO7i5.js";import{s as O,G as V,m as F,O as N,f as P,u as A,R,U as W,V as X,X as j,n as B}from"./audio-C03jcV_H.js";const k=512,J=`
 fn sample(x: f32) -> f32 {
   let f = clamp(x, 0.0, 1.0) * f32(${k-1});
   let i = u32(floor(f));

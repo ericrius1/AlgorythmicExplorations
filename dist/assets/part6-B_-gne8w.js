@@ -1,4 +1,4 @@
-import{g as qe,S as Ae,a as He,c as Ve,i as Je,m as Ye}from"./gpu-BLPsBJnk.js";import{B as ve,_ as Xe,H as Qe}from"./hands-Dk_Aa9ga.js";import{O as Ke}from"./camera3d-_003W6Cq.js";import{m as Ze,b as Ce,l as Re,P as Ne,a as et,p as Pe}from"./scrolly-CD69uhsv.js";const tt=`// Part six's instrument: a 64³ velocity field stirred by hands, kept
+import{g as qe,S as Ae,a as He,c as Ve,i as Je,m as Ye}from"./gpu-fVucxd0a.js";import{B as ve,_ as Xe,H as Qe}from"./hands-Dk_Aa9ga.js";import{O as Ke}from"./camera3d-_003W6Cq.js";import{m as Ze,b as Ce,l as Re,P as Ne,a as et,p as Pe}from"./scrolly-CD69uhsv.js";const tt=`// Part six's instrument: a 64³ velocity field stirred by hands, kept
 // incompressible by the same Poisson equation part five solved for gravity,
 // and read back by half a million weightless paint particles.
 //
