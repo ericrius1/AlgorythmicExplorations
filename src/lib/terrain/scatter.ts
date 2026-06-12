@@ -32,9 +32,14 @@ export const SCATTER_DEFAULTS: ScatterParams = {
 // Rainfall as a second, broader noise field. Real moisture follows drainage
 // (part 2 computed exactly that), but drainage is history and this must stay
 // a function — the standing compromise of this series.
+// The raw field is exposed separately so demos can cache it: it depends only
+// on seed and frequency, while the offset is a per-draw dial.
+export function moistureRaw(x: number, z: number, p: ScatterParams): number {
+  return fbm2(x * p.moistureFreq + 3.7, z * p.moistureFreq - 9.1, { octaves: 3, seed: p.seed + 401 });
+}
+
 export function moisture(x: number, z: number, p: ScatterParams): number {
-  const m = fbm2(x * p.moistureFreq + 3.7, z * p.moistureFreq - 9.1, { octaves: 3, seed: p.seed + 401 });
-  return Math.min(1, Math.max(0, m * 0.5 + 0.5 + p.moistureOffset));
+  return Math.min(1, Math.max(0, moistureRaw(x, z, p) * 0.5 + 0.5 + p.moistureOffset));
 }
 
 export type Biome = "meadow" | "forest" | "scrub" | "scree" | "alpine" | "cliff";

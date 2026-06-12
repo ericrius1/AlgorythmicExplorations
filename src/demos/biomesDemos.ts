@@ -6,13 +6,14 @@ import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../lib/demoShell";
 import { createStage3D } from "../lib/stage3d";
 import { hash2 } from "../lib/terrain/noise";
-import { TERRAIN_DEFAULTS, buildTerrainGeometry, type TerrainParams } from "../lib/terrain/heightmap";
+import { TERRAIN_DEFAULTS, buildTerrainGeometry, terrainHeight, type TerrainParams } from "../lib/terrain/heightmap";
 import { buildGrassGeometry, makeGrassMaterial } from "../lib/terrain/grass";
 import { growTree, buildTreeGeometry, TREE_DEFAULTS } from "../lib/terrain/trees";
 import {
   SCATTER_DEFAULTS,
   groundAt,
-  moisture,
+  moistureRaw,
+  classify,
   scatterItems,
   grassBlades,
   buildRockGeometry,
@@ -54,29 +55,61 @@ export function mountBiomeMap(container: HTMLElement): Demo {
     }),
   ) as Record<Biome, [number, number, number]>;
 
+  // The expensive noise is paid into cached grids — heights once per seed,
+  // raw moisture once per seed/climate-scale — a few rows per frame so the
+  // page never freezes. The view toggle and the other dials then redraw from
+  // the arrays in a millisecond or two, because classification is cheap;
+  // it was only ever the noise that cost anything.
+  const SPAN = 64;
+  const xAt = (i: number): number => (i / RW - 0.5) * SPAN;
+  const zAt = (j: number): number => (j / RH - 0.5) * SPAN * (RH / RW);
+  const h01g = new Float32Array(RW * RH);
+  const slopeg = new Float32Array(RW * RH);
+  const mrawg = new Float32Array(RW * RH);
+  let hRow = 0, mRow = 0; // chunked-compute cursors; RH = pass complete
+
+  const computeRows = (budgetMs: number): void => {
+    const t0 = performance.now();
+    while (hRow < RH && performance.now() - t0 < budgetMs) {
+      const j = hRow++;
+      for (let i = 0; i < RW; i++) h01g[i + j * RW] = terrainHeight(xAt(i), zAt(j), tp) / tp.amplitude;
+      if (hRow === RH) {
+        // slope straight off the height grid — array math, no more noise
+        const cell = SPAN / RW;
+        for (let j2 = 0; j2 < RH; j2++) {
+          for (let i = 0; i < RW; i++) {
+            const i0 = Math.max(0, i - 1), i1 = Math.min(RW - 1, i + 1);
+            const j0 = Math.max(0, j2 - 1), j1 = Math.min(RH - 1, j2 + 1);
+            const dhdx = ((h01g[i1 + j2 * RW] - h01g[i0 + j2 * RW]) * tp.amplitude) / ((i1 - i0) * cell);
+            const dhdz = ((h01g[i + j1 * RW] - h01g[i + j0 * RW]) * tp.amplitude) / ((j1 - j0) * cell);
+            slopeg[i + j2 * RW] = Math.hypot(dhdx, dhdz);
+          }
+        }
+      }
+    }
+    while (hRow === RH && mRow < RH && performance.now() - t0 < budgetMs) {
+      const j = mRow++;
+      for (let i = 0; i < RW; i++) mrawg[i + j * RW] = moistureRaw(xAt(i), zAt(j), sp);
+    }
+  };
+
   const draw = (): void => {
     const data = img.data;
-    const span = 64;
     let p = 0;
-    for (let j = 0; j < RH; j++) {
-      const z = (j / RH - 0.5) * span * (RH / RW);
-      for (let i = 0; i < RW; i++) {
-        const x = (i / RW - 0.5) * span;
-        if (showMoisture) {
-          const m = moisture(x, z, sp);
-          data[p++] = 30 + m * 60;
-          data[p++] = 60 + m * 120;
-          data[p++] = 80 + m * 175;
-          data[p++] = 255;
-        } else {
-          const g = groundAt(x, z, tp, sp);
-          const [r, gg, b] = palette[g.biome];
-          const shade = 0.55 + 0.45 * g.h01; // relief whispers through the classes
-          data[p++] = r * shade;
-          data[p++] = gg * shade;
-          data[p++] = b * shade;
-          data[p++] = 255;
-        }
+    for (let q = 0; q < RW * RH; q++) {
+      const m = Math.min(1, Math.max(0, mrawg[q] * 0.5 + 0.5 + sp.moistureOffset));
+      if (showMoisture) {
+        data[p++] = 30 + m * 60;
+        data[p++] = 60 + m * 120;
+        data[p++] = 80 + m * 175;
+        data[p++] = 255;
+      } else {
+        const [r, gg, b] = palette[classify(h01g[q], slopeg[q], m, sp)];
+        const shade = 0.55 + 0.45 * h01g[q]; // relief whispers through the classes
+        data[p++] = r * shade;
+        data[p++] = gg * shade;
+        data[p++] = b * shade;
+        data[p++] = 255;
       }
     }
     octx.putImageData(img, 0, 0);
@@ -89,12 +122,18 @@ export function mountBiomeMap(container: HTMLElement): Demo {
 
   shell.slider({ label: "wet ↔ dry", min: -0.35, max: 0.35, step: 0.01, value: -sp.moistureOffset, format: (v) => (v >= 0 ? `dry +${v.toFixed(2)}` : `wet ${(-v).toFixed(2)}`), onInput: (v) => { sp.moistureOffset = -v; dirty = true; } });
   shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, onInput: (v) => { sp.treeLine = v; dirty = true; } });
-  shell.slider({ label: "climate scale", min: 0.015, max: 0.09, step: 0.002, value: sp.moistureFreq, format: (v) => `${(1 / v).toFixed(0)} u`, onInput: (v) => { sp.moistureFreq = v; dirty = true; } });
+  shell.slider({ label: "climate scale", min: 0.015, max: 0.09, step: 0.002, value: sp.moistureFreq, format: (v) => `${(1 / v).toFixed(0)} u`, onInput: (v) => { sp.moistureFreq = v; mRow = 0; } });
   shell.button("moisture / biomes", () => { showMoisture = !showMoisture; dirty = true; });
-  shell.button("reroll", () => { tp.seed = (Math.random() * 1e6) | 0; sp.seed = tp.seed; dirty = true; });
+  shell.button("reroll", () => { tp.seed = (Math.random() * 1e6) | 0; sp.seed = tp.seed; hRow = 0; mRow = 0; });
 
   return {
     frame() {
+      if (hRow < RH || mRow < RH) {
+        computeRows(10);
+        shell.readout.textContent = `surveying the climate… ${(((hRow + mRow) / (2 * RH)) * 100) | 0}%`;
+        if (hRow === RH && mRow === RH) dirty = true;
+        return;
+      }
       if (dirty) {
         dirty = false;
         draw();
@@ -180,19 +219,37 @@ function populate(
 
 // Re-tint an existing terrain geometry by biome, so the ground itself admits
 // which climate it's in (the part-1 palette only knew height and slope).
-function biomeTint(geometry: THREE.BufferGeometry, tp: TerrainParams, sp: ScatterParams): void {
+// Height and slope come straight off the geometry (position.y, the normal),
+// raw moisture is cached per vertex, and the tint always starts from a
+// pristine copy of the original colors — re-tinting a tinted mesh would
+// otherwise compound toward the biome colors a little more per slider move.
+interface TintCache {
+  base: Float32Array;
+  mraw: Float32Array;
+}
+
+function biomeTint(geometry: THREE.BufferGeometry, tp: TerrainParams, sp: ScatterParams, cache?: TintCache): TintCache {
   const pos = geometry.getAttribute("position");
+  const nor = geometry.getAttribute("normal");
   const col = geometry.getAttribute("color");
+  if (!cache) {
+    const mraw = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) mraw[i] = moistureRaw(pos.getX(i), pos.getZ(i), sp);
+    cache = { base: (col.array as Float32Array).slice(), mraw };
+  }
   const c = new THREE.Color(), b = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
-    const g = groundAt(pos.getX(i), pos.getZ(i), tp, sp);
-    c.setRGB(col.getX(i), col.getY(i), col.getZ(i));
-    b.setHex(BIOME_COLORS[g.biome]);
+    const h01 = pos.getY(i) / tp.amplitude;
+    const slope = Math.hypot(nor.getX(i), nor.getZ(i)) / Math.max(0.05, nor.getY(i)); // |∇h| from the normal
+    const m = Math.min(1, Math.max(0, cache.mraw[i] * 0.5 + 0.5 + sp.moistureOffset));
+    c.setRGB(cache.base[i * 3], cache.base[i * 3 + 1], cache.base[i * 3 + 2]);
+    b.setHex(BIOME_COLORS[classify(h01, slope, m, sp)]);
     const mottle = 0.9 + 0.2 * hash2(i, 5, sp.seed);
     c.lerp(b, 0.42).multiplyScalar(mottle);
     col.setXYZ(i, c.r, c.g, c.b);
   }
   col.needsUpdate = true;
+  return cache;
 }
 
 // ---- the populated patch ---------------------------------------------------------------------
@@ -217,8 +274,8 @@ export async function mountBiomePatch(container: HTMLElement): Promise<Demo> {
   const region = { minX: -SIZE / 2, minZ: -SIZE / 2, maxX: SIZE / 2, maxZ: SIZE / 2 };
 
   const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
-  let ground = new THREE.Mesh(buildTerrainGeometry(tp, { size: SIZE, segments: 256 }).geometry, groundMat);
-  biomeTint(ground.geometry, tp, sp);
+  const ground = new THREE.Mesh(buildTerrainGeometry(tp, { size: SIZE, segments: 256 }).geometry, groundMat);
+  let tintCache = biomeTint(ground.geometry, tp, sp);
   stage.scene.add(ground);
 
   const grassMat = makeGrassMaterial();
@@ -231,8 +288,10 @@ export async function mountBiomePatch(container: HTMLElement): Promise<Demo> {
     if (newTerrain) {
       ground.geometry.dispose();
       ground.geometry = buildTerrainGeometry(tp, { size: SIZE, segments: 256 }).geometry;
+      tintCache = biomeTint(ground.geometry, tp, sp); // new seed: fresh base colors and moisture
+    } else {
+      biomeTint(ground.geometry, tp, sp, tintCache);
     }
-    biomeTint(ground.geometry, tp, sp);
     stage.scene.remove(pop.group);
     pop.group.traverse((o) => {
       if (o instanceof THREE.InstancedMesh) o.dispose();
