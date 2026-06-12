@@ -46,7 +46,7 @@ const CORE: RawBone[] = [
   // -- neck and head ---------------------------------------------------------------
   { name: "neck", parent: "body", head: [0, 0.50, 0.10], tail: [0, 0.56, 0.15], r0: 0.085, r1: 0.08, blend: 0.07 },
   { name: "head", parent: "neck", head: [0, 0.56, 0.15], tail: [0, 0.62, 0.20], r0: 0.105, r1: 0.095, blend: 0.05 },
-  { name: "beak", parent: "head", head: [0, 0.585, 0.27], tail: [0, 0.563, 0.40], r0: 0.024, r1: 0.0035, zone: 4, blend: 0.012 },
+  { name: "beak", parent: "head", head: [0, 0.585, 0.27], tail: [0, 0.563, 0.40], r0: 0.027, r1: 0.005, zone: 4, blend: 0.012 },
 
   // -- the famous tail, cocked at fifty degrees -------------------------------------
   // A fan, not a rod: wide at the tip, thinned to a blade perpendicular to its
@@ -61,10 +61,10 @@ const LEFT: RawBone[] = [
   { name: "handL", parent: "forearmL", head: [0.14, 0.485, -0.17], tail: [0.10, 0.50, -0.33], r0: 0.038, r1: 0.012, zone: 2, blend: 0.03, flat: { axis: [1, 0, 0], s: 0.45 } },
 
   // -- leg: a feathered thigh, then the bare stick birds actually stand on ---------
-  { name: "thighL", parent: "body", head: [0.06, 0.38, -0.02], tail: [0.075, 0.24, 0.0], r0: 0.05, r1: 0.03, blend: 0.05 },
-  { name: "tarsusL", parent: "thighL", head: [0.075, 0.24, 0.0], tail: [0.08, 0.045, 0.02], r0: 0.016, r1: 0.014, zone: 6, blend: 0.012 },
-  { name: "footL", parent: "tarsusL", head: [0.08, 0.045, 0.02], tail: [0.085, 0.008, 0.10], r0: 0.013, r1: 0.008, zone: 6, blend: 0.01 },
-  { name: "halluxL", parent: null, head: [0.08, 0.045, 0.02], tail: [0.075, 0.008, -0.045], r0: 0.012, r1: 0.007, zone: 6, deform: false, blend: 0.01 },
+  { name: "thighL", parent: "body", head: [0.06, 0.38, -0.02], tail: [0.075, 0.20, 0.0], r0: 0.05, r1: 0.032, blend: 0.05 },
+  { name: "tarsusL", parent: "thighL", head: [0.075, 0.20, 0.0], tail: [0.08, 0.045, 0.02], r0: 0.022, r1: 0.019, zone: 6, blend: 0.012 },
+  { name: "footL", parent: "tarsusL", head: [0.08, 0.045, 0.02], tail: [0.085, 0.01, 0.10], r0: 0.017, r1: 0.011, zone: 6, blend: 0.01 },
+  { name: "halluxL", parent: null, head: [0.08, 0.045, 0.02], tail: [0.075, 0.01, -0.045], r0: 0.015, r1: 0.009, zone: 6, deform: false, blend: 0.01 },
 
   // -- the supercilium: the pale eyebrow that makes a wren look permanently alert --
   { name: "browL", parent: null, head: [0.075, 0.625, 0.235], tail: [0.092, 0.605, 0.16], r0: 0.018, r1: 0.014, zone: 5, deform: false, blend: 0.015 },

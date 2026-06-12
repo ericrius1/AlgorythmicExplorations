@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Wren — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A new series builds a bird from a function: twenty-two tapered capsules, one smooth minimum, a surface-nets polygonizer, and a deliberately low-poly finish. By the end of the series she will fly, land on trees, and sing."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/wren.ts -->
+    <header class="hero">
+      <div data-demo="hero-bird"></div>
+      <div class="hero-title">
+        <h1>The Wren</h1>
+        <p class="subtitle">
+          A new series builds a bird the way this site builds everything: from
+          a function. Twenty-two capsules, one smooth minimum, one polygonizer —
+          and a low-poly wren with a silhouette you could spot across a garden,
+          waiting for the rest of her series to teach her to fly. Drag to meet
+          her.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This series has one goal, six articles away: a bird you can fly. Not a
+        downloaded model with someone else's animations — a creature that exists
+        because a table of numbers says so, rigged by arithmetic, flapped by
+        physics, and eventually handed over to you (or to an AI that wants the
+        keys) above a world with mountains and trees worth landing on. This
+        first article does the modeling: it turns a description of a wren into
+        an actual mesh, live, in your browser tab.
+      </p>
+      <p>
+        The world she'll fly over is its own project. A sister series,
+        <a href="/heightfield.html">Ground Truth</a>, starts in parallel with
+        this one and grows the terrain — mountains first, then erosion, grass,
+        and (importantly for a bird) trees. The two series are written to
+        converge: her final article and its final article are the same demo.
+        And the pipeline here is a close cousin of the one that built
+        <a href="/bear.html">the bear</a> — same bones-first philosophy,
+        different polygonizer, different animal, different fate.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why a wren</span>
+        <p>
+          Because attitude is cheap when your model is a table. A wren is a
+          ten-gram bird shaped like an outrage: round body, no visible neck, a
+          needle of a beak, and a tail held cocked above its back like a raised
+          eyebrow. Every one of those features is one or two lines in the
+          skeleton table below — and the cocked tail, the hardest thing to find
+          in a stock model, is just a capsule with an unusual angle. It also
+          makes her the ideal low-poly subject: you identify a wren by outline
+          alone, which is exactly the part polygons are good at.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The parts list</span>A bird as a table</h2>
+      <p>
+        The wren's single source of truth is a list of <em>capsules</em> —
+        line segments with a radius at each end. A capsule is the ideal
+        primitive for animals because it is exactly what anatomy is: a bone
+        with flesh at some thickness around it. Torso, neck, head, beak, tail,
+        three segments per wing, three per leg — each one is a row with a
+        start point, an end point, two radii, and a few annotations. Fourteen
+        rows are written by hand; left limbs are mirrored by flipping the sign
+        of x, and the bird is twenty-two capsules in all.
+      </p>
+      <div data-demo="parts"></div>
+      <p>
+        Drag the slider and the bird explodes into its rows. Two things are
+        worth noticing while she's apart. First, the <strong>folded wing is a
+        Z</strong>: humerus back, forearm forward, hand back again, pressed
+        flat against the body — the same three segments that will unfold into a
+        full wingspan in part three. Birds don't have less arm than we do;
+        they keep it origamied under the plumage. Second, the wing and tail
+        capsules are <strong>squashed</strong> — each carries an optional
+        flatten axis that thins it from a sausage into a blade, because
+        feathers are panels, not volumes.
+      </p>
+      <p>
+        The table is the contract for the whole series. Part one blends these
+        capsules into a body. Part two will ask, for every vertex of that body,
+        "which capsules are you near?" — and that answer becomes skin weights.
+        Part three reads segment lengths out of the same rows to unfold the
+        wing with inverse kinematics. Change one number — make the beak longer,
+        the body rounder — and the bird is re-sculpted, re-rigged, and
+        re-animated to match, because nothing downstream ever stored its own
+        copy.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The blend</span>A bird as a function</h2>
+      <p>
+        Twenty-two capsules drawn as twenty-two meshes look like a toy snapped
+        together. An animal needs shoulders that flow into the torso and a
+        neck that isn't a seam. So the capsules are combined not as geometry
+        but as a <em>function</em>: f(p) returns the signed distance from any
+        point in space to the bird's surface — negative inside, positive
+        outside, zero exactly on the skin. Each capsule has such a distance;
+        the bird is all of them folded together with a <em>smooth minimum</em>:
+      </p>
+      <pre><code>smin(a, b, k):
+  h = clamp(0.5 + 0.5·(b − a)/k, 0, 1)
+  return mix(b, a, h) − k·h·(1 − h)    <span class="cm">// min(a,b), but with a fillet of width k</span></code></pre>
+      <p>
+        A plain min of two distance fields gives the union of the shapes,
+        crease included. The polynomial term spends a little extra negative
+        distance wherever the two fields are nearly tied — which is precisely
+        the seam — and the crease becomes a fillet of width k. Every row of
+        the table carries its own k: the belly merges into the torso across a
+        wide soft zone, while the beak keeps a crisp k of about a centimeter,
+        because a wren's beak does not blob into its face.
+      </p>
+      <div data-demo="slice"></div>
+      <p>
+        This is the field itself, sliced like an MRI: a plane of constant x,
+        colored by distance — contour bands outside, warm bands inside, and the
+        bright line at exactly zero, which is the only part the polygonizer
+        will keep. Slide the plane off-center and watch the wing and leg
+        cross-sections appear; drag the blend width down to zero and the
+        anatomy decomposes into hard-edged capsule unions — the fillets are
+        doing more work than you'd guess.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: squashing a capsule without breaking the math</summary>
+        <div class="fold-body">
+          <p>
+            The flattened wing panels cheat gently. To thin a capsule along an
+            axis n by a factor s, measure the offset from the segment as usual,
+            then stretch its component along n by 1/s before taking the length:
+            points that approach along n now seem farther away, so the surface
+            sits closer — a blade instead of a tube. The result is no longer an
+            exact distance field (gradients shear a little under the squash),
+            but the polygonizer only needs the sign to be honest and the zero
+            to be in the right place, and both survive. The same trick scaled
+            to three axes is how every "ellipsoid" in the SDF literature is
+            actually built.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Skin from signs</span>Surface nets</h2>
+      <p>
+        The field knows where the skin is; now we need triangles. The
+        <a href="/ferro.html">ferrofluid article</a> did this in two dimensions
+        with marching squares — sixteen corner cases, segments on cell edges —
+        and the <a href="/bear.html">bear</a> marched tetrahedra for the same
+        reason in 3D. This article takes the other road, the <em>dual</em> one:
+        <strong>surface nets</strong>.
+      </p>
+      <p>
+        Walk every cell of a grid and ask the eight corners for their signs.
+        Marching cubes would now look up which edges the surface crosses and
+        place vertices <em>on those edges</em>, several per cell, stitched by a
+        256-case table. Surface nets instead places <strong>one vertex inside
+        the cell</strong> — at the average of all its edge crossings — and
+        builds faces from adjacency: every grid edge that crosses the surface
+        is shared by exactly four cells, and those four cells' vertices form
+        one quad. No tables, no cases, no saddle ambiguities; the entire
+        algorithm is "average your crossings, then hold hands with your
+        neighbors."
+      </p>
+      <div data-demo="nets"></div>
+      <p>
+        The resolution slider is the whole economics of the technique. At 16
+        the wren is a dumpling with ambitions; legs thinner than a cell simply
+        do not exist, because a surface the lattice can't see can't vote. By
+        48 — the default — she has toes, and the facets are the size that
+        reads as a style rather than an accident. Toggle the wireframe and the
+        dual structure shows directly: mostly quads, flowing in grid-aligned
+        rivers, one vertex per cell, never more.
+      </p>
+      <p>
+        The <strong>smooth ⇄ faceted</strong> button is the article's one
+        aesthetic decision, made visible. The same surface can be shaded two
+        ways. <em>Smooth</em>: each vertex asks the field for its gradient —
+        which for a distance field is exactly the surface normal — and the
+        facets melt into soft organic curvature. <em>Faceted</em>: every
+        triangle keeps one flat normal and one flat color, and the bird
+        becomes intentionally low-poly. This series ships the faceted look,
+        and not to save money — at these triangle counts both are free. It's
+        honesty: at any resolution a mesh <em>is</em> facets, and embracing
+        them buys a crisp silhouette, readable at a distance, that will stay
+        readable when she's a speck banking over a valley in the finale. The
+        smooth gradient normals aren't wasted, though — they're still consulted
+        once per triangle, to tell each face which way is out.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Born in a hospital, not a render farm</span>
+        <p>
+          Surface nets were published by Sarah Gibson at MERL in 1998 — for
+          medical imaging, not graphics. Binary-segmented MRI volumes meshed
+          with marching cubes came out terraced, like contour-line staircases;
+          Gibson's "elastic" nets placed vertices inside cells and relaxed
+          them toward smoothness while keeping each vertex inside its cell so
+          the surface couldn't drift off the data. Four years later, dual
+          contouring added one idea — place the vertex where the field's
+          <em>gradients</em> vote, not at the plain average — and suddenly
+          sharp creases and corners survived polygonization. The ferrofluid
+          article promised that upgrade for spike tips; this wren's beak tip,
+          gently rounded by the averaging, is the same IOU.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Plumage</span>Paint by proximity</h2>
+      <p>
+        The mesh comes out of the polygonizer naked. The paint job reuses
+        machinery we already have: each face asks every capsule "how far is
+        your centroid from me?" and takes the <em>owner</em> — the nearest one
+        — as its color zone. The table's rows carry zone tags (body, breast,
+        wing, tail, beak, brow, leg), so the buff breast and the pale
+        supercilium — the eyebrow stripe that makes a wren look permanently
+        unimpressed — are not painted on; they are capsules, placed in the
+        table, claiming their territory by distance.
+      </p>
+      <p>
+        On top of the zones, two cheap textures, both applied per-face because
+        per-face is the style: a hashed mottle (every facet dims or brightens
+        itself by a few percent, keyed on its own index — the subtle
+        patchwork that makes low-poly read as crafted rather than unfinished)
+        and dark <em>barring</em> across the wings and tail — a sine wave
+        along the feather direction, clipped into stripes. Real wrens are
+        barred everywhere; ours is barred where it costs three lines.
+      </p>
+      <div data-demo="bird-full"></div>
+      <p>
+        The eyes are not in the field. An eyeball is a three-millimeter gloss
+        sphere; resolving it would need a lattice fine enough to waste on
+        everything else. So the eyes and their glints are <em>riders</em> —
+        faceted icosahedra parented to where the head capsule says the head
+        is. When part two gives the skeleton joints, they will ride the head
+        joint for free. The <strong>fluff</strong> slider is the table's
+        leverage demonstrated: it scales one number into every radius before
+        the field is rebuilt, and the wren puffs up against the cold exactly
+        the way the real bird does.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>A bird is not a statue</h2>
+      <p>
+        Everything in this article was deliberately built to be destroyed by
+        the next one. The mesh is frozen in rest pose; part two will give the
+        capsule table a second life as a <em>skeleton</em> — each vertex
+        weighted to the bones it lives near, so the body deforms when joints
+        rotate. Part three unfolds the wing Z with inverse kinematics and
+        finds the wingbeat. Part four stops faking it: lift, drag, and flapping
+        thrust as actual forces, with banking turns falling out of the
+        physics. Part five teaches her to land — the approach, the flare, the
+        toes-on-branch problem — and to sing, because a syrinx is two
+        oscillators and a grammar, and we have a whole
+        <a href="/vibration.html">music series</a> of parts to borrow. Part
+        six hands you the controls.
+      </p>
+      <p>
+        And under all of it, the other series is building the place. <a
+        href="/heightfield.html">Ground Truth</a> starts with mountains from
+        noise this week; by its middle parts there will be grass to skim and
+        trees with actual branches — branches whose positions her landing
+        controller will read like an instrument. Two series, one demo at the
+        end: a wren, a world, and you.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part one ·
+        written in parallel with <a href="/heightfield.html">Ground Truth</a> ·
+        built on the <a href="/part1.html">gravity</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>,
+        <a href="/bear.html">bodies</a>, and
+        <a href="/vibration.html">music</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/357306.357310">Blinn, "A Generalization of Algebraic Surface Drawing" (1982)</a> ·
+        <a href="https://doi.org/10.1117/12.310835">Gibson, "Constrained Elastic Surface Nets" (1998)</a> ·
+        <a href="https://doi.org/10.1145/566570.566586">Ju, Losasso, Schaefer &amp; Warren, "Dual Contouring of Hermite Data" (2002)</a> ·
+        <a href="https://doi.org/10.1145/37402.37422">Lorensen &amp; Cline, "Marching Cubes" (1987)</a> ·
+        <a href="https://iquilezles.org/articles/distfunctions/">Quilez, "distance functions" &amp; the smooth minimum</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/wren.ts"></script>
+  </body>
+</html>

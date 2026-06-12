@@ -25,6 +25,10 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "The physics of sound you can hear — why notes agree, why minor sounds sad, and a song that writes itself.",
   "Waking Bodies":
     "A character built from scratch — a bear modeled by math, rigged by distances, and taught qi gong by springs.",
+  "Feather & Bone":
+    "A bird built from first principles — modeled low-poly from capsules, rigged, flapped, and finally flown over a living world.",
+  "Ground Truth":
+    "A world grown from noise — mountains, erosion, grass, and trees, on the way to a horizon that never runs out.",
 };
 
 export const POSTS: Post[] = [
@@ -195,6 +199,20 @@ export const POSTS: Post[] = [
     part: 4,
     title: "The Form",
     subtitle: "Qi gong at last — poses as targets, springs as blends, moves that flow into each other; the series becomes a toy",
+  },
+  {
+    href: "/wren.html",
+    series: "Feather & Bone",
+    part: 1,
+    title: "The Wren",
+    subtitle: "A songbird as a table of capsules — smooth unions, surface nets, and a low-poly bird with a garden-grade silhouette",
+  },
+  {
+    href: "/heightfield.html",
+    series: "Ground Truth",
+    part: 1,
+    title: "The Heightfield",
+    subtitle: "Mountains from arithmetic — hashed gradients, fractal sums, ridges and warps, standing up as a mesh",
   },
 ];
 

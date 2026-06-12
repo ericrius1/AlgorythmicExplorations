@@ -33,6 +33,8 @@ export default defineConfig({
         rig: fileURLToPath(new URL("rig.html", import.meta.url)),
         reach: fileURLToPath(new URL("reach.html", import.meta.url)),
         qigong: fileURLToPath(new URL("qigong.html", import.meta.url)),
+        wren: fileURLToPath(new URL("wren.html", import.meta.url)),
+        heightfield: fileURLToPath(new URL("heightfield.html", import.meta.url)),
       },
     },
   },
