@@ -1,4 +1,4 @@
-import{g as ve,S as ge,a as be,c as we,i as ye,m as xe}from"./gpu-DqzAFztT.js";import{R as Be}from"./radianceCascades-POh41nn6.js";import{H as Pe}from"./hands-Dk_Aa9ga.js";const Se=`// The bonfire: free-flying ember particles (no SPH — nothing presses on
+import{g as ve,S as ge,a as be,c as we,i as ye,m as xe}from"./gpu-BLPsBJnk.js";import{R as Be}from"./radianceCascades-DbYxrb4l.js";import{H as Pe}from"./hands-Dk_Aa9ga.js";const Se=`// The bonfire: free-flying ember particles (no SPH — nothing presses on
 // anything) riding curl-noise wind, splatted into the radiance-cascades
 // scene as thousands of tiny moving lights. The scene pass paints the world
 // — ground, trees, flame — and closes the multi-bounce loop by adding

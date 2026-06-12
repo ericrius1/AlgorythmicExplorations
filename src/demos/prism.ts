@@ -159,7 +159,7 @@ function mountBench(container: HTMLElement): Demo {
         // entry refraction
         let px = ox + d0[0] * entry.t;
         let py = oy + d0[1] * entry.t;
-        let dir = refract2(d0[0], d0[1], entry.nx, entry.ny, 1 / n);
+        let dir: [number, number] | null = refract2(d0[0], d0[1], entry.nx, entry.ny, 1 / n);
         if (!dir) continue;
         ctx.beginPath();
         ctx.moveTo(px, py);
@@ -177,8 +177,10 @@ function mountBench(container: HTMLElement): Demo {
             inside = false;
           } else {
             // total internal reflection: bounce and keep going
-            const dot = dir[0] * hit2.nx + dir[1] * hit2.ny;
-            dir = [dir[0] - 2 * dot * hit2.nx, dir[1] - 2 * dot * hit2.ny];
+            const dx2: number = dir[0];
+            const dy2: number = dir[1];
+            const dn = dx2 * hit2.nx + dy2 * hit2.ny;
+            dir = [dx2 - 2 * dn * hit2.nx, dy2 - 2 * dn * hit2.ny];
           }
         }
         // the escaping ray

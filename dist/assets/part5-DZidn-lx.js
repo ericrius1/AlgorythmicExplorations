@@ -1,4 +1,4 @@
-import{g as ae,S as E,a as re,c as ie,i as ce,m as fe}from"./gpu-DqzAFztT.js";import{m as ue,P as R,b as V,l as O,p as z,a as pe}from"./scrolly-Bq15bFnz.js";const de=`// Stockham radix-2 FFT: one workgroup per line, the whole transform in
+import{g as ae,S as E,a as re,c as ie,i as ce,m as fe}from"./gpu-BLPsBJnk.js";import{m as ue,P as R,l as V,b as O,p as z,a as pe}from"./scrolly-CD69uhsv.js";const de=`// Stockham radix-2 FFT: one workgroup per line, the whole transform in
 // shared memory, no bit-reversal (Stockham's indexing is self-sorting).
 // __N__ / __LOGN__ / __HALF__ are substituted at module build time so one
 // source serves every mesh size; AXIS and INV are pipeline constants, so a

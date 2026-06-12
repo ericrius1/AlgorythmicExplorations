@@ -1,7 +1,7 @@
 // Every post on the site, in reading order. The nav, the menus, and the
 // read-next cards are all generated from this one list.
 
-export const SITE_NAME = "Cosmic Algorithmic Explorations";
+export const SITE_NAME = "Algorythmic Explorations";
 
 export interface Post {
   href: string;

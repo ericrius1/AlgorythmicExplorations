@@ -7,7 +7,6 @@ import { mountFifthsKeys } from "./demos/fifthsKeys";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountScaleRing(el, { mode: "hero" }),
   ring: (el) => mountScaleRing(el),
   keys: (el) => mountFifthsKeys(el),
 };

@@ -1,4 +1,4 @@
-# Cosmic Algorithmic Explorations
+# Algorythmic Explorations
 
 Three interactive series of articles with live WebGPU demos.
 
@@ -33,6 +33,21 @@ particles on curl-noise wind, each a true light source at no added cost;
 multi-bounce color bleeding from a one-frame temporal feedback loop
 (albedo × last frame's fluence); the sky as the top cascade's merge; and
 optional hand tracking so your fingertip sheds embers.
+Part three (`fog.html`) adds **participating media** to the cascades:
+Beer–Lambert extinction integrated along every cascade ray, fog whose glow
+is last frame's fluence (multiple scattering via the same one-frame time
+loop), and god rays that emerge as lit fog standing next to shadowed fog.
+Part four (`flatland.html`) leaves 2D by making the distance field a
+*function* instead of a texture: sphere-traced analytic SDFs, smooth-minimum
+sculpture, penumbras from near misses, ambient occlusion, and a step-count
+heatmap that makes the cost visible. Part five (`cornell.html`) pays part
+four's debts honestly: a progressive WebGPU path tracer aimed at the Cornell
+box — Monte Carlo, next-event estimation toggled live, bounce-depth slider,
+movable area light, mirror/glossy materials. Part six (`prism.html`) is the
+toy finale: a 2D Newton's-prism optics bench, then a **spectral** path
+tracer (one random wavelength per sample, Cauchy dispersion, Fresnel coin
+flips) producing real caustics, rainbow caustics, and thin-lens depth of
+field.
 
 **Music in a Browser Tab** — a six-part music theory series where every figure
 makes real sound (Tone.js) and every visual is a WebGPU fragment shader fed by

@@ -8,7 +8,6 @@ import { mountComb } from "./demos/comb";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountLissajous(el, { mode: "hero" }),
   beats: (el) => mountBeats(el),
   lissajous: (el) => mountLissajous(el),
   comb: (el) => mountComb(el),

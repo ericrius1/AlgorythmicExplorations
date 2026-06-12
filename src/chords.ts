@@ -7,7 +7,6 @@ import { mountVoiceLoop } from "./demos/voiceLoop";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountVoiceLoop(el, { mode: "hero" }),
   triads: (el) => mountTriadLab(el),
   loop: (el) => mountVoiceLoop(el),
 };

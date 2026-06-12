@@ -8,7 +8,6 @@ import { mountJukeboxGen } from "./demos/jukeboxGen";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountJukeboxGen(el, { mode: "hero" }),
   euclid: (el) => mountEuclid(el),
   walk: (el) => mountMelodyWalk(el),
   jukebox: (el) => mountJukeboxGen(el),

@@ -8,7 +8,6 @@ import { mountWhyTwelve } from "./demos/whyTwelve";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountSpiralFifths(el, { mode: "hero" }),
   spiral: (el) => mountSpiralFifths(el),
   comma: (el) => mountCommaLab(el),
   whytwelve: (el) => mountWhyTwelve(el),

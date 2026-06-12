@@ -1,4 +1,4 @@
-import{g as H,S as V,a as N,c as j,i as fe,m as he}from"./gpu-DqzAFztT.js";import{R as se}from"./radianceCascades-POh41nn6.js";import{m as ge,P as T,b as D,p as E,l as oe}from"./scrolly-Bq15bFnz.js";const ie=`// Lava rendering, stage one: particles become a continuous emissive surface.
+import{g as H,S as V,a as N,c as j,i as fe,m as he}from"./gpu-BLPsBJnk.js";import{R as se}from"./radianceCascades-DbYxrb4l.js";import{m as ge,P as T,l as D,p as E,b as oe}from"./scrolly-CD69uhsv.js";const ie=`// Lava rendering, stage one: particles become a continuous emissive surface.
 //
 // 1. vsSplat/fsSplat — every particle splats a smooth radial kernel into a
 //    low-res field texture, accumulating (weight, weight·temperature) with
