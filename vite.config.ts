@@ -33,6 +33,7 @@ export default defineConfig({
         // listed yet — modeling pipeline being reworked from SDFs to triangle
         // meshes. Re-add the four inputs when the series is done.
         wren: fileURLToPath(new URL("wren.html", import.meta.url)),
+        bones: fileURLToPath(new URL("bones.html", import.meta.url)),
         heightfield: fileURLToPath(new URL("heightfield.html", import.meta.url)),
         erosion: fileURLToPath(new URL("erosion.html", import.meta.url)),
         grass: fileURLToPath(new URL("grass.html", import.meta.url)),

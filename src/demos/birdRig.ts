@@ -18,11 +18,6 @@ import {
 } from "../lib/bird/rig";
 import { WREN_STAGE } from "./birdModel";
 
-const HEAD_PIVOT = (() => {
-  const h = DEFORM_BONES.find((b) => b.name === "head")!;
-  return h.head;
-})();
-
 // one distinct color per joint, walked around the hue wheel by golden ratio
 const jointColor = (i: number): THREE.Color => new THREE.Color().setHSL((i * 0.618034) % 1, 0.62, 0.6);
 
@@ -221,7 +216,7 @@ export async function mountRigPose(container: HTMLElement): Promise<Demo> {
   stage.scene.add(mesh);
 
   const face = new THREE.Group();
-  addFace(face, HEAD_PIVOT);
+  addFace(face); // children at rest-pose world positions; attachRider re-bases the group
   attachRider(rig, "head", face);
 
   const p: PuppetPose = { ...REST };
@@ -289,7 +284,7 @@ export async function mountRigAlive(container: HTMLElement, opts: { hero?: boole
   stage.scene.add(mesh);
 
   const face = new THREE.Group();
-  addFace(face, HEAD_PIVOT);
+  addFace(face); // children at rest-pose world positions; attachRider re-bases the group
   attachRider(rig, "head", face);
 
   // the whole performance is four timers and two springs
