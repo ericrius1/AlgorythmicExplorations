@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Sky — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The finale of both series: a wren modeled, rigged, flapped, flown, and landed — turned loose over a world of noise-grown mountains and space-colonized trees. Fly her yourself, or let the autopilot. Two series become one demo."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/sky.ts -->
+    <header class="hero">
+      <div data-demo="hero-sky"></div>
+      <div class="hero-title">
+        <h1>The Sky</h1>
+        <p class="subtitle">
+          Eleven articles, two series, one demo. Everything we built — a bird
+          from a function, a world from noise — is loose at last in the same
+          space. Above, the autopilot is flying her over the mountains,
+          choosing trees to land on and sing from. Below, the controls become
+          yours.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This is the article both series were walking toward from their first
+        sentence. <a href="/wren.html">Feather &amp; Bone</a> built a wren out
+        of a table of capsules and then spent four articles teaching her to
+        move: a skeleton weighted by distance, a wing unfolded by inverse
+        kinematics, flight as a balance of forces, a landing flown by guidance
+        laws. <a href="/heightfield.html">Ground Truth</a>, in parallel, grew a
+        world: mountains from noise, valleys carved by simulated rain, grass,
+        and trees raised branch by branch. Two projects, written side by side,
+        each ending here — because the end was always the same demo.
+      </p>
+      <p>
+        Nothing in this article is new machinery. It is <em>assembly</em>. The
+        bird's flight model meets the terrain's height function (now her
+        ground); her landing controller meets the trees' perch lists (now her
+        targets); her syrinx fills the air. The only genuinely new line of code
+        is the one that reads your keyboard. Everything else is eleven articles
+        of parts, finally plugged into each other.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why "from a function" was the whole point</span>
+        <p>
+          A downloaded bird and a downloaded landscape would not compose like
+          this. They'd be frozen meshes with no idea of each other. But because
+          the wren is a flight model and the terrain is a height
+          <em>function</em> and the trees publish their branches as data, the
+          pieces interlock without a seam: she asks the ground how high it is,
+          asks the trees where she can land, and the physics does the rest.
+          Building everything from arithmetic was never about showing off — it
+          was so that, on the last day, the parts would fit.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The world</span>Mountains, with somewhere to land</h2>
+      <p>
+        First, the stage. The terrain is the sister series' height function,
+        stood up as a mesh — domain-warped ridged noise, colored by altitude
+        and slope. Onto its gentler, lower ground we scatter trees, each one
+        grown by space colonization with its own seed, so no two are alike;
+        the steep peaks and snowfields stay bare, the way real treelines work.
+        And every tree hands back its <em>perches</em> — the branches a bird
+        could actually stand on, found by the same code that drew them.
+      </p>
+      <div data-demo="world"></div>
+      <p>
+        Orbit the world. The faint gold motes are the perches: every place the
+        wren is allowed to land, computed from the trees' own geometry, not
+        placed by hand. This is the menu her landing controller reads. A world
+        that didn't just get drawn, but knows where a bird can sit in it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · You fly</span>Your keyboard, her physics</h2>
+      <p>
+        Here is the one new wire. The keyboard sets the same three commands the
+        autopilot did in <a href="/flight.html">part four</a> — bank, pitch,
+        flap effort — and the identical force model flies them. You are not
+        moving a puppet; you're <em>asking</em> for a bank and a climb, and the
+        aerodynamics decides what actually happens. Steer too slow and she
+        sinks; dive and she gains the speed back; bank and she carves. She
+        stays a bird because the physics, not your keystroke, has the final say.
+      </p>
+      <div data-demo="pilot"></div>
+      <p>
+        Hover the demo and fly: <strong>A/D</strong> to bank, <strong>W/S</strong>
+        to climb and dive, <strong>Space</strong> to pour on the flap. The
+        ground is the terrain's real height under her — fly low and she'll skim
+        it; fly into a hill and the physics pushes back. The same height
+        function that colored the mountains is now the thing she can't fall
+        through.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: the controller and the pilot are the same socket</summary>
+        <div class="fold-body">
+          <p>
+            Notice that "you fly" and "AI flies" plug into the exact same hole.
+            The flight model doesn't know or care whether its bank command came
+            from a proportional controller chasing a perch or from your finger
+            on the D key — it's the same three numbers either way. That's why
+            the autopilot from <a href="/landing.html">part five</a> and your
+            keyboard are interchangeable: an autonomous agent and a human pilot
+            are, to a physics simulation, both just sources of intent. Swap one
+            for the other mid-flight and the bird never notices. The whole
+            series was quietly building toward that socket.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The sandbox</span>Hand it to the bird, or take it back</h2>
+      <p>
+        And the finale: the whole thing, on a toggle. Leave it on autopilot and
+        she lives her loop — wander the valley, pick a tree, fly the approach,
+        flare onto a branch, sing a phrase from her two-voiced syrinx, launch,
+        and go again. Take the controls and the same bird is yours to fly
+        through the same world, past the same trees, with the option to hand
+        her back whenever you like.
+      </p>
+      <div data-demo="sandbox"></div>
+      <p>
+        That's the demo this whole site has been a long approach toward: a
+        creature that exists because a table of numbers says so, flying a world
+        that exists because a noise function says so, landing on trees that
+        exist because a growth rule says so — and answering equally to a
+        controller or to you. Every article was a part. This is the assembled
+        machine.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>A wren, a world, and you</h2>
+      <p>
+        That phrase has ended every article in both series, a promise made
+        eleven times. Here it is, kept. The wren was modeled from capsules,
+        rigged by proximity, flapped by the law of cosines, flown by lift and
+        drag, and landed by feedback. The world was hashed into noise, summed
+        into mountains, carved by rain, planted with grass, and grown into
+        trees. Neither knew about the other until now, and yet they fit on the
+        first try — because both were built the same way, out of functions, on
+        purpose, for this.
+      </p>
+      <p>
+        The sister series closes on its own horizon in
+        <a href="/horizon.html">Ground Truth's finale</a>; this one closes in
+        the air above it. Thank you for reading all the way to the part where
+        the bird flies. Now go fly her.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part six — the finale ·
+        converged with <a href="/horizon.html">Ground Truth</a> ·
+        built on every series before it:
+        <a href="/part1.html">gravity</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>,
+        <a href="/vibration.html">music</a>, and the
+        <a href="/heightfield.html">world</a>
+      </p>
+      <p>
+        Standing on the shoulders of the whole series:
+        <a href="/wren.html">modeling</a> ·
+        <a href="/bones.html">rigging</a> ·
+        <a href="/wingbeat.html">the wingbeat</a> ·
+        <a href="/flight.html">flight</a> ·
+        <a href="/landing.html">landing &amp; song</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/sky.ts"></script>
+  </body>
+</html>

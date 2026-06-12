@@ -18,7 +18,7 @@ import { growTree, buildTreeGeometry, findPerches, TREE_DEFAULTS, type Perch } f
 
 // ---- a wren that can fly, glide, flare, perch, and sing ------------------------------
 
-interface Wren {
+export interface Wren {
   group: THREE.Group;
   rig: BirdRig;
   bodyRest: THREE.Vector3;
@@ -27,7 +27,7 @@ interface Wren {
   pose(opts: { phase: number; spread: number; flap: number; tailFan: number; beak: number; theta?: number }): void;
 }
 
-function makeWren(): Wren {
+export function makeWren(): Wren {
   const built = buildBirdMesh({ res: 56, skin: true });
   const { mesh, rig } = createSkinnedWren(built.geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide }));
   const group = new THREE.Group();
@@ -72,7 +72,7 @@ const mPerch = new THREE.Matrix4();
 const perchX = new THREE.Vector3();
 const perchZ = new THREE.Vector3();
 const perchY = new THREE.Vector3(0, 1, 0);
-function orientWren(group: THREE.Group, state: FlightState, perch: PerchTarget, settle: number): void {
+export function orientWren(group: THREE.Group, state: FlightState, perch: PerchTarget, settle: number): void {
   flightQuaternion(state, qFlight);
   // perched frame: up is world up, forward faces across the branch (the
   // tangent rotated a quarter turn) — a wren perches at right angles to the

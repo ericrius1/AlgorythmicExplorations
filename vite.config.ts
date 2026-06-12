@@ -37,6 +37,7 @@ export default defineConfig({
         wingbeat: fileURLToPath(new URL("wingbeat.html", import.meta.url)),
         flight: fileURLToPath(new URL("flight.html", import.meta.url)),
         landing: fileURLToPath(new URL("landing.html", import.meta.url)),
+        sky: fileURLToPath(new URL("sky.html", import.meta.url)),
         heightfield: fileURLToPath(new URL("heightfield.html", import.meta.url)),
         erosion: fileURLToPath(new URL("erosion.html", import.meta.url)),
         grass: fileURLToPath(new URL("grass.html", import.meta.url)),

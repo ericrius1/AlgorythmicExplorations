@@ -209,6 +209,13 @@ export const POSTS: Post[] = [
     subtitle: "Arriving — guidance laws fly the physics onto a real tree's branch, a flare at the edge of the stall, and a song from a two-voiced syrinx",
   },
   {
+    href: "/sky.html",
+    series: "Feather & Bone",
+    part: 6,
+    title: "The Sky",
+    subtitle: "The finale — the wren turned loose over the sister series' world, flown by you or by autopilot; two series become one demo",
+  },
+  {
     href: "/heightfield.html",
     series: "Ground Truth",
     part: 1,

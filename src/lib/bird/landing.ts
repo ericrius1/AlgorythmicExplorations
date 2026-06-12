@@ -33,10 +33,12 @@ export interface LandingTuning {
 
 export const LANDING_TUNING: LandingTuning = {
   approachDist: 11,
-  flareDist: 3.0,
+  // the flare capture radius must exceed the bird's minimum turn radius, or
+  // she orbits the perch forever without ever getting close enough to flare
+  flareDist: 4.5,
   grabDist: 0.7,
   glideSlope: 0.2,
-  bankGain: 1.8,
+  bankGain: 2.2,
   cruiseSpeedMul: 1.0,
 };
 
@@ -125,9 +127,11 @@ export class LandingController {
       const desiredDescent = -Math.sin(t.glideSlope) * Math.max(this.speed, 0.5);
       const vyErr = desiredDescent - s.vel.y;
       s.pitchCmd = THREE.MathUtils.clamp(0.07 + vyErr * 0.05, -0.05, 0.16);
-      // ease off the throttle so she bleeds toward perching speed
-      const speedWant = trimSpeed(this.params) * THREE.MathUtils.lerp(0.85, 1.0, (dist - t.flareDist) / (t.approachDist - t.flareDist));
-      s.flapEffort = THREE.MathUtils.clamp(0.35 + (speedWant - this.speed) * 0.12, 0.08, 0.7);
+      // ease off the throttle so she bleeds toward perching speed — slow
+      // enough that her turn radius shrinks below the flare capture radius,
+      // or she'd circle the perch without ever closing on it
+      const speedWant = trimSpeed(this.params) * THREE.MathUtils.lerp(0.55, 0.95, (dist - t.flareDist) / (t.approachDist - t.flareDist));
+      s.flapEffort = THREE.MathUtils.clamp(0.3 + (speedWant - this.speed) * 0.14, 0.05, 0.7);
     } else {
       // FLARE: pitch up toward the stall, kill thrust. Lift spikes then
       // collapses — the cushion. The cupped, near-stalled wing is also a huge
