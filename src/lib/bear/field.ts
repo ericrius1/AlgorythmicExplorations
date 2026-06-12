@@ -38,7 +38,7 @@ export interface FieldOptions {
 }
 
 // The assembled bear. Evaluates every capsule and folds them together with
-// per-bone blend widths. ~25 capsules; cheap enough to call millions of times.
+// per-bone blend widths. ~24 capsules; cheap enough to call millions of times.
 export function bearField(x: number, y: number, z: number, opts?: FieldOptions): number {
   const rs = opts?.radiusScale ?? 1;
   const bs = opts?.blendScale ?? 1;

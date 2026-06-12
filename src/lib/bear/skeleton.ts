@@ -17,7 +17,7 @@ export interface BoneDef {
   blend: number; // smooth-union k against the rest of the body
 }
 
-// Color zones, baked per-vertex at mesh time, palette applied in the shader.
+// Color zones, baked per-vertex at mesh time, palette applied per zone.
 export const ZONES = ["body", "belly", "muzzle", "ear", "paw", "foot", "tail"] as const;
 
 // The bear stands upright (a qi gong practitioner, after all): y up, facing +z,

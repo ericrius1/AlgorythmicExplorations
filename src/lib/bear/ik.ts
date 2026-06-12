@@ -19,10 +19,10 @@ const _r = new THREE.Vector3();
 const _pq = new THREE.Quaternion();
 const _q = new THREE.Quaternion();
 
-// Solve joints [root, mid, tip] (e.g. upperArm, forearm, hand) so that the
-// *mid joint's tail*... no — so that the tip joint's head lands on `target`.
-// `pole` is a world-space hint: the bend (elbow/knee) leans toward it.
-// `blend` ∈ [0,1] lerps between the rig's current pose and the IK result.
+// Solve joints [root, mid, tip] (e.g. upperArm, forearm, hand) so the tip
+// joint's head (the wrist) lands on `target`. `pole` is a world-space hint:
+// the bend (elbow/knee) leans toward it. `blend` ∈ [0,1] lerps between the
+// rig's current pose and the IK result.
 export function solveTwoBone(
   rig: Rig,
   chain: [string, string, string],

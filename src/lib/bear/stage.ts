@@ -16,12 +16,14 @@ export class Orbit {
   distance = 3.4;
   target = new THREE.Vector3(0, 0.95, 0);
   autoSpin = 0.0012;
+  enabled = true;
   private lastInteraction = 0;
 
   attach(canvas: HTMLCanvasElement): void {
     let dragging = false;
     let lx = 0, ly = 0;
     canvas.addEventListener("pointerdown", (e) => {
+      if (!this.enabled) return;
       dragging = true;
       lx = e.clientX;
       ly = e.clientY;
@@ -30,7 +32,7 @@ export class Orbit {
     canvas.addEventListener("pointerup", () => (dragging = false));
     canvas.addEventListener("pointercancel", () => (dragging = false));
     canvas.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+      if (!dragging || !this.enabled) return;
       this.azimuth -= (e.clientX - lx) * 0.005;
       this.elevation = Math.min(1.35, Math.max(-0.1, this.elevation + (e.clientY - ly) * 0.005));
       lx = e.clientX;

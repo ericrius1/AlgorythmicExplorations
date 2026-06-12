@@ -116,7 +116,7 @@ export function marchTetra(
           const o = CORNER_OFF[c];
           g[c] = (ix + o[0]) + (iy + o[1]) * sx + (iz + o[2]) * sx * sy;
         }
-        // Quick reject: all eight corners on the same side, far from surface.
+        // Quick reject: all eight corners on the same side.
         let allIn = true, allOut = true;
         for (let c = 0; c < 8; c++) {
           if (values[g[c]] < 0) allOut = false;

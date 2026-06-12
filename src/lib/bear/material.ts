@@ -34,6 +34,19 @@ export const PALETTES: Record<string, number[]> = {
 };
 export const PALETTE_NAMES = Object.keys(PALETTES);
 
+// Bake palette colors into the geometry's color attribute from its zone ids.
+// Swapping the whole bear from cinnamon to panda is one buffer rewrite.
+export function paintZones(geometry: THREE.BufferGeometry, palette: string): void {
+  const zones = geometry.getAttribute("zone") as THREE.BufferAttribute;
+  const colors = geometry.getAttribute("color") as THREE.BufferAttribute;
+  const pal = (PALETTES[palette] ?? PALETTES.cinnamon).map((c) => new THREE.Color(c));
+  for (let i = 0; i < zones.count; i++) {
+    const c = pal[zones.getX(i)] ?? pal[0];
+    colors.setXYZ(i, c.r, c.g, c.b);
+  }
+  colors.needsUpdate = true;
+}
+
 // ---- GPU skinning --------------------------------------------------------------
 
 export interface SkinBinding {
@@ -70,19 +83,6 @@ function fresnel(power: number) {
 }
 
 // ---- the fur material ----------------------------------------------------------
-
-// Bake palette colors into the geometry's color attribute from its zone ids.
-// Swapping the whole bear from cinnamon to panda is one buffer rewrite.
-export function paintZones(geometry: THREE.BufferGeometry, palette: string): void {
-  const zones = geometry.getAttribute("zone") as THREE.BufferAttribute;
-  const colors = geometry.getAttribute("color") as THREE.BufferAttribute;
-  const pal = (PALETTES[palette] ?? PALETTES.cinnamon).map((c) => new THREE.Color(c));
-  for (let i = 0; i < zones.count; i++) {
-    const c = pal[zones.getX(i)] ?? pal[0];
-    colors.setXYZ(i, c.r, c.g, c.b);
-  }
-  colors.needsUpdate = true;
-}
 
 export interface BearMaterial {
   material: THREE.MeshPhysicalNodeMaterial;
@@ -148,9 +148,9 @@ export function createWeightMaterial(skin: SkinBinding | null): WeightMaterial {
   // Cold steel → cyan → warm amber, with a hint of head-on lambert so the
   // shape still reads. sqrt stretches the low weights you actually debug.
   const t = w.sqrt();
-  const cold = vec3(0.13, 0.15, 0.19);
-  const mid = vec3(0.1, 0.65, 0.75);
-  const hot = vec3(1.0, 0.72, 0.25);
+  const cold = vec3(0.045, 0.055, 0.085);
+  const mid = vec3(0.06, 0.45, 0.55);
+  const hot = vec3(1.0, 0.68, 0.18);
   const ramp = mix(mix(cold, mid, smoothstep(0.0, 0.55, t)), hot, smoothstep(0.55, 1.0, t));
   const shade = transformNormalToView(normalGeometry).z.abs().mul(0.35).add(0.65);
   material.colorNode = ramp.mul(shade);
