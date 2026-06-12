@@ -2,6 +2,7 @@
 // read-next cards are all generated from this one list.
 
 export const SITE_NAME = "Algorythmic Explorations";
+export const SITE_REPO = "https://github.com/ericrius1/AlgorythmicExplorations";
 
 export interface Post {
   href: string;

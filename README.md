@@ -1,5 +1,7 @@
 # Algorythmic Explorations
 
+[Source on GitHub](https://github.com/ericrius1/AlgorythmicExplorations)
+
 Three interactive series of articles with live WebGPU demos.
 
 **Gravity in a Browser Tab** — a six-part series that builds particle simulators step by step,

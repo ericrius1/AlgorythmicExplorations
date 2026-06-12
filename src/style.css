@@ -605,6 +605,19 @@ footer {
   visibility: hidden;
 }
 
+.site-nav-github {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.site-nav-github:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .site-nav-toggle {
   font: 600 0.78rem ui-sans-serif, system-ui, sans-serif;
   color: var(--text);

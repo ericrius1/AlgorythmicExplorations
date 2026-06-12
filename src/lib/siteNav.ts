@@ -4,7 +4,7 @@
 //   · "read next" cards above the footer
 // All generated from posts.ts, so adding a post is a one-line change.
 
-import { POSTS, SITE_NAME, currentPost, type Post } from "./posts";
+import { POSTS, SITE_NAME, SITE_REPO, currentPost, type Post } from "./posts";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -74,6 +74,13 @@ export function initNav(): void {
     right.appendChild(el("span", "site-nav-where", `${post.series.replace(" in a Browser Tab", "")} · ${post.part} of ${POSTS.filter((p) => p.series === post.series).length}`));
     arrow(next, "→", "Next");
   }
+
+  const github = el("a", "site-nav-github", "GitHub");
+  github.href = SITE_REPO;
+  github.target = "_blank";
+  github.rel = "noopener noreferrer";
+  github.title = "Source on GitHub";
+  right.appendChild(github);
 
   const toggle = el("button", "site-nav-toggle", "all posts ▾");
   right.appendChild(toggle);
