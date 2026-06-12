@@ -23,6 +23,8 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "Simulated stuff you can poke — a magnetic liquid that grows spikes, its surface re-meshed from scratch every frame.",
   "Living Music":
     "The physics of sound you can hear — why notes agree, why minor sounds sad, and a song that writes itself.",
+  "Waking Bodies":
+    "A character built from scratch — a bear carpentered from triangles, rigged by distances, and taught qi gong by springs.",
   "Feather & Bone":
     "A bird built from first principles — modeled low-poly from capsules, rigged, flapped, and finally flown over a living world.",
   "Ground Truth":
@@ -170,9 +172,34 @@ export const POSTS: Post[] = [
     title: "The Accompanist",
     subtitle: "Encore — play, and an algorithmic bandmate follows: key-finding, chord-guessing, and knowing when to stay out of the way",
   },
-  // Waking Bodies (bear.html, rig.html, reach.html, qigong.html) is unlisted
-  // while its modeling pipeline is reworked from SDFs to triangle meshes —
-  // restore its four posts (and its tagline above) when the rework lands.
+  {
+    href: "/bear.html",
+    series: "Waking Bodies",
+    part: 1,
+    title: "The Bear",
+    subtitle: "A character carpentered by code — rings of vertices lofted along a table of bones, stitched into 1,700 triangles, and dressed in TSL fur",
+  },
+  {
+    href: "/rig.html",
+    series: "Waking Bodies",
+    part: 2,
+    title: "The Skeleton",
+    subtitle: "Bones as a hierarchy, skin as a weighted vote — the bear learns to bend, four matrices per vertex",
+  },
+  {
+    href: "/reach.html",
+    series: "Waking Bodies",
+    part: 3,
+    title: "The Reach",
+    subtitle: "Inverse kinematics — stop dialing angles, start asking for places; the law of cosines meets a draggable orb",
+  },
+  {
+    href: "/qigong.html",
+    series: "Waking Bodies",
+    part: 4,
+    title: "The Form",
+    subtitle: "Qi gong at last — poses as targets, springs as blends, moves that flow into each other; the series becomes a toy",
+  },
   {
     href: "/wren.html",
     series: "Feather & Bone",

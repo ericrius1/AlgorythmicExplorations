@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Skeleton — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="Rigging from first principles: eighteen joints read out of the same bone table that lofted the bear, forward kinematics as one matrix pass, skin weights as a proximity vote, and linear blend skinning written by hand in the TSL vertex stage — four matrices per vertex, sixty times a second."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/rig.ts -->
+    <header class="hero">
+      <div data-demo="hero-rig"></div>
+      <div class="hero-title">
+        <h1>The Skeleton</h1>
+        <p class="subtitle">
+          Part one carpentered a statue. This article installs the machinery
+          under the fur: eighteen joints, read out of the same table of bones
+          that lofted the mesh, and every vertex taught which of them to
+          follow. The ghost above is waving because a few sine waves are
+          turning a few joints — the twelve hundred vertices of his arm were
+          never told anything at all.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/bear.html">Part one</a> ended on a secret: the table of bones
+        that placed every ring of the bear's skin is also, row for row, a
+        <em>skeleton</em>. Each row has a head, a tail, a parent — that is not
+        a modeling convenience, it is an anatomy. This article spends the
+        secret. The plan has two halves, and they are the two halves of every
+        character rig ever shipped: first make the bones move <em>each
+        other</em> (rotate a shoulder and the forearm, paw, and claws must all
+        come along), then make the skin move with the bones — without tearing
+        the mesh apart at the joints.
+      </p>
+      <p>
+        Neither half touches the vertex buffer. That is the discipline of the
+        whole enterprise: the mesh stays exactly as part one built it, frozen
+        in GPU memory, and everything that looks like motion is a handful of
+        matrices changing on the way in. The bear bends; his triangles never
+        do.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The hierarchy</span>Bones that move bones</h2>
+      <p>
+        Of the twenty-one rows in the bone table, eighteen carry
+        <code>deform: true</code>, and each becomes a <strong>joint</strong>: a
+        pivot at the row's head point, a parent named by the row, and exactly
+        one animated quantity — a rotation. Nothing else is stored. The
+        skeleton's shape lives in the rest offsets between each head and its
+        parent's head, read once from the table; the pose lives in eighteen
+        quaternions; and the machine that turns one into the other is a single
+        loop of matrix multiplies, parents first:
+      </p>
+      <pre><code>// world(child) = world(parent) · T(offset) · R(q) — one pass, parents first
+for (let i = 0; i &lt; joints.length; i++) {
+  const j = joints[i];
+  local.compose(j.restOffset, j.rotation, ONE);
+  world[i].multiplyMatrices(world[j.parent], local);  <span class="cm">// the root just copies</span>
+}</code></pre>
+      <p>
+        This is <strong>forward kinematics</strong>, and "forward" is earned:
+        information flows one way, from root to leaf. Because each world
+        matrix is built on the parent's <em>finished</em> world matrix,
+        rotating the shoulder drags the elbow's pivot through space before the
+        elbow's own rotation is even consulted — which is exactly what your
+        skeleton does, and why the hierarchy is the rig. Dial the four angles
+        below and watch the readout: the paw's world position is a number
+        nobody chose, the product of four matrices that each only knew its own
+        joint.
+      </p>
+      <div data-demo="fk"></div>
+      <p>
+        Notice the deal FK offers. Give it angles and it <em>cannot fail</em>:
+        no iteration, no convergence, no impossible inputs — every set of
+        eighteen rotations is some pose, even the embarrassing ones. The cost
+        of that certainty is the steering. You don't get to say where the paw
+        goes; you only get to say how the joints turn, and where the paw goes
+        is news. Hold that thought until the coda.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Steel under the rubber</span>
+        <p>
+          The armature is older than the computer. Willis O'Brien's King Kong
+          (1933) was a jointed steel skeleton under rubber muscles and rabbit
+          fur, posed a frame at a time by hand; Ray Harryhausen's creatures
+          ran on the same machined ball joints for forty years. A digital rig
+          is that object, abstracted: quaternions for the ball joints, a
+          matrix pass for the animator's thumbs. The vocabulary even
+          survived — riggers still call the rest pose the <em>bind pose</em>,
+          as if the skin were still being stretched over an armature on a
+          workbench, which, give or take a vertex buffer, it is.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The weights</span>A weighted vote</h2>
+      <p>
+        Half one done: bones move bones. But the skin is one welded mesh, not
+        nine separate tubes — when the forearm joint turns, which of the 5,000
+        vertices should care? In a commercial package an artist answers by
+        <em>painting</em>: brush over the forearm, vertices there get weight.
+        The bear has no artist. It has something better — the table. Every
+        bone is a tapered capsule (two points, two radii), so "is this vertex
+        near the forearm?" is a distance query — point to segment, minus the
+        local radius — against the same silhouette the rings were lofted
+        around. Part one used that distance to build the skin; part two asks
+        it who the skin <em>belongs to</em>.
+      </p>
+      <p>
+        Per vertex: measure the distance to all eighteen joints, keep the
+        closest four, and convert nearness to loyalty with one sharpening
+        knob — <code>w&nbsp;=&nbsp;1&nbsp;/&nbsp;(d&nbsp;+&nbsp;ε)<sup>p</sup></code>,
+        then normalize the four to sum to one. The ears and muzzle, which have
+        no joints of their own, are counted as part of the head bone's
+        territory, so an ear vertex reads as "basically zero distance to the
+        head" and rides along. Below, the result as a heatmap: amber is owned,
+        steel-blue is indifferent, and the falloff power <code>p</code> is
+        yours to abuse.
+      </p>
+      <div data-demo="weights"></div>
+      <p>
+        The power is the rig's temperament. At <code>p&nbsp;=&nbsp;1</code>
+        loyalty is mushy — half the torso sympathizes with the upper arm and
+        the bear bends like a gummy — while at <code>p&nbsp;=&nbsp;6</code>
+        every vertex pledges to one bone and the joints turn to hard creases.
+        The shipped bear sits at 2.4, which is less a number than a taste,
+        arrived at the way all skin weights are: by bending the elbow and
+        squinting.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The blend</span>The matrix that undoes birth</h2>
+      <p>
+        There is a trap between the weights and the motion. A joint's world
+        matrix maps <em>joint-local</em> points into the world — but the
+        vertices were born in world space, already standing where the rest
+        pose put them. Feed a world-space vertex through a world matrix and it
+        gets the joint's translation a second time; the arm flies off into a
+        parallel arm two shoulder-widths away. Every vertex must first be
+        carried <em>back</em> into the joint's frame — un-positioned, as it
+        were — before being re-posed. That undo is the <strong>bind
+        inverse</strong>, and the matrix the skin actually uses is the
+        product of both steps:
+      </p>
+      <pre><code>// "undo where the bone was born, apply where it is now"
+skin[i] = world[i] · inverse(restWorld[i])</code></pre>
+      <p>
+        In rest pose, <code>world</code> and <code>restWorld</code> cancel and
+        every skin matrix is the identity — the bear stands exactly as built,
+        which is the sanity check rigs live and die by. From there, a posed
+        vertex is a <em>vote</em> among its four bones: run the rest-pose
+        position through each bone's skin matrix and blend the four answers
+        by the weights. The literature calls it <strong>linear blend
+        skinning</strong>, and it has been the standard since the late
+        eighties for the usual reason — it is four matrix multiplies and an
+        add, and it almost always looks right.
+      </p>
+      <div data-demo="skin"></div>
+      <p>
+        The toggle above is the argument for the blend, compressed. "Rigid"
+        assigns each vertex wholly to its strongest bone — the skeleton's
+        territories made literal — and at a deep elbow bend the mesh cracks
+        open along the border like a poorly mitered pipe joint. "Blended"
+        lets the borderline vertices average the two opinions, and the crack
+        becomes a crease. Almost always right, though: bend far enough and
+        the averaged vertices cut the corner, thinning the elbow — the
+        <em>collapsing joint</em>, linear blending's signature sin, joined by
+        the candy-wrapper collapse wherever a bone twists. Production fixes
+        exist (corrective shapes, dual-quaternion blending); the bear's fix
+        is fur and a forgiving silhouette, which has also shipped many games.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: why the bear's bind inverse is just a translation</summary>
+        <div class="fold-body">
+          <p>
+            A production rig exports a full 4×4 inverse bind matrix per bone,
+            because bones in a DCC are born rotated — each has a rest
+            orientation aiming it down its own length. The bear's joints
+            store no rest rotation at all: at bind time every quaternion is
+            identity, and a joint's rest world transform is a pure
+            translation to its head point. The inverse of "translate to the
+            head" is "translate by minus the head", so the entire bind-pose
+            apparatus collapses to <code>makeTranslation(−head)</code> —
+            eighteen vectors the table already knew. The price is that bone
+            rotations are expressed in the parent's axes rather than the
+            bone's own; the rig pays it gladly, and part three's IK will pay
+            it again with a shortest-arc quaternion.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The vertex stage</span>Four multiplies, sixty times a second</h2>
+      <p>
+        Now the accounting. Where does the blend <em>run</em>? Doing it on the
+        CPU means rewriting every vertex position every frame and re-uploading
+        the buffer — exactly the traffic part one was proud to avoid. So the
+        blend runs where the vertices already live. The weights and indices
+        are baked into the geometry once, as two <code>vec4</code> attributes
+        per vertex; the eighteen skin matrices ride in as a uniform array; and
+        the vertex stage — the same TSL stage that until now merely stood
+        still — does the voting:
+      </p>
+      <pre><code>const boneMats = uniformArray(skin.matrices);  <span class="cm">// 18 mat4s — the rig mutates, the GPU re-reads</span>
+const idx = attribute("skinIndex");            <span class="cm">// vec4: who</span>
+const wgt = attribute("skinWeight");           <span class="cm">// vec4: how much</span>
+const blend = (v) =>
+  boneMats.element(int(idx.x)).mul(v).mul(wgt.x)
+    .add(boneMats.element(int(idx.y)).mul(v).mul(wgt.y))
+    .add(boneMats.element(int(idx.z)).mul(v).mul(wgt.z))
+    .add(boneMats.element(int(idx.w)).mul(v).mul(wgt.w));
+material.positionNode = blend(vec4(positionGeometry, 1)).xyz;
+material.normalNode   = transformNormalToView(blend(vec4(normalGeometry, 0)).xyz.normalize());</code></pre>
+      <p>
+        Two details earn their keep. Normals go through the same blend with a
+        <em>zero</em> in the fourth component — they are directions, not
+        positions, and must rotate with the bone without inheriting its
+        translation. And the uniform array wraps the very
+        <code>Matrix4[]</code> the rig writes into during its FK pass, so
+        there is no copy step to forget: the CPU computes eighteen matrices,
+        the GPU moves five thousand vertices, and the division of labor is
+        exactly proportional to what each is good at. (three.js ships a
+        <code>SkinnedMesh</code> that does all of this for you — the
+        <a href="/bones.html">wren next door</a> uses it. The bear writes the
+        four multiplies out by hand because seeing them <em>is</em> this
+        article.) The glossy eyes and nose, too proud to be skinned, are
+        simply parented to the head joint's world matrix — three little
+        spheres doing forward kinematics the easy way.
+      </p>
+      <p>
+        Everything is now wired: table to joints, joints to matrices, matrices
+        to skin. The demo below drives the whole stack with eleven sine
+        waves — hips counter the spine, arms swing opposite, the tail keeps
+        its own time. No keyframes, no clips, nothing recorded; it is not yet
+        <em>animation</em>, but it is unmistakably a bear dancing, and every
+        bit of it is the machinery of this article being fed clock signals.
+      </p>
+      <div data-demo="dance"></div>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>A machine pointed the wrong way</h2>
+      <p>
+        A confession, before the next part. Forward kinematics is a wonderful
+        machine pointed the wrong way. It answers, flawlessly and instantly,
+        a question nobody on a film set has ever asked: "if the shoulder
+        turns 40 degrees and the elbow 60, where does the paw end up?"
+        Direction runs opposite. <em>Touch that mark. Look at the firefly.
+        Put the paw on the orb.</em> The place is given; the angles are the
+        problem. Running this article's machine backwards — angles from
+        places — is called <em>inverse kinematics</em>, it is harder in
+        honest and interesting ways, and for a two-bone limb it is solved by
+        a triangle you met in school. Next time the bear stops being dialed
+        and starts being <em>asked</em> — and begins, at last, to want
+        things.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Waking Bodies, part two ·
+        <a href="/bear.html">part one: The Bear</a> ·
+        <a href="/reach.html">part three: The Reach</a> ·
+        <a href="/qigong.html">part four: The Form</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://dl.acm.org/doi/10.5555/52351.52371">Magnenat-Thalmann, Laperrière &amp; Thalmann, "Joint-Dependent Local Deformations for Hand Animation and Object Grasping" (1988)</a> ·
+        <a href="https://doi.org/10.1145/344779.344862">Lewis, Cordner &amp; Fong, "Pose Space Deformation" (2000)</a> ·
+        <a href="https://doi.org/10.1145/1409625.1409627">Kavan, Collins, Žára &amp; O'Sullivan, "Geometric Skinning with Approximate Dual Quaternion Blending" (2008)</a> ·
+        <a href="https://github.com/mrdoob/three.js/wiki/Three.js-Shading-Language">three.js, TSL (docs)</a> ·
+        Willis O'Brien's patient thumbs, eighteen joints at a time
+      </p>
+    </footer>
+
+    <script type="module" src="/src/rig.ts"></script>
+  </body>
+</html>

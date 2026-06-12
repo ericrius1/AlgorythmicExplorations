@@ -29,9 +29,10 @@ export default defineConfig({
         jukebox: fileURLToPath(new URL("jukebox.html", import.meta.url)),
         contact: fileURLToPath(new URL("contact.html", import.meta.url)),
         accompanist: fileURLToPath(new URL("accompanist.html", import.meta.url)),
-        // Waking Bodies (bear/rig/reach/qigong) deliberately not built or
-        // listed yet — modeling pipeline being reworked from SDFs to triangle
-        // meshes. Re-add the four inputs when the series is done.
+        bear: fileURLToPath(new URL("bear.html", import.meta.url)),
+        rig: fileURLToPath(new URL("rig.html", import.meta.url)),
+        reach: fileURLToPath(new URL("reach.html", import.meta.url)),
+        qigong: fileURLToPath(new URL("qigong.html", import.meta.url)),
         wren: fileURLToPath(new URL("wren.html", import.meta.url)),
         bones: fileURLToPath(new URL("bones.html", import.meta.url)),
         wingbeat: fileURLToPath(new URL("wingbeat.html", import.meta.url)),
