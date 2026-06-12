@@ -73,7 +73,7 @@ export interface TerrainBuild {
 
 export function buildTerrainGeometry(
   p: TerrainParams,
-  opts: { size?: number; segments?: number; centerX?: number; centerZ?: number } = {},
+  opts: { size?: number; segments?: number; centerX?: number; centerZ?: number; skirt?: number } = {},
 ): TerrainBuild {
   const t0 = performance.now();
   const size = opts.size ?? 14;
@@ -83,19 +83,20 @@ export function buildTerrainGeometry(
   const step = size / n;
   const half = size / 2;
 
-  // sample the height function once per lattice point; everything else —
-  // normals included — is read back out of this grid for free
+  // sample the height function once per lattice point, with one row of margin
+  // beyond each edge — the function is pure, so the margin is exact, and it
+  // keeps border normals two-sided (chunked worlds shade seamlessly)
   const W = n + 1;
-  const heights = new Float32Array(W * W);
+  const MW = W + 2;
+  const heights = new Float32Array(MW * MW);
   let s = 0;
-  for (let j = 0; j < W; j++) {
+  for (let j = -1; j <= n + 1; j++) {
     const z = cz - half + j * step;
-    for (let i = 0; i < W; i++) {
+    for (let i = -1; i <= n + 1; i++) {
       heights[s++] = terrainHeight(cx - half + i * step, z, p);
     }
   }
-  const H = (i: number, j: number): number =>
-    heights[Math.min(n, Math.max(0, i)) + W * Math.min(n, Math.max(0, j))];
+  const H = (i: number, j: number): number => heights[i + 1 + MW * (j + 1)];
 
   const positions = new Float32Array(W * W * 3);
   const normals = new Float32Array(W * W * 3);
@@ -128,7 +129,7 @@ export function buildTerrainGeometry(
     }
   }
 
-  const indices = new Uint32Array(n * n * 6);
+  const indices = new Uint32Array(n * n * 6 + (opts.skirt ? 4 * n * 12 : 0));
   let q = 0;
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -141,16 +142,56 @@ export function buildTerrainGeometry(
     }
   }
 
+  // the skirt: each border vertex gets a twin pushed straight down, and the
+  // wall between them hides the cracks where a coarser neighbor chunk meets
+  // this one (both windings, so the wall shows from every side)
+  let posOut = positions, normOut = normals, colOut = colors;
+  let vertCount = W * W;
+  if (opts.skirt) {
+    const edge: number[] = [];
+    for (let i = 0; i < W; i++) edge.push(i); // top
+    for (let i = 0; i < W; i++) edge.push(i + W * n); // bottom
+    for (let j = 0; j < W; j++) edge.push(W * j); // left
+    for (let j = 0; j < W; j++) edge.push(n + W * j); // right
+
+    const SW = edge.length;
+    posOut = new Float32Array((W * W + SW) * 3);
+    normOut = new Float32Array((W * W + SW) * 3);
+    colOut = new Float32Array((W * W + SW) * 3);
+    posOut.set(positions); normOut.set(normals); colOut.set(colors);
+    for (let k = 0; k < SW; k++) {
+      const src = edge[k] * 3, dst = (W * W + k) * 3;
+      posOut[dst] = positions[src];
+      posOut[dst + 1] = positions[src + 1] - opts.skirt;
+      posOut[dst + 2] = positions[src + 2];
+      normOut[dst] = normals[src]; normOut[dst + 1] = normals[src + 1]; normOut[dst + 2] = normals[src + 2];
+      colOut[dst] = colors[src] * 0.85; colOut[dst + 1] = colors[src + 1] * 0.85; colOut[dst + 2] = colors[src + 2] * 0.85;
+    }
+    for (let e2 = 0; e2 < 4; e2++) {
+      for (let i = 0; i < n; i++) {
+        const a = edge[e2 * W + i];
+        const b = edge[e2 * W + i + 1];
+        const sa = W * W + e2 * W + i;
+        const sb = sa + 1;
+        indices[q++] = a; indices[q++] = b; indices[q++] = sa;
+        indices[q++] = b; indices[q++] = sb; indices[q++] = sa;
+        indices[q++] = a; indices[q++] = sa; indices[q++] = b;
+        indices[q++] = b; indices[q++] = sa; indices[q++] = sb;
+      }
+    }
+    vertCount += SW;
+  }
+
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("position", new THREE.BufferAttribute(posOut, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normOut, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colOut, 3));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
   return {
     geometry,
-    vertexCount: W * W,
-    triangleCount: n * n * 2,
+    vertexCount: vertCount,
+    triangleCount: indices.length / 3,
     buildMs: performance.now() - t0,
   };
 }

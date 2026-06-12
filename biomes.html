@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Biomes — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="What grows where: a moisture field, a pocket Whittaker diagram, and a jittered grid that places every tree, rock, and blade of grass — deterministically, so an infinite world can agree with itself."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/biomes.ts -->
+    <header class="hero">
+      <div data-demo="hero-biomes"></div>
+      <div class="hero-title">
+        <h1>The Biomes</h1>
+        <p class="subtitle">
+          Forests hold the wet ground, meadows take the middle, scree and
+          snow divide the heights — and not one decision in sight. Two noise
+          fields and a slope test are doing all the ecology under this
+          camera. The world stops being decorated and starts being
+          inhabited.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        The series has parts now — <a href="/heightfield.html">mountains</a>,
+        <a href="/erosion.html">drainage</a>,
+        <a href="/grass.html">grass</a>, <a href="/trees.html">trees</a> —
+        but so far every demo has assembled them by hand: this grove here,
+        that meadow there. A real landscape doesn't get assembled. Its
+        pattern <em>is</em> information: where trees stop tells you the
+        temperature, where green turns tan tells you the rainfall, and a
+        glance at any hillside reads as a climate report. Fake that pattern
+        badly — uniform trees sprinkled like parsley — and terrain that
+        survived four articles of care instantly looks like a video game.
+      </p>
+      <p>
+        Ecologists compressed the real rules into one famous picture.
+        Whittaker's biome diagram plots temperature against precipitation
+        and carves the plane into regions: tundra here, grassland there,
+        forest where both are generous. This article builds the pocket
+        version — altitude stands in for temperature, a noise field stands
+        in for rainfall — and then spends its real effort on a quieter
+        problem: <em>placing</em> a million plants in a way that an
+        infinite world will be able to reproduce, chunk by chunk, without
+        any two chunks ever comparing notes. That second problem decides
+        the design of everything.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Climate</span>A second weather, broader than the first</h2>
+      <p>
+        The terrain already gives us altitude and slope at any point — both
+        pure functions. The missing axis is moisture, and the trick is the
+        same one that made the mountains: fractal noise, but much
+        <em>broader</em> — climate varies over kilometers, not meters. Three
+        octaves at a fiftieth of the terrain's frequency produce wet
+        regions and rain shadows that sprawl across many hills, which is
+        what makes the pattern read as weather rather than camouflage:
+      </p>
+      <pre><code>moisture(x, z) = fbm(x · k, z · k) + offset      <span class="cm">// k broad; offset is the climate dial</span>
+biome(h, slope, m): slope &gt; 0.55 → cliff
+                    h &gt; treeline + ε → alpine
+                    h &gt; treeline     → m wet ? meadow : scree
+                    else             → m wet ? forest : m mild ? meadow : scrub</code></pre>
+      <div data-demo="map"></div>
+      <p>
+        The classification painted over the terrain. Flip to the moisture
+        view to see the underlying field — note how much broader its
+        features are than the hills'. Then play the two dials:
+        <strong>wet ↔ dry</strong> shifts the whole world's climate (slide
+        toward dry and watch forests retreat to the dampest hollows, like
+        a time-lapse of a drying century); <strong>tree line</strong> moves
+        the altitude where trees surrender. Real tree lines do exactly
+        this — they're a temperature contour made visible in vegetation.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The missing river</span>
+        <p>
+          The honest version of moisture isn't noise — it's drainage.
+          Water flows downhill and collects, so valley floors are wet
+          because of the <em>shape of the terrain</em>, and part two
+          computed precisely that. But erosion's output is a stored grid,
+          and this article needs moisture to be a pure function for the
+          infinite world's sake. So the noise is a stand-in, and the
+          compromise is visible if you look: this climate doesn't quite
+          follow the valleys. The final article will spend real effort on
+          exactly this tension — what must be a function, and what's
+          allowed to be history.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Placement</span>The grid that never needs its neighbors</h2>
+      <p>
+        Knowing forest-or-meadow at a point is not the same as knowing
+        where each individual tree stands. Tree spacing has texture —
+        natural but not uniform, scattered but never clumped into
+        absurdity — and graphics' favorite answer is Poisson-disk
+        sampling: points placed randomly but never closer than a minimum
+        distance. It looks superb. It is also a <em>process</em>: each new
+        sample must check the samples placed before it, which means a
+        chunk can't place its trees without knowing its neighbors' trees —
+        and that dependency is poison for a streaming world (the same
+        poison as erosion, in a smaller bottle).
+      </p>
+      <p>
+        The chunk-proof alternative is the <strong>jittered grid</strong>.
+        Divide the world into cells in <em>global</em> coordinates — cell
+        indices from floor(x / cellSize), not from any chunk origin. Each
+        cell hosts at most one candidate, jittered inside the cell by the
+        cell's own hash. Any region query now reproduces the identical
+        trees, because a tree's existence and position depend only on its
+        cell's integers:
+      </p>
+      <pre><code>candidate(ci, cj) = ((ci + jitter(hash)) · cell, (cj + jitter(hash)) · cell)
+keep if: hash(ci, cj) &lt; P(biome at candidate)     <span class="cm">// the climate votes, the hash decides</span></code></pre>
+      <p>
+        Spacing comes free (two candidates can't share a cell), and the
+        slight regularity that makes jittered grids inferior to Poisson
+        for sampling theory is invisible once trees land on hilly ground
+        with hashed scales and rotations. The acceptance probability is
+        where ecology re-enters: near-certain in forest, a stray pioneer
+        in meadows, zero above the tree line — with a fade band below it
+        where acceptance drops <em>and the trees themselves shrink</em>,
+        because real tree lines end in stunted krummholz, not a fence.
+      </p>
+      <div data-demo="patch"></div>
+      <p>
+        Every tree, rock, and grass blade here was accepted or rejected by
+        the rules — slide the climate and watch whole forests migrate
+        downhill into the hollows. The rocks follow their own grid
+        (scree fields above the tree line, boulders thinning to pebbles by
+        a squared hash, because nature stocks many more small rocks than
+        large). The readout's tally is the article's thesis: nobody placed
+        any of them, and yet none of them is anywhere twice.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: four trees playing a forest</summary>
+        <div class="fold-body">
+          <p>
+            The patch above contains hundreds of trees but only four tree
+            <em>geometries</em> — grown once by <a href="/trees.html">part
+            four's</a> space colonization, then instanced with hashed yaw
+            and scale. The eye identifies a tree by silhouette, and a
+            rotated, rescaled skeleton on different ground reads as a
+            different individual; meshes are expensive, silhouettes are
+            free. The same economy stretches further in big games — LOD
+            imposters, billboard crowds — but the principle is already
+            fully present here: <strong>uniqueness is a property of
+            placement, not of geometry</strong>.
+          </p>
+          <p>
+            One subtlety worth stealing: each instanced variant is one
+            draw call <em>per variant</em>, not per tree, so the whole
+            forest costs about a dozen draw calls regardless of count. The
+            grass takes the part-three route instead (one merged buffer)
+            because blades are too small to be worth a matrix each. Two
+            scales of the same problem, two different answers — the
+            boundary between them is roughly "does one instance have more
+            vertices than its matrix has floats."
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>One article left</h2>
+      <p>
+        Stand back and audit what the series now owns. Ground:
+        h(x, z), a pure function. Climate: moisture(x, z), a pure
+        function. Population: scatter(region), a pure function of cell
+        integers. Everything the eye sees is now computable from
+        coordinates alone — no stored maps, no history, no assembly steps
+        — except for one glorious holdout (the rain, still sulking in its
+        grid) and one unbuilt machine. The next article is that machine:
+        chunks, rings of level-of-detail, a build budget measured in
+        milliseconds, and a camera that can fly in one direction for as
+        long as you care to hold the key. The world is already infinite on
+        paper. Part six makes it infinite in person — and somewhere above
+        it, <a href="/wren.html">a wren</a> is going to need somewhere to
+        land.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Ground Truth, part five ·
+        written in parallel with <a href="/wren.html">Feather &amp; Bone</a> ·
+        placing <a href="/trees.html">part four's</a> trees on
+        <a href="/heightfield.html">part one's</a> ground
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://www.jstor.org/stable/1948435">Whittaker, "Vegetation of the Siskiyou Mountains" (1960)</a> ·
+        <a href="https://doi.org/10.1145/1278780.1278807">Bridson, "Fast Poisson Disk Sampling in Arbitrary Dimensions" (2007)</a> ·
+        <a href="https://doi.org/10.1111/j.1467-8659.2007.01051.x">Lagae &amp; Dutré, "A Comparison of Methods for Generating Poisson Disk Distributions" (2008)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/biomes.ts"></script>
+  </body>
+</html>

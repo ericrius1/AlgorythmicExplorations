@@ -208,6 +208,20 @@ export const POSTS: Post[] = [
     title: "The Grass",
     subtitle: "A hundred thousand blades, planted in part two's silt and bent by a wind that lives entirely in the vertex shader",
   },
+  {
+    href: "/trees.html",
+    series: "Ground Truth",
+    part: 4,
+    title: "The Trees",
+    subtitle: "Space colonization — branches compete for open air, thicken by Leonardo's rule, and publish their perches for a certain wren",
+  },
+  {
+    href: "/biomes.html",
+    series: "Ground Truth",
+    part: 5,
+    title: "The Biomes",
+    subtitle: "What grows where — a moisture field, a pocket Whittaker diagram, and a jittered grid that places a million plants deterministically",
+  },
 ];
 
 export function currentPost(): { post: Post | null; index: number } {

@@ -2,13 +2,12 @@
 // Shell's canvas (with three's automatic WebGL2 fallback), the site's orbit
 // feel (drag to turn, ctrl/⌘+wheel to zoom, slow auto-spin when idle), soft
 // three-point lighting, a fading ground disc, and the bear's face — eyes and
-// nose are tiny glossy spheres that ride the head bone, because marching a
-// field fine enough to grow eyeballs would be the wrong kind of heroism.
+// nose are tiny glossy spheres that ride the head bone, because lofting rings
+// fine enough to grow eyeballs would be the wrong kind of heroism.
 
 import * as THREE from "three/webgpu";
 import { screenUV, mix, vec3, float, positionLocal, smoothstep } from "three/tsl";
 import type { Rig } from "./rig";
-import { BONES } from "./skeleton";
 
 export class Orbit {
   azimuth = 0.45;
@@ -167,36 +166,4 @@ export class Face {
     const m = rig.world[this.headIndex];
     for (const p of this.parts) p.mesh.position.copy(p.local).applyMatrix4(m);
   }
-}
-
-// ---- tapered capsule meshes (part 1's "the parts") -------------------------------
-// One lathe profile per bone: hemisphere of r0, cone flank, hemisphere of r1.
-
-export function capsulePartMeshes(material: THREE.Material): { group: THREE.Group; parts: { mesh: THREE.Mesh; center: THREE.Vector3 }[] } {
-  const group = new THREE.Group();
-  const parts: { mesh: THREE.Mesh; center: THREE.Vector3 }[] = [];
-  const up = new THREE.Vector3(0, 1, 0);
-  for (const b of BONES) {
-    const a = new THREE.Vector3(...b.head);
-    const c = new THREE.Vector3(...b.tail);
-    const dir = c.clone().sub(a);
-    const len = dir.length();
-    const pts: THREE.Vector2[] = [];
-    const N = 12;
-    for (let i = 0; i <= N; i++) {
-      const t = (i / N) * Math.PI * 0.5;
-      pts.push(new THREE.Vector2(Math.cos(t - Math.PI / 2) * b.r0, Math.sin(t - Math.PI / 2) * b.r0));
-    }
-    for (let i = 0; i <= N; i++) {
-      const t = (i / N) * Math.PI * 0.5;
-      pts.push(new THREE.Vector2(Math.cos(t) * b.r1, len + Math.sin(t) * b.r1));
-    }
-    const geo = new THREE.LatheGeometry(pts, 24);
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.position.copy(a);
-    if (len > 1e-6) mesh.quaternion.setFromUnitVectors(up, dir.normalize());
-    group.add(mesh);
-    parts.push({ mesh, center: a.clone().add(c).multiplyScalar(0.5) });
-  }
-  return { group, parts };
 }

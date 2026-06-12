@@ -156,23 +156,31 @@ export class Animator {
     }
 
     // ---- 2 · breath layer --------------------------------------------------------
+    // Applied as an *overlay* at target time, never written into the pose
+    // tables — sampleMove hands out shared pose objects (WUJI itself when the
+    // bear is idle), and mutating those accumulates the offset frame after
+    // frame until the spine random-walks somewhere anatomically actionable.
     const br = Math.sin(this.time * 2 * Math.PI * this.breathRate);
     const breath = br * this.breathAmp * breathMul;
-    const add = (name: string, dx: number, dy: number, dz: number): void => {
-      const e = pose.joints[name];
-      pose.joints[name] = [e[0] + dx, e[1] + dy, e[2] + dz];
+    const BREATH: Record<string, [number, number, number]> = {
+      chest: [-1.8 * breath, 0, 0],
+      spine: [-0.9 * breath, 0, 0],
+      neck: [0.8 * breath, 0, 0],
+      upperArmL: [0, 0, 1.5 * breath],
+      upperArmR: [0, 0, -1.5 * breath],
     };
-    add("chest", -1.8 * breath, 0, 0);
-    add("spine", -0.9 * breath, 0, 0);
-    add("neck", 0.8 * breath, 0, 0);
-    add("upperArmL", 0, 0, 1.5 * breath);
-    add("upperArmR", 0, 0, -1.5 * breath);
 
     // ---- 3 · springs chase -------------------------------------------------------
     for (let i = 0; i < rig.joints.length; i++) {
       const name = rig.joints[i].name;
       const e = pose.joints[name] ?? [0, 0, 0];
-      this.euler.set(e[0] * DEG, e[1] * DEG, e[2] * DEG, "XYZ");
+      const b = BREATH[name];
+      this.euler.set(
+        (e[0] + (b ? b[0] : 0)) * DEG,
+        (e[1] + (b ? b[1] : 0)) * DEG,
+        (e[2] + (b ? b[2] : 0)) * DEG,
+        "XYZ",
+      );
       this.targets[i].setFromEuler(this.euler);
       this.springs[i].step(this.targets[i], dt, this.freqHz);
       rig.joints[i].rotation.copy(this.springs[i].q);

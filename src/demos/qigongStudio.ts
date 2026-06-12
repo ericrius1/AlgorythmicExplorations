@@ -32,7 +32,7 @@ export async function mountQigongStudio(container: HTMLElement, opts: QigongStud
   }
   const { scene } = stage;
 
-  const built = buildBearMesh({ res: 56 });
+  const built = buildBearMesh();
   paintZones(built.geometry, "cinnamon");
   const rig = new Rig();
   const skin = { matrices: rig.skinMatrices };

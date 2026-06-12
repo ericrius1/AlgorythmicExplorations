@@ -30,7 +30,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
   }
   const { scene } = stage;
 
-  const built = buildBearMesh({ res: 56 });
+  const built = buildBearMesh();
   paintZones(built.geometry, "cinnamon");
   const rig = new Rig();
   const skin = { matrices: rig.skinMatrices };
@@ -132,7 +132,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
     let power = 2.4;
     const positions = built.geometry.getAttribute("position") as THREE.BufferAttribute;
     const recompute = (): void => {
-      const { skinIndex, skinWeight } = computeSkinWeights(positions.array as Float32Array, power);
+      const { skinIndex, skinWeight } = computeSkinWeights(positions, power);
       (built.geometry.getAttribute("skinIndex") as THREE.BufferAttribute).copyArray(skinIndex).needsUpdate = true;
       (built.geometry.getAttribute("skinWeight") as THREE.BufferAttribute).copyArray(skinWeight).needsUpdate = true;
     };

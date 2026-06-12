@@ -37,6 +37,8 @@ export default defineConfig({
         heightfield: fileURLToPath(new URL("heightfield.html", import.meta.url)),
         erosion: fileURLToPath(new URL("erosion.html", import.meta.url)),
         grass: fileURLToPath(new URL("grass.html", import.meta.url)),
+        trees: fileURLToPath(new URL("trees.html", import.meta.url)),
+        biomes: fileURLToPath(new URL("biomes.html", import.meta.url)),
       },
     },
   },

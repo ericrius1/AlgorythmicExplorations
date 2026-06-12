@@ -1,15 +1,13 @@
 import { initNav } from "./lib/siteNav";
 import { mountLazy } from "./lib/demoShell";
-import { mountBearStudio } from "./demos/bearStudio";
+import { mountColonize2D, mountTreeStudio, mountGroveHero } from "./demos/treesDemos";
 
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  "hero-bear": (el) => mountBearStudio(el, { hero: true, view: "hero" }),
-  parts: (el) => mountBearStudio(el, { view: "parts" }),
-  loft: (el) => mountBearStudio(el, { view: "loft" }),
-  sculpt: (el) => mountBearStudio(el, { view: "sculpt" }),
-  final: (el) => mountBearStudio(el, { view: "final" }),
+  "hero-grove": (el) => mountGroveHero(el),
+  colonize: (el) => mountColonize2D(el),
+  studio: (el) => mountTreeStudio(el),
 };
 
 for (const el of document.querySelectorAll<HTMLElement>("[data-demo]")) {

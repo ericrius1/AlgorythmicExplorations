@@ -30,7 +30,7 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
   }
   const { scene, camera } = stage;
 
-  const built = buildBearMesh({ res: 56 });
+  const built = buildBearMesh();
   paintZones(built.geometry, "cinnamon");
   const rig = new Rig();
   const skin = { matrices: rig.skinMatrices };
