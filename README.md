@@ -4,7 +4,7 @@
 
 Three interactive series of articles with live WebGPU demos.
 
-**Gravity in a Browser Tab** — a six-part series that builds particle simulators step by step,
+**Particle Worlds** — a six-part series that builds particle simulators step by step,
 one data structure per article. Part one (`index.html`) goes from two falling
 dots to a GPU-resident Barnes–Hut pyramid running half a million bodies live
 in the page. Part two (`part2.html`) promotes the solver to 3D — quadtree to
@@ -22,7 +22,7 @@ optional webcam hand tracking (`@svenflow/micro-handpose`) so you conduct the
 fluid with your hands. Companion piece to the `nbody` WebGPU lab (sibling
 folder).
 
-**Light in a Browser Tab** — a new series about simulating light itself.
+**Bounced Light** — a new series about simulating light itself.
 Part one (`lava.html`) is a lava lamp: the SPH stack from part three grows a
 per-particle temperature (heated by a coil, cooled at the top, conducted
 between neighbours) that drives rest density and buoyancy; metaballs turn
@@ -51,7 +51,7 @@ tracer (one random wavelength per sample, Cauchy dispersion, Fresnel coin
 flips) producing real caustics, rainbow caustics, and thin-lens depth of
 field.
 
-**Music in a Browser Tab** — a six-part music theory series where every figure
+**Living Music** — a six-part music theory series where every figure
 makes real sound (Tone.js) and every visual is a WebGPU fragment shader fed by
 live analyser data. Part one (`vibration.html`) dissects a single note: an
 oscilloscope you can play, a wave-equation string you pluck (audio synthesized

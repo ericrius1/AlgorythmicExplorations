@@ -71,7 +71,7 @@ export function initNav(): void {
       right.appendChild(a);
     };
     arrow(prev, "←", "Previous");
-    right.appendChild(el("span", "site-nav-where", `${post.series.replace(" in a Browser Tab", "")} · ${post.part} of ${POSTS.filter((p) => p.series === post.series).length}`));
+    right.appendChild(el("span", "site-nav-where", `${post.series} · ${post.part} of ${POSTS.filter((p) => p.series === post.series).length}`));
     arrow(next, "→", "Next");
   }
 
