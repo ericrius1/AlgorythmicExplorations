@@ -121,7 +121,7 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
   let world = clip / RP.viewScale;
 
   let f = textureSampleLevel(fieldTex, linSamp, in.uv, 0.0);
-  var cover = smoothstep(RP.threshold - 0.12, RP.threshold + 0.12, f.x);
+  var cover = smoothstep(RP.threshold - 0.09, RP.threshold + 0.07, f.x);
   if (RP.lampOn > 0.5) {
     // the splat kernel reaches past particle centres; trim the wax surface
     // at the glass so blobs press against it instead of bulging through

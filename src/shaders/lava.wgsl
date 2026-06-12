@@ -160,15 +160,15 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   let heatZone = LP.heaterY - LP.floorY;
   if (p.pv.y < LP.heaterY) {
     let f = 1.0 - (p.pv.y - LP.floorY) / max(heatZone, 1e-4);
-    let cx = p.pv.x / (LP.wallBottom * 0.45);
+    let cx = p.pv.x / (LP.wallBottom * 0.35);
     let centre = max(1.0 - cx * cx, 0.0);
     t += LP.heatRate * LP.dt * clamp(f, 0.0, 1.0) * centre;
   }
-  // radiative loss: mild everywhere so blobs keep their heat while rising,
+  // radiative loss: almost nothing mid-flight so blobs ride the full height,
   // then a hard chill concentrated in the throat so they stall and sink
-  let topF = smoothstep(LP.topY - 0.3, LP.topY, p.pv.y);
+  let topF = smoothstep(LP.topY - 0.28, LP.topY, p.pv.y);
   let wallF = smoothstep(hw - 0.08, hw, abs(p.pv.x));
-  t -= LP.coolRate * LP.dt * t * (0.45 + 4.0 * topF + 0.5 * wallF);
+  t -= LP.coolRate * LP.dt * t * (0.35 + 5.0 * topF + 0.4 * wallF);
   t = clamp(t, 0.0, 1.15);
 
   var vel = (p.pv.zw + acc * LP.dt) * 0.9996;

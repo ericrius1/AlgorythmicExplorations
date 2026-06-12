@@ -98,7 +98,7 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   const writeRP = (): void => {
     const f = new Float32Array([
       viewScale[0], viewScale[1], rc.width, rc.height,
-      H * 5.2, 0.8, time, glow,
+      H * 6.2, 1.1, time, glow,
       LAMP.wallBottom, LAMP.wallTop, LAMP.floorY, LAMP.topY,
       LAMP.heaterY, H * 0.7, 1, 0,
     ]);

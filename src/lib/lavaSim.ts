@@ -33,15 +33,15 @@ export interface LavaKnobs {
 
 export const DEFAULT_KNOBS: LavaKnobs = {
   gravity: 3.0,
-  stiffness: 60.0,
+  stiffness: 80.0,
   restDensity: 2.4,
   nearStiffness: 260.0,
-  xsph: 0.15,
-  beta: 0.3,
-  buoyancy: 5.2,
-  heatRate: 1.1,
-  coolRate: 0.8,
-  diffusion: 0.015,
+  xsph: 0.22,
+  beta: 0.2,
+  buoyancy: 5.0,
+  heatRate: 1.5,
+  coolRate: 1.1,
+  diffusion: 0.02,
 };
 
 export function vesselHalfWidth(y: number): number {
