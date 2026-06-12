@@ -2,7 +2,7 @@
 
 [Source on GitHub](https://github.com/ericrius1/AlgorythmicExplorations)
 
-Three interactive series of articles with live WebGPU demos.
+Three interactive series of articles with live WebGPU demos. 
 
 **Particle Worlds** — a six-part series that builds particle simulators step by step,
 one data structure per article. Part one (`index.html`) goes from two falling

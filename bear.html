@@ -50,7 +50,7 @@
         then a file format, then a loader. This article takes the other road,
         the one this site always takes: <em>state the thing as math and let the
         computer build it</em>. The entire bear — body, limbs, ears, the
-        slightly self-satisfied belly — is twenty-five capsules and one smooth
+        slightly self-satisfied belly — is twenty-four capsules and one smooth
         operator.
       </p>
 
@@ -66,7 +66,7 @@
         That is also, not coincidentally, the definition of a <em>bone</em>.
       </p>
       <p>
-        So the bear's single source of truth is a table of twenty-five rows:
+        So the bear's single source of truth is a table of twenty-four rows:
         name, parent, head point, tail point, radius at each end. Drag the
         slider and the kit comes apart.
       </p>
@@ -123,7 +123,7 @@
       </p>
       <div data-demo="smin"></div>
       <p>
-        The bear is this, twenty-five times: fold every capsule in with its own
+        The bear is this, twenty-four times: fold every capsule in with its own
         blend width <code>k</code>. Big k where masses merge (thigh into hip,
         belly into everything — the belly blends at k = 0.12, the most generous
         handshake in the table, which is why the bear looks well-fed rather
@@ -208,17 +208,21 @@
         WebGPU (or GLSL, if a browser must). The bear's coat is built from
         whatever the geometry already knows:
       </p>
-      <pre><code>const zone  = attribute("zone");                  <span class="cm">// baked at march time: body, belly, muzzle…</span>
-const base  = palette.element(int(zone));         <span class="cm">// per-zone color, swappable live</span>
+      <pre><code>const base  = vertexColor();                      <span class="cm">// zone color, baked at march time</span>
 const grain = mx_noise_float(positionGeometry.mul(scale))  <span class="cm">// rest-pose noise: fur glued to the skin</span>
             .add(mx_noise_float(positionGeometry.mul(scale * 3.13)).mul(0.4));
 material.colorNode = base.mul(grain.mul(strength).add(1));
 material.sheenNode = base.mul(0.5);               <span class="cm">// fuzzy backlit edges — fur's tell</span></code></pre>
       <p>
-        Every vertex was stamped at march time with the capsule that owns it,
-        so the muzzle, belly, paws and ears each get a palette slot — switch
-        the whole animal from cinnamon to panda with four color writes and zero
-        rebuilds. The noise is sampled in <em>rest-pose</em> coordinates
+        Every vertex was stamped at march time with the capsule that owns it —
+        muzzle, belly, paws, ears — and that zone id is baked down to a vertex
+        color, so switching the whole animal from cinnamon to panda is one
+        buffer rewrite, no re-march. (The first draft sent the zone <em>index</em>
+        to the shader and looked the color up there — and learned why you
+        don't: the GPU interpolates attributes across each triangle, and an
+        interpolated index sweeps through every palette slot in between,
+        drawing rainbow stripes along every border. Indices don't interpolate;
+        colors do.) The noise is sampled in <em>rest-pose</em> coordinates
         (<code>positionGeometry</code>), which matters in two articles: when the
         bear bends, the grain must bend with the skin, not swim through it.
         The glossy eyes and nose are confessed cheats — three little spheres
