@@ -11,7 +11,7 @@ import { Shell, type Demo } from "../lib/demoShell";
 import { createStage3D } from "../lib/stage3d";
 import { FLAP_DEFAULTS } from "../lib/bird/wing";
 import { stepFlight, flightQuaternion, trimSpeed, FLIGHT_DEFAULTS, type FlightState } from "../lib/bird/flight";
-import { LandingController, inboundState, type PerchTarget } from "../lib/bird/landing";
+import { LandingController, inboundState, legExtendForLanding, type PerchTarget } from "../lib/bird/landing";
 import { Syrinx, generatePhrase } from "../lib/bird/syrinx";
 import { waveform, audioOn } from "../lib/audio";
 import { makeEagle, orientEagle, type Eagle } from "./birdLanding";
@@ -122,11 +122,17 @@ function makePilot(world: World): Pilot {
 
 // pose the wings for a flight condition: flap hard when powered, glide when
 // coasting, fold when slow/perched
-function poseFlying(eagle: Eagle, state: FlightState, phase: number, perched: number): void {
+function poseFlying(eagle: Eagle, state: FlightState, phase: number, perched: number, legExtend = 0): void {
   const speed = state.vel.length();
   const spread = THREE.MathUtils.clamp(0.55 + speed * 0.03, 0.45, 1) * (1 - perched) + 0.1 * perched;
   const flap = state.flapEffort * (1 - perched);
-  eagle.pose({ phase, spread, flap, tailFan: 0.5 * (1 - perched) + 0.2 * perched, beak: 0, theta: phase * Math.PI * 2 });
+  eagle.pose({
+    phase, spread, flap,
+    tailFan: 0.5 * (1 - perched) + 0.2 * perched,
+    beak: 0, theta: phase * Math.PI * 2,
+    legExtend: perched > 0 ? 1 : legExtend,
+    legCrouch: perched,
+  });
 }
 
 // third-person chase camera
@@ -233,9 +239,10 @@ class AIBrain {
 class Keys {
   private down = new Set<string>();
   hovered = false;
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, opts: { alwaysActive?: boolean } = {}) {
+    if (opts.alwaysActive) this.hovered = true;
     canvas.addEventListener("pointerenter", () => (this.hovered = true));
-    canvas.addEventListener("pointerleave", () => (this.hovered = false));
+    canvas.addEventListener("pointerleave", () => { if (!opts.alwaysActive) this.hovered = false; });
     window.addEventListener("keydown", (e) => {
       if (!this.hovered) return;
       this.down.add(e.key.toLowerCase());
@@ -247,7 +254,7 @@ class Keys {
 }
 
 function flyByKeys(state: FlightState, keys: Keys, dt: number): void {
-  const bankTarget = keys.has("a", "arrowleft") ? 0.7 : keys.has("d", "arrowright") ? -0.7 : 0;
+  const bankTarget = keys.has("a", "arrowleft") ? -0.7 : keys.has("d", "arrowright") ? 0.7 : 0;
   state.bank += (bankTarget - state.bank) * Math.min(1, dt * 4);
   const pitchTarget = keys.has("w", "arrowup") ? -0.04 : keys.has("s", "arrowdown") ? 0.18 : 0.08;
   state.pitchCmd += (pitchTarget - state.pitchCmd) * Math.min(1, dt * 4);
@@ -341,15 +348,17 @@ export async function mountSandbox(container: HTMLElement, opts: { hero?: boolea
   const pilot = makePilot(world);
   stage.scene.add(pilot.eagle.group);
   const brain = new AIBrain(pilot, world);
-  const keys = new Keys(shell.canvas);
+  const keys = new Keys(shell.canvas, { alwaysActive: !!opts.hero });
 
-  let ai = true;
+  let ai = !opts.hero;
   if (!opts.hero) {
     shell.button("AI flies", function (this: HTMLButtonElement) {
       ai = !ai;
       this.textContent = ai ? "AI flies" : "you fly";
     });
     shell.setInfo(() => ai ? `autopilot · ${brain.mode} · ${world.perches.length} perches` : (keys.hovered ? "A/D steer · W/S climb-dive · Space flap" : "hover to take the controls"));
+  } else {
+    shell.setInfo(() => "A/D steer · W/S climb-dive · Space flap");
   }
 
   const look = new THREE.Vector3().copy(pilot.state.pos);
@@ -372,11 +381,12 @@ export async function mountSandbox(container: HTMLElement, opts: { hero?: boolea
         if (brain.mode === "perched" && brain.ctrl) {
           orientEagle(pilot.eagle.group, pilot.state, brain.target, perched);
           const breath = Math.sin(t * 2.4) * 0.35;
-          pilot.eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak: brain.beak, theta: breath });
+          pilot.eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak: brain.beak, theta: breath, legExtend: 1, legCrouch: perched });
           pilot.eagle.rig.bone("head").rotation.x = -brain.beak * 0.5;
         } else {
           flightQuaternion(pilot.state, pilot.eagle.group.quaternion);
-          poseFlying(pilot.eagle, pilot.state, pilot.phase, perched);
+          const legExtend = brain.ctrl ? legExtendForLanding(brain.ctrl.phase, brain.ctrl.distance) : 0;
+          poseFlying(pilot.eagle, pilot.state, pilot.phase, perched, legExtend);
         }
       } else {
         flyByKeys(pilot.state, keys, dt);

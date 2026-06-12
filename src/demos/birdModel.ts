@@ -321,7 +321,7 @@ export async function mountBirdFull(container: HTMLElement, opts: { hero?: boole
     frame() {
       const t = performance.now() / 1000;
       const breath = Math.sin(t * Math.PI * 2 * 0.4) * 0.4;
-      eagle.pose({ phase: 0, spread, flap: 0, tailFan, beak: 0, theta: breath });
+      eagle.pose({ phase: 0, spread, flap: 0, tailFan, beak: 0, theta: breath, legExtend: 1 });
       // idle: slow head scan so she reads alive even at rest
       eagle.rig.bone("head").rotation.y = Math.sin(t * 0.5) * 0.35;
       stage.render();

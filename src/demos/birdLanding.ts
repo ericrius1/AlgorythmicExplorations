@@ -10,7 +10,7 @@ import { createStage3D } from "../lib/stage3d";
 import { createEagle, type Eagle } from "../lib/bird/bird";
 import { FLAP_DEFAULTS } from "../lib/bird/wing";
 import { flightQuaternion, FLIGHT_DEFAULTS, type FlightState } from "../lib/bird/flight";
-import { LandingController, inboundState, type PerchTarget, type LandingPhase } from "../lib/bird/landing";
+import { LandingController, inboundState, legExtendForLanding, type PerchTarget, type LandingPhase } from "../lib/bird/landing";
 import { Syrinx, generatePhrase } from "../lib/bird/syrinx";
 import { waveform, audioOn, soundHint } from "../lib/audio";
 import { growTree, buildTreeGeometry, findPerches, TREE_DEFAULTS, type Perch } from "../lib/terrain/trees";
@@ -138,7 +138,12 @@ export async function mountApproach(container: HTMLElement): Promise<Demo> {
       const tailFan = ctrl.phase === "flare" ? 1 : ctrl.phase === "perched" ? 0.2 : 0.5;
       phase = (phase + dt * FLAP_DEFAULTS.rate * (0.3 + flapping)) % 1;
       // the flare reads best with everything thrown wide: splay hard
-      eagle.pose({ phase, spread, flap: flapping, tailFan, beak: 0, theta: phase * Math.PI * 2, splay: ctrl.phase === "flare" ? 1 : 0 });
+      eagle.pose({
+        phase, spread, flap: flapping, tailFan, beak: 0, theta: phase * Math.PI * 2,
+        splay: ctrl.phase === "flare" ? 1 : 0,
+        legExtend: legExtendForLanding(ctrl.phase, ctrl.distance),
+        legCrouch: ctrl.phase === "perched" ? ctrl.perchProgress : 0,
+      });
 
       if (ctrl.phase !== "perched") {
         pushTrail(s.pos);
@@ -277,7 +282,7 @@ export async function mountSong(container: HTMLElement): Promise<Demo> {
       if (t > phraseEnds) { singing = false; if (auto && t > phraseEnds + 0.8) sing(); }
 
       const breath = Math.sin(t * 2.4) * 0.4;
-      eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak, theta: breath });
+      eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak, theta: breath, legExtend: 1, legCrouch: 1 });
       // the head goes back as the scream leaves — the classic throw
       eagle.rig.bone("head").rotation.x = -beak * 0.5;
       stage.render();
@@ -369,7 +374,10 @@ export async function mountLandingAct(container: HTMLElement, opts: { hero?: boo
         const spread = ctrl.phase === "flare" ? 1 : 0.9;
         const tailFan = ctrl.phase === "flare" ? 1 : 0.5;
         phase = (phase + dt * FLAP_DEFAULTS.rate * (0.3 + flapping)) % 1;
-        eagle.pose({ phase, spread, flap: flapping, tailFan, beak: 0, theta: phase * Math.PI * 2 });
+        eagle.pose({
+          phase, spread, flap: flapping, tailFan, beak: 0, theta: phase * Math.PI * 2,
+          legExtend: legExtendForLanding(ctrl.phase, ctrl.distance),
+        });
         if (ctrl.phase === "perched") {
           mode = "perched";
           perchedUntil = t + 3.5 + Math.random() * 2;
@@ -387,7 +395,7 @@ export async function mountLandingAct(container: HTMLElement, opts: { hero?: boo
         beak += (tgt - beak) * Math.min(1, dt * 18);
         const breath = Math.sin(t * 2.4) * 0.35;
         orientEagle(eagle.group, ctrl.state, target, 1);
-        eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak, theta: breath });
+        eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak, theta: breath, legExtend: 1, legCrouch: 1 });
         eagle.rig.bone("head").rotation.x = -beak * 0.5;
         if (t > perchedUntil && (t > singEnds || !audioOn())) {
           // take off toward the next perch

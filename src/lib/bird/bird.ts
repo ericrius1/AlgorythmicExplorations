@@ -29,7 +29,25 @@ export interface EaglePoseOpts {
   theta?: number; // stroke angle override (breath, when not flapping)
   splay?: number; // extra finger spread (a flare), on top of the stroke's own
   slot?: number; // extra primary venting, on top of the stroke's own
+  legExtend?: number; // 0 tucked under the tail in flight .. 1 dropped for landing
+  legCrouch?: number; // 0..1 grip fold when perched (on top of extend)
   fp?: FlapParams;
+}
+
+// Eagles fly with legs tucked; they drop only on final approach. `extend`
+// lerps from the tucked pose to the rest hang; `crouch` folds for a perch.
+function applyLegPose(rig: BirdRig, extend: number, crouch = 0): void {
+  const e = THREE.MathUtils.clamp(extend, 0, 1);
+  const c = THREE.MathUtils.clamp(crouch, 0, 1);
+  const tuckThighX = -62;
+  const tuckThighZL = -7;
+  const tuckTarsusX = 88;
+  const thighX = tuckThighX * (1 - e) + 30 * c;
+  const tarsusX = tuckTarsusX * (1 - e) - 36 * c;
+  rig.setEulerDeg("thighL", thighX, 0, tuckThighZL * (1 - e));
+  rig.setEulerDeg("thighR", thighX, 0, -tuckThighZL * (1 - e));
+  rig.setEulerDeg("tarsusL", tarsusX, 0, 0);
+  rig.setEulerDeg("tarsusR", tarsusX, 0, 0);
 }
 
 export interface Eagle {
@@ -110,6 +128,7 @@ export function createEagle(opts: { material?: THREE.Material; bulk?: number } =
 
     setTail(rig, -6 + 6 * Math.cos(theta) * (0.3 + 0.7 * flap), 0);
     rig.bone("beak").rotation.set(o.beak * 0.6, 0, 0);
+    applyLegPose(rig, o.legExtend ?? 0, o.legCrouch ?? 0);
 
     // feathers last: they read the bones the IK just wrote
     coatPoseFromFlap(sample, o.spread, o.tailFan, flap, coatPose);

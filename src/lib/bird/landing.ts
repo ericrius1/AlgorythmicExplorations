@@ -33,6 +33,15 @@ export interface LandingTuning {
 
 // Distances sized for an eagle arriving near 13 m/s — everything roughly 2.5×
 // the songbird numbers this controller was first tuned on.
+// Legs stay tucked until final approach; ramp extend through approach and flare.
+export function legExtendForLanding(phase: LandingPhase, dist: number, tuning: LandingTuning = LANDING_TUNING): number {
+  if (phase === "cruise") return 0;
+  if (phase === "flare" || phase === "perched") return 1;
+  const span = tuning.approachDist - tuning.flareDist;
+  if (span < 1e-3) return 1;
+  return THREE.MathUtils.clamp(1 - (dist - tuning.flareDist) / span, 0, 0.9);
+}
+
 export const LANDING_TUNING: LandingTuning = {
   approachDist: 30,
   // the flare capture radius must exceed the bird's minimum turn radius, or
