@@ -154,14 +154,17 @@ function wingSlots(side: "L" | "R"): FeatherSlot[] {
       color: dark(0.16 + 0.05 * hash(i * 3 + (side === "L" ? 0 : 50))),
     });
   }
-  // secondaries: a dozen along the forearm, all trailing back toward the body
+  // secondaries: a dozen along the forearm, all trailing back toward the
+  // body. The folded forearm points FORWARD, so a folded secondary sits at
+  // nearly π from its bone — feathers rotate hugely at the base during the
+  // fold, far more than the bones do.
   for (let i = 0; i < 12; i++) {
     const u = i / 11; // 0 at the wrist end, 1 at the elbow end
     slots.push({
       cls: "secondary",
       bone: "forearm" + side,
       t: 0.92 - u * 0.80,
-      fanFolded: 0.10 + u * 0.05,
+      fanFolded: 2.82 - u * 0.16,
       fanSpread: 1.62 - u * 0.30,
       len: 0.285 - u * 0.035,
       width: 0.082,
@@ -173,6 +176,26 @@ function wingSlots(side: "L" | "R"): FeatherSlot[] {
       color: dark(0.17 + 0.05 * hash(i * 7 + 11 + (side === "L" ? 0 : 50))),
     });
   }
+  // tertials: three long innermost feathers off the humerus, closing the gap
+  // between the secondaries and the back
+  for (let i = 0; i < 3; i++) {
+    const u = i / 2;
+    slots.push({
+      cls: "secondary",
+      bone: "humerus" + side,
+      t: 0.35 + u * 0.3,
+      fanFolded: 0.18 + u * 0.08,
+      fanSpread: 1.15 - u * 0.18,
+      len: 0.26 - u * 0.03,
+      width: 0.08,
+      cant: 0.14,
+      lift: 0.004 + 0.003 * i,
+      splayW: 0,
+      lagW: 0.1,
+      slotW: 0,
+      color: dark(0.19 + 0.04 * hash(i * 5 + 77 + (side === "L" ? 0 : 50))),
+    });
+  }
   // greater coverts shingled over the secondary bases, median row above them
   for (let i = 0; i < 11; i++) {
     const u = i / 10;
@@ -180,7 +203,7 @@ function wingSlots(side: "L" | "R"): FeatherSlot[] {
       cls: "covert",
       bone: "forearm" + side,
       t: 0.92 - u * 0.80,
-      fanFolded: 0.12 + u * 0.05,
+      fanFolded: 2.76 - u * 0.14,
       fanSpread: 1.55 - u * 0.28,
       len: 0.145,
       width: 0.062,
@@ -198,7 +221,7 @@ function wingSlots(side: "L" | "R"): FeatherSlot[] {
       cls: "covert",
       bone: "forearm" + side,
       t: 0.88 - u * 0.72,
-      fanFolded: 0.14 + u * 0.05,
+      fanFolded: 2.70 - u * 0.12,
       fanSpread: 1.42 - u * 0.24,
       len: 0.095,
       width: 0.052,
@@ -339,15 +362,18 @@ export class FeatherCoat {
   private shaftScaled = new THREE.Vector3();
   private pos = new THREE.Vector3();
 
-  constructor(material?: THREE.Material) {
-    const mat =
-      material ??
-      new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.8,
-        side: THREE.DoubleSide,
-        flatShading: true,
-      });
+  constructor() {
+    // one material per class: the class carries the base color (near-black
+    // flight feathers, brown coverts, white rectrices), the geometry's vertex
+    // colors carry the pale-rachis/dark-edge shading on top
+    const CLASS_COLORS: Record<FeatherClass, number> = {
+      primary: 0x312419,
+      secondary: 0x37281b,
+      covert: 0x55402a,
+      alula: 0x2c2117,
+      scapular: 0x4c3823,
+      rectrix: 0xf3eedf,
+    };
 
     const slots = allFeatherSlots();
     for (const cls of FEATHER_CLASSES) {
@@ -367,10 +393,15 @@ export class FeatherCoat {
         const anchorLocal = span.clone().multiplyScalar(len * s.t);
         return { ...s, anchorLocal, span, normal, boneIdx: BONE_INDEX.get(s.bone)! };
       });
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        color: new THREE.Color().setHex(CLASS_COLORS[cls], THREE.SRGBColorSpace),
+        roughness: 0.8,
+        side: THREE.DoubleSide,
+        flatShading: true,
+      });
       const mesh = new THREE.InstancedMesh(makeFeatherGeometry(SHAPES[cls]), mat, runtime.length);
       mesh.frustumCulled = false;
-      for (let i = 0; i < runtime.length; i++) mesh.setColorAt(i, runtime[i].color);
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       this.group.add(mesh);
       this.byClass.set(cls, { mesh, slots: runtime });
     }

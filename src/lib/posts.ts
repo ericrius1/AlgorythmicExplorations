@@ -26,7 +26,7 @@ export const SERIES_TAGLINES: Record<string, string> = {
   "Waking Bodies":
     "A procedural bear modeled from triangles, rigged by distance, and animated with inverse kinematics and springs.",
   "Feather & Bone":
-    "A low-poly bird modeled from capsules, rigged, animated, and flown with a simple aerodynamic model.",
+    "A bald eagle lofted ring by ring, feathered quill by quill, rigged, animated, and flown with a real aerodynamic model.",
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
 };
@@ -201,46 +201,46 @@ export const POSTS: Post[] = [
     subtitle: "Poses as targets, springs as blends, and layered procedural motion",
   },
   {
-    href: "/wren.html",
+    href: "/eagle.html",
     series: "Feather & Bone",
     part: 1,
-    title: "The Wren",
-    subtitle: "A songbird modeled from capsules with smooth unions and surface nets",
+    title: "The Eagle",
+    subtitle: "A bald eagle lofted from rings of vertices, with every flight feather its own mesh",
   },
   {
     href: "/bones.html",
     series: "Feather & Bone",
     part: 2,
     title: "The Bones",
-    subtitle: "Seventeen joints, proximity-based skin weights, and procedural idle motion",
+    subtitle: "Seventeen joints, proximity-based skin weights, pinned beaks and talons, and idle motion",
   },
   {
     href: "/wingbeat.html",
     series: "Feather & Bone",
     part: 3,
     title: "The Wingbeat",
-    subtitle: "The law of cosines unfolds the wing; an asymmetric clock drives the wingbeat",
+    subtitle: "The law of cosines unfolds the wing; slots, splay, and lag make the feathers fly it",
   },
   {
     href: "/flight.html",
     series: "Feather & Bone",
     part: 4,
     title: "Flight",
-    subtitle: "Lift, drag, weight, and flap thrust integrated every frame",
+    subtitle: "Lift, drag, weight, and flap thrust integrated every frame — at eagle weight and speed",
   },
   {
     href: "/landing.html",
     series: "Feather & Bone",
     part: 5,
     title: "The Landing",
-    subtitle: "Guidance laws, a landing flare, procedural perches, and a two-voiced syrinx",
+    subtitle: "Guidance laws, a landing flare, procedural boughs, and a two-voiced scream",
   },
   {
     href: "/sky.html",
     series: "Feather & Bone",
     part: 6,
     title: "The Sky",
-    subtitle: "The simulated wren and streamed terrain combined in one manual or autopilot demo",
+    subtitle: "The simulated eagle and the grown terrain combined in one manual or autopilot demo",
   },
   {
     href: "/heightfield.html",

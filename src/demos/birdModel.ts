@@ -11,7 +11,6 @@ import {
   loftRings,
   buildLoftGeometry,
   buildEagleBody,
-  addFace,
   ZONE_COLORS,
   type Loft,
 } from "../lib/bird/body";

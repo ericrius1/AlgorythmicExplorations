@@ -33,7 +33,7 @@ export default defineConfig({
         rig: fileURLToPath(new URL("rig.html", import.meta.url)),
         reach: fileURLToPath(new URL("reach.html", import.meta.url)),
         qigong: fileURLToPath(new URL("qigong.html", import.meta.url)),
-        wren: fileURLToPath(new URL("wren.html", import.meta.url)),
+        eagle: fileURLToPath(new URL("eagle.html", import.meta.url)),
         bones: fileURLToPath(new URL("bones.html", import.meta.url)),
         wingbeat: fileURLToPath(new URL("wingbeat.html", import.meta.url)),
         flight: fileURLToPath(new URL("flight.html", import.meta.url)),

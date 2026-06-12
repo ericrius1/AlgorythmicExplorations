@@ -1,10 +1,10 @@
 // The finale of both series. Everything built across eleven articles, in one
-// place: a wren modeled from a function, rigged by distances, flapped by
-// inverse kinematics, flown by forces, and landed by guidance — loose over a
-// world of mountains the sister series raised from noise, with trees it grew
-// by space colonization standing as the bird's landing targets. You can fly
-// her, or let the autopilot. This is where Feather & Bone and Ground Truth
-// stop being two series and become one demo.
+// place: an eagle lofted from rings, feathered quill by quill, rigged by
+// distances, flapped by inverse kinematics, flown by forces, and landed by
+// guidance — loose over a world of mountains the sister series raised from
+// noise, with trees it grew by space colonization standing as the bird's
+// landing targets. You can fly her, or let the autopilot. This is where
+// Feather & Bone and Ground Truth stop being two series and become one demo.
 
 import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../lib/demoShell";
@@ -14,7 +14,7 @@ import { stepFlight, flightQuaternion, trimSpeed, FLIGHT_DEFAULTS, type FlightSt
 import { LandingController, inboundState, type PerchTarget } from "../lib/bird/landing";
 import { Syrinx, generatePhrase } from "../lib/bird/syrinx";
 import { waveform, audioOn } from "../lib/audio";
-import { makeWren, orientWren, type Wren } from "./birdLanding";
+import { makeEagle, orientEagle, type Eagle } from "./birdLanding";
 import { terrainHeight, buildTerrainGeometry, TERRAIN_DEFAULTS, type TerrainParams } from "../lib/terrain/heightmap";
 import { growTree, buildTreeGeometry, findPerches, TREE_DEFAULTS, type Perch } from "../lib/terrain/trees";
 
@@ -28,45 +28,47 @@ interface World {
   size: number;
 }
 
-function buildWorld(seed = 7, size = 80): World {
-  const params: TerrainParams = { ...TERRAIN_DEFAULTS, seed, amplitude: 5.5, frequency: 0.05 };
+// Eagle country: the same noise mountains as before, but the patch is nearly
+// three times wider and the relief three times taller — at 13 m/s the old
+// songbird-sized world went by in six seconds.
+function buildWorld(seed = 7, size = 220): World {
+  const params: TerrainParams = { ...TERRAIN_DEFAULTS, seed, amplitude: 16, frequency: 0.019 };
   const group = new THREE.Group();
 
-  const terr = buildTerrainGeometry(params, { size, segments: 140 });
+  const terr = buildTerrainGeometry(params, { size, segments: 170 });
   const ground = new THREE.Mesh(terr.geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
   group.add(ground);
 
   const height = (x: number, z: number): number => terrainHeight(x, z, params);
 
-  // scatter trees on the gentler, lower ground — where a forest would actually
-  // grow — and collect their perches into world space
+  // scatter big trees on the gentler, lower ground and collect their perches
   const perches: PerchTarget[] = [];
   const bark = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
   const leaf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
   const hash = (n: number): number => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
   let placed = 0;
-  for (let i = 0; placed < 9 && i < 70; i++) {
+  for (let i = 0; placed < 12 && i < 90; i++) {
     const x = (hash(i * 3 + 1) - 0.5) * size * 0.8;
     const z = (hash(i * 3 + 2) - 0.5) * size * 0.8;
     const h = height(x, z);
     if (h > params.amplitude * 0.62) continue; // no trees on the snowy peaks
     // local slope: too steep, no tree
-    const e = 0.6;
+    const e = 1.6;
     const slope = Math.abs(height(x + e, z) - height(x - e, z)) + Math.abs(height(x, z + e) - height(x, z - e));
-    if (slope > 1.6) continue;
+    if (slope > 4.2) continue;
 
-    const skel = growTree({ ...TREE_DEFAULTS, seed: 100 + i, attractors: 150, trunkHeight: 1.2 + hash(i) * 0.8 });
+    const skel = growTree({ ...TREE_DEFAULTS, seed: 100 + i, attractors: 170, trunkHeight: 1.4 + hash(i) * 0.8 });
     const tb = buildTreeGeometry(skel);
     const tree = new THREE.Group();
     tree.add(new THREE.Mesh(tb.bark, bark), new THREE.Mesh(tb.leaves, leaf));
     tree.position.set(x, h, z);
-    const treeScale = 0.8 + hash(i * 7) * 0.5;
+    const treeScale = 2.6 + hash(i * 7) * 1.6; // eagle-sized timber
     tree.scale.setScalar(treeScale);
     group.add(tree);
 
-    // hoist this tree's perches into world space (only the better ones)
-    const local: Perch[] = findPerches(skel, { minRadius: 0.02, maxRadius: 0.06, minHeadroom: 0.26 })
-      .filter((pc) => pc.position.y > 1.3)
+    // hoist this tree's perches into world space (only the stouter boughs)
+    const local: Perch[] = findPerches(skel, { minRadius: 0.016, maxRadius: 0.07, minHeadroom: 0.24 })
+      .filter((pc) => pc.position.y * treeScale > 3.4)
       .slice(0, 4);
     for (const pc of local) {
       perches.push({
@@ -77,13 +79,13 @@ function buildWorld(seed = 7, size = 80): World {
     placed++;
   }
   // a guaranteed fallback perch so guidance always has a target
-  if (!perches.length) perches.push({ position: new THREE.Vector3(0, height(0, 0) + 2, 0), tangent: new THREE.Vector3(1, 0, 0) });
+  if (!perches.length) perches.push({ position: new THREE.Vector3(0, height(0, 0) + 6, 0), tangent: new THREE.Vector3(1, 0, 0) });
 
   return { group, params, height, perches, size };
 }
 
-// keep the wren above the ground; return true if she touched
-function clampToGround(s: FlightState, world: World, clearance = 0.25): boolean {
+// keep the eagle above the ground; return true if she touched
+function clampToGround(s: FlightState, world: World, clearance = 0.6): boolean {
   const g = world.height(s.pos.x, s.pos.z) + clearance;
   if (s.pos.y < g) {
     s.pos.y = g;
@@ -102,36 +104,36 @@ function clampToBounds(s: FlightState, world: World): void {
   }
 }
 
-// ---- shared flight body: wren + state + wing/camera plumbing ------------------------
+// ---- shared flight body: eagle + state + wing/camera plumbing ------------------------
 
 interface Pilot {
-  wren: Wren;
+  eagle: Eagle;
   state: FlightState;
   phase: number;
   syrinx: Syrinx;
 }
 
 function makePilot(world: World): Pilot {
-  const wren = makeWren();
+  const eagle = makeEagle();
   const p = { ...FLIGHT_DEFAULTS };
-  const state = inboundState(new THREE.Vector3(0, world.height(0, 0) + 8, -world.size * 0.3), new THREE.Vector3(0, 6, 0), p);
-  return { wren, state, phase: 0, syrinx: new Syrinx() };
+  const state = inboundState(new THREE.Vector3(0, world.height(0, 0) + 24, -world.size * 0.3), new THREE.Vector3(0, 18, 0), p);
+  return { eagle, state, phase: 0, syrinx: new Syrinx() };
 }
 
 // pose the wings for a flight condition: flap hard when powered, glide when
 // coasting, fold when slow/perched
-function poseFlying(wren: Wren, state: FlightState, phase: number, perched: number): void {
+function poseFlying(eagle: Eagle, state: FlightState, phase: number, perched: number): void {
   const speed = state.vel.length();
-  const spread = THREE.MathUtils.clamp(0.5 + speed * 0.06, 0.4, 1) * (1 - perched) + 0.12 * perched;
+  const spread = THREE.MathUtils.clamp(0.55 + speed * 0.03, 0.45, 1) * (1 - perched) + 0.1 * perched;
   const flap = state.flapEffort * (1 - perched);
-  wren.pose({ phase, spread, flap, tailFan: 0.5 * (1 - perched) + 0.2 * perched, beak: 0, theta: phase * Math.PI * 2 });
+  eagle.pose({ phase, spread, flap, tailFan: 0.5 * (1 - perched) + 0.2 * perched, beak: 0, theta: phase * Math.PI * 2 });
 }
 
 // third-person chase camera
 const camPos = new THREE.Vector3();
 const heading = new THREE.Vector3();
 const up = new THREE.Vector3(0, 1, 0);
-function chase(stage: { camera: THREE.PerspectiveCamera }, state: FlightState, look: THREE.Vector3, dt: number, back = 3.4, lift = 1.2): void {
+function chase(stage: { camera: THREE.PerspectiveCamera }, state: FlightState, look: THREE.Vector3, dt: number, back = 7, lift = 2.4): void {
   heading.copy(state.vel).setY(0);
   if (heading.lengthSq() < 1e-4) heading.set(0, 0, 1);
   heading.normalize();
@@ -141,7 +143,7 @@ function chase(stage: { camera: THREE.PerspectiveCamera }, state: FlightState, l
   stage.camera.lookAt(look);
 }
 
-// ---- the AI brain: wander, pick a perch, land, sing, take off -----------------------
+// ---- the AI brain: wander, pick a perch, land, scream, take off ----------------------
 
 class AIBrain {
   mode: "wander" | "approach" | "perched" | "takeoff" = "wander";
@@ -169,13 +171,13 @@ class AIBrain {
     const s = this.pilot.state;
     if (this.mode === "wander") {
       // cruise and meander; after a spell of open-air flying, commit to a perch
-      if (this.commitAt < 0) this.commitAt = t + 5 + this.hash(this.seed++) * 5;
+      if (this.commitAt < 0) this.commitAt = t + 6 + this.hash(this.seed++) * 6;
       s.pitchCmd += (0.08 - s.pitchCmd) * 0.05 - s.vel.y * 0.03;
       s.flapEffort = 0.5;
       if (t > this.nextWander) { this.wanderBank = (this.hash(this.seed++) - 0.5) * 0.8; this.nextWander = t + 1.5 + this.hash(this.seed++) * 2.5; }
       s.bank += (this.wanderBank - s.bank) * 0.02;
       stepFlight(s, this.params, dt);
-      if (t > this.commitAt) { this.target = this.pick(); this.ctrl = new LandingController(s, this.target, this.params); this.mode = "approach"; this.approachUntil = t + 14; }
+      if (t > this.commitAt) { this.target = this.pick(); this.ctrl = new LandingController(s, this.target, this.params); this.mode = "approach"; this.approachUntil = t + 22; }
       return { perched: 0 };
     }
     if (this.mode === "approach") {
@@ -202,7 +204,7 @@ class AIBrain {
       this.beak += (tgt - this.beak) * Math.min(1, dt * 18);
       if (t > this.perchedUntil && (t > this.singEnds || !audioOn())) {
         // launch toward open air
-        s.vel.set((this.hash(this.seed++) - 0.5) * 2, 1.5, (this.hash(this.seed++) - 0.5) * 2);
+        s.vel.set((this.hash(this.seed++) - 0.5) * 4, 3, (this.hash(this.seed++) - 0.5) * 4);
         s.flapEffort = 1;
         this.mode = "takeoff";
         this.commitAt = -1; // re-armed on the next wander
@@ -257,26 +259,26 @@ function flyByKeys(state: FlightState, keys: Keys, dt: number): void {
 
 export async function mountWorld(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const world = buildWorld(7, 80);
+  const world = buildWorld(7, 220);
   const stage = await createStage3D(shell.canvas, {
     skyTop: [0.05, 0.08, 0.14], skyBottom: [0.13, 0.15, 0.19],
-    target: [0, world.params.amplitude * 0.4, 0], distance: 46, azimuth: 0.7, elevation: 0.28,
-    far: 400, fog: { color: 0x1a1e26, near: 40, far: 150 },
+    target: [0, world.params.amplitude * 0.4, 0], distance: 130, azimuth: 0.7, elevation: 0.28,
+    far: 1100, fog: { color: 0x1a1e26, near: 110, far: 420 },
   });
   stage.scene.add(world.group);
   stage.orbit.maxElevation = 1.2;
-  stage.orbit.minDistance = 12;
-  stage.orbit.maxDistance = 80;
+  stage.orbit.minDistance = 30;
+  stage.orbit.maxDistance = 230;
 
   // mark the perches with faint motes so the landing targets are legible
-  const moteGeo = new THREE.SphereGeometry(0.05, 6, 5);
+  const moteGeo = new THREE.SphereGeometry(0.18, 6, 5);
   const moteMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.5 });
   const motes = new THREE.InstancedMesh(moteGeo, moteMat, world.perches.length);
   const m = new THREE.Matrix4();
   world.perches.forEach((pc, i) => { m.makeTranslation(pc.position.x, pc.position.y, pc.position.z); motes.setMatrixAt(i, m); });
   stage.scene.add(motes);
 
-  shell.setInfo(() => `${world.perches.length} perches on ${"this"} grown world — every one a place she can land`);
+  shell.setInfo(() => `${world.perches.length} perches on this grown world — every one a bough that can take her weight`);
   return {
     frame() { stage.render(); shell.tick(); },
     dispose: () => stage.dispose(),
@@ -287,15 +289,15 @@ export async function mountWorld(container: HTMLElement): Promise<Demo> {
 
 export async function mountPilot(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const world = buildWorld(11, 80);
+  const world = buildWorld(11, 220);
   const stage = await createStage3D(shell.canvas, {
     skyTop: [0.05, 0.08, 0.14], skyBottom: [0.13, 0.15, 0.19],
-    target: [0, 6, 0], distance: 4, azimuth: 0.6, elevation: 0.1, far: 400,
-    fog: { color: 0x1a1e26, near: 45, far: 160 },
+    target: [0, 18, 0], distance: 8, azimuth: 0.6, elevation: 0.1, far: 1100,
+    fog: { color: 0x1a1e26, near: 120, far: 460 },
   });
   stage.scene.add(world.group);
   const pilot = makePilot(world);
-  stage.scene.add(pilot.wren.group);
+  stage.scene.add(pilot.eagle.group);
   const keys = new Keys(shell.canvas);
   const look = new THREE.Vector3().copy(pilot.state.pos);
   let last = performance.now() / 1000;
@@ -313,9 +315,9 @@ export async function mountPilot(container: HTMLElement): Promise<Demo> {
       touched = clampToGround(pilot.state, world);
       clampToBounds(pilot.state, world);
       pilot.phase = (pilot.phase + dt * FLAP_DEFAULTS.rate * (0.4 + pilot.state.flapEffort)) % 1;
-      pilot.wren.group.position.copy(pilot.state.pos);
-      flightQuaternion(pilot.state, pilot.wren.group.quaternion);
-      poseFlying(pilot.wren, pilot.state, pilot.phase, touched ? 0.3 : 0);
+      pilot.eagle.group.position.copy(pilot.state.pos);
+      flightQuaternion(pilot.state, pilot.eagle.group.quaternion);
+      poseFlying(pilot.eagle, pilot.state, pilot.phase, touched ? 0.3 : 0);
       chase(stage, pilot.state, look, dt);
       stage.renderer.render(stage.scene, stage.camera);
       shell.tick();
@@ -328,16 +330,16 @@ export async function mountPilot(container: HTMLElement): Promise<Demo> {
 
 export async function mountSandbox(container: HTMLElement, opts: { hero?: boolean } = {}): Promise<Demo> {
   const shell = new Shell(container, opts.hero ? 0.5 : 0.62);
-  const world = buildWorld(opts.hero ? 5 : 7, 80);
+  const world = buildWorld(opts.hero ? 5 : 7, 220);
   const stage = await createStage3D(shell.canvas, {
     skyTop: [0.05, 0.08, 0.14], skyBottom: [0.13, 0.15, 0.2],
-    target: [0, 6, 0], distance: 5, azimuth: 0.6, elevation: 0.12, far: 400,
-    fog: { color: 0x1a1e26, near: 50, far: 180 },
+    target: [0, 18, 0], distance: 10, azimuth: 0.6, elevation: 0.12, far: 1100,
+    fog: { color: 0x1a1e26, near: 130, far: 500 },
   });
   stage.scene.add(world.group);
 
   const pilot = makePilot(world);
-  stage.scene.add(pilot.wren.group);
+  stage.scene.add(pilot.eagle.group);
   const brain = new AIBrain(pilot, world);
   const keys = new Keys(shell.canvas);
 
@@ -366,14 +368,15 @@ export async function mountSandbox(container: HTMLElement, opts: { hero?: boolea
         clampToGround(pilot.state, world);
         clampToBounds(pilot.state, world);
         pilot.phase = (pilot.phase + dt * FLAP_DEFAULTS.rate * (0.35 + pilot.state.flapEffort)) % 1;
-        pilot.wren.group.position.copy(pilot.state.pos);
+        pilot.eagle.group.position.copy(pilot.state.pos);
         if (brain.mode === "perched" && brain.ctrl) {
-          orientWren(pilot.wren.group, pilot.state, brain.target, perched);
-          const breath = Math.sin(t * 3) * 0.35;
-          pilot.wren.pose({ phase: 0, spread: 0.12, flap: 0, tailFan: 0.22, beak: brain.beak, theta: breath });
+          orientEagle(pilot.eagle.group, pilot.state, brain.target, perched);
+          const breath = Math.sin(t * 2.4) * 0.35;
+          pilot.eagle.pose({ phase: 0, spread: 0.1, flap: 0, tailFan: 0.22, beak: brain.beak, theta: breath });
+          pilot.eagle.rig.bone("head").rotation.x = -brain.beak * 0.5;
         } else {
-          flightQuaternion(pilot.state, pilot.wren.group.quaternion);
-          poseFlying(pilot.wren, pilot.state, pilot.phase, perched);
+          flightQuaternion(pilot.state, pilot.eagle.group.quaternion);
+          poseFlying(pilot.eagle, pilot.state, pilot.phase, perched);
         }
       } else {
         flyByKeys(pilot.state, keys, dt);
@@ -381,12 +384,12 @@ export async function mountSandbox(container: HTMLElement, opts: { hero?: boolea
         clampToGround(pilot.state, world);
         clampToBounds(pilot.state, world);
         pilot.phase = (pilot.phase + dt * FLAP_DEFAULTS.rate * (0.4 + pilot.state.flapEffort)) % 1;
-        pilot.wren.group.position.copy(pilot.state.pos);
-        flightQuaternion(pilot.state, pilot.wren.group.quaternion);
-        poseFlying(pilot.wren, pilot.state, pilot.phase, 0);
+        pilot.eagle.group.position.copy(pilot.state.pos);
+        flightQuaternion(pilot.state, pilot.eagle.group.quaternion);
+        poseFlying(pilot.eagle, pilot.state, pilot.phase, 0);
       }
 
-      chase(stage, pilot.state, look, dt, opts.hero ? 4.2 : 3.6, 1.3);
+      chase(stage, pilot.state, look, dt, opts.hero ? 8.5 : 7.2, 2.6);
       stage.renderer.render(stage.scene, stage.camera);
       if (!opts.hero) shell.tick();
     },
