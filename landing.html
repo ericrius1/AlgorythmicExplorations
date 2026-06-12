@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Landing — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The hardest thing a bird does: arriving. A guidance controller flies the flight physics onto a real tree's branch — approach, glide slope, the flare at the edge of the stall — and then she sings, with a two-voiced syrinx."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/landing.ts -->
+    <header class="hero">
+      <div data-demo="hero-landing"></div>
+      <div class="hero-title">
+        <h1>The Landing</h1>
+        <p class="subtitle">
+          Flying is the easy part. This article is about <em>stopping</em> —
+          arriving at one twig in a whole tree with no speed left, caught by a
+          flare at the edge of the stall — and then, perched, singing with a
+          voice box that has two throats. The wren above is landing on a tree
+          the sister series grew, over and over. Watch her pick her spot.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/flight.html">Part four</a> gave the wren an engine and a sky,
+        and an autopilot that could hold a cruise and wander through lazy
+        turns. But cruising is the easy regime — the forces are gentle, the
+        margins wide. This article tackles the regime where everything is
+        tight: the last few meters of an arrival, where she must hit a precise
+        point in space, pointed the right way, with her speed bled to almost
+        nothing — and do it by flying the same physics, not by snapping to a
+        pose. Then, having landed, she finally gets a voice.
+      </p>
+      <p>
+        And she lands on something real. The sister series,
+        <a href="/trees.html">Ground Truth</a>, finished growing its trees —
+        and those trees publish their branches as <em>perches</em>: a position,
+        a tangent along the twig, a radius, and the headroom above. Her landing
+        controller reads that list like a menu. This is the first place the two
+        series actually touch; in <a href="/horizon.html">part six</a> they
+        merge entirely.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why landing is the boss level</span>
+        <p>
+          A cruising bird that's off by a meter is still cruising. A landing
+          bird that's off by a meter is in a bush. Landing has no margin: the
+          target is a point, the acceptable speed is near zero, and the
+          approach is flown in the worst corner of the envelope — slow, where
+          lift is weakest and the stall is one twitch away. Every aircraft's
+          trickiest minutes are its last ones, and it's the same physics here.
+          We don't cheat it with a scripted arc; we build a guidance law that
+          flies the forces down to the branch.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The approach</span>Guidance, not a path</h2>
+      <p>
+        The controller never plans a trajectory. Each frame it looks at where
+        the perch is relative to where she is and issues three commands, each a
+        simple feedback law. <strong>Steering:</strong> measure the angle
+        between her heading and the direction to the perch, and bank in
+        proportion — she rolls toward the target and the part-four physics
+        curves her path there (banking turns, reused). <strong>Glide slope:</strong>
+        compare her sink rate to the gentle descent the approach wants, and
+        pitch to close the gap. <strong>Speed:</strong> schedule the throttle
+        by distance, easing off as she nears so she arrives slow.
+      </p>
+      <div data-demo="approach"></div>
+      <p>
+        Launch the approach and watch the phases in the readout: she lines up
+        in <em>cruise</em>, settles onto the dashed glide slope in
+        <em>approach</em>, and at the last moment enters <em>flare</em>. The
+        orange trail is the path the guidance laws actually flew — never drawn,
+        only fed back, frame after frame. Nothing tells her where to be; she's
+        told only where the branch is, and corrects her way onto it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The flare</span>The stall, used on purpose</h2>
+      <p>
+        Here is the trick that makes a landing soft, and it's the
+        angle-of-attack cliff from <a href="/flight.html">part four</a> turned
+        from hazard into tool. Approaching the branch, she pitches her wings
+        sharply nose-up — toward the stall. For an instant before the stall,
+        lift <em>spikes</em>: she's still moving, and the steep angle wrings
+        every last newton out of the air. That spike arrests her descent —
+        the cushion — while the drag of the steep wing kills her remaining
+        speed. A heartbeat later the wing stalls fully and lets go, but by
+        then she's at the branch with nothing left to give. Spike, cushion,
+        stall, stop.
+      </p>
+      <div data-demo="flare"></div>
+      <p>
+        This is the flare in slow motion, plotted: the blue speed line bleeding
+        toward zero, and the green sink-rate line — watch it lift toward level
+        right in the shaded flare zone, the cushion arresting her fall just
+        before touchdown. No part of those curves is keyframed. They're what
+        the force balance does when you point a slow wing steeply up at the
+        right moment, which is precisely what "flare" means to every pilot and
+        every bird.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: a controller is the seed of a brain</summary>
+        <div class="fold-body">
+          <p>
+            The three feedback laws here — bank from heading error, pitch from
+            sink-rate error, throttle from distance — are the simplest members
+            of a family that runs all the way up to animal intelligence. Each
+            is a <em>proportional controller</em>: measure an error, push back
+            in proportion. String a few together with a phase machine
+            (cruise → approach → flare → perched) and you have something that
+            looks goal-directed without any planning at all. Part six will let
+            <em>you</em> supply the errors instead — your steering becomes her
+            heading command — and the very same laws will fly your intentions.
+            The reflex and the pilot share a wire.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The song</span>A voice box with two throats</h2>
+      <p>
+        Perched, she sings — and birdsong deserves its own physics. Birds don't
+        have our larynx. They have a <em>syrinx</em>, sitting deep at the fork
+        where the windpipe splits toward the two lungs, and it has
+        <strong>two independent sound sources</strong>, one per branch.
+        Suthers proved in 1990 that a songbird can drive the two halves
+        separately — which is how a wren sings two notes at once, and trills
+        faster than any single voice could. We model exactly that: two
+        oscillators, each with its own pitch and volume envelope, summed.
+      </p>
+      <p>
+        On top of the two voices sits a little <em>grammar</em>. Wren song is
+        built from a handful of gestures — clear whistles, quick rising
+        sweeps, and the machine-gun trills they're famous for — strung into
+        short, repeatable phrases. The generator picks a sequence of those
+        gestures with wren-ish proportions (lots of trills), hands them to one
+        voice or the other, and schedules the whole burst at once.
+      </p>
+      <div data-demo="song"></div>
+      <p>
+        Tap for sound and she sings a freshly generated phrase up in the
+        brilliant 2–8 kHz register where wrens live. Her beak isn't animated to
+        the song — it's driven <em>by</em> it: the demo reads the actual
+        loudness coming out of the speakers and opens her beak to match, the
+        same reading the <a href="/vibration.html">music series</a> takes off
+        its master bus. Two systems we built separately, snapped together: a
+        rig that can open a beak, and a synth that can fill it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The whole act</span>Land, sing, leave</h2>
+      <p>
+        Put it on a loop over a real tree. She circles in, the controller
+        picks a perch from the tree's published list and flies her onto it,
+        she settles and sings a phrase, then launches — a burst of full-power
+        flapping — and lines up for the next branch. Approach, flare, perch,
+        song, takeoff: the whole vocabulary of this series running as one
+        behavior, with nothing scripted but the order of the phases.
+      </p>
+      <div data-demo="act"></div>
+      <p>
+        That tree is not decoration — it's an actual Ground Truth tree, grown
+        by space colonization, its branches found and ranked as perches by the
+        sister series' own code. The wren is choosing real twigs. This little
+        scene is a preview of the finale: a bird with a full behavioral
+        repertoire, loose in a world that was grown, not drawn.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The keys</h2>
+      <p>
+        One article left, and it's the one the whole series was walking toward.
+        Everything is built: a wren modeled from a function, rigged by
+        distances, flapped by inverse kinematics, flown by forces, and landed
+        by guidance laws — and a whole world next door with mountains, rivers
+        carved by rain, grass, trees, and a horizon that never ends. Part six
+        hands you the controls and turns the bird loose in that world, with the
+        option to let an AI fly instead. The reflexes you just watched become
+        the thing that answers your steering.
+      </p>
+      <p>
+        It is also <a href="/horizon.html">Ground Truth's</a> finale — the two
+        series have been one demo apart since the beginning, and that demo is
+        next. A wren, a world, and you.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part five ·
+        written in parallel with <a href="/heightfield.html">Ground Truth</a> ·
+        the wren lands on <a href="/trees.html">its trees</a>, sings with the
+        <a href="/vibration.html">music series'</a> voice
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1038/347473a0">Suthers, "Contributions to Birdsong from the Left and Right Sides of the Intact Syrinx" (1990)</a> ·
+        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/landing.ts"></script>
+  </body>
+</html>

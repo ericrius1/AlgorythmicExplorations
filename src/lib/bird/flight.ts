@@ -31,7 +31,9 @@ export const FLIGHT_DEFAULTS: FlightParams = {
   clStall: 1.5,
   cd0: 0.05,
   inducedK: 0.06,
-  thrustPerFlap: 0.16,
+  // tuned so a half-effort flap holds roughly the trim speed (~7 m/s) rather
+  // than accelerating without bound — thrust must balance drag near cruise
+  thrustPerFlap: 0.035,
   airDensity: 1.225,
 };
 

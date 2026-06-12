@@ -202,6 +202,13 @@ export const POSTS: Post[] = [
     subtitle: "Lift, drag, weight, and flap thrust as real forces — gliding, stalling, and banking turns nobody scripted, integrated every frame",
   },
   {
+    href: "/landing.html",
+    series: "Feather & Bone",
+    part: 5,
+    title: "The Landing",
+    subtitle: "Arriving — guidance laws fly the physics onto a real tree's branch, a flare at the edge of the stall, and a song from a two-voiced syrinx",
+  },
+  {
     href: "/heightfield.html",
     series: "Ground Truth",
     part: 1,
