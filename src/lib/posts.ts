@@ -188,6 +188,13 @@ export const POSTS: Post[] = [
     subtitle: "The capsule table's second job — seventeen joints, skin weights by proximity, and a wren who fidgets with zero keyframes",
   },
   {
+    href: "/wingbeat.html",
+    series: "Feather & Bone",
+    part: 3,
+    title: "The Wingbeat",
+    subtitle: "Wingtip, be there — the law of cosines unfolds the wing, and an asymmetric clock with folding wrists teaches it to beat",
+  },
+  {
     href: "/heightfield.html",
     series: "Ground Truth",
     part: 1,

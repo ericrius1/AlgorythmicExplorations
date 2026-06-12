@@ -205,7 +205,7 @@ export function flapTip(side: WingSide, p: number, fp: FlapParams, out: FlapSamp
   const reach = wingReach(side);
   const ext = reach * (0.92 - 0.3 * fp.foldUp * upAmount);
   out.tip.set(
-    side.sign * (side.shoulder.x + ext),
+    side.shoulder.x + side.sign * ext,
     side.shoulder.y + 0.03 + fp.amp * vert,
     side.shoulder.z - 0.05 + fp.amp * 0.5 * sweep,
   );

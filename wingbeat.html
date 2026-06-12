@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Wingbeat — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The wren's folded wing opens: two-bone inverse kinematics by the law of cosines, a one-slider unfold to full span, and a wingbeat cycle with asymmetric strokes, folding wrists, and twisting blades."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/wingbeat.ts -->
+    <header class="hero">
+      <div data-demo="hero-wing"></div>
+      <div class="hero-title">
+        <h1>The Wingbeat</h1>
+        <p class="subtitle">
+          Two articles of patience and the wing finally opens. One triangle
+          identity does the unfolding, one warped clock does the beating, and
+          the wren above is doing both right now — slowly, so you can watch
+          the machinery think. Drag to orbit her.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/bones.html">Part two</a> ended with a bird that could be
+        posed: seventeen joints, each waiting for an angle. That's enough for
+        head-turns and tail-flicks, where one joint does one job. The wing is
+        different. Three segments per side — humerus, forearm, hand — and any
+        pose you actually want is a <em>coordination</em> of all three. Dial
+        the shoulder and you've moved the elbow and wrist somewhere wrong;
+        fix the elbow and the wingtip drifts. Posing a chain joint-by-joint
+        is solving a puzzle backwards.
+      </p>
+      <p>
+        So this article stops dialing angles and starts asking for places.
+        <em>Inverse kinematics</em> turns the question around: instead of
+        "given these rotations, where does the wingtip end up?" we say
+        "the wingtip should be <strong>there</strong> — derive the rotations."
+        For a limb of two main segments the answer isn't even iterative; it
+        falls straight out of a triangle identity you met in school. With it,
+        the entire wingbeat — the unfold, the stroke, the recovery — becomes
+        one moving target and a solver that never gets tired of catching it.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The arm in the wing</span>
+        <p>
+          A bird's wing is the same arm you have. Humerus to the elbow,
+          radius-and-ulna to the wrist, and then the hand — fused, stretched,
+          and flying the biggest feathers. When the wing folds, all that arm
+          collapses into the neat teardrop silhouette part one sculpted; the
+          fold lives in the <em>angles</em>, hidden under plumage. Unfolding
+          is just those angles relaxing toward straight — which is exactly
+          what an IK solver does as its target moves away from the shoulder.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Wingtip, be there</span>One triangle, no iteration</h2>
+      <p>
+        Fix the shoulder S, pick a target T, and call the two segment lengths
+        a and b. If the wing is to touch the target, the elbow must sit at
+        distance a from S and distance b from T — and now look at what's on
+        the table: a triangle with all three side lengths known (a, b, and
+        d = |T − S|). Triangles with three known sides have no secrets. The
+        <em>law of cosines</em> gives the angle at the shoulder directly:
+      </p>
+      <pre><code>cos A = (a² + d² − b²) / 2ad      <span class="cm">// angle between the target line and the humerus</span></code></pre>
+      <p>
+        Swing the humerus off the shoulder→target line by A, place the elbow,
+        aim the forearm at the target: solved, in closed form, every frame,
+        for the price of one square root. The only thing the triangle does
+        <em>not</em> decide is which way the elbow sticks out — the solution
+        is a whole circle of elbows around the shoulder→target axis. That
+        choice is the <strong>pole</strong>: a hint vector saying "bend this
+        way". Birds' elbows point back along the body, so our pole does too.
+      </p>
+      <div data-demo="reach"></div>
+      <p>
+        The third segment — the hand — rides on top of the two-bone core: aim
+        it at the true wingtip target, pull the two-bone target back by one
+        hand-length, solve, re-aim from wherever the wrist actually landed,
+        and solve once more. Two passes and the tip is pinned. Drag the orb
+        anywhere: inside her reach the wing folds and unfolds to track it;
+        past her reach the chain goes straight and points, which is the
+        dignified thing to do. The <strong>elbow lift</strong> slider is the
+        pole made visible — same wingtip, a whole family of wings.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The unfold</span>From silhouette to span</h2>
+      <p>
+        With the solver in place, the wing's biggest transformation needs
+        embarrassingly little code. The folded tip position is in the table
+        (it's the hand capsule's far end); the spread tip is one wing-reach
+        out from the shoulder, level and slightly forward. Slide the target
+        from one to the other along an arc and the solver fills in everything
+        between — shoulder opening, elbow passing through every angle of the
+        fold, blade rolling from flat-against-the-body to flat-against-the-sky.
+      </p>
+      <div data-demo="unfold"></div>
+      <p>
+        One slider, and the readout tells the story: the span more than
+        doubles, from a teardrop to a glider, using <em>the same three
+        segments</em> — nothing is created, only redistributed. Toggle the
+        x-ray and watch the elbow: mid-unfold it kinks backward into a
+        genuine Z before straightening into span. And watch the shoulder
+        seam, too — the mesh smears a little where body weights and wing
+        weights blend. Our weights were computed against the folded pose;
+        production rigs bind with wings spread for exactly this reason. We
+        keep the smear: it's honest, it's small, and at part six's camera
+        distances it's invisible.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: a bone is an arrow, a wing is a blade</summary>
+        <div class="fold-body">
+          <p>
+            "Aim the forearm at the target" underdetermines the forearm: it
+            can aim there with its feathers facing up, down, or anywhere
+            around its own axis, and rotation-from-direction-alone leaves
+            that twist to chance. So every segment is posed from a <em>frame</em>,
+            not a direction: build an orthonormal basis from (direction,
+            blade-normal hint) for the rest pose, the same for the desired
+            pose, and take the rotation between the two matrices. The hint is
+            cheap — folded wings face sideways, spread wings face up, blend
+            by how far out the tip is — but it removes the ambiguity exactly,
+            and it gives us a free knob: rotate the hint about the bone axis
+            and the blade <em>twists</em>. Remember that knob; the wingbeat
+            is about to lean on it.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The cycle</span>An asymmetric clock</h2>
+      <p>
+        A wingbeat is a loop, so the obvious move is a phase p running 0→1
+        and a tip target riding a tilted ellipse — down-and-forward, then
+        up-and-back. The obvious move is also wrong in a telling way: a real
+        wingbeat is not a sine. Only the downstroke pushes air where air
+        needs pushing; the upstroke is overhead, a recovery. So the bird
+        spends more time on the half that pays — our clock is <em>warped</em>,
+        giving the downstroke its share of the period first and hurrying the
+        upstroke home. And during that hurried half the wrist <em>folds</em>:
+        span pulls in by a third, because hauling a full wing back up through
+        the air would refund most of the downstroke. Less span up than down —
+        watch slow-motion footage of any songbird and it's the first thing
+        you'll see.
+      </p>
+      <div data-demo="cycle"></div>
+      <p>
+        The orange trail is the wingtip's own diagram — the tilted loop,
+        fatter on the downstroke side, pinched where the wrist folds. The
+        last slider is the twist knob from the deep dive doing its real job:
+        on the downstroke the blade pitches leading-edge-down so the push has
+        a forward component, on the upstroke it feathers flat to slip through.
+        Right now that's choreography — the air in this article is purely
+        decorative. The next article makes the air push back, and this twist
+        becomes thrust with a number on it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · All together</span>The rest of the bird joins</h2>
+      <p>
+        Wings don't beat in isolation; the whole bird is the mechanism. Three
+        cheap couplings, all driven by the same phase. The <strong>body</strong>
+        rides the reaction — pushed up through the downstroke, sagging in
+        recovery, a two-line heave. The <strong>head counter-pitches</strong>
+        against the body's bobbing, because a bird's head is a gimbal that
+        holds its gaze level while everything behind it heaves (the part-two
+        saccade system will plug straight into this). And the <strong>tail
+        fans</strong>: one capsule, scaled sideways along its bone, and the
+        skinned vertices spread into a fan for free — the same trick as every
+        deformation so far, just with scale instead of rotation in the matrix.
+      </p>
+      <div data-demo="all"></div>
+      <p>
+        Turn the beat rate up and she's a wren in a hurry; down to one beat
+        per second and she's a crow. The shapes of flight are all here now —
+        what's missing is consequence. She flaps and nothing happens, because
+        nothing yet says it should.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The air owes her</h2>
+      <p>
+        Next time, physics. The wing is an airfoil and the wingbeat is a
+        force generator: lift that scales with speed and angle of attack,
+        drag taxing everything, the downstroke's twisted blade converting
+        beats into thrust. Give the wren a velocity and let those forces
+        integrate, and flight stops being an animation and becomes an
+        <em>outcome</em> — including banking turns, which fall out of rolling
+        the lift vector sideways rather than being scripted. The flapping you
+        just watched will stop being a looping gif and start being the engine.
+      </p>
+      <p>
+        And she'll need somewhere to go: <a href="/heightfield.html">Ground
+        Truth</a> has been busy — rain has carved its mountains, grass is
+        growing, and <a href="/trees.html">trees</a> are publishing their
+        branches like landing pads with coordinates. Two more articles each.
+        One demo at the end: a wren, a world, and you.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part three ·
+        written in parallel with <a href="/heightfield.html">Ground Truth</a> ·
+        built on the <a href="/part1.html">gravity</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>, and
+        <a href="/vibration.html">music</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/325334.325244">Girard &amp; Maciejewski, "Computational Modeling for the Computer Animation of Legged Figures" (1985)</a> ·
+        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/wingbeat.ts"></script>
+  </body>
+</html>
