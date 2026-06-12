@@ -153,6 +153,34 @@ export const POSTS: Post[] = [
     title: "The Harmonizer",
     subtitle: "Encore — the series learns to listen: live pitch detection, and a voice that sings thirds with you",
   },
+  {
+    href: "/bear.html",
+    series: "Waking Bodies",
+    part: 1,
+    title: "The Bear",
+    subtitle: "A character sculpted by arithmetic — capsules, smooth unions, and a mesh marched out of a field",
+  },
+  {
+    href: "/rig.html",
+    series: "Waking Bodies",
+    part: 2,
+    title: "The Skeleton",
+    subtitle: "Bones as a hierarchy, skin as a weighted vote — the bear learns to bend, four matrices per vertex",
+  },
+  {
+    href: "/reach.html",
+    series: "Waking Bodies",
+    part: 3,
+    title: "The Reach",
+    subtitle: "Inverse kinematics — stop dialing angles, start asking for places; the law of cosines meets a draggable orb",
+  },
+  {
+    href: "/qigong.html",
+    series: "Waking Bodies",
+    part: 4,
+    title: "The Form",
+    subtitle: "Qi gong at last — poses as targets, springs as blends, moves that flow into each other; the series becomes a toy",
+  },
 ];
 
 export function currentPost(): { post: Post | null; index: number } {
