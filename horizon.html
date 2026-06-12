@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Horizon — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The terrain series finale: chunks, LOD rings, skirts, and a millisecond build budget — an infinite world that streams in around your flight, with grass, forests, and biomes that never repeat."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/horizon.ts -->
+    <header class="hero">
+      <div data-demo="hero-horizon"></div>
+      <div class="hero-title">
+        <h1>The Horizon</h1>
+        <p class="subtitle">
+          This flight does not end. There is no far edge of the map under
+          that fog — chunks of world are being built a few milliseconds at a
+          time, just beyond what you can see, and dismantled just behind
+          you. Five articles of functions were the price of this one
+          sentence: the world exists wherever you look, because looking is
+          what causes it.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Every demo in this series so far has had four walls. A patch of
+        mountains 16 units wide, a meadow 56 units wide — generous stages,
+        but stages. Meanwhile, from the very first article, every design
+        decision has been quietly auditioning for today:
+        <a href="/heightfield.html">part one</a> insisted the ground be a
+        pure function with no stored map;
+        <a href="/biomes.html">part five</a> insisted every tree's
+        existence depend only on integers it can compute locally. Those
+        constraints were never about the demos that carried them. They
+        were about this article, which finally asks: what does it take to
+        <em>never run out of world</em>?
+      </p>
+      <p>
+        Memory says you can't keep an infinite world; arithmetic says you
+        never need to. If everything visible is a function of coordinates,
+        then the world doesn't have to be <em>stored</em> — it has to be
+        <em>summoned</em>, just-in-time, in the moving window around the
+        camera. The machinery of summoning has three parts: chunks (what
+        to build), levels of detail (how well to build it), and a budget
+        (when to build it). None of the three is glamorous. Together they
+        are the difference between a diorama and a place.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The ring</span>A world keyed by integers</h2>
+      <p>
+        Carve the plane into square chunks and key each one by the integer
+        pair (⌊x/S⌋, ⌊z/S⌋). The rule of existence: a chunk exists if and
+        only if it lies within a few chunks of the camera. Each frame, the
+        manager compares that rule against reality — chunks newly inside
+        the ring get queued for construction, nearest first; chunks that
+        fall outside get dismantled, geometry and all. (One chunk of
+        hysteresis on the way out, so a camera dithering on a boundary
+        doesn't make the same chunk flicker in and out of existence.)
+      </p>
+      <div data-demo="rings"></div>
+      <p>
+        The whole machine from above. The white flashes are construction —
+        watch how they wavefront ahead of the camera's motion, because the
+        queue is sorted by distance and the budget only allows a couple of
+        builds per frame. Notice also what happens at the trailing edge:
+        nothing dramatic. Chunks vanish, and the world doesn't care,
+        because nothing a chunk contained was ever unique to it. <em>That</em>
+        is what all the determinism was for: revisit any coordinate next
+        week and the hash rebuilds the same hill, the same boulder, the
+        same tree leaning the same way.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Resolution by distance</span>The pyramid of attention</h2>
+      <p>
+        A chunk three rings out covers the same screen area as a postage
+        stamp; building it at full resolution is generosity nobody sees.
+        So resolution follows distance — full grid density for the ring
+        the camera occupies, half for the next band, a quarter beyond
+        that. The savings are not subtle: in this demo the far rings hold
+        most of the chunks but a small fraction of the vertices, and the
+        vertex total stays roughly constant no matter how far you fly.
+      </p>
+      <p>
+        The price of mixed resolutions is the seam. Where a 48-segment
+        chunk meets a 24-segment neighbor, their edges sample the same
+        height function at different spacings — and between samples they
+        disagree, leaving pixel-thin cracks of sky. The honorable fix
+        (stitching edge vertices to match the coarser side) is a
+        bookkeeping tax on every border of every LOD pair. The pragmatic
+        fix, used by engines you've played, is the <strong>skirt</strong>:
+        every chunk wears a short curtain of geometry hanging straight
+        down from its border. Cracks don't show sky anymore; they show
+        skirt, shaded like the terrain above it, and at any distance where
+        LODs differ the eye reads dirt, not deceit. It's a lie with the
+        same defense as the grass normals two articles ago: choose errors
+        that eyes don't audit.
+      </p>
+      <pre><code>ring 0–1: 48² grid    ring 2–3: 24²    ring 4+: 12²    <span class="cm">// all + skirt, all + margin-sampled normals</span></code></pre>
+      <details class="fold">
+        <summary>Deep dive: the seam you'd never think of</summary>
+        <div class="fold-body">
+          <p>
+            Cracks are the visible seam problem; lighting is the invisible
+            one. Normals come from central differences on the height grid,
+            and a chunk's border vertex has no neighbor on one side — use a
+            one-sided difference there and every chunk boundary shows up as
+            a faint crease of shading, even with zero geometric cracks.
+            The fix costs almost nothing because the height function is
+            pure: sample one extra row of heights <em>beyond</em> each
+            edge — heights the chunk doesn't own and will never draw — and
+            every border normal becomes honestly two-sided, identical to
+            the one its neighbor computes. Purity pays twice: the margin
+            row is guaranteed to match the neighbor's interior, no
+            communication required.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The budget</span>Milliseconds, not chunks</h2>
+      <p>
+        At sixty frames a second the renderer owes a frame every 16.7 ms,
+        and a chunk costs real money: thousands of height samples, normals,
+        a scatter query, sometimes ten thousand grass blades. Build
+        everything the wish list wants and the world hitches every time
+        you crest a ridge. The manager's discipline: each frame it builds
+        from the front of the distance-sorted queue <em>until a
+        millisecond budget runs out</em>, then stops mid-list and yields.
+        Whatever didn't get built stays wanted — next frame, the same
+        sort, another few milliseconds. The flight never waits for the
+        world; the world owes no frame more than its budget.
+      </p>
+      <p>
+        The same thrift decides what far chunks deserve. Trees exist out
+        to ring three (a forest's silhouette carries); grass exists only
+        in the ring you could land in, because at two hundred meters a
+        hundred thousand blades are, measurably, nothing. Population
+        follows attention exactly the way resolution does.
+      </p>
+      <div data-demo="flight"></div>
+      <p>
+        The finished machine. <strong>Drag to steer</strong> (sideways for
+        heading, up and down for altitude) and pick a direction you like —
+        any direction; they're all infinite. Press
+        <strong>freeze streaming</strong> and keep flying to do the
+        forbidden thing: catch up with the edge of the world and look over
+        it. Unfreeze and watch the machinery sweep the gap closed in front
+        of you. <strong>LOD tint</strong> paints each new chunk by its
+        resolution class so you can see the pyramid of attention follow
+        the camera; the readout's "last build" number is the budget at
+        work.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The rain didn't make it</span>
+        <p>
+          One passenger from this series is missing.
+          <a href="/erosion.html">Part two's erosion</a> is a history —
+          each droplet changes the ground the next one sees — and a
+          hundred-thousand-droplet history cannot be replayed per chunk
+          in a 6 ms budget, nor chopped into chunks that agree at their
+          borders (a river is the ultimate neighbor-dependence). So the
+          infinite world fakes maturity the way part one did, with shaping
+          curves, and keeps the honest rain for bounded scenes. This is
+          the standing trade of procedural worlds: <em>functions scale,
+          history convinces</em>, and engineering is choosing which one
+          each feature gets. Big games run erosion offline and ship the
+          result as data; the no-download browser version chooses scale.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Ground truth, delivered</h2>
+      <p>
+        Six articles ago this series promised "a world grown from noise,"
+        and it's worth tallying what that world now contains: mountains
+        from hashed gradients, valleys that remember rain, meadows planted
+        in simulated silt, trees that grew by competing for light and
+        publish their perches, biomes that follow a climate, and now no
+        edges at all. Every part of it reproducible from a seed and a
+        coordinate; none of it drawn by hand.
+      </p>
+      <p>
+        And it is, deliberately, a world built for someone. Next door in
+        <a href="/wren.html">Feather &amp; Bone</a>, a wren has a body and
+        bones and is working on her wings. The two series were always one
+        story told from two sides: hers ends with flight, and flight needs
+        somewhere worth flying. When she's ready — wingbeats, banking
+        turns, a landing flare onto a branch this series measured for her
+        — the final demo of her series will take place over this ground.
+        The world is finished. It's waiting for its bird.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Ground Truth, part six — series complete ·
+        the finale belongs to <a href="/wren.html">Feather &amp; Bone</a> ·
+        built from <a href="/heightfield.html">one</a>,
+        <a href="/erosion.html">two</a>, <a href="/grass.html">three</a>,
+        <a href="/trees.html">four</a>, and <a href="/biomes.html">five</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/566654.566622">Ulrich, "Rendering Massive Terrains Using Chunked Level of Detail Control" (2002)</a> ·
+        <a href="https://doi.org/10.1145/1015706.1015799">Losasso &amp; Hoppe, "Geometry Clipmaps: Terrain Rendering Using Nested Regular Grids" (2004)</a> ·
+        <a href="https://github.com/fstrugar/CDLOD">Strugar, "Continuous Distance-Dependent Level of Detail for Rendering Heightmaps (CDLOD)" (2009)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/horizon.ts"></script>
+  </body>
+</html>

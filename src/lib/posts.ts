@@ -222,6 +222,13 @@ export const POSTS: Post[] = [
     title: "The Biomes",
     subtitle: "What grows where — a moisture field, a pocket Whittaker diagram, and a jittered grid that places a million plants deterministically",
   },
+  {
+    href: "/horizon.html",
+    series: "Ground Truth",
+    part: 6,
+    title: "The Horizon",
+    subtitle: "Chunks, LOD rings, skirts, and a millisecond budget — the world streams in around your flight and never runs out",
+  },
 ];
 
 export function currentPost(): { post: Post | null; index: number } {

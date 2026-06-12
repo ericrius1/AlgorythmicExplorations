@@ -111,6 +111,11 @@ interface TubeSpec {
   bones: string[];
   shape?: ShapeFn;
   shapeZone?: number; // zone for vertices the shape pushed out
+  // Cap depth multipliers (1 = full hemisphere). Caps that live buried inside
+  // another part get flattened so two near-parallel surfaces never sit close
+  // enough to z-fight — the groin learned this the visible way.
+  capStart?: number;
+  capEnd?: number;
 }
 
 function emitTube(spec: TubeSpec, opts: Required<LoftOptions>): PartGeometry {
@@ -121,12 +126,12 @@ function emitTube(spec: TubeSpec, opts: Required<LoftOptions>): PartGeometry {
   // Cap rings reuse the end station's frame so the stitching loop below
   // doesn't need to know caps exist.
   const CAP_RINGS = 2;
-  const capRings = (s: Station, sign: 1 | -1): Station[] => {
+  const capRings = (s: Station, sign: 1 | -1, depth: number): Station[] => {
     const out: Station[] = [];
     for (let k = 1; k <= CAP_RINGS; k++) {
       const ang = (k / (CAP_RINGS + 1)) * (Math.PI / 2);
       out.push({
-        c: add(s.c, scale(s.t, sign * Math.sin(ang) * s.r * 0.85)),
+        c: add(s.c, scale(s.t, sign * Math.sin(ang) * s.r * 0.85 * depth)),
         t: s.t,
         r: s.r * Math.cos(ang),
         zone: s.zone,
@@ -134,10 +139,11 @@ function emitTube(spec: TubeSpec, opts: Required<LoftOptions>): PartGeometry {
     }
     return out;
   };
+  const dStart = spec.capStart ?? 1, dEnd = spec.capEnd ?? 1;
   const first = main[0], last = main[main.length - 1];
-  const stations = [...capRings(first, -1).reverse(), ...main, ...capRings(last, 1)];
-  const apexStart: V3 = add(first.c, scale(first.t, -first.r * 0.92));
-  const apexEnd: V3 = add(last.c, scale(last.t, last.r * 0.92));
+  const stations = [...capRings(first, -1, dStart).reverse(), ...main, ...capRings(last, 1, dEnd)];
+  const apexStart: V3 = add(first.c, scale(first.t, -first.r * 0.92 * dStart));
+  const apexEnd: V3 = add(last.c, scale(last.t, last.r * 0.92 * dEnd));
 
   // Frames by parallel transport: pick any normal for the first ring, then
   // carry it station to station with the minimal rotation between tangents —
@@ -233,15 +239,15 @@ export function buildParts(options: LoftOptions = {}): PartGeometry[] {
     1 + opts.belly * 0.45 * Math.max(0, dz) ** 1.4 * bump((y - 0.84) / 0.46);
 
   const specs: TubeSpec[] = [
-    { name: "torso", bones: ["hips", "spine", "chest", "neck", "head"], shape: belly, shapeZone: 1 },
-    { name: "tail", bones: ["tail"] },
-    { name: "muzzle", bones: ["muzzle"] },
-    { name: "earL", bones: ["earL"] },
-    { name: "earR", bones: ["earR"] },
-    { name: "armL", bones: ["upperArmL", "forearmL", "handL"] },
-    { name: "armR", bones: ["upperArmR", "forearmR", "handR"] },
-    { name: "legL", bones: ["thighL", "shinL", "footL"] },
-    { name: "legR", bones: ["thighR", "shinR", "footR"] },
+    { name: "torso", bones: ["hips", "spine", "chest", "neck", "head"], shape: belly, shapeZone: 1, capStart: 0.65 },
+    { name: "tail", bones: ["tail"], capStart: 0.4 },
+    { name: "muzzle", bones: ["muzzle"], capStart: 0.4 },
+    { name: "earL", bones: ["earL"], capStart: 0.5 },
+    { name: "earR", bones: ["earR"], capStart: 0.5 },
+    { name: "armL", bones: ["upperArmL", "forearmL", "handL"], capStart: 0.45 },
+    { name: "armR", bones: ["upperArmR", "forearmR", "handR"], capStart: 0.45 },
+    { name: "legL", bones: ["thighL", "shinL", "footL"], capStart: 0.45 },
+    { name: "legR", bones: ["thighR", "shinR", "footR"], capStart: 0.45 },
   ];
 
   return specs.map((s) => emitTube(s, opts));

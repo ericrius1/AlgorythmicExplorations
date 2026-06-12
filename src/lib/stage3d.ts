@@ -8,6 +8,7 @@ import * as THREE from "three/webgpu";
 import { screenUV, mix, vec3, float, positionLocal, smoothstep } from "three/tsl";
 
 export class Orbit3D {
+  enabled = true; // demos with their own canvas drags flip this off mid-drag
   azimuth = 0.5;
   elevation = 0.2;
   distance = 3;
@@ -23,6 +24,7 @@ export class Orbit3D {
     let dragging = false;
     let lx = 0, ly = 0;
     canvas.addEventListener("pointerdown", (e) => {
+      if (!this.enabled) return;
       dragging = true;
       lx = e.clientX;
       ly = e.clientY;
@@ -31,7 +33,7 @@ export class Orbit3D {
     canvas.addEventListener("pointerup", () => (dragging = false));
     canvas.addEventListener("pointercancel", () => (dragging = false));
     canvas.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+      if (!dragging || !this.enabled) return;
       this.azimuth -= (e.clientX - lx) * 0.005;
       this.elevation = Math.min(this.maxElevation, Math.max(this.minElevation, this.elevation + (e.clientY - ly) * 0.005));
       lx = e.clientX;

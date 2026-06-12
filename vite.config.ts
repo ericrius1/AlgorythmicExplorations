@@ -39,6 +39,7 @@ export default defineConfig({
         grass: fileURLToPath(new URL("grass.html", import.meta.url)),
         trees: fileURLToPath(new URL("trees.html", import.meta.url)),
         biomes: fileURLToPath(new URL("biomes.html", import.meta.url)),
+        horizon: fileURLToPath(new URL("horizon.html", import.meta.url)),
       },
     },
   },
