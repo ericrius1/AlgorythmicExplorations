@@ -195,6 +195,13 @@ export const POSTS: Post[] = [
     subtitle: "Wingtip, be there — the law of cosines unfolds the wing, and an asymmetric clock with folding wrists teaches it to beat",
   },
   {
+    href: "/flight.html",
+    series: "Feather & Bone",
+    part: 4,
+    title: "Flight",
+    subtitle: "Lift, drag, weight, and flap thrust as real forces — gliding, stalling, and banking turns nobody scripted, integrated every frame",
+  },
+  {
     href: "/heightfield.html",
     series: "Ground Truth",
     part: 1,

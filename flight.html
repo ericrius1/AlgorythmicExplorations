@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Flight — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The wingbeat becomes an engine: lift, drag, weight, and flap thrust as real forces, integrated every frame. Flight stops being an animation and becomes an outcome — gliding, stalling, and banking turns nobody scripted."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/flight.ts -->
+    <header class="hero">
+      <div data-demo="hero-flight"></div>
+      <div class="hero-title">
+        <h1>Flight</h1>
+        <p class="subtitle">
+          Three articles built a bird that could flap. This one makes the air
+          notice. Four forces, integrated every frame — and the wren above is
+          not playing an animation, she is falling forward and being caught by
+          her own wings, lap after lap, because the physics says she must.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/wingbeat.html">Part three</a> gave the wren a beautiful,
+        useless wingbeat. Useless because the air in that article was
+        decorative — the wing pushed against nothing, so the flapping was a
+        looping animation that left her standing exactly where she started.
+        This article removes the floor. From here she is a point mass in a
+        sky that pushes back, and everything she does is a consequence of
+        four forces, summed and integrated, frame after frame.
+      </p>
+      <p>
+        The forces are the famous four. <strong>Weight</strong> pulls straight
+        down, always. <strong>Lift</strong> is the wing's reward for moving
+        through air at an angle — perpendicular to the flight path, and the
+        thing that holds her up. <strong>Drag</strong> is the tax on all of
+        it, opposing motion. And <strong>thrust</strong> is what the wingbeat
+        was secretly for: the twisted downstroke from part three, now cashed
+        in as a forward push. Add them, divide by mass, integrate twice, and
+        you have flight — not a script of where she goes, but a derivation.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why not just keyframe it?</span>
+        <p>
+          Because a keyframed bird can only do what it was animated to do. A
+          simulated one does what the situation demands — it speeds up in a
+          dive because gravity says so, sinks when it slows because lift fell
+          off with the square of speed, and recovers when it flaps because
+          thrust restored the speed. None of those behaviors are authored;
+          they're emergent. You get the whole envelope of flight from one
+          force balance, and — the payoff of the whole series — you can later
+          hand the controls to a player or an AI and the bird stays a bird,
+          because the physics, not a clip, is in charge.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The balance</span>Four arrows on a bird</h2>
+      <p>
+        Start static, so the forces hold still long enough to see. A wing of
+        area A moving at speed v through air of density ρ has a
+        <em>dynamic pressure</em> ½ρv² to spend, and two coefficients decide
+        how it's spent: the lift coefficient C<sub>L</sub> and drag
+        coefficient C<sub>D</sub>. Lift grows with the wing's
+        <em>angle of attack</em> — the tilt between the wing and the oncoming
+        air — until, abruptly, it doesn't:
+      </p>
+      <pre><code>L = ½ ρ v² A · C_L(α)      C_L = C_L0 + slope·α   <span class="cm">// until the wing stalls</span>
+D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// induced drag: the price of lift</span></code></pre>
+      <div data-demo="forces"></div>
+      <p>
+        Tip her out of balance and watch the white net arrow appear: in trim
+        it vanishes, because lift cancels weight and thrust cancels drag.
+        Raise the <strong>angle of attack</strong> and the green lift arrow
+        grows — until you cross the stall, where C<sub>L</sub> collapses
+        instead of climbing and the wing simply lets go of the air. That cliff
+        is real aerodynamics, not a safety rail: a wing tilted too steeply
+        stops working all at once, which is why a landing bird flares to the
+        edge of it and not past. The <strong>speed</strong> slider shows the
+        v² in the equations biting — double the speed, quadruple every
+        aerodynamic force.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The glide</span>Trading height for distance</h2>
+      <p>
+        Cut the engine. With no flapping, a bird is a glider, and a glider
+        does one trick supremely well: it converts altitude into distance at
+        a fixed exchange rate. That rate — the <em>glide ratio</em> — is just
+        lift divided by drag, and it's why the angle of attack matters so
+        much. Too shallow and lift is weak; too steep and induced drag
+        (that <code>k·C<sub>L</sub>²</code> term, the unavoidable cost of
+        bending air downward) eats the gain. Somewhere between sits the angle
+        that flies farthest per meter dropped.
+      </p>
+      <div data-demo="glide"></div>
+      <p>
+        Release her and the orange trail draws the descent; the readout keeps
+        the running glide ratio. Hunt the <strong>angle of attack</strong>
+        slider for the flattest trail — that's her best-glide angle, found by
+        the same physics a paper airplane obeys. Push past it toward stall and
+        the trail steepens into a mush; pull below it and she's diving. No
+        part of this path was drawn. It's lift and drag and gravity, resolved
+        sixty times a second.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: integrating without blowing up</summary>
+        <div class="fold-body">
+          <p>
+            The motion is F = ma, but the force depends on the velocity (via
+            v² and the angle of attack), so it's a differential equation, not
+            a formula. We integrate it the cheap-and-stable way:
+            <em>semi-implicit Euler</em> — update the velocity from the current
+            force, then update the position from the <em>new</em> velocity.
+            That one-line reordering (new velocity, not old) is what keeps a
+            fast, springy system from spiralling to infinity, and it's the
+            same integrator the <a href="/part1.html">n-body</a> and
+            <a href="/lava.html">fluid</a> series leaned on. When a frame runs
+            long or the bird runs fast, we split it into a couple of substeps
+            so the force never extrapolates too far on stale data. Cheap
+            insurance; flight is stiff near stall.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The turn</span>Nobody scripted the circle</h2>
+      <p>
+        Here is the most satisfying thing in the article, and it costs one
+        line. To turn, a bird does not yaw like a car. It <em>banks</em> —
+        rolls so its wings tilt — and the lift vector, which was holding it
+        straight up, now leans. The vertical slice of that leaned lift still
+        fights gravity; the new horizontal slice points sideways, into the
+        turn, and pulls the flight path into a curve. Roll angle in, circle
+        out. We never compute a turn rate or a heading; we just roll the lift
+        vector and let the integrator discover the circle.
+      </p>
+      <div data-demo="bank"></div>
+      <p>
+        Drag the <strong>bank</strong> slider and the trail coils tighter as
+        the lean steepens — exactly the geometry, because a bigger bank gives
+        a bigger sideways slice. Bank the other way and she circles the other
+        way. This is the whole secret of why banking turns look so right in
+        good flight games and so wrong in bad ones: the right ones turn
+        <em>because</em> they bank, and here you can see there's nothing else
+        going on. Steepen the bank toward vertical and she has to flap harder
+        to hold height — the vertical lift slice shrank, and the physics sends
+        the bill.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Free flight</span>An autopilot with a chase cam</h2>
+      <p>
+        Put it together and let her go. The wings flap (part three), the flap
+        makes thrust (step one), the forces integrate (step two), and a small
+        <em>autopilot</em> closes the loop: it reads the gap between her
+        altitude and a target, and from that error alone commands her angle of
+        attack and flap effort — climb when low, ease off when high. A lazy
+        wander rolls her into slow banking turns. None of it is a path; it's a
+        controller flying a physics model, which is precisely what part six
+        will hand to you.
+      </p>
+      <div data-demo="free"></div>
+      <p>
+        The camera chases from behind and above, so the world streams past and
+        the flight reads as flight. Raise the <strong>cruise altitude</strong>
+        and watch the autopilot pitch up and pour on flap to climb, then
+        settle; turn up <strong>wander</strong> and she roams. She is, for the
+        first time, going somewhere — though "somewhere" is still a bare plane
+        with a scatter of posts. Two articles left to make it a world worth the
+        wings.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The hardest thing a bird does</h2>
+      <p>
+        Flying is easy; <em>stopping</em> is hard. The next article is about
+        landing — the approach, the flare that trades speed for a heartbeat of
+        lift at the stall's edge, and the toes-on-branch problem of arriving
+        at a precise point with zero speed left. It's the angle-of-attack
+        cliff from step one, used on purpose. And she'll land on something
+        real at last: <a href="/trees.html">Ground Truth's trees</a> publish
+        their branches as perches with positions and thicknesses, so her
+        landing controller can read them like an instrument. She'll also,
+        finally, <a href="/vibration.html">sing</a> — two oscillators and a
+        grammar, borrowed wholesale from the music series.
+      </p>
+      <p>
+        Then part six: the controls come to you, over the whole living world
+        the sister series built. A wren, a world, and you — one article away.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part four ·
+        written in parallel with <a href="/heightfield.html">Ground Truth</a> ·
+        built on the <a href="/part1.html">gravity</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>, and
+        <a href="/vibration.html">music</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1242/jeb.49.3.527">Pennycuick, "Power Requirements for Horizontal Flight in the Pigeon Columba Livia" (1968)</a> ·
+        <a href="https://doi.org/10.1242/jeb.000273">Tobalske, "Biomechanics of Bird Flight" (2007)</a> ·
+        Anderson, <em>Fundamentals of Aerodynamics</em> (the lift equation and induced drag, as every textbook states them)
+      </p>
+    </footer>
+
+    <script type="module" src="/src/flight.ts"></script>
+  </body>
+</html>
