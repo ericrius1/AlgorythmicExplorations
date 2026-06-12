@@ -64,10 +64,10 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
         rig.setEulerDeg("head", -4 + Math.sin(time * 0.6) * 6, Math.sin(time * 0.4) * 14, 0);
         const wave = Math.max(0, Math.sin(time * 0.5));
         const flap = Math.sin(time * 4.2);
-        rig.setEulerDeg("upperArmR", -10 - wave * 130, 0, -10 - wave * 30);
+        rig.setEulerDeg("upperArmR", -10 - wave * 130, 0, 14 - wave * 30);
         rig.setEulerDeg("forearmR", -8 - wave * 30 + wave * flap * 16, 0, 0);
         rig.setEulerDeg("handR", -6 + wave * flap * 18, 0, 0);
-        rig.setEulerDeg("upperArmL", -4 + breathe * 1.5, 0, 10);
+        rig.setEulerDeg("upperArmL", -4 + breathe * 1.5, 0, -14);
         rig.setEulerDeg("tail", 0, Math.sin(time * 2.3) * 18, 0);
         rig.update();
         viz.update(rig);
@@ -89,7 +89,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
     scene.add(face.group);
     stage.orbit.azimuth = 0.9;
 
-    const angles = { shoulderX: -40, shoulderZ: 20, elbow: -40, wrist: -10 };
+    const angles = { shoulderX: -40, shoulderZ: -4, elbow: -40, wrist: -10 };
     const apply = (): void => {
       rig.setEulerDeg("upperArmL", angles.shoulderX, 0, angles.shoulderZ);
       rig.setEulerDeg("forearmL", angles.elbow, 0, 0);
@@ -98,7 +98,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
     };
     apply();
     shell.slider({ label: "shoulder pitch", min: -170, max: 40, step: 1, value: angles.shoulderX, onInput: (v) => { angles.shoulderX = v; apply(); } });
-    shell.slider({ label: "shoulder raise", min: -20, max: 120, step: 1, value: angles.shoulderZ, onInput: (v) => { angles.shoulderZ = v; apply(); } });
+    shell.slider({ label: "shoulder raise", min: -60, max: 120, step: 1, value: angles.shoulderZ, onInput: (v) => { angles.shoulderZ = v; apply(); } });
     shell.slider({ label: "elbow", min: -130, max: 10, step: 1, value: angles.elbow, onInput: (v) => { angles.elbow = v; apply(); } });
     shell.slider({ label: "wrist", min: -60, max: 60, step: 1, value: angles.wrist, onInput: (v) => { angles.wrist = v; apply(); } });
     shell.setInfo(() => {
@@ -122,7 +122,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
     viz.update(rig);
 
     // a gentle pose so the chosen bone's influence is visible in motion
-    rig.setEulerDeg("upperArmL", -50, 0, 30);
+    rig.setEulerDeg("upperArmL", -50, 0, 6);
     rig.setEulerDeg("forearmL", -50, 0, 0);
     rig.setEulerDeg("head", -4, 25, 0);
     rig.update();
@@ -195,7 +195,7 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
     return {
       frame: () => {
         tick();
-        rig.setEulerDeg("upperArmL", -55, 0, 14);
+        rig.setEulerDeg("upperArmL", -55, 0, -10);
         rig.setEulerDeg("forearmL", bend, 0, 0);
         rig.setEulerDeg("handL", -10, 0, 0);
         rig.update();
@@ -229,8 +229,8 @@ export async function mountRigStudio(container: HTMLElement, opts: RigStudioOpti
       rig.setEulerDeg("spine", 3, 0, s(Math.PI) * 7);
       rig.setEulerDeg("chest", -2, s(Math.PI / 2) * 6, s(Math.PI) * 4);
       rig.setEulerDeg("head", -4 + s(Math.PI / 2, 2) * 4, 0, s(0) * 6);
-      rig.setEulerDeg("upperArmL", -20 + s(0, 2) * 12, 0, 35 + s(0) * 30);
-      rig.setEulerDeg("upperArmR", -20 - s(0, 2) * 12, 0, -35 + s(0) * 30);
+      rig.setEulerDeg("upperArmL", -20 + s(0, 2) * 12, 0, 11 + s(0) * 30);
+      rig.setEulerDeg("upperArmR", -20 - s(0, 2) * 12, 0, -11 + s(0) * 30);
       rig.setEulerDeg("forearmL", -50 + s(Math.PI / 2) * 25, 0, 0);
       rig.setEulerDeg("forearmR", -50 - s(Math.PI / 2) * 25, 0, 0);
       rig.setEulerDeg("thighL", -8 + s(0) * 5, 0, -3);

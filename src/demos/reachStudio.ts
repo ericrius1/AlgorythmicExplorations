@@ -56,8 +56,8 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
     rig.setEulerDeg("chest", -2 + b * 2.0, 0, 0);
     rig.setEulerDeg("neck", 4, 0, 0);
     rig.setEulerDeg("head", -4, 0, 0);
-    rig.setEulerDeg("upperArmR", -4 + b * 1.5, 0, -10);
-    rig.setEulerDeg("forearmR", -10, 0, -4);
+    rig.setEulerDeg("upperArmR", -4 + b * 1.5, 0, 14);
+    rig.setEulerDeg("forearmR", -10, 0, 2);
     rig.setEulerDeg("tail", 0, Math.sin(time * 1.7) * 10, 0);
   };
 
@@ -104,8 +104,8 @@ export async function mountReachStudio(container: HTMLElement, opts: ReachStudio
         const want = dist < maxReach * 1.15 ? 1 : 0;
         reachAmount += (want - reachAmount) * Math.min(1, dt * 2.2);
 
-        rig.setEulerDeg("upperArmL", -4, 0, 10);
-        rig.setEulerDeg("forearmL", -10, 0, 4);
+        rig.setEulerDeg("upperArmL", -4, 0, -14);
+        rig.setEulerDeg("forearmL", -10, 0, -2);
         rig.setEulerDeg("handL", -6, 0, 0);
         rig.update();
         if (reachAmount > 0.01) {

@@ -54,9 +54,12 @@ const CORE: RawBone[] = [
 
 const LEFT: RawBone[] = [
   // -- arm (x > 0 = bear's left) -------------------------------------------------
-  { name: "upperArmL", parent: "chest", head: [0.205, 1.345, 0.0], tail: [0.295, 1.09, 0.02], r0: 0.095, r1: 0.075, blend: 0.06 },
-  { name: "forearmL", parent: "upperArmL", head: [0.295, 1.09, 0.02], tail: [0.33, 0.875, 0.045], r0: 0.07, r1: 0.06, blend: 0.045 },
-  { name: "handL", parent: "forearmL", head: [0.33, 0.875, 0.045], tail: [0.345, 0.78, 0.07], r0: 0.082, r1: 0.062, zone: 4, blend: 0.035 },
+  // Rest pose is an A-pose: the arm leaves the shoulder at ~40° so the marched
+  // mesh keeps an air gap to the torso. Fused arm/belly geometry can't be
+  // skinned — rotating the shoulder would tear the weld (parts 2–4).
+  { name: "upperArmL", parent: "chest", head: [0.215, 1.35, 0.0], tail: [0.4, 1.155, 0.02], r0: 0.09, r1: 0.072, blend: 0.045 },
+  { name: "forearmL", parent: "upperArmL", head: [0.4, 1.155, 0.02], tail: [0.455, 0.945, 0.045], r0: 0.068, r1: 0.058, blend: 0.035 },
+  { name: "handL", parent: "forearmL", head: [0.455, 0.945, 0.045], tail: [0.47, 0.85, 0.07], r0: 0.08, r1: 0.06, zone: 4, blend: 0.03 },
 
   // -- leg -----------------------------------------------------------------------
   { name: "thighL", parent: "hips", head: [0.115, 0.94, 0.0], tail: [0.15, 0.52, 0.005], r0: 0.135, r1: 0.10, blend: 0.09 },
