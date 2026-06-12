@@ -244,7 +244,7 @@ export function buildRockGeometry(variant: number): THREE.BufferGeometry {
     pos.setXYZ(i, v.x, v.y, v.z);
   }
 
-  const flat = ico.toNonIndexed();
+  const flat = ico.index ? ico.toNonIndexed() : ico;
   flat.computeVertexNormals(); // non-indexed → face normals → facets
   const fp = flat.getAttribute("position");
   const colors = new Float32Array(fp.count * 3);
