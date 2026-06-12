@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Prism — Cosmic Algorithmic Explorations</title>
+    <meta
+      name="description"
+      content="The series finale: glass, rainbows, caustics, and focus. One random wavelength per ray turns Snell's law into Newton's spectrum, and the path tracer becomes a toy box of optics."
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <div data-demo="hero-prism"></div>
+      <div class="hero-title">
+        <h1>The Prism</h1>
+        <p class="subtitle">
+          Part six: a glass prism, a glass sphere, one small lamp — and no
+          color anywhere in the scene description. Every hue you see was
+          manufactured in flight, by geometry, out of white light. The series
+          ends where optics began.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Every scene in this series has been opaque. Light bounced; it never
+        <em>entered</em>. But the phenomena that made people fall in love with
+        light — rainbows, the bright lace at the bottom of a swimming pool,
+        the way a lens gathers the sun to a point — all live inside
+        transparent things. The finale adds exactly one physical event to the
+        path tracer, refraction, and then stops lying about one number it has
+        quietly rounded off since part one: <em>which</em> light, exactly, is
+        being bent.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Bending</span>Snell's law on a tabletop</h2>
+      <p>
+        Light crossing into glass slows down, and the slowing turns it: the
+        ratio of speeds is the refractive index n, and the turn is Snell's law,
+        <code>n₁·sin θ₁ = n₂·sin θ₂</code>. One wrinkle hides the entire
+        finale: n is not a constant of the glass. It depends on the
+        wavelength — blue, the shorter wave, drags more and bends harder. The
+        empirical curve is Cauchy's, from 1836: <code>n(λ) ≈ A + B/λ²</code>.
+        White light is a crowd of wavelengths that happens to be walking in
+        step; a prism is two refractions that make each member of the crowd
+        take a slightly different turn.
+      </p>
+      <div data-demo="bench"></div>
+      <p>
+        Newton's tabletop, in your browser tab. With dispersion at zero the
+        prism merely kinks the white beam — one n, one turn, no color. Raise
+        it and the beam unravels into a fan, red stubborn, violet eager. Now
+        rotate the prism until a face catches the inner beam too shallowly:
+        the fan vanishes and the beam ricochets inside instead — total
+        internal reflection, the same trapping that makes optical fiber
+        possible. Every color in this figure is one number, λ, passed through
+        two equations.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The crucial experiment</span>
+        <p>
+          Newton's 1666 trick was not splitting white light — prisms were
+          carnival toys — it was the <em>second</em> prism. A red beam picked
+          out of the first fan and sent through another prism bends but does
+          not split further. Color is not added by the glass; it was in the
+          light all along, and the prism merely sorts it. He published in
+          <em>Opticks</em> in 1704, and the rendering equation's λ subscript
+          is that result, still load-bearing.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Glass in the tracer</span>Fresnel's coin flip</h2>
+      <p>
+        In the path tracer, glass is a fork: part of the light reflects off
+        the surface, part refracts through, in proportions given by the
+        Fresnel equations (graphics uses Schlick's 1994 shortcut). A
+        deterministic renderer would split the path and trace both — and
+        double its work at every interface. Monte Carlo shrugs: <em>flip a
+        weighted coin</em>. Reflect with probability F, refract otherwise;
+        across thousands of samples the average honors the exact proportions,
+        because that is what averages do. The dice that integrated the
+        rendering equation in part five absorb a new physical law without a
+        new mechanism.
+      </p>
+      <div data-demo="caustics"></div>
+      <p>
+        And the floor lights up. That bright-edged figure under the sphere is
+        a <em>caustic</em> — the sphere is a lens, and the pattern is the
+        lamp's image, focused and folded. Nothing draws it; camera paths that
+        happen to pass through the glass on their way to the lamp simply
+        deposit more light where the lens concentrates them. Shrink the lamp
+        toward a point and the caustic sharpens to a burning filigree — and
+        gets noisier, because ever fewer random paths thread the needle.
+        Caustics are famously the path tracer's slowest meal, and you are
+        watching exactly why.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · One λ per ray</span>Color stops being three numbers</h2>
+      <p>
+        Every renderer so far in this series carried color as RGB — three
+        floats along every ray. But n(λ) makes that a lie: a "white" ray
+        entering glass has no single direction to bend. The spectral fix is
+        pure Monte Carlo doctrine. The pixel's color is an integral over
+        wavelengths? Then <em>sample</em> it: give each path one random λ,
+        bend it by n(λ), and weight its contribution by how the eye responds
+        to that wavelength (the CIE curves, here as little Gaussian fits).
+        One more dimension folded into the same dice.
+      </p>
+      <pre><code>λ = 380 + rand()·340            <span class="cm">// each sample is one wavelength of one path</span>
+trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth; the average makes the rainbow</span></code></pre>
+      <p>
+        At zero dispersion the spectral machinery idles invisibly — every λ
+        bends alike, the weights sum to white, and you could never tell. The
+        moment n spreads, the caustics fringe into rainbows: red and violet
+        rays left the same lamp, hit the same prism face, and landed in
+        different places. The renderer never contains the concept "rainbow."
+        It contains Snell, Cauchy, and an honest average.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The toy</span>An optics bench with a render budget</h2>
+      <p>
+        The full instrument. Drag the lamp and watch caustics crawl across
+        the floor; push dispersion past anything real glass could do; then
+        open the <em>aperture</em>. Depth of field is the last rhyme of the
+        series: a pinhole camera is one eye-point, a lens is an <em>area</em>
+        of them — the same step that turned hard shadows soft in part five,
+        applied to the camera itself. Rays start from random points on the
+        lens disk, agree only at the focus distance, and everything elsewhere
+        smears into bokeh. One more integral, the same dice.
+      </p>
+      <div data-demo="full"></div>
+      <p>
+        Set focus on the sphere and the prism melts into colored fog; rack it
+        back and the caustic on the floor — which lives at a different depth
+        than the glass that cast it — drifts through sharpness on its own
+        schedule. Every blur in this image is the size of some region the
+        dice are averaging over: the lamp's area, the lens's disk, the
+        spectrum's width. By now you can read a photograph as a stack of
+        integrals.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>What does it see?</h2>
+      <p>
+        Six parts ago this series asked its question for the first time: not
+        <em>where do things go</em>, which the gravity series spent six parts
+        answering, but <em>what do things see?</em> It has now been answered
+        three ways. Hierarchically — the cascades, which made every pixel see
+        everything by being principled about what not to resolve.
+        Heuristically — the distance field's certificates, spent on shadows
+        and crevices at a fixed frame budget. And statistically — the dice,
+        which answer any question you can phrase as an average, in exchange
+        for patience measured in noise.
+      </p>
+      <p>
+        The lava lamp's glow, the bonfire's thousand embers, the fog's
+        slanting shafts, the sculpture that exists nowhere, the box that
+        converges out of static, the rainbow assembled from dice rolls — all
+        of it ran live, in this browser, in the time it took to read. Light
+        is the fastest thing there is and the hardest to fake; the joy of it
+        is that the faking keeps turning out to be physics after all. Both
+        series end the same way on purpose: the simulation becomes a toy,
+        because a toy is what an idea looks like when it finally costs
+        nothing to play with.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Light in a Browser Tab, part six ·
+        <a href="/lava.html">part one: The Lava Lamp</a> ·
+        <a href="/bonfire.html">part two: The Bonfire</a> ·
+        <a href="/fog.html">part three: The Fog</a> ·
+        <a href="/flatland.html">part four: Leaving Flatland</a> ·
+        <a href="/cornell.html">part five: The Cornell Box</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://www.gutenberg.org/ebooks/33504">Newton, "Opticks" (1704)</a> ·
+        <a href="https://gallica.bnf.fr/ark:/12148/bpt6k90181x">Cauchy, "Mémoire sur la dispersion de la lumière" (1836)</a> ·
+        <a href="https://doi.org/10.1080/10867651.1994.10390071">Schlick, "An Inexpensive BRDF Model for Physically-based Rendering" (1994)</a> ·
+        <a href="https://jcgt.org/published/0002/02/01/">Wyman, Sloan &amp; Shirley, "Simple Analytic Approximations to the CIE XYZ Color Matching Functions" (2013)</a> ·
+        <a href="https://www.pbr-book.org/">Pharr, Jakob &amp; Humphreys, "Physically Based Rendering" (2004–)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/prism.ts"></script>
+  </body>
+</html>

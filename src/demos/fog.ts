@@ -33,10 +33,13 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
   const viewScaleY = modeNum === 0 ? 1.0 : 0.98;
   const viewScale: [number, number] = [viewScaleY / aspect, viewScaleY];
 
-  // GI at /2 — fog is the lowest-frequency light there is, but the trees
-  // still have to read as trees once the composite upscales
-  const gw = Math.floor(W / 2);
-  const gh = Math.floor(Hpx / 2);
+  // GI at /2.4 — fog is the lowest-frequency light there is, but narrow
+  // light corridors (the wall slits) must stay wider than the upper
+  // cascades' probe spacing or the shafts interpolate away. The fog march
+  // is the priciest in the series (every leap samples the media texture),
+  // so this is the perf/looks compromise.
+  const gw = Math.floor(W / 2.4);
+  const gh = Math.floor(Hpx / 2.4);
 
   // the fog texture the rays march through: a = density, rgb = glow
   const mediaTex = dev.createTexture({
@@ -46,14 +49,16 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
   });
   const mediaView = mediaTex.createView();
 
-  // temporal 0.3: the fog's glow reads last frame's light (the bounce trick
-  // again), and the EMA both stores that history and calms the feedback
-  const rc = new RadianceCascades(dev, gw, gh, 4, 0.3, mediaView);
+  // temporal 0.45: the fog's glow reads last frame's light (the bounce trick
+  // again). The EMA stores that history — but multiple scattering is itself
+  // a feedback loop, so too much history makes moving lights smear into
+  // long-lived ghost trails. 0.45 is the compromise.
+  const rc = new RadianceCascades(dev, gw, gh, 4, 0.45, mediaView);
 
   // ---- state -----------------------------------------------------------------
-  let fog = modeNum === 1 ? 0.4 : modeNum === 2 ? 0.45 : 0.55;
-  let scatter = 1.0;
-  let mist = 0.5;
+  let fog = modeNum === 1 ? 0.4 : modeNum === 2 ? 0.32 : 0.7;
+  let scatter = modeNum === 2 ? 0.9 : modeNum === 1 ? 0.55 : 0.7; // single-scattering albedo
+  let mist = 0.8;
   let sunHeight = 0.45; // 0 horizon … 1 overhead (shafts mode)
   let bounce = 0.6;
   let debugMode = 0;
@@ -156,7 +161,7 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
   if (opts.mode === "halo" || opts.mode === "forest") {
     shell.slider({
       label: "scatter",
-      min: 0, max: 3, step: 0.05, value: scatter,
+      min: 0, max: 1.15, step: 0.01, value: scatter,
       onInput: (v) => (scatter = v),
     });
   }
@@ -212,20 +217,20 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
         horizon: [0.22, 0.16, 0.1],
         sunDir: dir,
         sunSharpness: 150,
-        sunIntensity: 2.6,
+        sunIntensity: 10,
         sunColor: [1, 0.95 - warm * 0.4, 0.85 - warm * 0.6],
         strength: 1,
       });
       return;
     }
-    // the forest: a sunrise barely over the horizon, off to the left
+    // the forest: morning sun, high enough to slant down through the crowns
     rc.setSky({
-      zenith: [0.025, 0.045, 0.10],
-      horizon: [0.38, 0.20, 0.08],
-      sunDir: [-0.95, -0.28],
-      sunSharpness: 70,
-      sunIntensity: 2.2,
-      sunColor: [1, 0.55, 0.22],
+      zenith: [0.05, 0.09, 0.18],
+      horizon: [0.40, 0.26, 0.12],
+      sunDir: [-0.6, -0.85],
+      sunSharpness: 90,
+      sunIntensity: 8.0,
+      sunColor: [1, 0.72, 0.38],
       strength: 1,
     });
   };
@@ -239,9 +244,10 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
       last = now;
       time += dt;
 
-      // the lamp wanders when nobody is carrying it
-      if (modeNum === 1 && now - lastPointer > 2500) {
-        lamp = [0.5 * Math.sin(time * 0.33) - 0.15, 0.45 * Math.sin(time * 0.21 + 1.3)];
+      // the lamp wanders when nobody is carrying it — slowly, because a
+      // fast lamp in scattering fog drags a comet tail of stale glow
+      if (modeNum === 1 && now - lastPointer > 4000) {
+        lamp = [0.5 * Math.sin(time * 0.16) - 0.15, 0.45 * Math.sin(time * 0.11 + 1.3)];
       }
 
       stepPuffs(dt);
@@ -249,7 +255,9 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
       writeSky();
       // sigma: extinction per scene px at density 1 — at fog 1 an e-fold
       // every ~80 px, which reads as "thick" without going black
-      rc.setMedia({ sigma: 0.013, scatter: 0.0045 * scatter });
+      // rooms are smaller worlds than the forest — gentler extinction, or
+      // the far wall vanishes entirely
+      rc.setMedia({ sigma: modeNum === 0 ? 0.013 : 0.008, scatter });
 
       const enc = dev.createCommandEncoder();
 
@@ -273,7 +281,7 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
 
       rc.encodeGI(enc);
       rc.encodeComposite(enc, ctx.getCurrentTexture().createView(), {
-        exposure: modeNum === 0 ? 1.9 : 1.6,
+        exposure: modeNum === 0 ? 1.9 : 2.1,
         debugMode,
         emitBoost: 0.55,
       });

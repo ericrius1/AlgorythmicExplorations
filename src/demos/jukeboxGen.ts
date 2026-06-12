@@ -52,6 +52,26 @@ fn vnoise(p: vec2f) -> f32 {
     u.y,
   );
 }
+// Sparse point stars: each grid cell may hold one star at a jittered position,
+// drawn as a round gaussian glow so it stays crisp at any resolution.
+fn stars(q: vec2f, density: f32, t: f32) -> f32 {
+  let cell = floor(q * density);
+  var v = 0.0;
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      let c = cell + vec2f(f32(dx), f32(dy));
+      let h = hash(c);
+      if (h < 0.85) { continue; }
+      let pos = (c + vec2f(hash(c + vec2f(1.3, 7.1)), hash(c + vec2f(4.7, 2.9)))) / density;
+      let d = length(q - pos);
+      let size = (0.35 + 0.65 * pow(hash(c + vec2f(9.2, 3.3)), 4.0)) * 0.011;
+      let tw = 0.6 + 0.4 * sin(t * (1.0 + h * 4.0) + h * 40.0);
+      v += (glow(d, size) + halo(d, size * 0.4) * 0.12) * tw * (h - 0.84) / 0.15;
+    }
+  }
+  return v;
+}
+
 fn fbm(p: vec2f) -> f32 {
   var v = 0.0;
   var a = 0.5;
@@ -101,9 +121,9 @@ fn scene(uv: vec2f) -> vec3f {
   // snare: a brief whole-field sparkle
   col += vec3f(0.7, 0.8, 1.0) * fil * snare * 0.5;
 
-  // starfield dust
-  let star = pow(hash(floor(q * 60.0 + vec2f(7.0))), 60.0);
-  col += vec3f(star) * 0.5 * (0.4 + 0.6 * sin(t * 2.0 + hash(floor(q * 60.0)) * 40.0));
+  // starfield dust: a far dim layer and a near bright one
+  col += vec3f(0.7, 0.78, 1.0) * stars(q, 26.0, t) * 0.4;
+  col += vec3f(0.95, 0.97, 1.0) * stars(q + vec2f(31.7, 17.3), 12.0, t * 0.7) * 0.7;
 
   return col * vignette(uv);
 }

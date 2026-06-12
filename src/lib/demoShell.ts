@@ -32,7 +32,12 @@ export class Shell {
     this.canvas = document.createElement("canvas");
     this.canvas.className = "demo-canvas";
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.min(container.clientWidth || 720, 900);
+    // Heroes stretch to the full window width, so render them at native size
+    // (capped in device pixels) — the 900px article cap leaves them blurry.
+    const hero = container.closest("header.hero") !== null;
+    const w = hero
+      ? Math.min(container.clientWidth || 1280, 2560 / dpr)
+      : Math.min(container.clientWidth || 720, 900);
     this.canvas.width = Math.floor(w * dpr);
     this.canvas.height = Math.floor(w * aspect * dpr);
     container.appendChild(this.canvas);

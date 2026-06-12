@@ -111,7 +111,9 @@ struct SkyParams {
 // march reduces to the vanilla recipe.
 struct MediaParams {
   sigma: f32,   // extinction per scene px at density 1 (how fast light dies)
-  scatter: f32, // in-scatter strength applied to mediaTex.rgb
+  scatter: f32, // single-scattering albedo: the fraction of extinguished
+                // light re-emitted as glow. ≤ 1 conserves energy; above 1
+                // the fog becomes a gain medium and the time loop diverges.
   enabled: f32,
   _p0: f32,
 }
@@ -157,9 +159,9 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
   var trans = 1.0;
   var inscat = vec3f(0.0);
   let tEnd = CU.intervalStart + CU.intervalLen;
-  // fog varies smoothly, so cap the leap: ~20 samples across the interval
-  let fogStep = max(CU.intervalLen / 20.0, 2.0);
-  for (var s = 0; s < 40; s++) {
+  // fog varies smoothly, so cap the leap: ~12 samples across the interval
+  let fogStep = max(CU.intervalLen / 12.0, 3.0);
+  for (var s = 0; s < 32; s++) {
     let pos = origin + dir * t;
     if (pos.x < 0.0 || pos.y < 0.0 || pos.x >= sceneRes.x || pos.y >= sceneRes.y) {
       break; // off the canvas: a miss — let the cascade above (or the sky) answer
@@ -178,9 +180,10 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
       let m = textureSampleLevel(mediaTex, linSamp, uv, 0.0);
       let sigT = m.a * MU.sigma;
       let segT = exp(-sigT * segLen);
-      // source term ∫ J·e^(−σs) ds over the segment, J constant: J·(1−e^(−σL))/σ
-      // (the max() keeps the density→0 limit exact: contribution → 0)
-      inscat += trans * (m.rgb * MU.scatter) * (1.0 - segT) / max(sigT, 1e-5);
+      // the segment swallows (1 − segT) of the beam; the same fraction of
+      // the local light field (m.rgb, scaled by the albedo) is re-emitted
+      // toward us. Source-term integral ∫ σ·J·e^(−σs) ds = J·(1 − e^(−σL)).
+      inscat += trans * m.rgb * MU.scatter * (1.0 - segT);
       trans *= segT;
       if (trans < 0.004) { hit = true; radiance = vec3f(0.0); break; } // optically thick
     }

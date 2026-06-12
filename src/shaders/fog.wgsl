@@ -72,18 +72,21 @@ fn sdCapsule(p: vec2f, a: vec2f, b: vec2f, r: f32) -> f32 {
   return length(pa - ba * h) - r;
 }
 
-// bare winter trees: a trunk and a few branches, no canopy — gaps are what
-// god rays need
+// pines: a trunk and a heavy crown. The crowns matter more than the trunks —
+// god rays need *wide* occluders with gaps between them, and a crown is the
+// widest thing a forest owns.
 fn treeDist(world: vec2f, baseX: f32, h: f32, seed: f32) -> f32 {
   let gy = groundY(baseX);
   let sway = 0.02 * sin(seed * 9.0);
   let top = vec2f(baseX + sway, gy + h);
-  var d = sdCapsule(world, vec2f(baseX, gy - 0.05), top, 0.020 + 0.013 * h);
-  let m1 = mix(gy, gy + h, 0.55);
-  let m2 = mix(gy, gy + h, 0.75);
+  var d = sdCapsule(world, vec2f(baseX, gy - 0.05), top, 0.022 + 0.014 * h);
+  // crown: a lumpy ellipse, big enough to cast a shadow the upper cascades
+  // can't interpolate away
+  let c = world - (top + vec2f(0.0, 0.08));
+  let lump = 1.0 + 0.5 * (vnoise(world * 9.0 + seed * 13.0) - 0.5);
+  d = min(d, length(c * vec2f(1.25, 1.7)) - 0.26 * h * lump);
+  let m1 = mix(gy, gy + h, 0.6);
   d = min(d, sdCapsule(world, vec2f(baseX + sway * 0.5, m1), vec2f(baseX + 0.16 * h, m1 + 0.22 * h), 0.011));
-  d = min(d, sdCapsule(world, vec2f(baseX + sway * 0.5, m2), vec2f(baseX - 0.14 * h, m2 + 0.18 * h), 0.010));
-  d = min(d, sdCapsule(world, vec2f(baseX + sway, m1 + 0.1 * h), vec2f(baseX - 0.1 * h, m1 + 0.3 * h), 0.009));
   return d;
 }
 
@@ -110,17 +113,16 @@ fn evalScene(world: vec2f, aa: f32) -> SceneEval {
       let depth = gy - world.y;
       albedo = mix(vec3f(0.13, 0.13, 0.10), vec3f(0.05, 0.05, 0.045), smoothstep(0.0, 0.25, depth)) * gcov;
     }
-    let t1 = treeDist(world, -0.95, 0.95, 1.0);
-    let t2 = treeDist(world, -0.35, 1.15, 2.0);
-    let t3 = treeDist(world, 0.28, 0.9, 3.0);
-    let t4 = treeDist(world, 0.85, 1.2, 4.0);
-    let t5 = treeDist(world, 1.45, 0.85, 5.0);
-    let t6 = treeDist(world, -1.5, 1.05, 6.0);
-    let td = min(min(min(t1, t2), min(t3, t4)), min(t5, t6));
+    let t1 = treeDist(world, -1.05, 0.9, 1.0);
+    let t2 = treeDist(world, -0.42, 1.1, 2.0);
+    let t3 = treeDist(world, 0.3, 0.85, 3.0);
+    let t4 = treeDist(world, 0.95, 1.15, 4.0);
+    let t5 = treeDist(world, 1.55, 0.9, 5.0);
+    let td = min(min(min(t1, t2), min(t3, t4)), t5);
     let tcov = smoothstep(aa, -aa, td);
     if (tcov > 0.0) {
       occ = max(occ, tcov);
-      albedo = mix(albedo, vec3f(0.10, 0.075, 0.05), tcov);
+      albedo = mix(albedo, vec3f(0.05, 0.075, 0.04), tcov);
     }
   } else if (mode == 1u) {
     // ---- the lamp room ----------------------------------------------------------
@@ -137,13 +139,15 @@ fn evalScene(world: vec2f, aa: f32) -> SceneEval {
       occ = max(occ, pcov);
       albedo = mix(albedo, vec3f(0.22, 0.24, 0.3), pcov);
     }
-    // the lamp follows the cursor
+    // the lamp follows the cursor. Kept deliberately fat: a near-point
+    // source beads the low cascades' sparse directions into visible dots,
+    // and a wide soft emitter is the honest fix.
     let ld = length(world - FP.lamp);
-    let lampCov = smoothstep(aa, -aa, ld - 0.055);
+    let lampCov = smoothstep(aa, -aa, ld - 0.09);
     if (lampCov > 0.0) {
       occ = max(occ, lampCov);
       albedo = mix(albedo, vec3f(0.0), lampCov);
-      emission = vec3f(1.0, 0.8, 0.55) * 7.0 * FP.glow * smoothstep(0.055, 0.015, ld);
+      emission = vec3f(1.0, 0.8, 0.55) * 4.5 * FP.glow * smoothstep(0.09, 0.025, ld);
     }
   } else {
     // ---- the window room ----------------------------------------------------------
@@ -153,7 +157,7 @@ fn evalScene(world: vec2f, aa: f32) -> SceneEval {
     let b = 0.92;
     var wallCov = step(0.0, max(abs(world.x), abs(world.y)) - b);
     if (world.x < -b + 0.10) {
-      let slit = abs(world.y - 0.42) < 0.085 || abs(world.y - 0.02) < 0.085;
+      let slit = abs(world.y - 0.44) < 0.115 || abs(world.y - 0.0) < 0.115;
       wallCov = select(1.0, 0.0, slit);
     }
     if (wallCov > 0.0) {
@@ -253,9 +257,17 @@ fn fsMedia(in: FullOut) -> @location(0) vec4f {
   let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
   let world = clip / FP.viewScale;
   let dens = fogDensity(world, in.uv);
-  // the glow: what last frame's light field deposits in this parcel of fog.
-  // A slightly warm albedo — water droplets scatter sunrise light amber-ish.
-  let albedo = vec3f(1.0, 0.93, 0.82);
-  let glow = dens * fluenceAt(in.uv) * albedo;
+  // the glow channel holds the local light field (last frame's fluence) with
+  // a slightly warm tint — droplets scatter sunrise light amber-ish. The
+  // march multiplies in the density's (1 − e^(−σρΔs)) itself, so density is
+  // NOT folded in here. The wide 5-tap blur matters: near a bright source
+  // the cascades' probe grid leaves faint rings, and glowing fog is a
+  // magnifying glass for them — fog is allowed to be blurry.
+  let res = vec2f(FP.res);
+  let o1 = vec2f(9.0, 3.0) / res;
+  let o2 = vec2f(-3.0, 9.0) / res;
+  let tint = vec3f(1.0, 0.93, 0.82);
+  let glow = (fluenceAt(in.uv) + fluenceAt(in.uv + o1) + fluenceAt(in.uv - o1) +
+              fluenceAt(in.uv + o2) + fluenceAt(in.uv - o2)) * 0.2 * tint;
   return vec4f(glow, dens);
 }
