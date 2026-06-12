@@ -29,6 +29,7 @@ export interface LavaKnobs {
   heatRate: number;
   coolRate: number;
   diffusion: number;
+  tension: number;
 }
 
 export const DEFAULT_KNOBS: LavaKnobs = {
@@ -42,6 +43,7 @@ export const DEFAULT_KNOBS: LavaKnobs = {
   heatRate: 1.5,
   coolRate: 1.1,
   diffusion: 0.02,
+  tension: 2.0,
 };
 
 export function vesselHalfWidth(y: number): number {
@@ -158,6 +160,7 @@ export class LavaSim {
     dv.setFloat32(92, LAMP.wallTop, true);
     dv.setFloat32(96, LAMP.floorY, true);
     dv.setFloat32(100, LAMP.topY, true);
+    dv.setFloat32(104, knobs.tension, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 

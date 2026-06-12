@@ -145,6 +145,11 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       onInput: (v) => (knobs.buoyancy = v),
     });
     shell.slider({
+      label: "surface tension",
+      min: 0, max: 8, step: 0.1, value: knobs.tension,
+      onInput: (v) => (knobs.tension = v),
+    });
+    shell.slider({
       label: "gooiness (XSPH)",
       min: 0.0, max: 0.3, step: 0.01, value: knobs.xsph,
       onInput: (v) => (knobs.xsph = v),

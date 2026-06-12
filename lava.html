@@ -81,6 +81,18 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// and the unsimulated wat
         density. We are not simulating the water, so its job is performed by a single
         force proportional to temperature. Cold wax sinks and hot wax rises.
       </p>
+      <p>
+        One more force keeps the wax in one piece. Pressure is indifferent to
+        whether the fluid stays whole — it only objects to crowding — so a plume
+        left to pressure and buoyancy alone shears into ragged streamers. Real wax
+        does not, because it is one phase suspended in another, and the interface
+        between them costs energy. The sim buys that behaviour with a cohesion
+        force between particle pairs: gently attractive at mid range, repulsive up
+        close. That is surface tension in particle form — necks pinch off cleanly,
+        small blobs swallow their neighbours, and everything that survives is
+        round. The lamp demo below has a slider for it; drag it to zero and watch
+        the blobs fray.
+      </p>
       <div data-demo="temp"></div>
       <p>
         Watch the cycle develop: heat pools along the floor until a patch of wax
@@ -253,6 +265,7 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         <a href="https://jason.today/rc">McGhee, "Building Real-Time Global Illumination" (2024)</a> ·
         <a href="https://doi.org/10.1145/1111411.1111431">Rong &amp; Tan, "Jump Flooding in GPU" (2006)</a> ·
         <a href="https://doi.org/10.1145/1073368.1073400">Clavet, Beaudoin &amp; Poulin, "Particle-based Viscoelastic Fluid Simulation" (2005)</a> ·
+        <a href="https://doi.org/10.1145/2508363.2508395">Akinci, Akinci &amp; Teschner, "Versatile Surface Tension and Adhesion for SPH Fluids" (2013)</a> ·
         <a href="https://doi.org/10.1145/357306.357310">Blinn, "A Generalization of Algebraic Surface Drawing" (1982)</a>
       </p>
     </footer>

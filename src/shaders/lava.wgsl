@@ -5,7 +5,9 @@
 // dynamics twice: the rest density falls as a particle warms (thermal
 // expansion, so hot wax genuinely takes more room) and a direct buoyancy
 // term lifts warm particles, because the water the wax floats in is not
-// simulated and somebody has to do its job.
+// simulated and somebody has to do its job. A pairwise cohesion force
+// (Akinci-style spline) plays the part of surface tension: the wax–water
+// interface costs energy, so blobs round off and necks pinch.
 //
 // The lamp is not a box: walls are a taper, wide at the base, narrow at the
 // throat, enforced with the same penalty springs as everywhere else in the
@@ -41,7 +43,8 @@ struct LavaParams {
   wallTop: f32,    // half-width at topY
   floorY: f32,
   topY: f32,
-  _pad: vec2f,
+  tension: f32,    // surface tension: pairwise cohesion strength
+  _pad: f32,
 }
 
 @group(0) @binding(0) var<uniform> LP: LavaParams;
@@ -49,6 +52,17 @@ struct LavaParams {
 @group(0) @binding(2) var<storage, read> cellStart: array<u32>;
 @group(0) @binding(3) var<storage, read> cellCount: array<u32>;
 @group(0) @binding(4) var<storage, read_write> density: array<vec4f>; // rho, rhoNear, tFlux, _
+
+// Cohesion kernel (Akinci, Akinci & Teschner 2013), normalized so the
+// attractive peak at q = 0.5 is exactly 1 and the core bottoms out at -1.
+// Pressure only objects to crowding; this is what makes the wax *want* to
+// stay in one piece — the particle-level stand-in for the wax–water
+// interface costing energy.
+fn cohesionW(q: f32) -> f32 {
+  let a = (1.0 - q) * (1.0 - q) * (1.0 - q) * q * q * q;
+  if (q < 0.5) { return 64.0 * (2.0 * a - 0.015625); }
+  return 64.0 * a;
+}
 
 fn cellCoord(p: vec2f) -> vec2i {
   let g = f32(LP.grid);
@@ -132,6 +146,9 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
           let near = 0.5 * (nearI + LP.nearStiffness * dj.y);
           let w = 1.0 - q;
           acc -= (d / r) * (press * w + near * w * w);
+          // surface tension: mid-range attraction rounds blobs and pinches
+          // necks; the repulsive core keeps it from fighting near-pressure
+          acc += (d / r) * (LP.tension * cohesionW(q));
           dv += (parts[k].pv.zw - p.pv.zw) * w;
         }
       }
