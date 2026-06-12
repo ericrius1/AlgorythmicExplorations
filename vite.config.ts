@@ -8,6 +8,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL("index.html", import.meta.url)),
+        part1: fileURLToPath(new URL("part1.html", import.meta.url)),
         part2: fileURLToPath(new URL("part2.html", import.meta.url)),
         part3: fileURLToPath(new URL("part3.html", import.meta.url)),
         part4: fileURLToPath(new URL("part4.html", import.meta.url)),
@@ -27,7 +28,11 @@ export default defineConfig({
         chords: fileURLToPath(new URL("chords.html", import.meta.url)),
         jukebox: fileURLToPath(new URL("jukebox.html", import.meta.url)),
         contact: fileURLToPath(new URL("contact.html", import.meta.url)),
-        harmonizer: fileURLToPath(new URL("harmonizer.html", import.meta.url)),
+        accompanist: fileURLToPath(new URL("accompanist.html", import.meta.url)),
+        bear: fileURLToPath(new URL("bear.html", import.meta.url)),
+        rig: fileURLToPath(new URL("rig.html", import.meta.url)),
+        reach: fileURLToPath(new URL("reach.html", import.meta.url)),
+        qigong: fileURLToPath(new URL("qigong.html", import.meta.url)),
       },
     },
   },

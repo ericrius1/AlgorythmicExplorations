@@ -59,4 +59,23 @@ export class Piano {
       k.classList.toggle("is-root", m === root);
     }
   }
+
+  // Print keycap labels on the keys (e.g. the QWERTY note map). A fresh call
+  // replaces all existing labels; keys absent from the map go blank.
+  setLabels(labels: Map<number, string>): void {
+    for (const [m, k] of this.keys) {
+      let cap = k.querySelector<HTMLSpanElement>(".piano-cap");
+      const text = labels.get(m);
+      if (!text) {
+        cap?.remove();
+        continue;
+      }
+      if (!cap) {
+        cap = document.createElement("span");
+        cap.className = "piano-cap";
+        k.appendChild(cap);
+      }
+      cap.textContent = text;
+    }
+  }
 }

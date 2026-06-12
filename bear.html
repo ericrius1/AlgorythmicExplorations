@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Bear — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A new series on procedural character animation. A stylized bear modeled by arithmetic — capsules, smooth unions, and a mesh marched out of a signed distance field, shaded in TSL. No modeling software was opened."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/bear.ts -->
+    <header class="hero">
+      <div data-demo="hero-bear"></div>
+      <div class="hero-title">
+        <h1>The Bear</h1>
+        <p class="subtitle">
+          A new series begins with a new kind of protagonist. Not particles, not
+          light — a <em>character</em>. This bear was never sculpted, never
+          exported from anything: it is one JavaScript function, polygonized in
+          your tab a moment ago. Over four articles it will get a skeleton, learn
+          to want things, and perform qi gong.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        The previous series on this site simulated <em>stuff</em>: gravity,
+        light, water, sound. This one simulates <em>somebody</em>. The plan, over
+        four parts, is the full character pipeline — modeling, rigging,
+        animation — built from scratch in the browser with
+        <a href="https://threejs.org">three.js</a> and TSL, its shading language
+        that compiles to WebGPU. By the end the bear will perform a qi gong form
+        whose moves you can call out in any order, each one flowing into the
+        next without a single stored animation clip.
+      </p>
+      <p>
+        But every performer must first exist. The usual way to make a character
+        is interactive sculpting in Blender or ZBrush — hours of artistry,
+        then a file format, then a loader. This article takes the other road,
+        the one this site always takes: <em>state the thing as math and let the
+        computer build it</em>. The entire bear — body, limbs, ears, the
+        slightly self-satisfied belly — is twenty-five capsules and one smooth
+        operator.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The parts</span>A bear kit, in capsules</h2>
+      <p>
+        Look at any stylized animal — a Pixar bear, a Ghibli forest spirit, a
+        claymation dog — and squint. The body resolves into sausages: a fat one
+        for the torso, tapered ones for limbs, little spheres for ears. The
+        capsule (a cylinder with hemispherical caps, optionally tapered) is the
+        atom of character modeling, and it has a property that will pay rent for
+        the whole series: it is defined by <em>two points and two radii</em>.
+        That is also, not coincidentally, the definition of a <em>bone</em>.
+      </p>
+      <p>
+        So the bear's single source of truth is a table of twenty-five rows:
+        name, parent, head point, tail point, radius at each end. Drag the
+        slider and the kit comes apart.
+      </p>
+      <div data-demo="parts"></div>
+      <p>
+        Two kinds of rows live in the table. Eighteen are <strong>deform
+        bones</strong> — they have a parent and will become joints in part 2:
+        hips, spine, chest, neck, head, a stubby tail (load-bearing in part 4,
+        when the bear performs <em>Sway the Head and Wag the Tail</em>), and
+        three segments per limb. The other seven are <strong>shape-only
+        blobs</strong> — ears, muzzle, brows, belly — pure anatomy, no
+        articulation. The split matters later; today everything is just
+        geometry.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The blobby man of 1980</span>
+        <p>
+          Building creatures from blended primitives is nearly as old as
+          computer graphics. Jim Blinn, working on the Voyager flyby animations
+          at JPL, modeled molecules as summed Gaussian density fields — "blobby
+          molecules" — and in 1980 bent the same trick into a crouching human
+          figure, the <em>blobby man</em>. Japan's Omura lab and the Wyvills
+          formalized the idea as "metaballs" and "soft objects" through the
+          eighties. The bear is a direct descendant, with one modernization: it
+          blends <em>distances</em> instead of densities, because distances come
+          with a free gift we will collect twice before this page ends.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The glue</span>Smooth minimum</h2>
+      <p>
+        A capsule, as a <em>signed distance function</em>, answers one question:
+        how far is point <code>p</code> from my surface? Negative inside,
+        positive outside, zero exactly on the skin. The
+        <a href="/flatland.html">sphere-tracing article</a> in the light series
+        used SDFs to march rays; here we use them to <em>be</em> the model.
+        Combining two SDF shapes is one line: <code>min(a, b)</code> — a point
+        is inside the union if it is inside either. But <code>min</code> welds
+        with a crease, and creatures do not have creases where the arm meets
+        the shoulder. They have fillets. The fix is one of the great small
+        functions in graphics, the polynomial <em>smooth minimum</em>:
+      </p>
+      <pre><code>function smin(a, b, k) {
+  const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1);
+  return mix(b, a, h) - k * h * (1 - h);   <span class="cm">// k = width of the handshake</span>
+}</code></pre>
+      <p>
+        Where the two fields disagree by more than <code>k</code>, smin is just
+        min. Inside the disagreement zone it dips <em>below</em> both — and a
+        lower distance means a fatter union, which is exactly a fillet of
+        flesh. Drag a circle into the other and watch the handshake; the bright
+        line is the zero contour, the surface itself.
+      </p>
+      <div data-demo="smin"></div>
+      <p>
+        The bear is this, twenty-five times: fold every capsule in with its own
+        blend width <code>k</code>. Big k where masses merge (thigh into hip,
+        belly into everything — the belly blends at k = 0.12, the most generous
+        handshake in the table, which is why the bear looks well-fed rather
+        than assembled). Small k where anatomy should stay crisp (ears, muzzle).
+        Those two knobs — radius and blend — are the entire sculpting
+        interface:
+      </p>
+      <div data-demo="sculpt"></div>
+      <p>
+        Slide blend to zero and the bear becomes an obvious bag of capsules —
+        a useful reminder of how little shape information it really contains.
+        Slide it high and the parts melt toward one blob. Character design
+        lives in a surprisingly narrow band in the middle.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The harvest</span>Marching tetrahedra</h2>
+      <p>
+        A field is not a mesh. To render the bear the usual way (and later to
+        <em>deform</em> it, which is the whole point of the series), the zero
+        contour has to be extracted as triangles, once, at load time. The
+        ferrofluid article did this in 2D with marching squares; the textbook 3D
+        answer is <em>marching cubes</em> — visit every cell of a grid, classify
+        its eight corners as in/out, look up the triangle recipe among the 256
+        cases. But those 256 cases want a famously fiddly lookup table, and
+        there is a humbler relative with no table at all:
+        <em>marching tetrahedra</em>. Slice each cube into six tetrahedra. A
+        tetrahedron has four corners, sixteen sign patterns, and only three
+        honest outcomes: all same side (nothing), one corner odd (a triangle),
+        or two-and-two (a quad). You can write it from scratch and trust it.
+      </p>
+      <div data-demo="march"></div>
+      <p>
+        Each crossed edge gets one vertex, placed where the field actually hits
+        zero along the edge — <code>t = d₀ / (d₀ − d₁)</code> — and
+        <em>welded</em>: edges are shared between tetrahedra, so vertices are
+        cached by edge identity and the mesh comes out watertight. At a grid of
+        80 the bear costs about as many triangles as a video-game character;
+        at 14 it is a crystal bear from some lower-polygon afterlife. The
+        readout counts only <em>surface</em> cubes — the empty ones are
+        rejected with eight comparisons, which is why doubling the grid does not
+        even nearly cube the cost.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The patent dodge, paid off</span>
+        <p>
+          The ferrofluid article mentioned that marching cubes was patented in
+          1987, and that "marching tetrahedra" was invented largely to route
+          around the license. The patent expired in 2005, so using the dodge
+          today is an aesthetic choice rather than a legal one — but it is a
+          good aesthetic: no tables, no ambiguous saddle cases (a tetrahedron's
+          quad case has only one reading, where a cube's has two), at the price
+          of a few more, slightly thinner triangles. For a one-time build of a
+          smooth blob, that trade is free money.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: the free gift — normals from the gradient</summary>
+        <div class="fold-body">
+          <p>
+            A mesh needs normals for lighting, and the usual recipe — average
+            the face normals around each vertex — inherits every wobble of the
+            triangulation. But this mesh came from a distance field, and a
+            distance field's <em>gradient</em> points exactly away from the
+            nearest surface: the gradient <em>is</em> the normal, analytically
+            smooth no matter how coarse the triangles. Four extra field
+            evaluations per vertex (central differences) buy normals that make
+            the grid-14 crystal bear light like a smooth one wearing a low-poly
+            costume. That is gift number one of blending distances rather than
+            densities; gift number two — "how far is this vertex from that
+            bone?" — is the entire next article.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The fur</span>Dressing the bear in TSL</h2>
+      <p>
+        The mesh arrives naked and needs a material. This series writes its
+        shaders in TSL — three.js's node-based shading language, where shader
+        code is composed as JavaScript expressions and compiled to WGSL for
+        WebGPU (or GLSL, if a browser must). The bear's coat is built from
+        whatever the geometry already knows:
+      </p>
+      <pre><code>const zone  = attribute("zone");                  <span class="cm">// baked at march time: body, belly, muzzle…</span>
+const base  = palette.element(int(zone));         <span class="cm">// per-zone color, swappable live</span>
+const grain = mx_noise_float(positionGeometry.mul(scale))  <span class="cm">// rest-pose noise: fur glued to the skin</span>
+            .add(mx_noise_float(positionGeometry.mul(scale * 3.13)).mul(0.4));
+material.colorNode = base.mul(grain.mul(strength).add(1));
+material.sheenNode = base.mul(0.5);               <span class="cm">// fuzzy backlit edges — fur's tell</span></code></pre>
+      <p>
+        Every vertex was stamped at march time with the capsule that owns it,
+        so the muzzle, belly, paws and ears each get a palette slot — switch
+        the whole animal from cinnamon to panda with four color writes and zero
+        rebuilds. The noise is sampled in <em>rest-pose</em> coordinates
+        (<code>positionGeometry</code>), which matters in two articles: when the
+        bear bends, the grain must bend with the skin, not swim through it.
+        The glossy eyes and nose are confessed cheats — three little spheres
+        parked on the head, because marching a grid fine enough to grow
+        eyeballs is the wrong kind of heroism.
+      </p>
+      <div data-demo="final"></div>
+      <p>
+        A sheen lobe and a faint fresnel rim do most of the "fur" here —
+        honest strand rendering would be its own article. What matters for this
+        series is on the inside: this is now an indexed triangle mesh with
+        positions, gradient normals, and a zone id per vertex, sitting in GPU
+        buffers. It just doesn't <em>do</em> anything yet.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The bear is a statue</h2>
+      <p>
+        A statue with a secret, though: the capsule table that sculpted it is
+        also, row for row, a <em>skeleton</em> — heads, tails, parents, a
+        hierarchy. The same distances that decided "this vertex is belly, color
+        it cream" can decide "this vertex is 80% forearm, 20% upper arm" — and
+        that sentence, made precise, is called <em>skinning</em>. Next time: the
+        bear gets joints, the joints get a hierarchy, and the mesh learns to
+        follow them on the GPU, four matrix multiplies per vertex, in the same
+        TSL vertex stage that today merely stands still.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Waking Bodies, part one ·
+        the <a href="/part1.html">particles</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>, and
+        <a href="/vibration.html">music</a> series that precede it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/357306.357310">Blinn, "A Generalization of Algebraic Surface Drawing" (1982)</a> ·
+        <a href="https://doi.org/10.1007/BF01900346">Wyvill, McPheeters &amp; Wyvill, "Data Structure for Soft Objects" (1986)</a> ·
+        <a href="https://doi.org/10.1145/37402.37422">Lorensen &amp; Cline, "Marching Cubes" (1987)</a> ·
+        <a href="https://doi.org/10.1016/0097-8493(88)90013-1">Bloomenthal, "Polygonization of Implicit Surfaces" (1988)</a> ·
+        <a href="https://iquilezles.org/articles/smin/">Quilez, "Smooth Minimum" (web)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/bear.ts"></script>
+  </body>
+</html>
