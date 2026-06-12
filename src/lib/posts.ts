@@ -146,6 +146,13 @@ export const POSTS: Post[] = [
     title: "The Infinite Jukebox",
     subtitle: "Euclidean rhythm, random-walk melody, a song that writes itself — the series becomes a toy",
   },
+  {
+    href: "/harmonizer.html",
+    series: "Music in a Browser Tab",
+    part: 7,
+    title: "The Harmonizer",
+    subtitle: "Encore — the series learns to listen: live pitch detection, and a voice that sings thirds with you",
+  },
 ];
 
 export function currentPost(): { post: Post | null; index: number } {

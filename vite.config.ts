@@ -26,6 +26,8 @@ export default defineConfig({
         scales: fileURLToPath(new URL("scales.html", import.meta.url)),
         chords: fileURLToPath(new URL("chords.html", import.meta.url)),
         jukebox: fileURLToPath(new URL("jukebox.html", import.meta.url)),
+        contact: fileURLToPath(new URL("contact.html", import.meta.url)),
+        harmonizer: fileURLToPath(new URL("harmonizer.html", import.meta.url)),
       },
     },
   },

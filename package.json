@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@svenflow/micro-handpose": "^0.3.0",
+    "three": "^0.184.0",
     "tone": "^15.1.22"
   }
 }

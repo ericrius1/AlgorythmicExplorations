@@ -75,6 +75,11 @@ export function initNav(): void {
     arrow(next, "→", "Next");
   }
 
+  const contact = el("a", "site-nav-github", "Contact");
+  contact.href = "/contact.html";
+  contact.title = "Get in touch";
+  right.appendChild(contact);
+
   const github = el("a", "site-nav-github", "GitHub");
   github.href = SITE_REPO;
   github.target = "_blank";
