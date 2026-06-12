@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Form — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The bear performs qi gong without a single animation clip: poses as joint-angle targets, critically damped springs as the only notion of time, breath and foot-planting and gaze as layers. Call the moves in any order and every transition just works."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/qigong.ts -->
+    <header class="hero">
+      <div data-demo="hero-qigong"></div>
+      <div class="hero-title">
+        <h1>The Form</h1>
+        <p class="subtitle">
+          The bear above is practicing right now — Lifting the Sky, Drawing the
+          Bow, Swaying the Head and Wagging the Tail — and none of it is a
+          recording. There is no animation clip anywhere in this series. There
+          are tables of joint angles, and springs that chase them. This final
+          article builds the whole performance: poses as targets, springs as
+          blends, and a form you can conduct.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Take stock of what three articles bought. A body marched out of a
+        capsule field; a skeleton with skin weights, bending on the GPU; and
+        wants — put the paw there, watch the firefly — compiled into joint
+        angles by a triangle and a clamp. What is still missing is the thing
+        audiences actually call <em>animation</em>: whole-body intent,
+        sustained over seconds, one shape flowing into the next.
+      </p>
+      <p>
+        The industrial answer is the <em>clip</em>: record curves for every
+        joint, play them back, and when you need to go from clip A to clip B,
+        crossfade. Clips are wonderful right up until someone interactive
+        touches them — interrupt a crossfade with a new request and you need a
+        blend of blends, then a tree of those, and the tree grows arbitration
+        logic of its own. This article takes the other road, the one this
+        site always takes, and it turns out to dissolve the blending problem
+        entirely: <em>never store motion at all</em>. Store destinations. Let
+        physics do the traveling.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The vocabulary</span>Poses as places</h2>
+      <p>
+        A <strong>pose</strong> here is nothing but a table: joint name →
+        three Euler angles, plus an optional whole-body lift. The qi gong
+        stances are all small edits of one base — <em>wu ji</em>, "empty
+        standing": knees soft, spine tall, arms just off the body. Composing a
+        stance is a spread operator:
+      </p>
+      <pre><code>const liftSky = over(WUJI, {
+  upperArmL: [-152, 0, -10], upperArmR: [-152, 0, 10],  <span class="cm">// both arms overhead</span>
+  spine: [-3, 0, 0], chest: [-6, 0, 0],
+  head: [-12, 0, 0],                                    <span class="cm">// eyes follow the hands up</span>
+});</code></pre>
+      <p>
+        A <strong>move</strong> is a handful of poses with normalized
+        timestamps — Lifting the Sky is six keyposes: stand, arms forward,
+        arms overhead, the stretch (up on the toes, a 4-centimeter lift),
+        sweep down through a T, stand again. Sampling a move at time
+        <code>t</code> finds the two bracketing keyposes and eases between
+        their tables with a smoothstep. That is the entire file format. No
+        curves per joint, no exported takes — the whole nine-move form is a
+        page of readable tables, and editing a stance is editing a number.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The bear was already in the curriculum</span>
+        <p>
+          Qi gong and bears go back further than either does with computers.
+          The <em>Wu Qin Xi</em> — Five Animal Frolics, attributed to the
+          physician Hua Tuo around the second century — is one of the oldest
+          documented exercise systems, and its five animals are the tiger, the
+          deer, the monkey, the crane, and the <em>bear</em>: heavy, rooted,
+          swaying from the waist. The routine this article's bear performs is
+          adapted from the <em>Ba Duan Jin</em>, the Eight Pieces of Brocade,
+          a Song-dynasty standing form whose move names — "Two Hands Hold Up
+          the Heavens", "Wise Owl Gazes Backwards", "Sway the Head and Wag the
+          Tail" — needed no adaptation at all to describe what a stylized bear
+          should do in a browser.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The time machine</span>Springs as blends</h2>
+      <p>
+        Here is the idea the whole article stands on. The move player never
+        rotates a joint. It only writes <em>targets</em> — and every joint
+        chases its target with a <strong>critically damped spring</strong>:
+        acceleration proportional to the remaining error, damping tuned to the
+        exact value where the joint arrives as fast as possible <em>without
+        overshooting</em>. The spring owns two numbers per channel — position
+        and velocity — and the velocity is the magic. When a new move
+        interrupts an old one, the spring does not restart; it carries its
+        momentum into the new chase. The result reads as a performer changing
+        their mind, not a video changing its frame.
+      </p>
+      <p>
+        Watch the three philosophies race. The grey line is a hard cut — what
+        switching clips does. The violet line is a fixed-duration crossfade —
+        what blend trees do, and it looks fine <em>until you interrupt it</em>:
+        click mid-fade and it visibly restarts from wherever it was, with a
+        kink. The blue spring just keeps flowing:
+      </p>
+
+      <div data-demo="springs"></div>
+
+      <p>
+        Rotations need one extra courtesy. A joint's orientation is a
+        quaternion, and "the remaining error" between two quaternions is not a
+        subtraction — the animator measures it as a <em>rotation vector</em>
+        (axis times angle, the log map), runs the spring in that space, and
+        integrates the angular velocity back onto the quaternion each frame:
+      </p>
+      <pre><code>err = log(target · current⁻¹)            <span class="cm">// rotation vector: axis × angle</span>
+vel += k·err·dt − c·vel·dt               <span class="cm">// k from the stiffness, c = 2√k (ζ = 1)</span>
+current = exp(vel·dt) · current          <span class="cm">// physics that refuses to teleport</span></code></pre>
+      <p>
+        One knob falls out of the math: the spring frequency, in honest hertz —
+        the bear's <em>muscle speed</em>. Around 1.3&nbsp;Hz it moves like a
+        large, calm animal. Crank it to 3&nbsp;Hz and it snaps to its stances
+        like a drill sergeant; drop it to half a hertz and it underwater-dreams
+        through the same form, every keypose arriving late and soft. Same
+        tables, same schedule — one number changes the character's apparent
+        mass.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The games industry converged here too</span>
+        <p>
+          Springs as the connective tissue of character motion is now
+          mainstream practice. David Bollo's GDC talk on
+          <em>inertialization</em> made the case that transitions should be
+          physical decays rather than crossfades — Gears of War shipped on it —
+          and Daniel Holden's writing catalogued the critically damped spring
+          as the single most useful object in a gameplay animator's toolbox
+          (cameras, aim offsets, IK targets, everything). The thirty-line
+          version in this article's animator is the same animal, just with the
+          fur visible.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The layers</span>Breath, ground, gaze</h2>
+      <p>
+        Springs chasing keyposes already look like motion, but not yet like a
+        <em>body</em>. Three layers, applied in order each frame, close the
+        distance — and each is a tool this series already owns:
+      </p>
+      <p>
+        <strong>Breath.</strong> A slow sine — six breaths a minute, qi gong
+        tempo — added onto the chest, spine, neck, and shoulder targets before
+        the springs see them. It never stops, so the bear is never a statue,
+        even standing "still". Some moves breathe deeper: Embracing the Tree
+        is mostly breath.
+      </p>
+      <p>
+        <strong>Ground.</strong> The pose tables bend knees, but forward
+        kinematics alone would leave the feet swinging through the floor like
+        a marionette's. So after the springs run, part 3's two-bone solver
+        re-plants each ankle exactly where it stood at rest — and there is one
+        subtlety worth the italics: <em>pinning the feet is what turns bent
+        knees into a crouch</em>. The animator measures how much the pose
+        moved the ankles relative to the hips and sinks the hips by the same
+        amount; the IK then makes the legs honest. Horse stance comes out as
+        an actual descent, not a levitation with folded legs.
+      </p>
+      <p>
+        <strong>Gaze.</strong> The clamped-cone aim from part 3, eased so
+        glances feel intentional. Each move can name a point worth watching —
+        the archer's distant hawk, the owl's over-the-shoulder look — and the
+        neck and head recruit toward it at their own rates while everything
+        else carries on.
+      </p>
+      <p>
+        The order — pose targets, breath, springs, feet, gaze — is a pipeline,
+        and like the GPU pipelines earlier in this site's history, each stage
+        only ever <em>improves</em> the numbers the previous stage wrote. No
+        stage knows the others exist. That ignorance is the architecture.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The toy</span>Conduct the form</h2>
+      <p>
+        Everything assembled. Nine moves from the Brocade, bear edition — call
+        them in any order, as rudely as you like. Interrupt the archer
+        mid-draw with a bounce; demand the owl while the bear is still deep in
+        horse stance. There is no transition code to confuse, because there
+        are no transitions — only springs discovering they have somewhere new
+        to be. Then turn <em>feet: planted</em> off and watch the marionette
+        problem come back; turn the gaze off and watch the practice go vacant.
+      </p>
+
+      <div data-demo="form"></div>
+
+      <p>
+        The muscle-speed slider is worth a slow minute: at 0.6&nbsp;Hz the
+        same nine tables read as tai chi; at 3&nbsp;Hz they read as calisthenics.
+        Tempo scales the schedule without touching the physics, so a slow form
+        still <em>arrives</em> — late targets, honest travel.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>One table, four articles</h2>
+      <p>
+        The series is over, so audit the spend. One table of twenty-four
+        capsules — two points and two radii each — was, in order: a body (the
+        smooth-minimum field of part one), a paint job (color zones by nearest
+        capsule), a skeleton (the deform rows became joints), a skinning (the
+        same distances became weights), a set of bone lengths for the IK
+        triangle of part three, and finally the address space the qi gong
+        tables write their angles into. Every later system leaned on the same
+        twenty-four rows the first article typed in.
+      </p>
+      <p>
+        And the moral that generalizes, the one worth taking to systems that
+        have nothing to do with bears: <em>storing destinations is more
+        composable than storing journeys</em>. Clips are journeys; they fight
+        when combined. Targets plus dynamics compose by construction — which
+        is why the same trick keeps surfacing as camera smoothing, cursor
+        inertia, UI transitions, and a bear that can be interrupted
+        mid-brocade without ever once looking embarrassed.
+      </p>
+      <p>
+        The bear at the top of this page is still practicing. It will not
+        repeat itself exactly, ever — and nobody taught it any of those
+        in-betweens.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Waking Bodies, part four ·
+        <a href="/bear.html">part one: The Bear</a> ·
+        <a href="/rig.html">part two: The Skeleton</a> ·
+        <a href="/reach.html">part three: The Reach</a>
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1145/237170.237258">Perlin &amp; Goldberg, "Improv: A System for Scripting Interactive Actors in Virtual Worlds" (1996)</a> ·
+        <a href="https://www.gdcvault.com/play/1025165/Inertialization-High-Performance-Animation">Bollo, "Inertialization: High-Performance Animation Transitions" (GDC 2018)</a> ·
+        <a href="https://theorangeduck.com/page/spring-roll-call">Holden, "Spring-It-On: The Game Developer's Spring-Roll-Call" (web)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/qigong.ts"></script>
+  </body>
+</html>

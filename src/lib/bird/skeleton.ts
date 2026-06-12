@@ -101,6 +101,13 @@ export const BIRD_BONES: BirdBone[] = [...CORE, ...LEFT, ...LEFT.map(mirror)].ma
 
 export const BONE_INDEX = new Map(BIRD_BONES.map((b, i) => [b.name, i]));
 
+// The joints, in parents-first order (the table is written that way), so one
+// forward pass computes every world matrix. Part 2's skeleton and skin
+// weights index bones by this list, not by BIRD_BONES.
+export const DEFORM_BONES: BirdBone[] = BIRD_BONES.filter((b) => b.deform);
+
+export const DEFORM_INDEX = new Map(DEFORM_BONES.map((b, i) => [b.name, i]));
+
 // Shape-only blobs attach to a deform bone so they will follow the skeleton
 // when part 2 makes it move.
 export const SHAPE_PARENT: Record<string, string> = {

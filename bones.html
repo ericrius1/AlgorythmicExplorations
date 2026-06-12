@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Bones — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The wren's capsule table takes a second job: seventeen joints, skin weights computed by proximity, linear blend skinning, and a bird that fidgets, breathes, and looks around — with zero keyframes."
+    />
+  </head>
+  <body>
+    <!-- demos mount via src/bones.ts -->
+    <header class="hero">
+      <div data-demo="hero-rig"></div>
+      <div class="hero-title">
+        <h1>The Bones</h1>
+        <p class="subtitle">
+          Last time the wren was a statue. This article gives her the table's
+          second gift: joints. Skin weights fall out of the same capsules that
+          modeled her, forward kinematics chains seventeen rotations into a
+          pose, and a handful of fidget timers does the rest. She is looking
+          around right now. Drag to look back.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/wren.html">Part one</a> ended with a confession: everything
+        in it was built to be destroyed. The mesh that came out of the
+        polygonizer was frozen in rest pose — a beautifully faceted statue.
+        This article breaks the freeze. By the end, the same mesh bends:
+        head turning, tail flicking, body breathing, every vertex deciding for
+        itself how much of each motion to follow. The machinery is called
+        <em>skinning</em>, and the punchline of the whole article is that we
+        already built most of it — in part one, by accident, when we wrote
+        down the capsule table.
+      </p>
+      <p>
+        The plan is three steps and a reward. First the table's deform rows
+        become actual <em>joints</em> — things that rotate, chained
+        parent-to-child. Then every vertex of the mesh gets <em>weights</em>:
+        a short list of joints it cares about, computed by the same distance
+        function that sculpted the body. Then the GPU blends it all together
+        with one formula from 1988. And once a bird can be posed, making her
+        <em>act</em> turns out to be embarrassingly cheap — the hero above is
+        four timers and two springs, no keyframes anywhere. Her sister series
+        is on the same arc: while the wren learns to move,
+        <a href="/heightfield.html">Ground Truth</a>'s mountains are learning
+        history, one simulated raindrop at a time.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The contract pays out</span>
+        <p>
+          Part one made a promise: nothing downstream of the capsule table
+          would ever store its own copy of the bird. Here is the first payout.
+          This article adds <strong>zero new numbers</strong> describing the
+          wren — no joint positions, no weight maps, no painted influence
+          regions. Joints are the table's rows with <code>deform: true</code>;
+          their pivots are the rows' head points; the weights are queries
+          against the rows' capsules. Make the neck longer in the table and
+          the rig follows before you've saved the file. The
+          <a href="/bear.html">bear</a> works the same way — same philosophy,
+          sibling series, heavier animal.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The skeleton</span>Rows become joints</h2>
+      <p>
+        Of the twenty-two capsules, seventeen carry <code>deform: true</code> —
+        the rows that are secretly bones: body, neck, head, beak, tail, three
+        per wing, three per leg. (The other five — breast, brows, halluxes —
+        are shape-only blobs; they'll reappear in step two.) Each deform row
+        becomes a joint: a pivot at the row's head point, a parent from the
+        row's parent column, and exactly one new degree of freedom — a
+        rotation.
+      </p>
+      <p>
+        Posing is then a chain rule. A joint's transform in the world is its
+        parent's world transform, times a fixed translation (where the child's
+        pivot sits relative to the parent's — measured straight off the
+        table), times the joint's own rotation:
+      </p>
+      <pre><code>world(joint) = world(parent) · T(head − parentHead) · R(joint)</code></pre>
+      <p>
+        That is the whole of <em>forward kinematics</em>. Rotate the neck and
+        the head, beak, brows, and eyes all inherit the turn, because their
+        transforms are multiplied downstream of it; rotate the body and all
+        sixteen descendants come along. The skeleton is a tree, the pose is a
+        product of matrices along each branch, and one pass over the joints —
+        parents first, which is the order the table is already written in —
+        computes everything.
+      </p>
+      <div data-demo="fk"></div>
+      <p>
+        The x-ray shows the machinery naked: octahedra for joints, beads for
+        pivots, the mesh ghosted on top. Roll the body and watch the whole
+        tree obey; yaw the head and only its subtree moves. One slider, one
+        joint, one rotation — every complex pose this series will ever strike,
+        including a full wingbeat, is just several of these at once.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The weights</span>Which bones own you?</h2>
+      <p>
+        Joints move; now the skin has to follow. The question every vertex
+        must answer is: <em>when joint j rotates, how much do I care?</em>
+        A vertex on the forehead should follow the head completely. A vertex
+        mid-neck should split its loyalty — half neck, half body — or it will
+        crease like bent cardboard. The answer is a set of weights per vertex,
+        non-negative, summing to one.
+      </p>
+      <p>
+        Production pipelines have artists paint these by hand, brushing
+        influence onto meshes like watercolor. We have something better than a
+        brush: a <em>distance function</em>. Part one already taught every
+        capsule to report how far any point is from it. So for each vertex,
+        ask all the capsules, keep the four nearest joints, and turn distances
+        into weights with a sharpened reciprocal:
+      </p>
+      <pre><code>wᵢ = 1 / (dᵢ + ε)^p          <span class="cm">// then normalize so the four sum to 1</span></code></pre>
+      <p>
+        The shape-only blobs from step one get their purpose back here: each
+        is a <em>proxy</em> for the joint it rides. The breast capsule answers
+        for the body, the brows answer for the head, so a vertex on the
+        eyebrow reads "practically touching the head" even though the head's
+        own capsule is millimeters away. Five capsules that deform nothing,
+        still earning their rows.
+      </p>
+      <div data-demo="weights"></div>
+      <p>
+        Every joint's territory, painted by arithmetic. The <strong>falloff
+        power</strong> p is the only artistic dial: low p spreads influence
+        wide and the bird goes rubbery; high p snaps each vertex to its
+        nearest bone and joints crease. Around 2.6, blends span exactly the
+        fillets the smooth minimum built — which is not a coincidence; both
+        are reading the same geometry. And use the <strong>stress pose</strong>
+        button: weights can only be judged bent. Rest pose hides every sin.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: weights on a mesh with no shared vertices</summary>
+        <div class="fold-body">
+          <p>
+            Part one un-shared every vertex so each triangle could own one flat
+            normal and one flat color — the low-poly look. That means the
+            three corners of a triangle are distinct vertices and each
+            computes its own weights. Corners at the same position get the
+            same weights (the computation is a pure function of position), so
+            the skin never tears; but <em>within</em> a triangle the GPU
+            interpolates between corner weights as smoothly as on any mesh.
+            The facets stay rigid little plates exactly when their corners
+            agree — near a joint they shear slightly instead of folding, which
+            reads as the plates "giving" at the hinge. It looks deliberate.
+            We'll take it.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The blend</span>One formula since 1988</h2>
+      <p>
+        One piece is missing. A joint's world matrix says where the joint
+        <em>is</em>, but a vertex needs to know how the joint <em>moved</em> —
+        the change from rest. That's one multiplication: undo where the bone
+        was born, then apply where it is now. With rest-pose world transforms
+        being plain translations to each pivot, the skin matrix for joint i is
+      </p>
+      <pre><code>Mᵢ = world(i) · T(−headᵢ)      <span class="cm">// "as born" → identity; rest pose moves nothing</span>
+v′ = Σᵢ wᵢ · Mᵢ · v             <span class="cm">// each vertex: blend of its four bones' motions</span></code></pre>
+      <p>
+        The second line is <em>linear blend skinning</em>, and it is what the
+        GPU executes for every vertex of every skinned character in every
+        game you have ever played, essentially unchanged since Magnenat-Thalmann,
+        Laperrière and Thalmann wrote it down in 1988 for a hand grabbing a
+        ball. Our four weights and four indices ride into the vertex shader as
+        a pair of vec4 attributes; three.js calls the bundle a
+        <code>SkinnedMesh</code> and runs the sum on hardware. The arithmetic
+        is ours; the silicon is rented.
+      </p>
+      <div data-demo="pose"></div>
+      <p>
+        The puppet, fully strung. Seven dials, three preset poses, and one
+        detail to catch: the eyes. They were never part of the field — part
+        one bolted them on as <em>riders</em> at fixed positions. Now they're
+        parented to the head joint, exactly as promised, so they get carried
+        by world(head) without owning a single weight. Turn her head: the
+        face simply comes along, glints and all. Free, forever, for anything
+        else we ever glue to a joint.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · The candy wrapper</span>
+        <p>
+          Linear blend skinning has a famous failure: blend two rotations that
+          differ too much and the linear average of matrices is not a rotation
+          — it shrinks. Twist a wrist 180° and the forearm pinches to a point
+          like a candy wrapper; bend an elbow hard and the inner crease loses
+          volume. Wrens are merciful subjects — no wrists, modest joint
+          angles, plumage hiding the elbows — so this article gets away with
+          the 1988 formula. The fix, blending rotations as <em>dual
+          quaternions</em> instead of matrices, waited until 2008. If the
+          wingbeat's shoulder twist ever candy-wraps, that's the IOU we'll
+          cash.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Alive</span>Four timers, two springs</h2>
+      <p>
+        A poseable bird is still a statue between poses. The final step is the
+        cheapest and the most rewarding: <em>idle behavior</em>. Watch a real
+        wren for one minute and you'll see the repertoire — she fixates on a
+        point, holds, snaps to a new one (birds move their eyes barely at all;
+        they move the whole head, in saccades), the tail flicks up and rings
+        back down, the body never quite stops breathing.
+      </p>
+      <p>
+        Every item on that list is one line of state. A look target that
+        re-rolls every couple of seconds, approached fast and held — that's a
+        timer and an exponential ease. The tail flick is an impulse into an
+        underdamped spring, so it overshoots and rings down like the real
+        thing. Breath is a slow sine on the body joint, weight-shift a slower
+        one on its roll. No keyframes, no animation clips, no blend trees —
+        the pose is computed fresh every frame from four timers and two
+        springs, and the rig does the acting.
+      </p>
+      <div data-demo="alive"></div>
+      <p>
+        The sliders are personality knobs: <strong>curiosity</strong> is the
+        saccade rate, <strong>tail sass</strong> the flick frequency. Turn
+        both up and she's caffeinated; down, and she's contemplating rain.
+        This is the part of character work that data can't sell you — a
+        downloaded animation clip loops; a behavior <em>responds</em>. In part
+        six, when you're flying her, the same head-saccade system will be
+        looking where you're about to turn.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The Z under the plumage</h2>
+      <p>
+        She moves, but she hasn't <em>done</em> anything yet. The next article
+        takes on the reason birds exist: the wing. Remember from part one that
+        the folded wing is a Z — humerus back, forearm forward, hand back —
+        pressed flat against the body. Part three unfolds that Z with
+        <em>inverse kinematics</em>: instead of dialing three joint angles, we
+        say "wingtip, be there" and solve for the angles — the same trick the
+        bear's arm learned in <a href="/reach.html">The Reach</a>, retuned for
+        a limb that becomes an airfoil. Then a flap cycle, the tail spreading
+        into its fan, and the first wingbeats of a bird with somewhere to go.
+      </p>
+      <p>
+        Somewhere worth going is under construction next door.
+        <a href="/heightfield.html">Ground Truth</a> is carving its mountains
+        with hydraulic erosion as we speak — drainage for valleys she'll bank
+        through, sediment flats she'll skim. Two series, one demo at the end:
+        a wren, a world, and you.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Feather &amp; Bone, part two ·
+        written in parallel with <a href="/heightfield.html">Ground Truth</a> ·
+        built on the <a href="/part1.html">gravity</a>,
+        <a href="/lava.html">light</a>,
+        <a href="/ferro.html">matter</a>,
+        <a href="/bear.html">bodies</a>, and
+        <a href="/vibration.html">music</a> series before it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://graphicsinterface.org/proceedings/gi1988/gi1988-4/">Magnenat-Thalmann, Laperrière &amp; Thalmann, "Joint-Dependent Local Deformations for Hand Animation and Object Grasping" (1988)</a> ·
+        <a href="https://doi.org/10.1145/344779.344862">Lewis, Cordner &amp; Fong, "Pose Space Deformation" (2000)</a> ·
+        <a href="https://doi.org/10.1145/1409625.1409627">Kavan, Collins, Žára &amp; O'Sullivan, "Geometric Skinning with Approximate Dual Quaternion Blending" (2008)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/bones.ts"></script>
+  </body>
+</html>

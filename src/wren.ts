@@ -1,4 +1,3 @@
-import "./style.css";
 import { initNav } from "./lib/siteNav";
 import { mountLazy } from "./lib/demoShell";
 import { mountBirdFull, mountBirdParts, mountBirdSlice, mountBirdNets } from "./demos/birdModel";

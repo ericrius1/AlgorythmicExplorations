@@ -10,7 +10,7 @@ import { BIRD_BONES } from "../lib/bird/skeleton";
 import { birdField, FIELD_BOUNDS } from "../lib/bird/field";
 import { buildBirdMesh, addFace, ZONE_COLORS } from "../lib/bird/build";
 
-const WREN_STAGE = {
+export const WREN_STAGE = {
   target: [0, 0.38, 0] as [number, number, number],
   distance: 1.9,
   minDistance: 0.8,

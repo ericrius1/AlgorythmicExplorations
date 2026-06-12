@@ -2,7 +2,6 @@
 // series. The index is generated from posts.ts, so it never drifts from the
 // nav.
 
-import "./style.css";
 import { initNav } from "./lib/siteNav";
 import { mountLazy } from "./lib/demoShell";
 import { mountPyramidGpu } from "./demos/pyramidGpu";

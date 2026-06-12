@@ -8,10 +8,13 @@ import * as THREE from "three/webgpu";
 import { BIRD_BONES } from "./skeleton";
 import { birdField, birdGradient, boneDistance, FIELD_BOUNDS, type FieldOptions } from "./field";
 import { surfaceNets } from "./nets";
+import { computeSkinWeights, WEIGHT_POWER_DEFAULT } from "./rig";
 
 export interface BuildOptions extends FieldOptions {
   res?: number; // sampling resolution along the longest axis
   style?: "faceted" | "smooth";
+  skin?: boolean; // part 2: bake skinIndex/skinWeight attributes
+  weightPower?: number; // skin-weight falloff sharpness
 }
 
 export interface BirdMesh {
@@ -131,6 +134,13 @@ export function buildBirdMesh(opts: BuildOptions = {}): BirdMesh {
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   }
 
+  if (opts.skin) {
+    const pos = geometry.getAttribute("position").array as Float32Array;
+    const { skinIndex, skinWeight } = computeSkinWeights(pos, opts.weightPower ?? WEIGHT_POWER_DEFAULT);
+    geometry.setAttribute("skinIndex", new THREE.BufferAttribute(skinIndex, 4));
+    geometry.setAttribute("skinWeight", new THREE.BufferAttribute(skinWeight, 4));
+  }
+
   return {
     geometry,
     vertexCount: geometry.getAttribute("position").count,
@@ -143,12 +153,14 @@ export function buildBirdMesh(opts: BuildOptions = {}): BirdMesh {
 // Eyes are not in the field: growing a glossy three-millimeter eyeball out of
 // a distance field would need a lattice fine enough to waste. They are riders
 // — two faceted spheres and two glints parented to where the head will be.
-export function addFace(parent: THREE.Object3D): void {
+// `pivot` re-bases the rest-pose world positions into the parent's local
+// frame, so part 2 can hang the whole face off the head joint.
+export function addFace(parent: THREE.Object3D, pivot: [number, number, number] = [0, 0, 0]): void {
   const eyeMat = new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.15, flatShading: true });
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number): void => {
     const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
+    m.position.set(x - pivot[0], y - pivot[1], z - pivot[2]);
     parent.add(m);
   };
   const eye = new THREE.IcosahedronGeometry(0.02, 1);

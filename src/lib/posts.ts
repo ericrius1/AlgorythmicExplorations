@@ -23,8 +23,6 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "Simulated stuff you can poke — a magnetic liquid that grows spikes, its surface re-meshed from scratch every frame.",
   "Living Music":
     "The physics of sound you can hear — why notes agree, why minor sounds sad, and a song that writes itself.",
-  "Waking Bodies":
-    "A character built from scratch — a bear modeled by math, rigged by distances, and taught qi gong by springs.",
   "Feather & Bone":
     "A bird built from first principles — modeled low-poly from capsules, rigged, flapped, and finally flown over a living world.",
   "Ground Truth":
@@ -172,34 +170,9 @@ export const POSTS: Post[] = [
     title: "The Accompanist",
     subtitle: "Encore — play, and an algorithmic bandmate follows: key-finding, chord-guessing, and knowing when to stay out of the way",
   },
-  {
-    href: "/bear.html",
-    series: "Waking Bodies",
-    part: 1,
-    title: "The Bear",
-    subtitle: "A character sculpted by arithmetic — capsules, smooth unions, and a mesh marched out of a field",
-  },
-  {
-    href: "/rig.html",
-    series: "Waking Bodies",
-    part: 2,
-    title: "The Skeleton",
-    subtitle: "Bones as a hierarchy, skin as a weighted vote — the bear learns to bend, four matrices per vertex",
-  },
-  {
-    href: "/reach.html",
-    series: "Waking Bodies",
-    part: 3,
-    title: "The Reach",
-    subtitle: "Inverse kinematics — stop dialing angles, start asking for places; the law of cosines meets a draggable orb",
-  },
-  {
-    href: "/qigong.html",
-    series: "Waking Bodies",
-    part: 4,
-    title: "The Form",
-    subtitle: "Qi gong at last — poses as targets, springs as blends, moves that flow into each other; the series becomes a toy",
-  },
+  // Waking Bodies (bear.html, rig.html, reach.html, qigong.html) is unlisted
+  // while its modeling pipeline is reworked from SDFs to triangle meshes —
+  // restore its four posts (and its tagline above) when the rework lands.
   {
     href: "/wren.html",
     series: "Feather & Bone",
@@ -208,11 +181,32 @@ export const POSTS: Post[] = [
     subtitle: "A songbird as a table of capsules — smooth unions, surface nets, and a low-poly bird with a garden-grade silhouette",
   },
   {
+    href: "/bones.html",
+    series: "Feather & Bone",
+    part: 2,
+    title: "The Bones",
+    subtitle: "The capsule table's second job — seventeen joints, skin weights by proximity, and a wren who fidgets with zero keyframes",
+  },
+  {
     href: "/heightfield.html",
     series: "Ground Truth",
     part: 1,
     title: "The Heightfield",
     subtitle: "Mountains from arithmetic — hashed gradients, fractal sums, ridges and warps, standing up as a mesh",
+  },
+  {
+    href: "/erosion.html",
+    series: "Ground Truth",
+    part: 2,
+    title: "The Rain",
+    subtitle: "Hydraulic erosion — droplets with momentum and appetite carve the noise into drainage, and the valleys finally have a history",
+  },
+  {
+    href: "/grass.html",
+    series: "Ground Truth",
+    part: 3,
+    title: "The Grass",
+    subtitle: "A hundred thousand blades, planted in part two's silt and bent by a wind that lives entirely in the vertex shader",
   },
 ];
 

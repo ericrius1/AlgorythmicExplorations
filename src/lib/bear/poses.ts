@@ -23,8 +23,8 @@ export const WUJI: Pose = {
     thighL: [-7, 0, -3], thighR: [-7, 0, 3],
     shinL: [13, 0, 0], shinR: [13, 0, 0],
     footL: [-6, 0, 0], footR: [-6, 0, 0],
-    upperArmL: [-4, 0, 10], upperArmR: [-4, 0, -10],
-    forearmL: [-10, 0, 4], forearmR: [-10, 0, -4],
+    upperArmL: [-4, 0, -14], upperArmR: [-4, 0, 14],
+    forearmL: [-10, 0, -2], forearmR: [-10, 0, 2],
     handL: [-6, 0, 0], handR: [-6, 0, 0],
   },
 };
@@ -52,22 +52,22 @@ export interface Move {
 // ---- the eight(ish) brocades, bear edition --------------------------------------
 
 const liftSky = over(WUJI, {
-  upperArmL: [-152, 0, 14], upperArmR: [-152, 0, -14],
-  forearmL: [-12, 0, 6], forearmR: [-12, 0, -6],
+  upperArmL: [-152, 0, -10], upperArmR: [-152, 0, 10],
+  forearmL: [-12, 0, 0], forearmR: [-12, 0, 0],
   handL: [-14, 0, 4], handR: [-14, 0, -4],
   spine: [-3, 0, 0], chest: [-6, 0, 0],
   neck: [-2, 0, 0], head: [-12, 0, 0],
 });
 
 const armsForward = over(WUJI, {
-  upperArmL: [-74, 0, 8], upperArmR: [-74, 0, -8],
-  forearmL: [-18, 0, 2], forearmR: [-18, 0, -2],
+  upperArmL: [-74, 0, -16], upperArmR: [-74, 0, 16],
+  forearmL: [-18, 0, -4], forearmR: [-18, 0, 4],
   handL: [-10, 0, 0], handR: [-10, 0, 0],
 });
 
 const armsSide = over(WUJI, {
-  upperArmL: [-32, 0, 64], upperArmR: [-32, 0, -64],
-  forearmL: [-8, 0, 6], forearmR: [-8, 0, -6],
+  upperArmL: [-32, 0, 40], upperArmR: [-32, 0, -40],
+  forearmL: [-8, 0, 0], forearmR: [-8, 0, 0],
 });
 
 const bowStanceBase = {
@@ -80,11 +80,11 @@ const drawBowL = over(WUJI, {
   ...bowStanceBase,
   chest: [-2, 12, 0],
   neck: [2, 16, 0], head: [-4, 22, 0],
-  upperArmL: [-12, 0, 78],
-  forearmL: [-4, 0, 8],
+  upperArmL: [-12, 0, 54],
+  forearmL: [-4, 0, 2],
   handL: [0, 0, 24],
-  upperArmR: [-38, 0, -48],
-  forearmR: [-104, 0, -18],
+  upperArmR: [-38, 0, -24],
+  forearmR: [-104, 0, -12],
   handR: [-12, 0, -8],
 });
 
@@ -92,37 +92,37 @@ const drawBowR = over(WUJI, {
   ...bowStanceBase,
   chest: [-2, -12, 0],
   neck: [2, -16, 0], head: [-4, -22, 0],
-  upperArmR: [-12, 0, -78],
-  forearmR: [-4, 0, -8],
+  upperArmR: [-12, 0, -54],
+  forearmR: [-4, 0, -2],
   handR: [0, 0, -24],
-  upperArmL: [-38, 0, 48],
-  forearmL: [-104, 0, 18],
+  upperArmL: [-38, 0, 24],
+  forearmL: [-104, 0, 12],
   handL: [-12, 0, 8],
 });
 
 const armsCrossed = over(WUJI, {
   ...bowStanceBase,
-  upperArmL: [-58, 0, -16], upperArmR: [-58, 0, 16],
-  forearmL: [-52, 0, -10], forearmR: [-52, 0, 10],
+  upperArmL: [-58, 0, -40], upperArmR: [-58, 0, 40],
+  forearmL: [-52, 0, -16], forearmR: [-52, 0, 16],
 });
 
 const heavenEarthL = over(WUJI, {
-  upperArmL: [-166, 0, 10],
-  forearmL: [-8, 0, 2],
+  upperArmL: [-166, 0, -14],
+  forearmL: [-8, 0, -4],
   handL: [-90, 0, 0], // palm flattens toward the sky
-  upperArmR: [-2, 0, -16],
-  forearmR: [-2, 0, -2],
+  upperArmR: [-2, 0, 8],
+  forearmR: [-2, 0, 4],
   handR: [86, 0, 0], // palm presses the earth
   spine: [-2, 0, 0], chest: [-4, 0, 0],
   head: [-9, 0, 0],
 });
 
 const heavenEarthR = over(WUJI, {
-  upperArmR: [-166, 0, -10],
-  forearmR: [-8, 0, -2],
+  upperArmR: [-166, 0, 14],
+  forearmR: [-8, 0, 4],
   handR: [-90, 0, 0],
-  upperArmL: [-2, 0, 16],
-  forearmL: [-2, 0, 2],
+  upperArmL: [-2, 0, -8],
+  forearmL: [-2, 0, -4],
   handL: [86, 0, 0],
   spine: [-2, 0, 0], chest: [-4, 0, 0],
   head: [-9, 0, 0],
@@ -132,16 +132,16 @@ const owlL = over(WUJI, {
   chest: [-2, 14, 0],
   neck: [2, 24, 0],
   head: [-2, 30, 0],
-  upperArmL: [-2, 0, 16], upperArmR: [-2, 0, -16],
-  forearmL: [-4, 0, 8], forearmR: [-4, 0, -8],
+  upperArmL: [-2, 0, -8], upperArmR: [-2, 0, 8],
+  forearmL: [-4, 0, 2], forearmR: [-4, 0, -2],
 });
 
 const owlR = over(WUJI, {
   chest: [-2, -14, 0],
   neck: [2, -24, 0],
   head: [-2, -30, 0],
-  upperArmL: [-2, 0, 16], upperArmR: [-2, 0, -16],
-  forearmL: [-4, 0, 8], forearmR: [-4, 0, -8],
+  upperArmL: [-2, 0, -8], upperArmR: [-2, 0, 8],
+  forearmL: [-4, 0, 2], forearmR: [-4, 0, -2],
 });
 
 const swayL = over(WUJI, {
@@ -151,7 +151,7 @@ const swayL = over(WUJI, {
   chest: [-2, 0, -7],
   head: [-4, 0, 9],
   tail: [0, 28, 0],
-  upperArmL: [-10, 0, 26], upperArmR: [-10, 0, -26],
+  upperArmL: [-10, 0, 2], upperArmR: [-10, 0, -2],
 });
 
 const swayR = over(WUJI, {
@@ -161,25 +161,25 @@ const swayR = over(WUJI, {
   chest: [-2, 0, 7],
   head: [-4, 0, -9],
   tail: [0, -28, 0],
-  upperArmL: [-10, 0, 26], upperArmR: [-10, 0, -26],
+  upperArmL: [-10, 0, 2], upperArmR: [-10, 0, -2],
 });
 
 const handsAtChest = over(WUJI, {
-  upperArmL: [-36, 0, 10], upperArmR: [-36, 0, -10],
-  forearmL: [-78, 0, -8], forearmR: [-78, 0, 8],
+  upperArmL: [-36, 0, -14], upperArmR: [-36, 0, 14],
+  forearmL: [-78, 0, -14], forearmR: [-78, 0, 14],
   handL: [-22, 0, 0], handR: [-22, 0, 0],
 });
 
 const pushOut = over(WUJI, {
-  upperArmL: [-88, 0, 8], upperArmR: [-88, 0, -8],
-  forearmL: [-6, 0, 0], forearmR: [-6, 0, 0],
+  upperArmL: [-88, 0, -16], upperArmR: [-88, 0, 16],
+  forearmL: [-6, 0, -6], forearmR: [-6, 0, 6],
   handL: [-42, 0, 0], handR: [-42, 0, 0],
   spine: [1, 0, 0], chest: [-4, 0, 0],
 });
 
 const embrace = over(WUJI, {
-  upperArmL: [-56, 0, 34], upperArmR: [-56, 0, -34],
-  forearmL: [-46, -26, -12], forearmR: [-46, 26, 12],
+  upperArmL: [-56, 0, 10], upperArmR: [-56, 0, -10],
+  forearmL: [-46, -26, -18], forearmR: [-46, 26, 18],
   handL: [-12, 0, -10], handR: [-12, 0, 10],
   thighL: [-10, 0, -4], thighR: [-10, 0, 4],
   shinL: [18, 0, 0], shinR: [18, 0, 0],
@@ -190,8 +190,8 @@ const glare = over(WUJI, {
   thighL: [-18, 0, -9], thighR: [-18, 0, 9],
   shinL: [32, 0, 0], shinR: [32, 0, 0],
   footL: [-14, 0, 0], footR: [-14, 0, 0],
-  upperArmL: [-28, 0, 38], upperArmR: [-28, 0, -38],
-  forearmL: [-64, 0, -6], forearmR: [-64, 0, 6],
+  upperArmL: [-28, 0, 14], upperArmR: [-28, 0, -14],
+  forearmL: [-64, 0, -12], forearmR: [-64, 0, 12],
   handL: [-30, 0, 0], handR: [-30, 0, 0],
   chest: [4, 0, 0], neck: [10, 0, 0], head: [6, 0, 0],
 });
