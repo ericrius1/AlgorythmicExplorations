@@ -10,7 +10,7 @@
     <title>The Bear — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A new series on procedural character animation. A stylized low-poly bear built triangle by triangle — rings of vertices lofted along a table of bones, stitched into a mesh, shaded in TSL. No modeling software was opened."
+      content="A procedural character-animation series. A stylized low-poly bear is built triangle by triangle from vertex rings lofted along a table of bones, stitched into a mesh, and shaded in TSL."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -21,11 +21,10 @@
       <div class="hero-title">
         <h1>The Bear</h1>
         <p class="subtitle">
-          A new series builds a procedural character rather than a physical
-          simulation. This bear was never sculpted or
-          exported from anything: it is a few hundred triangles, every vertex
-          placed by code in your tab a moment ago. Over four articles it will
-          get a skeleton, inverse kinematics, and a procedural qi gong routine.
+          This series builds a procedural character rather than a physical
+          simulation. The bear is generated directly in the browser from a few
+          hundred triangles. Over four articles it gets a skeleton, inverse
+          kinematics, and a procedural qi gong routine.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -38,8 +37,8 @@
       <p>
         The previous series on this site simulated gravity, light, water, and sound.
         This one covers a procedural character pipeline. The plan, over
-        four parts, is the full character pipeline — modeling, rigging,
-        animation — built from scratch in the browser with
+        four parts, is a complete character pipeline — modeling, rigging, and
+        animation — built in the browser with
         <a href="https://threejs.org">three.js</a> and TSL, its shading language
         that compiles to WebGPU. By the end the bear will perform a qi gong form
         whose moves you can call out in any order, each one flowing into the
@@ -101,12 +100,12 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · Mesh construction</span>Stitching vertex rings</h2>
       <p>
-        A mesh, to the GPU, is two flat lists. A <em>vertex buffer</em>: rows
+        To the GPU, a mesh is two flat lists. A <em>vertex buffer</em>: rows
         of floats, one row per vertex — position now, normals and colors and
         (in part 2) bone weights appended to the same row later. And an
         <em>index buffer</em>: integers, three at a time, each triple naming
-        the corners of one triangle. Modeling is nothing more than filling
-        both lists in a way you can defend.
+        the corners of one triangle. Procedural modeling means generating both
+        lists from the shape description.
       </p>
       <p>
         The loft fills them like a lathe operator. Walk along a chain of bones
@@ -128,7 +127,7 @@
         modelers spend rings at the joints and starve them elsewhere.
       </p>
       <details class="fold">
-        <summary>Deep dive: rings that refuse to twist</summary>
+        <summary>Deep dive: preventing ring twist</summary>
         <div class="fold-body">
           <p>
             Each ring needs two perpendicular directions to draw its circle in.
@@ -139,8 +138,8 @@
             station, then carry it forward, rotating it only by the minimal
             rotation that takes each tangent to the next. No reference axis, no
             snap, no twist; each frame derives from the previous one.
-            Hanson and Ma published it as a curve-framing technique in 1995;
-            every tube modeler since has quietly depended on it.
+            Hanson and Ma published it as a curve-framing technique in 1995.
+            It remains a standard way to construct stable frames along curves.
           </p>
         </div>
       </details>
@@ -155,13 +154,13 @@
         cone. The paws: the same trick at the wrists, where the radius jumps
         from 0.058 to 0.08 — a mitt, not a taper. And the belly: every torso
         vertex whose outward direction faces front, at belly height, gets its
-        radius multiplied by up to 1.45. That is the entire tummy. A sculptor
-        would call it pulling clay; the code calls it one multiply.
+        radius multiplied by up to 1.45. That single local scale creates the
+        belly without changing the underlying tube construction.
       </p>
       <div data-demo="sculpt"></div>
       <p>
-        The other shape decision is invisible in the buffers and loud on
-        screen: the <em>normals</em>. Shared vertices average their normals and
+        The other important shape decision concerns the <em>normals</em>.
+        Shared vertices average their normals and
         the lighting glides smoothly across edges — the low-poly look
         dissolves into cheap blobbiness. So after stitching, the bear's
         vertices are deliberately <em>un</em>-shared: each triangle gets
@@ -206,8 +205,8 @@ material.sheenNode = base.mul(0.5);               <span class="cm">// fuzzy back
         A sheen lobe and a faint fresnel rim do most of the "fur" here —
         strand rendering would be its own article. What matters for this
         series is on the inside: this is now a triangle mesh with positions,
-        face normals, and a zone id per vertex, sitting in GPU buffers. It
-        just doesn't <em>do</em> anything yet.
+        face normals, and a zone id per vertex, sitting in GPU buffers. The
+        next step is to deform that static mesh.
       </p>
 
       <!-- ================================================================ -->
@@ -216,12 +215,11 @@ material.sheenNode = base.mul(0.5);               <span class="cm">// fuzzy back
         The model already contains the basis of its rig: the bone table that lofted it is
         also, row for row, a <em>skeleton</em> — heads, tails, parents, a
         hierarchy. Asking "which bone's tube is this vertex from?" is a
-        distance query, and the same query, softened, can answer "this vertex
-        is 80% forearm, 20% upper arm" — and that sentence, made precise, is
-        called <em>skinning</em>. Next time: the bear gets joints, the joints
-        get a hierarchy, and the GPU deforms the mesh from them using four
-        matrix multiplies per vertex, in the same TSL vertex stage that today
-        merely stands still.
+        distance query, and the same query, softened, can assign a vertex 80%
+        to the forearm and 20% to the upper arm. That weighted deformation is
+        called <em>skinning</em>. Next, the bear gets a joint hierarchy and
+        the GPU deforms the mesh from it using four matrix multiplies per
+        vertex.
       </p>
     </main>
 

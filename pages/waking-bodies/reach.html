@@ -42,18 +42,18 @@
         failure. But nobody directing a character thinks in shoulder
         quaternions. Direction happens in the world: <em>put the paw on the
         orb. Look at the firefly.</em> The animator names the destination; the
-        angles are the machine's problem. Computing angles from places is
+        system computes the angles. Computing angles from places is
         <em>inverse kinematics</em>, and it is harder than the forward kind for
-        a structural reason: running a function backwards inherits none of its
-        guarantees.
+        a structural reason: the reverse mapping may have no solution or many
+        solutions.
       </p>
       <p>
         A target can be out of reach — then there is no answer. A target can be
         close — then there are infinitely many, a whole circle of elbows that
         all put the paw on the same spot (your own elbow can trace that circle
         while your fingertip stays put on the table). A good IK solver has to
-        manufacture the missing guarantees: clamp the impossible, and choose
-        among the infinite. Both, it turns out, fit in a page of code.
+        handle both cases: clamp unreachable targets, and choose one solution
+        when many are valid. Both fit in a page of code.
       </p>
 
       <!-- ================================================================ -->
@@ -72,8 +72,8 @@
 const cosA = (d * d + L1 * L1 - L2 * L2) / (2 * d * L1);
 const a = Math.acos(clamp(cosA, -1, 1));</code></pre>
       <p>
-        No iteration, no convergence test, no solver in sight — for a two-bone
-        limb the inverse problem is <em>closed form</em>. This is why nearly
+        For a two-bone limb the inverse problem is <em>closed form</em>, so it
+        needs no iteration or convergence test. This is why nearly
         every arm and leg in games is driven by exactly this formula. The
         impossible cases are handled before the trigonometry ever runs, by
         clamping <code>d</code> into the only range where a triangle exists:
@@ -85,20 +85,20 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
         also what you do when the jar is on the top shelf. The bone lengths
         themselves are not new measurements: they are read straight out of the
         same bone table that lofted the bear in part one and rigged it in
-        part two. One table, three articles of mileage.
+        part two.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Born on the assembly line</span>
         <p>
-          Inverse kinematics is a refugee from robotics. Factory arms had to
+          Inverse kinematics came to character animation from robotics. Factory arms had to
           place welders and grippers at world coordinates years before computer
           characters existed, and the robotics literature — Denavit and
           Hartenberg's joint parameters in 1955, Whitney's resolved motion rate
           control in 1969 — built the mathematics. Computer animation imported
           it in 1985, when Girard and Maciejewski used IK to plant the feet of
           walking figures, ending the era of legs that swam past the floor.
-          The bear's ambitions are more modest than a six-axis welder's, and it
-          is rewarded for that modesty with a closed-form answer.
+          A two-bone character limb is simpler than a six-axis industrial arm,
+          so it has a closed-form answer.
         </p>
       </aside>
 
@@ -111,11 +111,11 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
         correct solutions. Something has to break the tie. Riggers call that
         something the <strong>pole vector</strong>: a point in space the bend
         leans toward. Elbows want a pole behind and below; knees want one out
-        front. It is less a mathematical necessity than a statement of taste —
-        which is exactly why it is exposed as a control.
+        front. The pole vector is an artistic control that selects among
+        mathematically equivalent solutions.
       </p>
       <p>
-        Below, the full solver with its hands visible. Drag the amber orb
+        Below, each control exposes part of the solver. Drag the amber orb
         anywhere; the <em>elbow swing</em> slider walks the pole around the
         circle of solutions; <em>spine assist</em> leans the torso a fraction
         of the way toward the goal before the arm solves, the way you reach
@@ -129,13 +129,13 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
         spine lean, and gaze are <em>forward</em> kinematics — they write joint
         rotations from sine waves and aim heuristics. The two-bone solver runs
         <em>after</em> them, reads where the shoulder actually ended up, and
-        writes better numbers into the same three joints FK owns. IK never
-        replaces the rig. It is just a smarter way of choosing the numbers the
-        dials would have chosen — which means everything from part two (the
+        writes new rotations into the same three joints FK owns. IK does not
+        replace the rig. It computes the rotations that would otherwise be
+        chosen manually, so everything from part two (the
         weights, the skin matrices, the GPU vertex stage) works unchanged.
       </p>
       <details class="fold">
-        <summary>Deep dive: shortest-arc rotations and the free twist</summary>
+        <summary>Deep dive: shortest-arc rotations and unconstrained twist</summary>
         <div class="fold-body">
           <p>
             The solver converts each desired bone direction into a joint
@@ -143,8 +143,8 @@ const d = clamp(dist(shoulder, target), Math.abs(L1 - L2) + ε, L1 + L2 - ε);</
             rotation taking the bone's rest direction to the new one. A
             direction pins only two of a rotation's three degrees of freedom;
             the third, twist about the bone's own axis, is left wherever the
-            shortest arc puts it. For a bear in fur this is free money: the
-            twist is invisible, so the cheapest choice is the right one. On a
+            shortest arc puts it. For a bear in fur, that twist is not
+            visually apparent, so no extra constraint is needed. On a
             human wrist it is not — skin shows twist — which is why production
             rigs thread dedicated twist bones along the forearm and distribute
             the rotation across them. Same triangle, more bookkeeping.
@@ -169,8 +169,8 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
         the head gets 44° and answers faster. Stacked, they produce the
         natural recruitment order — head first, neck following — and the cones
         stop the bear from owling its head backwards when the firefly passes
-        behind it. Two clamped rotations, layered on top of breathing FK, and
-        the statue starts to seem <em>interested</em>.
+        behind it. Together, the two clamped rotations produce a readable gaze
+        direction.
       </p>
 
       <!-- ================================================================ -->
@@ -178,21 +178,21 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
       <p>
         The law of cosines solves two-bone chains because a triangle has three sides,
         no more. Tails, spines, tentacles, and anything with more joints than
-        an arm need a different idea, and the prettiest one in the toolbox is
+        an arm need a different method. One widely used option is
         <strong>FABRIK</strong> — <em>Forward And Backward Reaching Inverse
         Kinematics</em>. No matrices, no trigonometry; just two passes of
-        "snap and re-impose the lengths". Backward: teleport the tip onto the
+        "place and re-impose the lengths". Backward: place the tip on the
         target and walk toward the root, dragging each joint to its neighbor at
-        bone-length distance. That satisfies the target but uproots the chain.
-        Forward: teleport the root back home and walk to the tip, re-imposing
+        bone-length distance. That satisfies the target but moves the root.
+        Forward: restore the root and walk to the tip, re-imposing
         lengths the other way. Each round trip leaves the tip closer; a
         handful of iterations and it has effectively converged.
       </p>
       <p>
         Here it runs one iteration per frame, on purpose, so you can watch the
-        negotiation instead of just its outcome. Move the pointer; add
-        segments and the same loop keeps working where the triangle method
-        has no opinion at all:
+        convergence instead of just its outcome. Move the pointer; add
+        segments and the same loop continues to work, while the triangle
+        method applies only to two-bone chains:
       </p>
 
       <div data-demo="fabrik"></div>
@@ -207,17 +207,15 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
       <aside class="note">
         <span class="note-label">Aside · A 2011 algorithm that feels older</span>
         <p>
-          FABRIK is young by graphics standards — Aristidou and Lasenby
-          published it in 2011 — but it has the flavor of a folk algorithm:
-          two loops, no linear algebra, embarrassingly easy to implement from
-          the description alone. It spread through game engines almost
-          immediately, the way quicksort spread through everything. Before it,
+          FABRIK is young by graphics standards: Aristidou and Lasenby
+          published it in 2011. Its two position-space loops require no linear
+          algebra and are straightforward to implement. Before it,
           long chains were mostly handled by CCD (cyclic coordinate descent,
           1991): rotate one joint at a time to swing the tip toward the
-          target, loop until tired. CCD converges too, but it works angle by
+          target, then repeat. CCD converges too, but it works angle by
           angle and tends to curl chains unnaturally near the root; FABRIK's
-          position-space passes distribute the motion more evenly — which is
-          why the demo above looks like a creature and not like a crane.
+          position-space passes distribute the motion more evenly along the
+          chain.
         </p>
       </aside>
 
@@ -229,10 +227,9 @@ joint.rotation.slerp(q, weight);                        <span class="cm">// ease
         put the paw there, look at that — compiled into the same dials by a
         triangle, a tiebreaker, and a clamp. What is still missing is
         <em>composition</em>: a whole-body shape held with intent, and a way to
-        move from one such shape to the next so the journey looks like
-        practice rather than interpolation. Next time the dials get a memory:
-        poses as targets and springs as blends, producing the bear's
-        qi gong form.
+        move smoothly from one such shape to the next. The next article stores
+        poses as targets and uses springs to blend between them, producing the
+        bear's qi gong form.
       </p>
     </main>
 

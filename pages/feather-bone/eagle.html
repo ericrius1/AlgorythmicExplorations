@@ -10,7 +10,7 @@
     <title>The Eagle — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A new series builds a bald eagle the honest way: a body lofted from rings of vertices, stitched into faceted triangles, and 128 individual feathers hung on the wing bones. By the end of the series she will fly, land on trees, and scream."
+      content="A procedural bald eagle built from a lofted body and 128 individual feathers attached to the wing bones. Later articles add rigging, flight, landing, and a two-source syrinx model."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -43,15 +43,14 @@
         an actual mesh, live, in your browser tab.
       </p>
       <p>
-        The world she'll fly over is its own project. A sister series,
+        The world she flies over is developed in a parallel series,
         <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>, runs in parallel with
         this one and grows the terrain — mountains first, then erosion, grass,
         and (importantly for a bird) trees. The two series are written to
         converge: her final article and its final article are the same demo.
-        The pipeline here is also a close cousin of the one that built
-        <a href="/pages/waking-bodies/bear.html">the bear</a> — this site's other creature — and
-        the kinship is now exact: he lays his triangles down by hand, and so
-        does she. Where the bear lofts one body, though, the eagle splits the
+        The pipeline also follows the one that built
+        <a href="/pages/waking-bodies/bear.html">the bear</a>: both generate
+        their triangles directly. Where the bear lofts one body, the eagle splits the
         problem in two: a lofted core, and a coat of feathers that are not
         part of the skin at all.
       </p>
@@ -99,8 +98,8 @@
       <p>
         Alongside the lofts sits a second table: the <em>bones</em> — one
         segment per future joint, each with a position and a flesh radius.
-        Part one only reads it for placement, but the whole series feeds on
-        it. Part two will ask, for every vertex, "which bones are you near?"
+        Part one only reads it for placement, but every later stage uses it.
+        Part two will ask, for every vertex, "which bones are you near?"
         — and the answer becomes skin weights. Part three reads segment
         lengths out of the same rows to unfold the wing with inverse
         kinematics. Change one number — a longer beak, a deeper chest — and
@@ -111,8 +110,8 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · The skin</span>Stitching the loft</h2>
       <p>
-        Triangles come from the oldest trick in shipbuilding: march along the
-        path, and between every pair of adjacent rings connect vertex
+        The loft constructs triangles by marching along the path and, between
+        every pair of adjacent rings, connecting vertex
         <em>i</em> of one to vertex <em>i</em> of the next. Each ring pair
         becomes a strip of quads; each quad splits into two triangles; the
         ends get capped with a fan. There is no lookup table, no grid, no
@@ -125,8 +124,8 @@
       <p>
         The stitch slider replays the loop slowly: watch the quad strips climb
         the torso ring by ring, then check the wireframe — clean quads flowing
-        along the body like clinker planks. The segment count is the whole
-        economics of the technique: nine vertices around a thigh, fourteen
+        along the body like clinker planks. Segment count controls the
+        polygon budget: nine vertices around a thigh, fourteen
         around the torso, six around a toe. Nothing is wasted on smoothness we
         don't want anyway, because every triangle keeps one flat normal and
         one flat color — the faceted look this site ships everywhere, chosen
@@ -137,7 +136,7 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · The quill</span>One feather, parameterized</h2>
       <p>
-        Here is the real departure. A bird's flight surface isn't skin — it
+        A bird's flight surface requires a different representation. It is not skin; it
         is on the order of fifty overlapping blades per wing, each one stiff
         along its shaft and flexible at its base. So the model gives feathers
         their own geometry: a <em>tent-folded plane</em>. Five vertices across
