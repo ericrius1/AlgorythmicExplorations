@@ -10,7 +10,7 @@
     <title>The Ferrofluid — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A new series. A magnetic liquid that grows spikes — SPH with surface tension, a dipole's ∇|B|² pulling against gravity, and a surface that is meshed from scratch every frame by marching squares on the GPU."
+      content="A magnetic liquid simulated with SPH, surface tension, and a dipole force, with its surface reconstructed every frame by marching squares on the GPU."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -21,10 +21,9 @@
       <div class="hero-title">
         <h1>The Ferrofluid</h1>
         <p class="subtitle">
-          A new series begins with an ink-black, glossy, magnetic liquid.
-          Your cursor is the magnet. Hold it near the pool
-          and the fluid climbs; the surface you see is rebuilt from the particles,
-          from scratch, every frame.
+          This ink-black magnetic liquid responds to your cursor. Hold it near
+          the pool and the fluid climbs; the visible surface is reconstructed
+          from the particles every frame.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -35,33 +34,32 @@
 
     <main>
       <p>
-        Ferrofluid is an oil
-        crowded with magnetite grains so small (about ten nanometers) that thermal
-        jostling keeps them suspended forever, so the liquid as a whole responds
-        to a magnet while remaining liquid. Hold a magnet underneath a dish
-        of it and the surface breaks into a regular crown of spikes — the
-        <em>Rosensweig instability</em>, the signature image of the stuff.
+        Ferrofluid is an oil containing magnetite grains about ten nanometers
+        wide. Thermal motion keeps the grains suspended, allowing the liquid to
+        respond to a magnet without separating. Hold a magnet underneath a dish
+        of ferrofluid and the surface forms a regular crown of spikes — the
+        <em>Rosensweig instability</em>, ferrofluid's most recognizable
+        behavior.
       </p>
       <p>
-        This article builds one in a browser tab. The fluid machinery is borrowed
-        whole from the <a href="/pages/particle-worlds/part3.html">water</a> and
-        <a href="/pages/bounced-light/lava.html">lava lamp</a> articles — particles, grid sort,
-        double-density relaxation. The additions are a magnetic force and a new
-        rendering method: instead of thresholding a blurry field into
-        pixels, the surface is <em>extracted as geometry</em> — line segments,
-        meshed on the GPU every frame by the two-dimensional cousin of one of the
-        most-used algorithms in graphics.
+        This article builds one in a browser tab. The simulation reuses the
+        particles, grid sort, and double-density relaxation from the
+        <a href="/pages/particle-worlds/part3.html">water</a> and
+        <a href="/pages/bounced-light/lava.html">lava lamp</a> articles. It adds
+        a magnetic force and a new rendering method: instead of thresholding a
+        blurry field into pixels, it extracts the surface as line-segment
+        geometry with marching squares on the GPU.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Rocket fuel that follows orders</span>
+        <span class="note-label">Aside · Ferrofluid's NASA origin</span>
         <p>
           Ferrofluid was invented at NASA. In 1963, Steve Papell was working on a
           problem of weightlessness — rocket propellant floats away from the pump
           inlet in zero g — and proposed grinding magnetic particles into the fuel
           so a magnetic field could move it toward the pump inlet. The
-          propellant idea lost out to other solutions; the liquid escaped the
-          space program and found uses in loudspeaker coolants, rotary
-          seals, and display objects. Ronald Rosensweig, who developed the
+          propellant idea lost out to other solutions, but ferrofluid later found
+          uses in loudspeaker coolants, rotary seals, and display objects.
+          Ronald Rosensweig, who developed the
           theory (and the word <em>ferrohydrodynamics</em>), explained the spikes
           the fluid grows in a field — and they now carry his name.
         </p>
@@ -81,7 +79,7 @@
         pulls in the opposite direction. A magnetizable fluid is
         pulled toward where the field is strongest — the force is the gradient of
         the field's energy density, F ∝ ∇|B|² — and for a dipole that gradient
-        has a useful anatomy:
+        has two useful components:
       </p>
       <pre><code>|B|² ∝ (3cos²θ + 1) / r⁶     <span class="cm">// strongest on the dipole's axis</span>
 F = ∇|B|²                     <span class="cm">// toward the magnet — and sideways, toward its axis</span></code></pre>
@@ -97,9 +95,9 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         time.)
       </p>
       <p>
-        In the force kernel the magnet is six lines — the same
-        "constraints are forces" move as the dome, the tank walls, and the lamp's
-        buoyancy. Nothing else in the SPH implementation changes.
+        The magnet adds six lines to the force kernel. Like the dome, tank walls,
+        and the lamp's buoyancy, it is implemented as another force term; the
+        rest of the SPH implementation is unchanged.
       </p>
 
       <!-- ================================================================ -->
@@ -115,12 +113,11 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
       <p>
         The surface is the contour where the splat sum crosses the threshold.
         <em>Marching squares</em> extracts it.
-        Walk every 2×2 cell of field texels and ask the four corners: above the
-        threshold or below? Sixteen possible answers, and each one dictates how
-        the contour crosses the cell — through this edge and that one, with the
-        crossing point interpolated from the corner values. Each cell contributes
-        zero, one, or two line segments; together they chain into the
-        complete surface.
+        For every 2×2 cell of field texels, classify each corner as above or
+        below the threshold. The sixteen possible patterns determine which cell
+        edges the contour crosses, with each crossing interpolated from the
+        corner values. Each cell contributes zero, one, or two line segments;
+        together they form the complete surface.
       </p>
       <div data-demo="mesh"></div>
       <p>
@@ -129,9 +126,8 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         On the GPU the extraction is one compute pass: each cell that finds a
         crossing appends its segments to a buffer with an atomic counter — the
         same wait-free append as the gravity series' scatters — and a one-thread
-        pass converts the final count into the arguments of an indirect draw, so
-        the segment total is decided, allocated, and drawn without the CPU ever
-        hearing the number.
+        pass converts the final count into the arguments of an indirect draw.
+        The GPU allocates and draws the segments without a CPU readback.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The history of marching cubes</span>
@@ -140,9 +136,8 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
           16 — was published by Lorensen and Cline in 1987 and became the default
           way to pull surfaces out of CT scans, MRI volumes, and every implicit
           field since; by some counts it's among the most-cited papers in the
-          field. It was also patented, which so annoyed the research community
-          that a workaround ("marching tetrahedra") was invented largely to dodge
-          the license. The patent expired in 2005; the algorithm is now everyone's.
+          field. It was also patented, which helped motivate the license-free
+          marching tetrahedra alternative. The patent expired in 2005.
         </p>
       </aside>
       <details class="fold">
@@ -170,8 +165,8 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         field's gradient stands in for a surface normal (dense interior = tall),
         which produces the glossy highlight that makes the liquid read as ferrofluid
         rather than tar. Drag the tension to zero and the spikes dissolve into
-        spray; drag it high and the fluid balls up and resists the magnet; find
-        the middle and you get the balance observed in the real liquid. The
+        spray; drag it high and the fluid forms rounded clumps and resists the
+        magnet. Moderate tension produces the most realistic balance. The
         <em>view</em> button exposes each stage — final, mesh, the raw field with
         its threshold contour, and the particles underneath it all.
       </p>
@@ -201,12 +196,10 @@ F = ∇|B|²                     <span class="cm">// toward the magnet — and s
         contouring</em> exists to solve.
       </p>
       <p>
-        The deepest extension, though, is physical, and it is now written:
-        <a href="/pages/strange-matter/crown.html">part two</a> teaches the
-        particles to magnetize <em>each other</em> — and under a perfectly
-        uniform field, with no magnet gradient pulling anything anywhere, the
-        spikes grow anyway, and space themselves into the crown this article
-        could only grow one at a time.
+        <a href="/pages/strange-matter/crown.html">Part two</a> extends the
+        physics by allowing the particles to magnetize <em>each other</em>.
+        Under a perfectly uniform field, with no magnet gradient, the resulting
+        pair forces grow and space a full crown of spikes.
       </p>
     </main>
 
