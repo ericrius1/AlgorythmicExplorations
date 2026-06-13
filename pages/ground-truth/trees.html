@@ -126,7 +126,7 @@ radius(branch)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 is Leona
       <p>
         The studio grows the full 3D version in front of you — watch the
         trunk shoot and the twigs finish gently (that's the skeleton
-        revealed in growth order, which the mesh keeps for free). The
+        revealed in growth order, which the mesh already stores). The
         faceted pentagon branches and dented leaf blobs are deliberate:
         this site's creatures use low-poly silhouettes, and the trees use the
         same style. Then press <strong>perches</strong>.
@@ -160,7 +160,7 @@ radius(branch)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 is Leona
             Space colonization's inner loop is "every attractor finds its
             nearest node" — naively attractors × nodes per round, a few
             hundred times each, which lands around twenty million distance
-            checks per tree. JavaScript shrugs that off in well under a
+            checks per tree. JavaScript completes that in well under a
             tenth of a second, and the demos here grow trees live without
             spatial indexing. (The 2007 paper used a 3D grid for the
             lookups; worth it for thousands of attractors, not for
@@ -169,7 +169,7 @@ radius(branch)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 is Leona
             forest of ten-thousand-attractor oaks is ever on the menu.)
           </p>
           <p>
-            The grove in the hero doesn't even grow per tree: it grows
+            The grove in the hero grows only
             <em>four</em> trees and instances them across the hillside with
             hashed rotations and scales. Two trees with the same skeleton
             but different yaw, lean, and size read as different trees —

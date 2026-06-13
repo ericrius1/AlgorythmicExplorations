@@ -20,12 +20,10 @@
       <div class="hero-title">
         <h1>The Bones</h1>
         <p class="subtitle">
-          Last time the eagle was a statue. This article gives her the table's
-          second gift: joints. Skin weights fall out of the same bone segments
-          that placed her lofts, forward kinematics chains seventeen rotations
-          into a pose, the feather coat rides along for free, and a handful of
-          fidget timers does the rest. She is glaring around right now. Drag
-          to glare back.
+          Part one built a static eagle. This article turns the same bone table
+          into joints. Distances to those bones become skin weights, forward
+          kinematics chains seventeen rotations into a pose, and the feather
+          coat follows the resulting transforms.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -38,19 +36,19 @@
       <p>
         <a href="/pages/feather-bone/eagle.html">Part one</a> produced a faceted mesh in a fixed
         rest pose. This article adds a skeleton and skinning so the same mesh
-        bends: head turning, tail pitching, body breathing, every vertex
-        deciding for itself how much of each motion to follow. The machinery
-        is called <em>skinning</em>, and most of its input already exists in
+        bends: head turning, tail pitching, and body breathing, with every
+        vertex receiving a weighted combination of joint transforms. This is
+        called <em>skinning</em>, and most of its input already exists in
         the bone table from part one.
       </p>
       <p>
         The implementation has three steps. First the table's rows become
         actual <em>joints</em> — things that rotate, chained parent-to-child.
         Then every vertex of the body gets <em>weights</em>: a short list of
-        joints it cares about, computed by distance to the bone segments —
+        joints that influence it, computed by distance to the bone segments —
         with a few components deliberately exempted and <em>pinned</em>
         instead. Then the GPU blends it all together with one formula from
-        1988. Once a bird can be posed, idle motion requires remarkably little
+        1988. Once a bird can be posed, idle motion requires little additional
         state — the hero above runs on five timers and two springs, with no
         keyframes. In parallel, <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>
         adds hydraulic erosion to its terrain.
@@ -59,7 +57,7 @@
         <span class="note-label">Aside · Reusing the table</span>
         <p>
           Nothing downstream of the bone table stores its own copy of the
-          bird. This article adds <strong>zero new numbers</strong> describing
+          bird. This article adds <strong>no new measurements</strong> describing
           the eagle — no joint positions, no weight maps, no painted influence
           regions. Joints are the table's rows; their pivots are the rows'
           head points; the weights are queries against the rows' segments.
@@ -85,7 +83,7 @@
       </p>
       <pre><code>world(joint) = world(parent) · T(head − parentHead) · R(joint)</code></pre>
       <p>
-        That is the whole of <em>forward kinematics</em>. Rotate the neck and
+        That is <em>forward kinematics</em>. Rotate the neck and
         the head, beak, brows, and eyes all inherit the turn, because their
         transforms are multiplied downstream of it; rotate the body and all
         sixteen descendants come along. The skeleton is a tree, the pose is a
@@ -120,24 +118,24 @@
       </p>
       <pre><code>wᵢ = 1 / (dᵢ + ε)^p          <span class="cm">// then normalize so the four sum to 1</span></code></pre>
       <p>
-        Proximity has blind spots the anatomy refuses to forgive, and this is
-        where part one's component bookkeeping pays off. The upper beak runs
+        Proximity alone cannot represent every anatomical constraint, so part
+        one's component bookkeeping handles the exceptions. The upper beak runs
         far from the skull segment but must follow it rigidly — only the lower
         mandible rides the beak joint; that hinge is the gape she'll scream
         with in part five. And a talon that blends weights goes soft like
         licorice. So a loft can declare a <em>pin</em>: every vertex in that
-        component is nailed to one named bone, weight one, stamped over the
+        component is assigned to one named bone with weight one, replacing the
         proximity result. Beak halves, toes, and talons are pinned; everything
         fleshy stays blended.
       </p>
       <div data-demo="weights"></div>
       <p>
-        Every joint's territory, painted by arithmetic. The <strong>falloff
-        power</strong> p is the only artistic dial: low p spreads influence
-        wide and the bird goes rubbery; high p snaps each vertex to its
-        nearest bone and joints crease. Around 2.6 the blends span the
-        shoulder and hip exactly as far as the flesh radii overlap — both are
-        reading the same table. Use the <strong>stress pose</strong> button:
+        The heatmap shows each joint's computed influence region. The
+        <strong>falloff power</strong> p controls the transition: low p spreads
+        influence wide and produces rubbery deformation; high p assigns each
+        vertex mostly to its nearest bone and joints crease. Around 2.6 the blends span the
+        shoulder and hip about as far as the flesh radii overlap because both
+        use the same table. Use the <strong>stress pose</strong> button:
         weights can only be judged while bent. The rest pose hides weighting
         problems. And flip to <strong>one joint</strong> on the beak or a foot
         to see a pin: a hard, binary territory with no gradient at all.
@@ -153,10 +151,9 @@
             same weights (the computation is a pure function of position), so
             the skin never tears; but <em>within</em> a triangle the GPU
             interpolates between corner weights as smoothly as on any mesh.
-            The facets stay rigid little plates exactly when their corners
+            The facets remain rigid when their corners
             agree — near a joint they shear slightly instead of folding, which
-            reads as the plates "giving" at the hinge. It looks deliberate.
-            We'll take it.
+            produces a small amount of deformation at the hinge.
           </p>
         </div>
       </details>
@@ -164,13 +161,13 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · The blend</span>Linear blend skinning — and the riders</h2>
       <p>
-        One piece is missing. A joint's world matrix says where the joint
+        A joint's world matrix says where the joint
         <em>is</em>, but a vertex needs to know how the joint <em>moved</em> —
-        the change from rest. That's one multiplication: undo where the bone
-        was born, then apply where it is now. With rest-pose world transforms
-        being plain translations to each pivot, the skin matrix for joint i is
+        the change from rest. That requires one multiplication: transform out
+        of the rest pose, then into the current pose. Because each rest-pose
+        world transform is a translation to its pivot, the skin matrix for joint i is
       </p>
-      <pre><code>Mᵢ = world(i) · T(−headᵢ)      <span class="cm">// "as born" → identity; rest pose moves nothing</span>
+      <pre><code>Mᵢ = world(i) · T(−headᵢ)      <span class="cm">// identity in the rest pose</span>
 v′ = Σᵢ wᵢ · Mᵢ · v             <span class="cm">// each vertex: blend of its four bones' motions</span></code></pre>
       <p>
         The second line is <em>linear blend skinning</em>, and it is what the
@@ -182,11 +179,10 @@ v′ = Σᵢ wᵢ · Mᵢ · v             <span class="cm">// each vertex: blen
         on hardware.
       </p>
       <p>
-        And the feathers? They skip all of it. Part one made each one a rigid
+        The feathers use a simpler path. Part one made each one a rigid
         instance with a bone, an anchor, and a fan angle, so when this
         article's joints start rotating, the coat re-poses itself from the
-        fresh bone matrices — a hundred and twenty-eight passengers on
-        seventeen vehicles. The eyes work the same way, parented to the head
+        fresh bone matrices. The eyes work the same way, parented to the head
         joint without owning a single weight. Turn her head: the face and the
         nape feathers come along, glints included.
       </p>
@@ -241,8 +237,8 @@ v′ = Σᵢ wᵢ · Mᵢ · v             <span class="cm">// each vertex: blen
       <div data-demo="alive"></div>
       <p>
         The <strong>vigilance</strong> slider controls saccade rate, while
-        <strong>temper</strong> controls how often the tail and the coat have
-        opinions. Unlike a looping animation clip, the generated behavior can
+        <strong>temper</strong> controls how often the tail and coat move.
+        Unlike a looping animation clip, the generated behavior can
         respond to state. In part six, when you're flying her, the same
         head-saccade system will be looking where you're about to turn.
       </p>
@@ -256,9 +252,8 @@ v′ = Σᵢ wᵢ · Mᵢ · v             <span class="cm">// each vertex: blen
         kinematics</em>: instead of dialing three joint angles, we specify a
         wingtip target and solve for the angles, using the same two-bone
         method as <a href="/pages/waking-bodies/reach.html">the bear's arm</a>. Then the wingbeat
-        — and the part the old blob-bird could never do: the feather coat
-        flying the stroke, slots opening on the upstroke, fingers splaying at
-        the bottom.
+        and then drives the feather coat through the stroke, opening slots on
+        the upstroke and splaying the fingers at the bottom.
       </p>
       <p>
         In parallel, <a href="/pages/ground-truth/heightfield.html">Ground Truth</a> is adding

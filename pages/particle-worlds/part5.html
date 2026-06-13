@@ -46,7 +46,7 @@
         surveys reveal the same broad structure.
       </p>
       <p>
-        None of the machinery this series has built can run that simulation. Part
+        None of the earlier methods in this series suit that simulation. Part
         one's tree is efficient when it can summarize clumps; the early universe is uniform, and the
         structure is in very small differences. Part three's grid assumes forces
         with a cutoff; gravity has none. This article uses a third structure: a mesh
@@ -66,7 +66,7 @@
         into a torus.
       </p>
       <p>
-        For part one's tree this is quietly disastrous. Barnes–Hut walks outward
+        This is a poor fit for part one's tree. Barnes–Hut walks outward
         until contributions dwindle — but on a torus there is no outward, and the sum
         over infinite periodic images converges so slowly that using Ewald summation,
         borrowed from crystallography, roughly doubles the cost and
@@ -134,7 +134,7 @@
         Take a single wave of density: ρ = sin(<em>k</em>x). Differentiate twice and
         you get −<em>k</em>² sin(<em>k</em>x) — <em>the same wave</em>, scaled. Waves
         pass through the Laplacian untouched in shape. So for one wave, the potential
-        is just that wave divided by −<em>k</em>², and there is nothing more to solve.
+        is that wave divided by −<em>k</em>². Each mode therefore has a direct solution.
         Any density is a sum of such waves; the equation is linear, so each wave
         solves independently — and the system of 262,144 coupled equations falls apart
         into 262,144 separate one-line problems.
@@ -191,9 +191,9 @@ potential = inverse_fft2d(spectrum); // change back</code></pre>
         This is the third change of representation in the series. The tree didn't make gravity cheaper; it changed the
         question to one a tree answers fast. The sort didn't find neighbours faster;
         it rearranged memory so neighbours found themselves. And the transform
-        doesn't grind through a differential equation; it carries the problem to an
-        alphabet where the equation was never hard. Mathematicians call the pattern
-        <em>diagonalization</em>; engineers call it picking the right representation.
+        converts the differential equation into a representation where each
+        mode can be solved independently. Mathematicians call the pattern
+        <em>diagonalization</em>; engineers call it choosing the right representation.
         This change of representation is a common move in computational science.
       </p>
 
@@ -266,8 +266,8 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       <p>
         Only <em>deposit</em> and <em>gather</em> need design. The crude deposit
         drops each particle's whole mass into the cell under it — and jitters: as a
-        particle glides across a cell border its mass teleports, the field twitches,
-        and the twitch kicks the particle that caused it. The standard fix,
+        particle crosses a cell border its mass jumps between cells, causing a
+        discontinuity in the field that feeds back onto the particle. The standard fix,
         <em>cloud-in-cell</em>, splits the mass over the four cells the particle
         overlaps, weighted by overlap area, so the deposit slides as smoothly as the
         particle does. Gathering interpolates the force back with the same four
@@ -279,8 +279,8 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
       <div data-demo="cic"></div>
 
       <p>
-        And that is all of it — no tree to walk, no buckets to sort, just paint,
-        transform, divide, transform, read. Below, the full machine: part four's cold
+        The complete method needs no tree walk or bucket sort: deposit,
+        transform, divide, inverse-transform, gather. Below, part four's cold
         blob of dust, reborn in a periodic box. The slider changes nothing about the
         particles and everything about the mesh. At 64×64 the force is a blur and the
         collapse is mush; at 512×512 the same blob shatters into filaments and knots.
@@ -294,12 +294,11 @@ kick &amp; drift, wrap through the walls, repeat</code></pre>
 
       <p>
         For a galaxy, that price is fatal — part one needed forces down at star
-        spacing, which is why it grew a tree. For cosmology the price is perfect:
-        the structures of interest are enormous, smooth, and everywhere, exactly what
+        spacing, which is why it grew a tree. For cosmology the tradeoff is
+        appropriate: the structures of interest are enormous, smooth, and everywhere, exactly what
         a uniform mesh resolves evenly. Tree and mesh are not rivals; they are two
         ends of one trade — the tree spends bookkeeping to focus resolution where
-        matter clumps, the mesh spends uniformity to make the whole box cheap. Hold
-        that thought for the coda.
+        matter clumps, while the mesh spends uniformity to make the whole box cheap.
       </p>
 
       <!-- ================================================================ -->

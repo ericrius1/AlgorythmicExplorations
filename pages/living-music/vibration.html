@@ -55,13 +55,13 @@
         physically squeezes — more repeats packed into the same slice of time. The
         orange ticks bracket exactly one repeat. Then try the shape buttons:
         the pitch stays put, but the <em>character</em> of the sound changes — buzzy,
-        hollow, reedy. Hold that thought; it's Step 3.
+        hollow, reedy. Step 3 explains those timbral differences.
       </p>
 
       <div data-demo="oscillo"></div>
 
       <aside class="note">
-        <span class="note-label">Aside · 1,000 years of not knowing</span>
+        <span class="note-label">Aside · Pitch before frequency</span>
         <p>
           Musicians tuned by ear for millennia without knowing what pitch
           <em>was</em>. The frequency–pitch connection wasn't nailed down until the
@@ -85,8 +85,8 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · One string</span>String vibration</h2>
       <p>
-        Now for the machine that makes notes — the oldest one we have. A stretched
-        string, fixed at both ends, obeys a single rule: every point accelerates
+        A stretched string, one of the oldest pitched instruments, obeys a
+        simple rule when fixed at both ends: every point accelerates
         toward the average of its neighbours. That's the entire physics. Written as
         code, it's three lines:
       </p>
@@ -135,7 +135,7 @@ for (let i = 1; i &lt; N - 1; i++) {
         </div>
       </details>
       <aside class="note">
-        <span class="note-label">Aside · The first music theory result in history</span>
+        <span class="note-label">Aside · Early interval theory</span>
         <p>
           That frequencies come in the ladder f, 2f, 3f… was known, in geometric
           disguise, to the Pythagoreans around 500 BC: halve a string and it sounds
@@ -171,7 +171,7 @@ for (let i = 1; i &lt; N - 1; i++) {
       <div data-demo="harmonics"></div>
 
       <p>
-        Things worth trying. Pull everything down except <code>h1</code>: a pure
+        To isolate each harmonic, pull everything down except <code>h1</code>: a pure
         sine, the only sound with <em>no</em> recipe — soft, anonymous, the vanilla
         of sound. Add odd harmonics at 1/n (the clarinet preset) and the wave squares
         off — a clarinet really does suppress its even partials; that's the physics

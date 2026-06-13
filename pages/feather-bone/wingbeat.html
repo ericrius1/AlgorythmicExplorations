@@ -75,7 +75,7 @@
         a and b. If the wing is to touch the target, the elbow must sit at
         distance a from S and distance b from T — and now look at what's on
         the table: a triangle with all three side lengths known (a, b, and
-        d = |T − S|). Triangles with three known sides have no secrets. The
+        d = |T − S|). With all three side lengths known, the
         <em>law of cosines</em> gives the angle at the shoulder directly:
       </p>
       <pre><code>cos A = (a² + d² − b²) / 2ad      <span class="cm">// angle between the target line and the humerus</span></code></pre>
@@ -169,8 +169,8 @@
         Then the feathers take over, with three signals read off the same
         clock. <strong>Slot</strong>: on the upstroke the primaries rotate
         about their own shafts and the wing becomes a louver — air pours
-        through the gaps instead of being pushed down, which is how a real
-        bird gets its wing back up almost for free. <strong>Splay</strong>:
+        through the gaps instead of being pushed down, which reduces the force
+        needed to raise the wing. <strong>Splay</strong>:
         at the bottom of the power stroke the fingers spread, the wingtip
         grabbing its maximum area exactly when the push peaks.
         <strong>Lag</strong>: the fan is dragged a few degrees against the
@@ -205,15 +205,15 @@
         saccade system will plug straight into this). And the <strong>tail
         fans</strong>: twelve rectrices, each one rectrix rotated about the
         tail bone's normal by its share of a single spread parameter — the
-        same machinery as the wing fans, pointed backward.
+        same fan-angle system used by the wing feathers.
       </p>
       <div data-demo="all"></div>
       <p>
         Turn the beat rate up past five and she flaps like a panicked pigeon;
         down toward one beat per second and she's a condor coming in heavy.
         The default — two point three — is an eagle in no particular hurry.
-        The shapes of flight are all here now. What's missing is consequence:
-        she flaps and nothing happens, because nothing yet says it should.
+        The wing now has a complete animated stroke, but the stroke does not
+        yet apply forces to the bird.
       </p>
 
       <!-- ================================================================ -->
@@ -224,9 +224,8 @@
         drag taxing everything, the downstroke's twisted blade converting
         beats into thrust. Give the eagle a velocity and let those forces
         integrate, and flight stops being an animation and becomes an
-        <em>outcome</em> — including banking turns, which fall out of rolling
-        the lift vector sideways rather than being scripted. The flapping you
-        just watched will stop being a looping gif and start being the engine.
+        <em>outcome</em>, including banking turns produced by rolling the lift
+        vector sideways. The next article converts the wingbeat into thrust.
       </p>
       <p>
         And she'll need somewhere to go: <a href="/pages/ground-truth/heightfield.html">Ground

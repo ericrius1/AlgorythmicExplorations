@@ -54,10 +54,9 @@
         <span class="note-label">Aside · Why not just keyframe it?</span>
         <p>
           Because a keyframed bird can only do what it was animated to do. A
-          simulated one does what the situation demands — it speeds up in a
-          dive because gravity says so, sinks when it slows because lift fell
-          off with the square of speed, and recovers when it flaps because
-          thrust restored the speed. None of those behaviors are authored;
+          simulated one responds to changing conditions: it speeds up in a
+          dive under gravity, sinks when reduced speed lowers lift, and
+          recovers when flapping restores thrust and speed. None of those behaviors are authored;
           they emerge from the force model. One force balance produces a range
           of flight behavior, and you can later
           hand the controls to a player or an AI and the bird stays a bird,
@@ -74,7 +73,7 @@
         resulting forces: the lift coefficient C<sub>L</sub> and drag
         coefficient C<sub>D</sub>. Lift grows with the wing's
         <em>angle of attack</em> — the tilt between the wing and the oncoming
-        air — until, abruptly, it doesn't:
+        air until the wing stalls:
       </p>
       <pre><code>L = ½ ρ v² A · C_L(α)      C_L = C_L0 + slope·α   <span class="cm">// until the wing stalls</span>
 D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// induced drag: the price of lift</span></code></pre>
@@ -84,7 +83,7 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         it vanishes, because lift cancels weight and thrust cancels drag.
         Raise the <strong>angle of attack</strong> and the green lift arrow
         grows — until you cross the stall, where C<sub>L</sub> collapses
-        instead of climbing and the wing simply lets go of the air. That cliff
+        instead of climbing and the wing loses lift. That drop
         is real aerodynamics, not a safety rail: a wing tilted too steeply
         stops working all at once, which is why a landing bird flares to the
         edge of it and not past. The <strong>speed</strong> slider demonstrates
@@ -100,7 +99,7 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
       <p>
         Cut the engine. With no flapping, a bird is a glider, and a glider
         is optimized for one task: converting altitude into distance at
-        a fixed exchange rate. That rate — the <em>glide ratio</em> — is just
+        a fixed exchange rate. That rate — the <em>glide ratio</em> — is
         lift divided by drag, and it's why the angle of attack matters so
         much. Too shallow and lift is weak; too steep and induced drag
         (that <code>k·C<sub>L</sub>²</code> term, the unavoidable cost of
@@ -143,10 +142,9 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         Here is the most satisfying thing in the article, and it costs one
         line. To turn, a bird does not yaw like a car. It <em>banks</em> —
         rolls so its wings tilt — and the lift vector, which was holding it
-        straight up, now leans. The vertical slice of that leaned lift still
-        fights gravity; the new horizontal slice points sideways, into the
-        turn, and pulls the flight path into a curve. Roll angle in, circle
-        out. We never compute a turn rate or a heading; we just roll the lift
+        straight up, now leans. The vertical component still
+        opposes gravity; the new horizontal component points into the turn and
+        curves the flight path. We never compute a turn rate or heading; we roll the lift
         vector and let the integrator produce the circular path.
       </p>
       <div data-demo="bank"></div>
@@ -168,8 +166,8 @@ D = ½ ρ v² A · C_D         C_D = C_D0 + k·C_L²     <span class="cm">// ind
         makes thrust (step one), the forces integrate (step two), and a small
         <em>autopilot</em> closes the loop: it reads the gap between her
         altitude and a target, and from that error alone commands her angle of
-        attack and flap effort — climb when low, ease off when high. A lazy
-        wander rolls her into slow banking turns. None of it is a path; it's a
+        attack and flap effort — climb when low, ease off when high. A slow
+        wander command produces gradual banking turns. None of it is a path; it is a
         controller flying a physics model, which is precisely what part six
         will hand to you.
       </p>

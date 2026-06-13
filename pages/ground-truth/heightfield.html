@@ -21,8 +21,8 @@
       <div class="hero-title">
         <h1>The Heightfield</h1>
         <p class="subtitle">
-          A new series builds terrain from arithmetic. Nobody drew the mountains
-          under this camera — they are a sum of waves read off a grid of hashed
+          This series builds terrain from arithmetic. The mountains under this
+          camera are a sum of waves read from a grid of hashed
           gradients, and by the end of the series there will be no edge to
           them, grass on their flanks, and trees for a certain bird to land in.
         </p>
@@ -110,13 +110,13 @@ noise(p) = blend of the four corners' opinions by fade</code></pre>
         Two dials control the character of the world.
         <strong>Lacunarity</strong> is the frequency step between octaves
         (usually 2 — hence "octave"). <strong>Persistence</strong> is the
-        amplitude step, and it is the roughness dial of the universe: at 0.3
-        the high frequencies barely whisper and you get the Scottish
-        Highlands, worn smooth; at 0.7 they shout and you get the Dolomites.
+        amplitude step, and it controls surface roughness: at 0.3
+        the high frequencies contribute little and you get smooth Scottish
+        Highlands; at 0.7 they dominate and you get the sharper Dolomites.
         One number, geology.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The Oscar for arithmetic</span>
+        <span class="note-label">Aside · Perlin noise and film</span>
         <p>
           Perlin invented his noise working on <em>Tron</em> (1982), out of
           frustration with how relentlessly clean computer imagery looked —
@@ -124,8 +124,7 @@ noise(p) = blend of the four corners' opinions by fade</code></pre>
           function escaped into every renderer, every game engine, and every
           texture ever described as "procedural," and in 1997 the Academy of
           Motion Picture Arts and Sciences gave him a Technical Achievement
-          Award for it — an Oscar for a math function, which remains a very
-          short list.
+          Award for it, an unusual recognition for a mathematical technique.
         </p>
       </aside>
 
@@ -158,7 +157,7 @@ noise(p) = blend of the four corners' opinions by fade</code></pre>
         looking like noise — which is the entire job.
       </p>
       <details class="fold">
-        <summary>Deep dive: keeping the octaves from conspiring</summary>
+        <summary>Deep dive: decorrelating the octaves</summary>
         <div class="fold-body">
           <p>
             Stacking octaves on the same lattice has a subtle failure: every
@@ -176,7 +175,7 @@ noise(p) = blend of the four corners' opinions by fade</code></pre>
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 4 · Mesh construction</span>The heightfield mesh</h2>
       <p>
-        The third dimension is the cheapest step in the article: take a flat
+        The third dimension follows directly: take a flat
         grid of vertices, set every y to h(x, z), done. The interesting work
         is everything that makes the lifted grid <em>read</em> as terrain.
         First, shaping: raw fBm is symmetric around zero, so the height

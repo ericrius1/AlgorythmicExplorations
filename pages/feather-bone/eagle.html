@@ -21,7 +21,7 @@
       <div class="hero-title">
         <h1>The Eagle</h1>
         <p class="subtitle">
-          A new series builds a bird you can fly — and this time the mesh is
+          This series builds a bird you can fly. The mesh is
           laid down by hand: rings of vertices stationed along curves, stitched
           into a faceted body, and dressed in a hundred and twenty-eight
           individual feathers. Drag to inspect her.
@@ -35,19 +35,16 @@
 
     <main>
       <p>
-        This series builds a bird you can fly. Not a downloaded model with
-        someone else's animations — a creature that exists because a table of
-        numbers says so, rigged by arithmetic, and flapped by physics. The
-        final demo lets you fly her above a procedural world. This first
-        article does the modeling: it turns a description of a bald eagle into
-        an actual mesh, live, in your browser tab.
+        This series builds a procedural bird you can fly. A table defines the
+        mesh, skeleton, and feather layout; later articles add wing animation
+        and aerodynamic forces. The final demo lets you fly the eagle above a
+        procedural world. This first article turns a description of a bald
+        eagle into a mesh in the browser.
       </p>
       <p>
-        The world she flies over is developed in a parallel series,
-        <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>, runs in parallel with
-        this one and grows the terrain — mountains first, then erosion, grass,
-        and (importantly for a bird) trees. The two series are written to
-        converge: her final article and its final article are the same demo.
+        The parallel <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>
+        series builds the terrain — mountains first, then erosion, grass, and
+        trees. The final article combines that world with the eagle.
         The pipeline also follows the one that built
         <a href="/pages/waking-bodies/bear.html">the bear</a>: both generate
         their triangles directly. Where the bear lofts one body, the eagle splits the
@@ -57,14 +54,14 @@
       <aside class="note">
         <span class="note-label">Aside · Why a bald eagle</span>
         <p>
-          Because every part of the silhouette is doing identifiable work. The
-          white head and tail against the dark body mean the color zones read
+          Every part of the silhouette is easy to identify. The white head and
+          tail against the dark body mean the color zones read
           from any distance; the two-meter span with slotted, fingered tips is
           the most legible wing shape in the sky; the hooked beak and the brow
           ridge over the eye turn "bird" into "raptor" with two small lofts.
           And an eagle moves slowly enough to watch — two and a bit wingbeats
-          a second, long glides, deliberate landings. Everything this series
-          wants to teach happens at a speed your eye can follow.
+          a second, long glides, deliberate landings. Those motions are slow
+          enough to inspect clearly in the interactive demos.
         </p>
       </aside>
 
@@ -155,8 +152,8 @@
         That step is <em>emargination</em>, and it is the single most
         recognizable feature of a soaring raptor: the notch turns the wingtip
         into separated "fingers", each a little winglet that spills its own
-        vortex. Slide it in and watch a generic feather become unmistakably
-        an eagle's.
+        vortex. Slide it in and watch the notch separate the wingtip into
+        distinct aerodynamic fingers.
       </p>
 
       <!-- ================================================================ -->
@@ -179,7 +176,7 @@
         degrees about its own shaft so the coat louvers like window blinds,
         lift by a stack height so neighbors layer instead of z-fighting, then
         multiply by the bone's world matrix. The whole coat is six instanced
-        draw calls. And the fan angles are where the anatomy hides: a folded
+        draw calls. The fan angles encode the folded anatomy: a
         secondary sits at nearly 160° to its own bone, because when the
         forearm folds forward the feathers still have to point back along the
         body. Feathers rotate at the base far more than bones ever do — slide
@@ -195,10 +192,8 @@
           motion and goes rubbery; worse, spreading a fan is not a rotation
           any bone performs, so there is nothing to weight against. Rigid
           instances with per-feather fan angles cost one matrix multiply each
-          and stay knife-sharp at every spread. Part three will pay this
-          choice back with interest: slot, splay, and lag — the three signals
-          that make a wingbeat look alive — are all just additions to that
-          fan angle.
+          and stay knife-sharp at every spread. Part three builds slot, splay,
+          and lag by adding offsets to that fan angle.
         </p>
       </aside>
 
@@ -209,22 +204,21 @@
         zone — chocolate body, white head, near-black flight feathers, white
         tail, yellow beak and tarsus, charcoal talons — and every triangle
         takes its zone's color, dimmed or brightened a few percent by a hash
-        of its own index. That per-facet <em>mottle</em> is the cheapest
-        texture in graphics and the reason low-poly reads as crafted instead
-        of unfinished. The feather classes carry their own colors the same
+        of its own index. That per-facet <em>mottle</em> adds variation
+        without a texture map and helps the low-poly surface read as crafted
+        instead of unfinished. The feather classes carry their own colors the same
         way, plus a per-vertex touch: a pale stripe down the rachis, darker
         vane edges.
       </p>
       <div data-demo="bird-full"></div>
       <p>
-        The eyes are riders, not loft: a yellow iris, a black pupil, and a
-        white glint, parented to where the head will be — when part two gives
-        the skeleton joints, the face rides the head joint for free. They sit
-        deliberately in the shadow of the brow loft, which is most of why she
-        looks like she's deciding whether you're edible. The
+        The eyes are separate attachments rather than part of the loft: a
+        yellow iris, a black pupil, and a white glint. Part two parents them to
+        the head joint. Their position in the shadow of the brow loft produces
+        the eagle's characteristic severe expression. The
         <strong>wing spread</strong> slider above is a preview of part
-        three's machinery doing its resting pose; even frozen, the coat
-        explains the bird.
+        three's wing controls in their resting pose; even frozen, the feather
+        arrangement defines the silhouette.
       </p>
 
       <!-- ================================================================ -->
@@ -234,11 +228,11 @@
         table its second life as a <em>skeleton</em> — each body vertex
         weighted to the bones it lives near, so the hide deforms when joints
         rotate, while beak and talons are pinned rigid and the feather coat
-        simply rides along. Part three unfolds the wing Z with inverse
-        kinematics and finds the wingbeat — and the feathers earn their keep:
+        follows the wing bones. Part three unfolds the wing with inverse
+        kinematics and builds the wingbeat:
         slots opening on the upstroke, fingers splaying at the bottom of the
-        power stroke. Part four stops faking it: lift, drag, and flapping
-        thrust as actual forces, at four kilograms and thirteen meters per
+        power stroke. Part four adds lift, drag, and flapping
+        thrust as forces, at four kilograms and thirteen meters per
         second. Part five adds landing — the approach, the flare, the
         talons-on-bough problem — and the scream, because a syrinx is two
         oscillators and a grammar, and we have a whole
@@ -249,8 +243,8 @@
         And under all of it, the other series is building the place. <a
         href="/pages/ground-truth/heightfield.html">Ground Truth</a> raises mountains from
         noise; by its middle parts there will be grass to skim and trees with
-        actual branches — branches whose positions her landing controller
-        will read like an instrument. Two series, one demo at the end.
+        actual branches whose positions her landing controller can query. The
+        final demo combines both series.
       </p>
     </main>
 

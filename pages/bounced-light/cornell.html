@@ -92,7 +92,7 @@
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Better dice</span>Next-event estimation</h2>
+      <h2><span class="kicker">Step 2 · Directed sampling</span>Next-event estimation</h2>
       <p>
         Pure random bouncing has a weakness you can compute in your head: if
         the lamp covers a thousandth of the directions a bounce could take,
@@ -107,9 +107,9 @@
 <span class="cm">// one shadow ray per bounce — the same dice, loaded toward where the light is</span></code></pre>
       <div data-demo="nee"></div>
       <p>
-        The lamp here is deliberately small, and the toggle is brutal: with
-        light sampling <em>off</em>, the room at one second is a cave of
-        fireflies — bright speckles where a lucky path stumbled into the lamp.
+        The lamp here is deliberately small, making the comparison clear. With
+        light sampling <em>off</em>, the room at one second contains bright
+        speckles from the few random paths that reached the lamp.
         With it <em>on</em>, the same one second of work produces a smooth,
         plausible room. Same scene, same number of rays, same unbiased
         average — the variance went into a different variable. The general
@@ -146,8 +146,7 @@
         part four approximated with one clever multiply now arising from
         actual area, actually sampled. Set the sphere to <em>mirror</em> and
         check its reflection: the red wall, the lamp, the other sphere — a
-        whole second rendering for free, because a mirror is just a bounce
-        with no dice.
+        complete reflected view because a mirror bounce is deterministic.
       </p>
       <div data-demo="full"></div>
       <p>

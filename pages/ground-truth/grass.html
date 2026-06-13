@@ -83,7 +83,7 @@ y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip d
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · Planting</span>Placement from sediment</h2>
       <p>
-        Where does grass go? Part two left us the answer in writing. The
+        Grass placement comes from part two's erosion output. The
         erosion simulation recorded how much material was removed or deposited
         at every cell, producing a soil map.
         Deposition zones are exactly the flat, wet, silt-rich valley floors
@@ -119,7 +119,7 @@ y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip d
           The classic tool here is GPU instancing — upload one blade, stamp
           it N times. This meadow uses something even simpler: all the
           blades are merged into a single static buffer at planting time,
-          pre-transformed, pre-colored. Instancing earns its keep when
+          pre-transformed, pre-colored. Instancing helps when
           instances move independently on the CPU or share serious geometry;
           a seven-vertex blade has nothing to share, and none of them ever
           moves on the CPU. Merged buffers also let every blade be subtly
@@ -137,7 +137,7 @@ y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip d
         for scenery. What eyes actually verify is much weaker:
         <em>coherence</em>. Gusts should be patches, not pixels; they
         should travel; nearby blades should agree and distant ones
-        shouldn't. The cheapest field with those properties is two
+        shouldn't. A simple field with those properties is two
         traveling sine waves at different scales and speeds:
       </p>
       <pre><code>gust(x, z, t) = 0.7 · sin(k·(x + 0.7z) + 1.7t + φ) + 0.3 · sin(2.9k·(x − 0.7z) + 3.4t + 1.7φ)
@@ -171,7 +171,7 @@ sway = (gust · 0.5 + 0.62) · strength · t² · flex   <span class="cm">// nev
           </p>
           <p>
             Second subtlety: the baked colors darken toward the root
-            (ambient occlusion for free — deep grass is dark grass), and
+            to approximate ambient occlusion, and
             the displaced vertices keep their original normals even while
             the wind moves them. Stale normals on moving grass turn out to
             be invisible; the eye reads the motion from the silhouette, not

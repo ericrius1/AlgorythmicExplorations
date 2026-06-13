@@ -35,7 +35,7 @@
     <main>
       <p>
         Part one used one lamp in one room to introduce the distance field, cascade
-        hierarchy, and merge. The bonfire above uses the same machinery without
+        hierarchy, and merge. The bonfire above uses the same pipeline without
         adding a rendering pass. It tests a case that is expensive for many other
         lighting techniques:
         <em>what if everything is a light?</em>
@@ -113,8 +113,7 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · Environment light</span>The sky is a cascade</h2>
       <p>
-        One light has been missing from this series, and it is the big one. Daylight
-        is not a source in the scene — it is what the world looks like when rays
+        Daylight is not a source inside the scene. It is the radiance returned when rays
         escape the scene entirely. The cascade hierarchy has a precise slot for
         that case. When a top-cascade ray finishes its interval having hit
         nothing, part one merged it with darkness. But "what does a ray see when it

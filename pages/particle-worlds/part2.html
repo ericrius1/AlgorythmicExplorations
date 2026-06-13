@@ -67,7 +67,7 @@
         always just lengths.
       </p>
       <p>
-        So where's the catch? <strong>Memory.</strong> Each pyramid level now cubes
+        The limiting factor is <strong>memory</strong>. Each pyramid level now cubes
         instead of squares. Part one's finest grid was 1024² ≈ a million cells — 16 MB
         of accumulators, trivial. The same depth in 3D would be 1024³ ≈ a
         <em>billion</em> cells: 16 GB, which most machines reading this don't have. So
@@ -188,7 +188,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));        // Σ m·dz  ←
       <h2><span class="kicker">Step 3 · The octree pyramid</span>Building the octree pyramid</h2>
       <p>
         The full 3D pipeline is part one's pipeline with the constants swapped. Every
-        frame, a dozen dispatches rebuild the universe's index from nothing:
+        frame, a dozen dispatches rebuild the spatial index from nothing:
       </p>
       <pre><code>clear     → zero ~8M atomic words, reset the bounds slots
 bounds    → min/max reduce over every body          (the root cell)
@@ -200,8 +200,8 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
         Nothing here waits on anything. The tree is rebuilt from scratch each step
         because rebuilding is cheaper than updating — part one's lesson, intact in 3D.
         The force kernel still reads only its own body's position and velocity, so it
-        integrates in place, and there is still exactly one copy of the universe in
-        memory, shared by physics and renderer.
+        integrates in place, and one particle-state buffer remains shared by
+        physics and rendering.
       </p>
       <details class="fold">
         <summary>Deep dive: how a body avoids gravitating toward itself</summary>
@@ -275,10 +275,10 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
         </p>
       </aside>
       <p>
-        The slider below makes the argument physical. At zero, free 3D gravity. Drag
+        The slider below demonstrates the constraint. At zero, free 3D gravity. Drag
         it up and the shell condenses out of the chaos — bodies snap onto the dome and
         keep flowing, swirling, clustering, but now along a curved two-dimensional
-        world. And here is the detail worth staring at: gravity still acts through 3D
+        world. Gravity still acts through 3D
         space. Two clusters on opposite sides of the dome attract along the straight
         chord <em>through</em> the dome — watch them pair up and slide toward each
         other like beads pulled by a thread under the shell. The dynamics live on the
@@ -306,9 +306,9 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
             Projection is the tempting fix — <code>p = normalize(p) * shellR</code>,
             done — and it is everything a constraint shouldn't be. It silently deletes
             radial velocity (energy vanishes without anything deciding it should), and
-            it happens outside the integrator's view, so it fights damping, fights
-            gravity, and fights any second constraint you add later. A penalty force
-            obeys the integrator's rules: energy-aware, tunable, composable. Note the
+            it happens outside the integrator's view, so damping, gravity, and
+            later constraints cannot account for it. A penalty force remains
+            inside the integrator: energy-aware, tunable, and composable. Note the
             gentle velocity damping that switches on with the dome so the shell can
             settle instead of ringing forever.
           </p>

@@ -43,7 +43,7 @@
         interacts with light passing through it.
       </p>
       <p>
-        The machinery is unchanged — the same distance field, cascades, and merge
+        The rendering pipeline is unchanged: the same distance field, cascades, and merge
         as parts one and two. Fog enters as one new texture and two lines inside
         the ray march. That economy is the point: absorption and scattering are
         not new algorithms, they are new <em>terms</em> in the question every ray
@@ -78,7 +78,7 @@
         Something is clearly missing: real fog around a lamp <em>glows</em>. The
         light being taken from the beam has to go somewhere, and so far we have
         only removed it from the world. (With scatter up, look closely at the
-        halo and you can see the machinery's grain: faint beads where the lowest
+        halo and you can see the sampling pattern: faint beads where the lowest
         cascades' few directions undersample a small bright source, and a soft
         comet tail when the lamp moves — the glow is last frame's light, and
         glowing fog magnifies every piece of bookkeeping that was invisible when

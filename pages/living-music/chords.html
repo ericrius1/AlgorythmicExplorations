@@ -10,7 +10,7 @@
     <title>Major and Minor — Living Music</title>
     <meta
       name="description"
-      content="Triads as harmonic-series geometry, tension and resolution as physics, voice leading as laziness. Interactive: a chord microscope with a playable piano, and a four-chord band whose voices you can watch think."
+      content="Triads as harmonic-series geometry, tension and resolution, and voice leading as a minimum-motion assignment problem. Includes a chord microscope, playable piano, and four-chord progression."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -116,11 +116,12 @@
 
       <p>
         Watch the threads while it plays. The bass strides from root to root, but
-        the three upper voices are <em>lazy</em>: at each chord change every voice
+        the three upper voices minimize motion: at each chord change every voice
         slides to the nearest available chord tone, often not moving at all. That
-        laziness — <strong>voice leading</strong> — is why a chord change sounds
+        <strong>voice leading</strong> is why a chord change sounds
         like transformation rather than replacement, and the demo computes it the
-        way a chorale writer would: try the assignments, keep the cheapest. Watch
+        way a chorale writer would: try the assignments and keep the one with
+        the least total motion. Watch
         the amber tension lane rise on V and fall on I. Then press
         <em>deceptive</em>: same wind-up, but V resolves to vi — the relative
         minor. Composers use that deceptive resolution to delay the expected ending.
@@ -128,7 +129,7 @@
       <aside class="note">
         <span class="note-label">Aside · Four chords, several thousand songs</span>
         <p>
-          The loop below — I–V–vi–IV — underlies a comedy-routine-length
+          The loop below — I–V–vi–IV — underlies a long
           list of hits ("Let It Be", "No Woman No Cry", "Africa", "Let Her Go",
           and the Axis of Awesome's forty-song medley). Its effectiveness is built into
           the tension lane: the strongest release (V→I) never happens inside the
@@ -139,7 +140,7 @@
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: the lazy-voice algorithm</summary>
+        <summary>Deep dive: the minimum-motion voice-leading algorithm</summary>
         <div class="fold-body">
           <p>
             At each chord change the demo enumerates all six assignments of the
@@ -162,9 +163,9 @@
         ranked by harmonic alignment (part two). A twelve-note grid (part three). A
         seven-note landscape with a home (part four). And now chords — objects
         with <em>quality</em> (geometry of thirds) and <em>function</em> (distance
-        from home, with V7 as the spring) — moving through time on lazy voices.
+        from home, with V7 as the spring) — connected through minimum-motion voice leading.
         Those are central parts of Western tonal music. What the system does not yet
-        produce is a song: nothing in our machinery decides <em>when</em>
+        produce is a song: nothing in the system decides <em>when</em>
         notes happen, or which melody rides on top of the chords.
       </p>
       <p>

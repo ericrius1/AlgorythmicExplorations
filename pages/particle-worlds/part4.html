@@ -99,7 +99,7 @@
         watch particles escape it.
       </p>
       <p>
-        The escape hatch: keep the cells, lose the box. A cell is now just a pair of
+        A spatial hash keeps the cells without requiring a bounded box. A cell is a pair of
         integers — which column, which row, anywhere in the infinite plane — and those
         integers are <em>hashed</em> into a fixed table of 65,536 buckets:
       </p>
@@ -109,13 +109,13 @@
 }</code></pre>
       <p>
         Nothing else changes. The histogram counts bucket occupants, the scan finds
-        bucket starts, the scatter groups particles by bucket — part three's machinery
+        bucket starts, the scatter groups particles by bucket — part three's pipeline
         runs untouched. The price: unrelated cells, possibly half a world apart,
         occasionally land in the same bucket, so the 3×3 query dredges up
         <em>impostors</em>. And the algorithm does not care, because the force pass
         was always going to measure the distance to every candidate anyway. A real
-        neighbour passes the distance test; an impostor from across the world fails it
-        by a margin of, well, the world. The filter was already installed.
+        neighbour passes the distance test; an unrelated particle from a hash
+        collision fails it. The existing distance check removes false matches.
       </p>
       <p>
         The demo below makes the impostors visible. Same pile of discs as part three,
@@ -208,7 +208,8 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       <div data-demo="collapse"></div>
 
       <p>
-        <em>Gravity only</em> is Step 1's ghost: collapse, miss, re-expand, forever.
+        With <em>gravity only</em>, the cloud repeatedly collapses, passes
+        through itself, and re-expands.
         <em>Contacts only</em> is a handful of marbles tossed in space: they bump,
         drift, and disperse, because nothing binds them. But <em>both</em> produces
         a bound result — the cloud collapses and remains compact.
@@ -251,8 +252,9 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
       <h2><span class="kicker">Step 5 · The disk</span>Accretion from a debris ring</h2>
       <p>
         The collapse demo is planet formation with the difficulty turned down — a
-        cloud with nowhere to go but inward. The real nursery is a <em>disk</em>, and
-        a disk fights back. Here is the hero ring again, at full size and with the
+        cloud with nowhere to go but inward. A more realistic nursery is a
+        rotating <em>disk</em>, where angular momentum resists collapse. Here
+        is the ring again, at full size and with the
         knobs exposed:
       </p>
 

@@ -10,7 +10,7 @@
     <title>The Horizon — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The terrain series finale: chunks, LOD rings, skirts, and a millisecond build budget — an infinite world that streams in around your flight, with grass, forests, and biomes that never repeat."
+      content="Chunks, LOD rings, skirts, and a millisecond build budget create an infinite world that streams around the camera, with grass, forests, and deterministic biomes."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -71,12 +71,11 @@
       </p>
       <div data-demo="rings"></div>
       <p>
-        The whole machine from above. The white flashes are construction —
+        The view from above exposes the streaming process. The white flashes mark construction;
         watch how they wavefront ahead of the camera's motion, because the
         queue is sorted by distance and the budget only allows a couple of
-        builds per frame. Notice also what happens at the trailing edge:
-        nothing dramatic. Chunks vanish, and the world doesn't care,
-        because nothing a chunk contained was ever unique to it. <em>That</em>
+        builds per frame. At the trailing edge, chunks vanish without losing
+        unique state because every chunk can be regenerated. <em>That</em>
         is what all the determinism was for: revisit any coordinate next
         week and the hash rebuilds the same hill, the same boulder, the
         same tree leaning the same way.
@@ -109,7 +108,7 @@
       </p>
       <pre><code>ring 0–1: 48² grid    ring 2–3: 24²    ring 4+: 12²    <span class="cm">// all + skirt, all + margin-sampled normals</span></code></pre>
       <details class="fold">
-        <summary>Deep dive: the seam you'd never think of</summary>
+        <summary>Deep dive: matching normals across chunk seams</summary>
         <div class="fold-body">
           <p>
             Cracks are the visible seam problem; lighting is the invisible
@@ -162,7 +161,7 @@ for (const w of wanted) {
         any direction; they're all infinite. Press
         <strong>freeze streaming</strong> and keep flying to do the
         useful test: catch up with the generated edge and inspect
-        it. Unfreeze and watch the machinery sweep the gap closed in front
+        it. Unfreeze and watch the build queue close the gap in front
         of you. <strong>LOD tint</strong> paints each new chunk by its
         resolution class so you can see the pyramid of attention follow
         the camera; the readout's "last build" number is the budget at
@@ -171,7 +170,7 @@ for (const w of wanted) {
       <aside class="note">
           <span class="note-label">Aside · Why erosion is omitted</span>
         <p>
-          One passenger from this series is missing.
+          One earlier technique is omitted.
           <a href="/pages/ground-truth/erosion.html">Part two's erosion</a> is a history —
           each droplet changes the ground the next one sees — and a
           hundred-thousand-droplet history cannot be replayed per chunk

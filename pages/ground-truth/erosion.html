@@ -46,7 +46,7 @@
         finds a channel makes that channel better at being found.
       </p>
       <p>
-        So this article adds the missing ingredient: history, simulated. The
+        This article adds a simulated history. The
         tool is <em>hydraulic erosion</em> — not the full fluid dynamics of a
         watershed, but a simplified approximation: one raindrop at a time, simulated as a particle
         rolling over the heightfield, allowed to do only two things — pick up
@@ -66,8 +66,8 @@ move one cell along dir
 speed  = √(speed² + drop · gravity)                 <span class="cm">// falling makes it faster</span>
 water *= (1 − evaporation)                          <span class="cm">// shrinking makes it weaker</span></code></pre>
       <p>
-        The <strong>inertia</strong> blend is doing quiet but important
-        work. A droplet that follows the gradient exactly turns on a dime at
+        The <strong>inertia</strong> blend prevents abrupt direction changes.
+        A droplet that follows the gradient exactly turns on a dime at
         every cell and gets trapped by every pebble-sized dimple in the
         noise. A droplet with momentum cuts smooth curves and can coast
         across small flats — which is how real water behaves, and it is the
@@ -81,9 +81,9 @@ water *= (1 − evaporation)                          <span class="cm">// shrink
         Rain on the map and watch the paths. Nobody routed them — each
         droplet only ever sees the slope under its own feet — but they merge
         into the same channels, because converging is what downhill
-        <em>means</em>. This is the whole phenomenon of drainage in one
-        picture: rivers are not drawn on landscapes, they are computed by
-        them. Crank the inertia slider and the streams swing wide like
+        <em>means</em>. The demo shows how drainage networks emerge from local
+        downhill motion rather than being drawn explicitly. Increase the
+        inertia slider and the streams swing wide like
         rivers in flood; set it to zero and they hug every wrinkle.
       </p>
 
@@ -169,8 +169,7 @@ else:                    erode toward capacity  <span class="cm">// fast and hun
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · Outputs</span>Resulting terrain</h2>
       <p>
-        It's worth being precise about what changed, because the next
-        articles will build on each item. <strong>Drainage networks:</strong>
+        The next articles build on several outputs. <strong>Drainage networks:</strong>
         valleys now join downstream instead of wandering, one of the strongest
         visual cues of eroded terrain. <strong>Flat
         floors:</strong> deposition fills the low ground, making the only

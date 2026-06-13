@@ -21,8 +21,8 @@
         The <a href="/pages/living-music/jukebox.html">finale</a> ended with a band that generates
         plausible music but cannot listen. This article turns the pipeline around. Play —
         the letter rows of your computer keyboard become a piano, or plug in a
-        MIDI controller — and the browser listens, works out what key you are
-        in, guesses the chord you are implying, and answers with a bass line
+        MIDI controller — and the browser estimates the current key, infers the
+        implied chord, and generates a bass line
         and comping that adapt as the evidence changes.
       </p>
       <p>
@@ -40,7 +40,7 @@
       <h2><span class="kicker">Step 1 · Key estimation</span>Matching pitch-class profiles</h2>
       <p>
         A key is not a fact in the signal; it is an impression that builds up
-        and fades. The machine models it exactly that way: a twelve-slot
+        and fades. The key estimator models it that way: a twelve-slot
         histogram, one slot per pitch class, where every note you play adds a
         vote and every vote decays exponentially — a memory with a half-life.
         Play C–E–G–C and the histogram bulges at C, E, and G; stop playing for
@@ -69,14 +69,14 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
         blues third, a borrowed chord — briefly makes some other key score
         better, and a naive tracker would lurch its whole worldview sideways
         for one bar. So a challenger key must beat the incumbent clearly, two
-        bars running, before the machine changes its mind. Conviction, cheaply
-        implemented.
+        consecutive bars before the active key changes. This hysteresis prevents
+        brief chromatic notes from causing unstable key changes.
       </p>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · Chord inference</span>Choosing the chord</h2>
       <p>
-        Twice a bar, the machine asks: which of the key's seven diatonic
+        Twice a bar, the system scores the key's seven diatonic
         triads (<a href="/pages/living-music/chords.html">part five's</a> stack-of-thirds) best
         explains the recent notes? Each triad is scored on the fast-decaying
         histogram — notes currently under your fingers count extra — plus
@@ -90,9 +90,9 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
         The winner still has to be <em>voiced</em>. A C major triad is a set
         of pitch classes, not a set of piano keys, and a real accompanist's
         hand stays where it was: from F major to C major you don't leap a
-        fifth, you slide F→E and keep the C. The machine tries all three
+        fifth, you slide F→E and keep the C. The system tries all three
         inversions near middle C and keeps the one whose fingers travel the
-        least total distance — the lazy-voice rule from
+        least total distance — the minimum-motion voice-leading rule from
         <a href="/pages/living-music/chords.html">part five</a>, now running live. The bass is
         even simpler and even more traditional: roots and fifths, on the
         strong beats, an octave and a half down.
@@ -105,8 +105,8 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
           <em>written</em> piece, solving the alignment problem this page
           dodges by gridding time. Robert Rowe's <em>Cypher</em> and George
           Lewis's <em>Voyager</em> (built through the 1980s–90s) went the
-          other way — free improvisation, the machine as an opinionated
-          partner rather than a follower; Lewis, a trombonist, insisted his
+          other way — free improvisation, with the software acting as an
+          independent partner rather than a follower; Lewis, a trombonist, insisted his
           program be allowed to disagree with him. François Pachet's
           <em>Continuator</em> (2002) learned your style from your own phrases
           and answered in kind. The seesaw rule below — play busy, accompany
@@ -118,16 +118,16 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · Restraint</span>Choosing when to play</h2>
       <p>
-        The difference between an accompanist and a karaoke machine is
-        restraint. The machine keeps a running count of your notes per second
-        and treats density as a seesaw: leave space and it fills the space —
+        Accompaniment also requires restraint. The system keeps a running count
+        of your notes per second and uses density as a control signal: leave
+        space and it fills the space —
         sustained pads with a gentle arpeggio on the eighths; play
         conversationally and it switches to off-beat comping stabs, jazz
         rhythm-section style; flurry up and down the keyboard and it thins to
         bare pads and root notes, because somebody in this band has to hold
         the floor down. You can override the seesaw and pin any one style, but
-        <em>auto</em> is the point: the most musical thing the machine does is
-        decide not to play.
+        <em>auto</em> adapts the arrangement by reducing its activity when the
+        player becomes busier.
       </p>
 
       <!-- ================================================================ -->
@@ -140,14 +140,14 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
         <code>Z</code>/<code>X</code> shift octaves. A MIDI controller is wired
         up automatically the moment you plug it in — velocity and all — and
         the on-screen piano works on a phone. Play two or three notes and the
-        band joins: your notes are the white trace, the machine's reply is
+        band joins: your notes are the white trace, the generated response is
         amber, the gridlines are the key it currently believes in, and the
         chord changes are labeled as they happen. Try sitting on a sustained
         chord, then a fast run, and watch the readout switch styles under you.
       </p>
       <div data-demo="accompanist"></div>
       <p>
-        Two limitations remain. The machine keeps the time
+        Two limitations remain. The system keeps the time
         and you follow <em>it</em> — real accompaniment-following (rubato,
         your tempo, Dannenberg's problem) needs score alignment this page
         doesn't attempt; the groove toggle exists because playing to a pulse
@@ -167,7 +167,7 @@ key = argmax over 24 candidates of corr(evidence, profile)</code></pre>
         partner. Every piece was already on the shelf — <a href="/pages/living-music/twelve.html">part
         three's</a> grid names the notes, <a href="/pages/living-music/scales.html">part four's</a>
         scales become Krumhansl's profiles with measured numbers attached,
-        <a href="/pages/living-music/chords.html">part five's</a> triads and lazy voices became
+        <a href="/pages/living-music/chords.html">part five's</a> triads and voice-leading search became
         the hands, and the <a href="/pages/living-music/jukebox.html">jukebox's</a> step clock
         keeps the time. The series ends as a band that needs one more player:
         you.

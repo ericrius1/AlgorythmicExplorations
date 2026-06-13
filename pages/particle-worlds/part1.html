@@ -35,7 +35,7 @@
       <p>
         The galaxy at the top of this page is not a video. It is twenty thousand
         bodies, each pulling on all the others, simulated and drawn by your graphics
-        card about a hundred times per second. The same machinery scales to three
+        card about a hundred times per second. The same method scales to three
         hundred thousand bodies in the final demo on this page.
       </p>
       <p>
@@ -277,7 +277,7 @@ if (cellWidth² &lt; θ² × distance²) {
         cluster the walk accepted as a single point mass for your position. Move
         toward the disk's core and the boxes shrink near you while the far field stays
         coarse. Then drag θ down to 0.1 (strict — many small boxes, accurate) and up
-        to 2.0 (cavalier — five boxes for a galaxy).
+        to 2.0 (coarse — only a few boxes for a galaxy).
       </p>
 
       <div data-demo="barnes-hut"></div>
@@ -405,7 +405,7 @@ atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · GPU-resident</span>The whole loop on the GPU</h2>
+      <h2><span class="kicker">Step 6 · GPU-resident</span>The complete GPU pipeline</h2>
       <p>
         Assemble everything. Each simulation step is a fixed pipeline of ~15 GPU
         dispatches, and <em>nothing</em> touches the CPU:
@@ -422,7 +422,7 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
         drifts or explodes. And the <em>force</em> pass writes each body back
         <strong>in place</strong> — safe, because no kernel ever reads another body's
         position directly; all cross-body information flows through the pyramid. One
-        buffer, no copy of the universe.
+        buffer, with no duplicate particle-state buffer.
       </p>
       <details class="fold">
         <summary>Deep dive: atomically min/maxing floats</summary>
@@ -489,8 +489,8 @@ force    → every body walks the implicit tree           (Barnes-Hut, no pointe
       <p>
         <strong>3. Data structures choose your hardware.</strong> The pointer quadtree
         and the pyramid hold identical information. One is unbuildable in parallel;
-        the other is a scatter and a mipmap. When an algorithm "can't run on the GPU,"
-        the layout is usually the problem, not the algorithm.
+        the other is a scatter and a mipmap. When an algorithm maps poorly to
+        a GPU, changing the data layout can expose the necessary parallelism.
       </p>
       <p>
         <strong>4. Residence beats speed.</strong> The CPU tree build wasn't slow

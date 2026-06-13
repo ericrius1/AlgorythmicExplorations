@@ -10,7 +10,7 @@
     <title>The Lava Lamp — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A new series. Smoothed-particle wax with per-particle temperature — heated from below, cooled from above — rendered with radiance cascades, so the glow of hot wax actually illuminates the cold wax drifting past it."
+      content="Smoothed-particle wax with per-particle temperature, heated from below and cooled from above, rendered with radiance cascades so hot wax illuminates the cold wax around it."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -20,7 +20,7 @@
       <div class="hero-title">
         <h1>The Lava Lamp</h1>
         <p class="subtitle">
-          A new series begins with a lava lamp. The wax above is a fluid simulation
+          This lighting series begins with a lava lamp. The wax above is a fluid simulation
           that tracks its own temperature; the glow comes from
           two-dimensional light transport. Stir it with your cursor and watch
           the heat-driven cycle develop.
@@ -189,7 +189,7 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
         <summary>Deep dive: distance fields and the jump flood</summary>
         <div class="fold-body">
           <p>
-            Two pieces of supporting machinery. The rays sphere-march against a
+            Two supporting structures make this practical. The rays sphere-march against a
             <em>distance field</em> — at every pixel, the distance to the nearest
             surface, so each step can leap that far with certainty. And the field is
             built in logarithmic time by the <em>jump flood</em> algorithm (Rong
@@ -245,8 +245,8 @@ cascade 2:  probes every 8px, 64 rays each,  reaching  20 →  84px
       <p>
         The main change is the direction of the query. Matter simulation asks
         <em>where do things go?</em> Light transport asks <em>what do things see?</em>
-        — and it turns out to compress the same way, hierarchically, by being
-        explicit about what can be approximated. The next article applies the same
+        It also compresses hierarchically when the approximation bounds are
+        explicit. The next article applies the same
         cascades to a larger scene with many moving emitters, colored bounce, and
         hand interaction.
       </p>

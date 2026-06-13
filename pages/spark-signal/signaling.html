@@ -56,9 +56,9 @@ soma        → integrate input; decide whether to fire
 axon        → broadcast an all-or-none spike to downstream targets
 terminal    → convert the electrical spike into a chemical message</code></pre>
       <p>
-        The <em>dendritic tree</em> is an antenna farm — thousands of thin
-        branches covered in synapses where other neurons whisper in. Those whispers
-        are small voltage blips, not spikes. They <strong>sum</strong> in the
+        The <em>dendritic tree</em> contains thousands of thin branches covered
+        in synapses. Their inputs are small voltage changes, not spikes. They
+        <strong>sum</strong> in the
         soma. If the sum crosses a line called <strong>threshold</strong>, the
         soma launches an action potential down the <em>axon</em>, a cable that
         can stretch from your spine to your toe. At the <em>axon terminal</em>,
@@ -116,7 +116,7 @@ peak of spike     ≈  +40 mV     (brief reversal, then recovery)</code></pre>
       <div data-demo="membrane"></div>
 
       <p>
-        Things worth trying. Lower K⁺ conductance and inject current: the cell is
+        To inspect the model, lower K⁺ conductance and inject current: the cell is
         harder to repolarize — spikes get wider and stranger. Raise Na⁺
         conductance at rest: the resting line creeps toward threshold and the cell
         becomes excitable, firing with smaller inputs. The shape of the spike —
@@ -154,8 +154,8 @@ peak of spike     ≈  +40 mV     (brief reversal, then recovery)</code></pre>
           why neurons are slow — unmyelinated axons conduct at roughly 1 m/s;
           myelinated ones reach ~120 m/s — yet extraordinarily versatile: the
           same physical principle encodes the touch of a key, the colour of the
-          sky, and the decision to reach for coffee. Speed was never the point.
-          Conditional computation was.
+          sky, and the decision to reach for coffee. Their key property is
+          reliable, conditional signal propagation rather than raw speed.
         </p>
       </aside>
 
@@ -223,7 +223,7 @@ refractory period   ≈   1–2 ms             (limits max firing rate)</code></
             Every patch of membrane on the axon runs the same channel program.
             That is why the action potential looks the same at the cell body and
             at the fingertip — the waveform is a property of the membrane
-            machinery, not of the stimulus that triggered it. The stimulus only
+            dynamics, not of the stimulus that triggered it. The stimulus only
             decides <em>if</em> and <em>when</em>; the channels decide
             <em>what</em>.
           </p>
@@ -264,8 +264,9 @@ vesicle contents         ≈ 5,000 molecules of transmitter (order of magnitude)
 EPSP size (one vesicle)  ≈  0.1–1 mV   (too small to reach threshold alone)
 typical threshold gap    ≈ 15 mV from rest to spike</code></pre>
       <p>
-        So a single synaptic event is a whisper. The postsynaptic neuron listens
-        to thousands of whispers at once. <strong>Spatial summation</strong>:
+        A single synaptic event therefore produces a small voltage change. The
+        postsynaptic neuron integrates thousands of them.
+        <strong>Spatial summation</strong>:
         many EPSPs from different synapses add. <strong>Temporal summation</strong>:
         EPSPs arriving in quick succession add before the membrane leaks back.
         Only when the combined depolarization crosses threshold does the
@@ -353,7 +354,7 @@ energy cost of a spike    ≈ 10⁸ ATP molecules (mostly pump work to restore g
       <div data-demo="network"></div>
 
       <p>
-        Things worth trying. Stimulate the leftmost neuron and trace the wave
+        To inspect the circuit, stimulate the leftmost neuron and trace the wave
         forward. Then stimulate the centre and watch inhibition suppress the
         feedback loop. Crank noise until cells fire on their own: you are
         simulating the constant random synaptic bombardment real neurons live in.
@@ -378,9 +379,9 @@ energy cost of a spike    ≈ 10⁸ ATP molecules (mostly pump work to restore g
           <p>
             Why all-or-none? Why not send graded voltages down the axon, as
             dendrites do? Because graded signals decay exponentially with
-            distance. The action potential is an expensive fix: spend energy
-            regenerating the signal at every patch of membrane so it arrives
-            intact a metre away. Evolution paid that cost wherever long-range
+            distance. An action potential solves this by spending energy to
+            regenerate the signal at every patch of membrane so it arrives
+            intact a metre away. Nervous systems use that mechanism wherever long-range
             reliable transmission mattered.
           </p>
           <p>

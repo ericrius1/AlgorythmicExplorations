@@ -228,7 +228,7 @@ slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 4 · Assembly</span>The GPU implementation</h2>
       <p>
-        Now assemble the machine. Every simulation step, from scratch — because the
+        The complete GPU pipeline runs every simulation step from scratch because the
         particles never stop moving:
       </p>
       <pre><code>clear    → zero the cell counters
@@ -237,12 +237,12 @@ scan     → starts[] from counts[]                      (3 dispatches)
 scatter  → every particle copies itself to its slot    (one atomicAdd each)
 forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
       <p>
-        Two details do quiet work here. The scatter copies each particle's
+        Two details matter here. The scatter copies each particle's
         <em>entire state</em> into the sorted array, not just an index — so after the
         sort, particles that are neighbours in space are neighbours in memory, and the
         force pass reads clean contiguous runs instead of pointer-chasing. (Part one's
-        epilogue promised memory coherence as a future optimization; here it falls out
-        of the sort for free.) And nothing in the pipeline ever waits: the only
+        epilogue promised memory coherence as a future optimization; here the
+        sort provides it directly.) The only
         coordination is atomic increments, which the hardware resolves without anyone
         stopping.
       </p>
@@ -255,7 +255,7 @@ forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
             For a tank with walls that's the right call. But nothing about the method
             needs walls. Replace "cell index" with a <em>hash</em> of the cell
             coordinates — multiply ix and iy by two large primes, XOR, mask to the
-            table size — and the same count-scan-scatter machinery runs over an
+            table size — and the same count-scan-scatter pipeline runs over an
             unbounded world: only cells that actually contain something cost anything.
           </p>
           <p>
@@ -291,7 +291,7 @@ forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
         a point. The density anywhere is the sum of the blobs overlapping that spot.
         Density above the resting value means squeezed, and squeezed fluid pushes its
         neighbours apart; below means stretched, and it pulls back. Pressure becomes
-        one more short-range force — which is why the machinery we just built handles
+        one more short-range force, so the neighbor-search pipeline handles
         it unchanged.
       </p>
       <pre><code>// pass 1 — density: how crowded is each particle?

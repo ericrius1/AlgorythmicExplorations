@@ -10,7 +10,7 @@
     <title>The Prism — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="The series finale: glass, rainbows, caustics, and focus. One random wavelength per ray adds dispersion and spectral color to the path tracer."
+      content="Glass, rainbows, caustics, and focus. Sampling one wavelength per ray adds dispersion and spectral color to the path tracer."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -108,7 +108,7 @@
       <h2><span class="kicker">Step 3 · One λ per ray</span>Spectral sampling</h2>
       <p>
         Every renderer so far in this series carried color as RGB — three
-        floats along every ray. But n(λ) makes that a lie: a "white" ray
+        floats along every ray. But n(λ) makes that approximation insufficient: a "white" ray
         entering glass has no single direction to bend. The spectral fix is
         pure Monte Carlo doctrine. The pixel's color is an integral over
         wavelengths? Then <em>sample</em> it: give each path one random λ,
@@ -119,7 +119,7 @@
       <pre><code>λ = 380 + rand()·340            <span class="cm">// each sample is one wavelength of one path</span>
 trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth; the average makes the rainbow</span></code></pre>
       <p>
-        At zero dispersion the spectral machinery idles invisibly — every λ
+        At zero dispersion the spectral sampling produces the same result as RGB: every λ
         bends alike, the weights sum to white, and you could never tell. The
         moment n spreads, the caustics fringe into rainbows: red and violet
         rays left the same lamp, hit the same prism face, and landed in

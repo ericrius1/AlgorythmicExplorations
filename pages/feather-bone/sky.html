@@ -45,7 +45,7 @@
         and trees raised branch by branch. The two projects now share one demo.
       </p>
       <p>
-        Nothing in this article is new machinery. It is <em>assembly</em>. The
+        This final article combines the systems from both series. The
         bird's flight model meets the terrain's height function (now her
         ground); her landing controller meets the trees' perch lists (now her
         targets); her syrinx fills the air. The only genuinely new line of code
@@ -108,15 +108,14 @@
         <summary>Deep dive: the controller and the pilot are the same socket</summary>
         <div class="fold-body">
           <p>
-            Notice that "you fly" and "AI flies" plug into the exact same hole.
-            The flight model doesn't know or care whether its bank command came
+            Manual and autonomous control use the same interface. The flight
+            model receives the same bank command whether it came
             from a proportional controller chasing a perch or from your finger
             on the D key — it's the same three numbers either way. That's why
             the autopilot from <a href="/pages/feather-bone/landing.html">part five</a> and your
             keyboard are interchangeable: an autonomous agent and a human pilot
-            are, to a physics simulation, both just sources of intent. Swap one
-            for the other mid-flight and the bird never notices. The whole
-            series was quietly building toward that socket.
+            are both sources of the same control inputs. They can therefore be
+            exchanged during flight without changing the simulation.
           </p>
         </div>
       </details>
@@ -140,10 +139,10 @@
       <!-- ================================================================ -->
       <h2><span class="kicker">Coda</span>The combined demo</h2>
       <p>
-        The eagle was lofted from rings, feathered from a roster, rigged by
-        proximity, flapped by the law of cosines, flown by lift and drag, and
-        landed by feedback. The world was hashed into noise, summed into
-        mountains, carved by rain, planted with grass, and grown into trees.
+        The eagle combines a lofted mesh, instanced feathers, proximity-based
+        rigging, inverse kinematics, lift and drag, and feedback control. The
+        world turns hashed noise into mountains, applies rain erosion, and
+        populates the result with grass and trees.
         Their structured representations make the final integration
         straightforward.
       </p>
