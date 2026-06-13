@@ -157,6 +157,7 @@ export function mountMagneticCrown(el: HTMLElement): void {
       const drawH = h - padY * 2;
       const X = (x: number): number => padX + x * drawW;
       const Y = (y: number): number => padY + y * drawH;
+      const compact = w < 520;
 
       const pField = 0.35 + phase(t, 0, 0.1) * 0.65;
       const pMoments = phase(t, 0.18, 0.34);
@@ -193,14 +194,14 @@ export function mountMagneticCrown(el: HTMLElement): void {
       }
       label(ctx, "uniform external field  H", X(0.5), Y(0.1), {
         color: PAL.warm,
-        size: 12,
+        size: compact ? 9 : 12,
         align: "center",
         alpha: pField * fieldFade * (1 - pCrown * 0.9),
         mono: true,
       });
       label(ctx, "∇H = 0  →  no net force", X(0.5), Y(0.94), {
         color: PAL.good,
-        size: 12,
+        size: compact ? 9 : 12,
         align: "center",
         alpha: pField * (1 - phase(t, 0.32, 0.48)),
         mono: true,
@@ -248,11 +249,13 @@ export function mountMagneticCrown(el: HTMLElement): void {
         ctx.setLineDash([]);
         forcePair(ctx, x, y0, x, y1, false, 1, PAL.good);
         ctx.restore();
-        label(ctx, "head-to-tail attraction", x + 22, (y0 + y1) / 2, {
-          color: PAL.good,
-          size: 11,
-          alpha: pVertical * (1 - pCrown),
-        });
+        if (!compact) {
+          label(ctx, "head-to-tail attraction", x + 22, (y0 + y1) / 2, {
+            color: PAL.good,
+            size: 11,
+            alpha: pVertical * (1 - pCrown),
+          });
+        }
       }
 
       // Isolate a horizontal pair to explain side-by-side repulsion.
@@ -278,12 +281,14 @@ export function mountMagneticCrown(el: HTMLElement): void {
         ctx.setLineDash([]);
         forcePair(ctx, x0, y, x1, y, true, 1, PAL.red);
         ctx.restore();
-        label(ctx, "side-by-side repulsion", (x0 + x1) / 2, y - 28, {
-          color: PAL.red,
-          size: 11,
-          align: "center",
-          alpha: pHorizontal * (1 - pCrown),
-        });
+        if (!compact) {
+          label(ctx, "side-by-side repulsion", (x0 + x1) / 2, y - 28, {
+            color: PAL.red,
+            size: 11,
+            align: "center",
+            alpha: pHorizontal * (1 - pCrown),
+          });
+        }
       }
 
       // Final balance annotations.
@@ -293,7 +298,7 @@ export function mountMagneticCrown(el: HTMLElement): void {
         }
         label(ctx, "gravity + surface tension limit the spikes", X(0.5), Y(0.12), {
           color: PAL.muted,
-          size: 11,
+          size: compact ? 9 : 11,
           align: "center",
           alpha: pCrown,
         });
@@ -305,28 +310,30 @@ export function mountMagneticCrown(el: HTMLElement): void {
         arrow(ctx, X(PEAKS[2] - 0.02), spacingY, X(PEAKS[1] + 0.02), spacingY, PAL.red, 1.5, 6);
         label(ctx, "repulsion sets the spacing", X(0.5), spacingY - 15, {
           color: PAL.red,
-          size: 11,
+          size: compact ? 9 : 11,
           align: "center",
           alpha: pCrown,
         });
       }
 
-      const state =
-        pCrown > 0.3
-          ? "crown: attraction + repulsion + restoring forces"
-          : pHorizontal > 0.3
-            ? "pair force: repel sideways"
-            : pVertical > 0.3
-              ? "pair force: attract vertically"
-              : pMoments > 0.3
-                ? "uniform field: magnetization without net force"
-                : "uniform field: zero gradient";
-      label(ctx, state, w - 14, 20, {
-        color: PAL.muted,
-        size: 10,
-        align: "right",
-        mono: true,
-      });
+      if (!compact) {
+        const state =
+          pCrown > 0.3
+            ? "crown: attraction + repulsion + restoring forces"
+            : pHorizontal > 0.3
+              ? "pair force: repel sideways"
+              : pVertical > 0.3
+                ? "pair force: attract vertically"
+                : pMoments > 0.3
+                  ? "uniform field: magnetization without net force"
+                  : "uniform field: zero gradient";
+        label(ctx, state, w - 14, 20, {
+          color: PAL.muted,
+          size: 10,
+          align: "right",
+          mono: true,
+        });
+      }
     },
   });
 }
