@@ -41,6 +41,7 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   if (i >= SP.count) { return; }
   var p = parts[i];
   let dia = SP.cell;
+  let dia2 = dia * dia;
   let cc = cellCoord(p.xy);
 
   var acc = vec2f(0.0, -SP.gravity);
@@ -54,8 +55,9 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
       for (var k = s; k < s + n; k++) {
         if (k == i) { continue; }
         let d = p.xy - parts[k].xy;
-        let r = length(d);
-        if (r < dia && r > 1e-7) {
+        let r2 = dot(d, d);
+        if (r2 < dia2 && r2 > 1e-14) {
+          let r = sqrt(r2);
           let nrm = d / r;
           acc += nrm * (dia - r) * SP.stiffness;            // spring: push apart
           let vn = dot(p.zw - parts[k].zw, nrm);

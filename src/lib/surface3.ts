@@ -9,6 +9,7 @@ import { FIELD_N, FIELD_SCALE } from "./ferroSim3";
 export const MAX_VERTS = 600_000;
 export const MAX_IDX = 2_400_000;
 const CELLS = FIELD_N - 1;
+const COUNT_SAMPLE_EVERY = 15;
 
 export type Extractor = "tets" | "nets" | "dc";
 
@@ -23,6 +24,8 @@ export class Surface3 {
   private idxCount: GPUBuffer;
   private counts: GPUBuffer; // staging for the info line
   private countsBusy = false;
+  private countsQueued = false;
+  private frame = 0;
   private group: GPUBindGroup;
   private pipes: Record<string, GPUComputePipeline> = {};
   trisDrawn = 0;
@@ -86,6 +89,7 @@ export class Surface3 {
   }
 
   encode(enc: GPUCommandEncoder, mode: Extractor): void {
+    this.frame++;
     enc.clearBuffer(this.vertCount);
     enc.clearBuffer(this.idxCount);
     const cellWgs = Math.ceil(CELLS / 4);
@@ -104,15 +108,17 @@ export class Surface3 {
     pass.setPipeline(this.pipes.finalizePass);
     pass.dispatchWorkgroups(1);
     pass.end();
-    if (!this.countsBusy) {
+    if (!this.countsBusy && !this.countsQueued && this.frame % COUNT_SAMPLE_EVERY === 0) {
       enc.copyBufferToBuffer(this.vertCount, 0, this.counts, 0, 4);
       enc.copyBufferToBuffer(this.idxCount, 0, this.counts, 4, 4);
+      this.countsQueued = true;
     }
   }
 
   // call after submit; updates trisDrawn for the readout
   readCounts(mode: Extractor): void {
-    if (this.countsBusy) return;
+    if (this.countsBusy || !this.countsQueued) return;
+    this.countsQueued = false;
     this.countsBusy = true;
     this.counts.mapAsync(GPUMapMode.READ).then(() => {
       const u = new Uint32Array(this.counts.getMappedRange());

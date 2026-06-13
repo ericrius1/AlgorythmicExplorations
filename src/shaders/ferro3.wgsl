@@ -233,6 +233,7 @@ fn densityPass(@builtin(global_invocation_id) gid: vec3u) {
   if (i >= FP.count) { return; }
   let pi = parts[i].pos.xyz;
   let h = FP.cell;
+  let h2 = h * h;
   let cc = cellCoord(pi);
   let g = i32(FP.grid);
   var rho = 0.0;
@@ -246,8 +247,10 @@ fn densityPass(@builtin(global_invocation_id) gid: vec3u) {
         let st = cellStart[ci];
         let n = cellCount[ci];
         for (var k = st; k < st + n; k++) {
-          let q = length(parts[k].pos.xyz - pi) / h;
-          if (q < 1.0) {
+          let d = parts[k].pos.xyz - pi;
+          let r2 = dot(d, d);
+          if (r2 < h2) {
+            let q = sqrt(r2) / h;
             let w = 1.0 - q;
             rho += w * w;
             rhoNear += w * w * w;
@@ -271,6 +274,7 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   if (i >= FP.count) { return; }
   var p = parts[i];
   let h = FP.cell;
+  let h2 = h * h;
   let di = density[i];
 
   let pressI = FP.stiffness * (di.x - FP.restDensity);
@@ -291,9 +295,10 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
         for (var k = st; k < st + n; k++) {
           if (k == i) { continue; }
           let d = parts[k].pos.xyz - p.pos.xyz;
-          let r = length(d);
-          let q = r / h;
-          if (q < 1.0 && r > 1e-7) {
+          let r2 = dot(d, d);
+          if (r2 < h2 && r2 > 1e-14) {
+            let r = sqrt(r2);
+            let q = r / h;
             let dj = density[k];
             let press = 0.5 * (pressI + FP.stiffness * (dj.x - FP.restDensity));
             let near = 0.5 * (nearI + FP.nearStiffness * dj.y);

@@ -4,6 +4,7 @@
 // scan, scatter — same buffers, no walls.
 
 import hashShader from "../shaders/hashsort.wgsl?raw";
+import type { GpuProfiler } from "./gpuProfiler";
 
 export const HASH_TABLE_SIZES = [1 << 16, 1 << 18, 1 << 20] as const;
 export type HashTableSize = (typeof HASH_TABLE_SIZES)[number];
@@ -84,11 +85,11 @@ export class HashSort {
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 
-  encode(enc: GPUCommandEncoder, group: GPUBindGroup, count: number): void {
+  encode(enc: GPUCommandEncoder, group: GPUBindGroup, count: number, profiler?: GpuProfiler): void {
     const wgs = Math.ceil(count / WG);
     enc.clearBuffer(this.counts);
 
-    let pass = enc.beginComputePass();
+    const pass = enc.beginComputePass({ timestampWrites: profiler?.timestampWrites("hash sort") });
     pass.setBindGroup(0, group);
     pass.setPipeline(this.pipes.count);
     pass.dispatchWorkgroups(wgs);

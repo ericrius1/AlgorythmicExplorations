@@ -8,7 +8,9 @@ export function getDevice(): Promise<GPUDevice | null> {
     try {
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) return null;
-      const device = await adapter.requestDevice();
+      const requiredFeatures: GPUFeatureName[] = [];
+      if (adapter.features.has("timestamp-query")) requiredFeatures.push("timestamp-query");
+      const device = await adapter.requestDevice({ requiredFeatures });
       device.addEventListener("uncapturederror", (e) => {
         console.error("WebGPU uncaptured error:", (e as GPUUncapturedErrorEvent).error.message);
       });

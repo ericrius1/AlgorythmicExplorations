@@ -8,6 +8,7 @@ import { getDevice, configureContext } from "../../lib/gpu";
 import { ParticleRenderer } from "../../lib/particleRenderer";
 import { AccretionSolver } from "../../lib/accretionSolver";
 import { chooseHashTableSize } from "../../lib/hashSort";
+import { GpuProfiler } from "../../lib/gpuProfiler";
 
 // Grain diameter = hash cell. Sized so the default seeds sit well under
 // random close packing — overlapped seeds detonate the contact springs.
@@ -81,6 +82,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
   let gravity = opts.physics !== "contacts";
   let contacts = opts.physics === "contacts" || (opts.physics ?? "both") === "both";
   let solver = new AccretionSolver(dev, chooseHashTableSize(count));
+  const profiler = new GpuProfiler(dev);
 
   let bufs: [GPUBuffer, GPUBuffer] = [null!, null!];
   let cur = 0;
@@ -171,18 +173,20 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
     shell.button("re-seed", rebuild);
   }
   shell.setInfo(() => {
-    if (opts.hero) return `${count.toLocaleString()} dust grains around one star — stir the ring`;
+    const timing = profiler.format();
+    if (opts.hero) return `${count.toLocaleString()} dust grains around one star${timing ? ` · ${timing}` : ""} — stir the ring`;
     const phys =
       gravity && contacts ? "tree + grid" : gravity ? "tree only — ghosts" : "grid only — loose sand";
     return (
       `${count.toLocaleString()} grains · ${phys} · sorted into ${solver.sort.table.toLocaleString()} buckets ` +
-      `${steps}× per frame · stir with your cursor`
+      `${steps}× per frame${timing ? ` · ${timing}` : ""} · stir with your cursor`
     );
   });
 
   return {
     frame() {
       shell.tick();
+      profiler.beginFrame();
       solver.writeParams({
         count,
         gravity,
@@ -205,7 +209,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
         mouseVel,
       });
       const enc = dev.createCommandEncoder();
-      for (let s = 0; s < steps; s++) cur = solver.encode(enc, cur, count);
+      for (let s = 0; s < steps; s++) cur = solver.encode(enc, cur, count, profiler);
       renderer.bind(bufs[cur]);
       renderer.encode(enc, count, {
         scale: renderScale,
@@ -213,10 +217,13 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
         colorScale: disk ? 1.4 : 2.5,
       });
       starRenderer?.encode(enc, 1, { scale: renderScale, size: 0.035, colorScale: 0.2, load: true });
+      profiler.resolve(enc);
       dev.queue.submit([enc.finish()]);
+      profiler.afterSubmit();
     },
     dispose() {
       solver.dispose();
+      profiler.dispose();
       for (const b of bufs) b?.destroy();
       starBuf.destroy();
     },

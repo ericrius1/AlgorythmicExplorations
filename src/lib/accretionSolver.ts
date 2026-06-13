@@ -11,6 +11,7 @@
 
 import shader from "../shaders/accretion.wgsl?raw";
 import { HashSort, type HashTableSize } from "./hashSort";
+import type { GpuProfiler } from "./gpuProfiler";
 
 const WG = 256;
 const FINEST = 8;
@@ -156,13 +157,13 @@ export class AccretionSolver {
 
   // One substep. `cur` is the buffer the sort reads; returns the buffer
   // index now holding the integrated state.
-  encode(enc: GPUCommandEncoder, cur: number, count: number): number {
+  encode(enc: GPUCommandEncoder, cur: number, count: number, profiler?: GpuProfiler): number {
     const out = this.contacts ? 1 - cur : cur;
-    if (this.contacts) this.sort.encode(enc, this.gSort[cur], count);
+    if (this.contacts) this.sort.encode(enc, this.gSort[cur], count, profiler);
 
     const bodyWGs = Math.ceil(count / WG);
     const cells = DIM * DIM;
-    const pass = enc.beginComputePass();
+    const pass = enc.beginComputePass({ timestampWrites: profiler?.timestampWrites("pyramid + force") });
     if (this.gravity) {
       pass.setPipeline(this.pClear);
       pass.setBindGroup(0, this.gClear);

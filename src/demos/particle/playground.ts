@@ -627,10 +627,6 @@ export async function mountPlayground(container: HTMLElement, opts: PlaygroundOp
         pass.end();
       }
       dev.queue.submit([enc.finish()]);
-      const t0 = performance.now();
-      void dev.queue.onSubmittedWorkDone().then(() => {
-        (window as unknown as Record<string, unknown>).__gpuMs = performance.now() - t0;
-      });
       vp = 1 - vp;
     },
     dispose() {
