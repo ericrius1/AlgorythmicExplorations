@@ -1,6 +1,7 @@
 import { initNav } from "../../lib/siteNav";
 import { mountLazy } from "../../lib/demoShell";
 import { mountCrown } from "../../demos/ferro/ferroCrown";
+import { mountMagneticCrown } from "../../scrolly/magneticCrown";
 
 initNav();
 
@@ -15,4 +16,8 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-demo]")) {
   const kind = el.dataset.demo!;
   const make = mounts[kind];
   if (make) mountLazy(el, () => make(el));
+}
+
+for (const el of document.querySelectorAll<HTMLElement>("[data-scrolly]")) {
+  if (el.dataset.scrolly === "magnetic-crown") mountMagneticCrown(el);
 }
