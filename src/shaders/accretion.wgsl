@@ -14,8 +14,7 @@ override FINEST: u32 = 8u;    // pyramid depth; finest grid is DIM x DIM
 override DIM: u32 = 256u;     // 1 << FINEST
 override FP_SCALE: f32 = 8192.0;
 override LEVEL: u32 = 0u;
-
-const TABLE: u32 = 65536u;
+override TABLE: u32 = 65536u;
 
 struct AccParams {
   count: u32,
@@ -283,10 +282,11 @@ fn force(@builtin(global_invocation_id) gid: vec3u) {
         for (var k = s; k < s + n; k++) {
           if (k == i) { continue; }
           let d = pos - parts[k].xy;
-          let r = length(d);
+          let r2 = dot(d, d);
           // The distance test is also the impostor filter: a grain from a
           // far-away cell sharing this bucket can never pass it.
-          if (r < dia && r > 1e-7) {
+          if (r2 < dia * dia && r2 > 1e-14) {
+            let r = sqrt(r2);
             let nrm = d / r;
             acc += nrm * (dia - r) * P.stiffness;
             let vn = dot(vel - parts[k].zw, nrm);

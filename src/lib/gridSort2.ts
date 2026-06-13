@@ -73,7 +73,7 @@ export class GridSort2 {
     const wgs = Math.ceil(count / WG);
     enc.clearBuffer(this.counts);
 
-    let pass = enc.beginComputePass();
+    const pass = enc.beginComputePass();
     pass.setBindGroup(0, group);
     pass.setPipeline(this.pipes.count);
     pass.dispatchWorkgroups(wgs);
@@ -83,12 +83,6 @@ export class GridSort2 {
     pass.dispatchWorkgroups(1);
     pass.setPipeline(this.pipes.scan_add);
     pass.dispatchWorkgroups(BLOCKS);
-    pass.end();
-
-    enc.copyBufferToBuffer(this.starts, 0, this.cursor, 0, CELLS * 4);
-
-    pass = enc.beginComputePass();
-    pass.setBindGroup(0, group);
     pass.setPipeline(this.pipes.scatter);
     pass.dispatchWorkgroups(wgs);
     pass.end();

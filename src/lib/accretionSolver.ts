@@ -10,7 +10,7 @@
 // bounds); the hash cells are sized to the grain (one diameter).
 
 import shader from "../shaders/accretion.wgsl?raw";
-import { HashSort } from "./hashSort";
+import { HashSort, type HashTableSize } from "./hashSort";
 
 const WG = 256;
 const FINEST = 8;
@@ -66,23 +66,24 @@ export class AccretionSolver {
   private gScatter: GPUBindGroup[] = [];
   private gForce: GPUBindGroup[] = [];
   private gSort: GPUBindGroup[] = [];
+  private gravity = true;
+  private contacts = true;
 
-  constructor(dev: GPUDevice) {
+  constructor(dev: GPUDevice, table: HashTableSize) {
     this.dev = dev;
-    this.sort = new HashSort(dev);
+    this.sort = new HashSort(dev, table);
     this.params = dev.createBuffer({
       size: 80,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC, // COPY_SRC: DEBUG
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    const dbg = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC; // DEBUG: readback
-    this.grid = dev.createBuffer({ size: DIM * DIM * 16, usage: dbg });
-    this.nodes = dev.createBuffer({ size: levelOffset(FINEST + 1) * 16, usage: dbg });
-    this.bounds = dev.createBuffer({ size: 16, usage: dbg });
+    this.grid = dev.createBuffer({ size: DIM * DIM * 16, usage: GPUBufferUsage.STORAGE });
+    this.nodes = dev.createBuffer({ size: levelOffset(FINEST + 1) * 16, usage: GPUBufferUsage.STORAGE });
+    this.bounds = dev.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE });
 
     const module = dev.createShaderModule({ code: shader });
     const mk = (entryPoint: string, constants: Record<string, number> = {}): GPUComputePipeline =>
       dev.createComputePipeline({ layout: "auto", compute: { module, entryPoint, constants } });
-    const c = { FINEST, DIM, FP_SCALE };
+    const c = { FINEST, DIM, FP_SCALE, TABLE: table };
     this.pClear = mk("clear_grid", { DIM });
     this.pBounds = mk("reduce_bounds");
     this.pScatter = mk("scatter_mass", { DIM, FP_SCALE });
@@ -126,7 +127,9 @@ export class AccretionSolver {
   }
 
   writeParams(p: AccretionParams): void {
-    this.sort.writeParams(p.count, p.cellSize);
+    this.gravity = p.gravity;
+    this.contacts = p.contacts;
+    if (this.contacts) this.sort.writeParams(p.count, p.cellSize);
     const dv = new DataView(new ArrayBuffer(80));
     dv.setUint32(0, p.count, true);
     dv.setUint32(4, (p.gravity ? 1 : 0) | (p.contacts ? 2 : 0), true);
@@ -154,28 +157,30 @@ export class AccretionSolver {
   // One substep. `cur` is the buffer the sort reads; returns the buffer
   // index now holding the integrated state.
   encode(enc: GPUCommandEncoder, cur: number, count: number): number {
-    const out = 1 - cur;
-    this.sort.encode(enc, this.gSort[cur], count);
+    const out = this.contacts ? 1 - cur : cur;
+    if (this.contacts) this.sort.encode(enc, this.gSort[cur], count);
 
     const bodyWGs = Math.ceil(count / WG);
     const cells = DIM * DIM;
     const pass = enc.beginComputePass();
-    pass.setPipeline(this.pClear);
-    pass.setBindGroup(0, this.gClear);
-    pass.dispatchWorkgroups(Math.ceil((cells * 4) / WG));
-    pass.setPipeline(this.pBounds);
-    pass.setBindGroup(0, this.gBounds[out]);
-    pass.dispatchWorkgroups(bodyWGs);
-    pass.setPipeline(this.pScatter);
-    pass.setBindGroup(0, this.gScatter[out]);
-    pass.dispatchWorkgroups(bodyWGs);
-    pass.setPipeline(this.pResolve);
-    pass.setBindGroup(0, this.gResolve);
-    pass.dispatchWorkgroups(Math.ceil(cells / WG));
-    for (let l = FINEST - 1; l >= 0; l--) {
-      pass.setPipeline(this.pReduce[l]);
-      pass.setBindGroup(0, this.gReduce[l]);
-      pass.dispatchWorkgroups(Math.max(1, Math.ceil((1 << (2 * l)) / WG)));
+    if (this.gravity) {
+      pass.setPipeline(this.pClear);
+      pass.setBindGroup(0, this.gClear);
+      pass.dispatchWorkgroups(Math.ceil((cells * 4) / WG));
+      pass.setPipeline(this.pBounds);
+      pass.setBindGroup(0, this.gBounds[out]);
+      pass.dispatchWorkgroups(bodyWGs);
+      pass.setPipeline(this.pScatter);
+      pass.setBindGroup(0, this.gScatter[out]);
+      pass.dispatchWorkgroups(bodyWGs);
+      pass.setPipeline(this.pResolve);
+      pass.setBindGroup(0, this.gResolve);
+      pass.dispatchWorkgroups(Math.ceil(cells / WG));
+      for (let l = FINEST - 1; l >= 0; l--) {
+        pass.setPipeline(this.pReduce[l]);
+        pass.setBindGroup(0, this.gReduce[l]);
+        pass.dispatchWorkgroups(Math.max(1, Math.ceil((1 << (2 * l)) / WG)));
+      }
     }
     pass.setPipeline(this.pForce);
     pass.setBindGroup(0, this.gForce[out]);

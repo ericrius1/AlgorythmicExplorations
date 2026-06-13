@@ -89,12 +89,14 @@ fn scan_add(
   @builtin(global_invocation_id) gid: vec3u,
   @builtin(workgroup_id) wid: vec3u,
 ) {
-  starts[gid.x] = starts[gid.x] + blockSums[wid.x];
+  let start = starts[gid.x] + blockSums[wid.x];
+  starts[gid.x] = start;
+  atomicStore(&cursor[gid.x], start);
 }
 
 // ---- pass 3: scatter into cell order ---------------------------------------
-// cursor starts as a copy of starts[]; each particle claims the next slot in
-// its cell with one atomicAdd. The full state is copied (not an index) so
+// Each particle claims the next slot in its cell with one atomicAdd. The full
+// state is copied (not an index) so
 // neighbours in space become neighbours in memory.
 
 @compute @workgroup_size(256)

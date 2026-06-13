@@ -7,7 +7,7 @@ import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { ParticleRenderer } from "../../lib/particleRenderer";
 import { AccretionSolver } from "../../lib/accretionSolver";
-import { TABLE } from "../../lib/hashSort";
+import { chooseHashTableSize } from "../../lib/hashSort";
 
 // Grain diameter = hash cell. Sized so the default seeds sit well under
 // random close packing — overlapped seeds detonate the contact springs.
@@ -47,7 +47,7 @@ function seedRing(count: number, starGM: number): Float32Array {
   for (let i = 0; i < count; i++) {
     const r = Math.sqrt(r0 * r0 + (r1 * r1 - r0 * r0) * Math.random());
     const a = Math.random() * Math.PI * 2;
-    const v = Math.sqrt(starGM / r) * (1 + (Math.random() - 0.5) * 0.02) * 0; // DEBUG
+    const v = Math.sqrt(starGM / r) * (1 + (Math.random() - 0.5) * 0.02);
     const x = Math.cos(a) * r;
     const y = Math.sin(a) * r;
     state[i * 4] = x + (Math.random() - 0.5) * 0.004;
@@ -58,15 +58,12 @@ function seedRing(count: number, starGM: number): Float32Array {
   return state;
 }
 
-(window as unknown as Record<string, unknown>).__ACC_VERSION = "debug-isolate-1"; // DEBUG
-
 export async function mountAccretion(container: HTMLElement, opts: AccretionDemoOptions): Promise<Demo> {
   const dev = await getDevice();
   const shell = new Shell(container, opts.hero ? 0.5 : 0.7);
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
   const renderer = new ParticleRenderer(dev, ctx);
-  const solver = new AccretionSolver(dev);
   const disk = opts.mode === "disk";
 
   const aspect = shell.canvas.width / shell.canvas.height;
@@ -75,21 +72,27 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
   // Total dust gravity is fixed; the slider only changes how finely it is
   // sampled — the same resolution-knob contract as part one's galaxy.
   const GM_DUST = disk ? 0.12 : 0.12;
-  const STAR_GM = disk ? 0.0 : 0; // DEBUG: isolate dust self-gravity
+  const STAR_GM = disk ? 0.066 : 0;
 
   const cell = disk ? CELL_DISK : CELL_CLOUD;
-  let count = opts.count ?? (disk ? 8000 : 8000); // DEBUG: count probe
+  let count = opts.count ?? 20000;
   let steps = 4;
   let stickiness = 30;
   let gravity = opts.physics !== "contacts";
   let contacts = opts.physics === "contacts" || (opts.physics ?? "both") === "both";
+  let solver = new AccretionSolver(dev, chooseHashTableSize(count));
 
   let bufs: [GPUBuffer, GPUBuffer] = [null!, null!];
   let cur = 0;
 
   const rebuild = (): void => {
     for (const b of bufs) b?.destroy();
-    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
+    const table = chooseHashTableSize(count);
+    if (solver.sort.table !== table) {
+      solver.dispose();
+      solver = new AccretionSolver(dev, table);
+    }
+    const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
     bufs = [dev.createBuffer({ size: count * 16, usage }), dev.createBuffer({ size: count * 16, usage })];
     dev.queue.writeBuffer(bufs[0], 0, (disk ? seedRing(count, STAR_GM) : seedCloud(count)) as BufferSource);
     solver.setBuffers(bufs);
@@ -145,7 +148,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
       shell.slider({
         label: "grains",
         min: 10000,
-        max: 110000,
+        max: 150000,
         step: 1000,
         value: count,
         log: true,
@@ -172,21 +175,10 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
     const phys =
       gravity && contacts ? "tree + grid" : gravity ? "tree only — ghosts" : "grid only — loose sand";
     return (
-      `${count.toLocaleString()} grains · ${phys} · sorted into ${TABLE.toLocaleString()} buckets ` +
+      `${count.toLocaleString()} grains · ${phys} · sorted into ${solver.sort.table.toLocaleString()} buckets ` +
       `${steps}× per frame · stir with your cursor`
     );
   });
-
-  if (!opts.hero) {
-    // DEBUG handle for buffer readback
-    (window as unknown as Record<string, unknown>)[`__ACC_${opts.mode}`] = {
-      dev,
-      solver,
-      bufs: () => bufs,
-      cur: () => cur,
-      count: () => count,
-    };
-  }
 
   return {
     frame() {

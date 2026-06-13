@@ -11,7 +11,8 @@ struct HashParams {
   _pad1: f32,
 }
 
-const TABLE: u32 = 65536u; // buckets; power of two so modulo is a mask
+override TABLE: u32 = 65536u; // buckets; power of two so modulo is a mask
+override FOLD: u32 = 1u;      // block sums owned by each scan_sums thread
 
 @group(0) @binding(0) var<uniform> GP: HashParams;
 @group(0) @binding(1) var<storage, read> partsIn: array<vec4f>;
@@ -82,11 +83,20 @@ fn scan_blocks(
 
 @compute @workgroup_size(256)
 fn scan_sums(@builtin(local_invocation_id) lid: vec3u) {
-  let v0 = blockSums[lid.x];
-  sa[lid.x] = v0;
+  let base = lid.x * FOLD;
+  var total = 0u;
+  for (var j = 0u; j < FOLD; j++) {
+    total += blockSums[base + j];
+  }
+  sa[lid.x] = total;
   workgroupBarrier();
   let inclusive = scanShared(lid.x);
-  blockSums[lid.x] = inclusive - v0;
+  var run = inclusive - total;
+  for (var j = 0u; j < FOLD; j++) {
+    let v = blockSums[base + j];
+    blockSums[base + j] = run;
+    run += v;
+  }
 }
 
 @compute @workgroup_size(256)
@@ -94,7 +104,9 @@ fn scan_add(
   @builtin(global_invocation_id) gid: vec3u,
   @builtin(workgroup_id) wid: vec3u,
 ) {
-  starts[gid.x] = starts[gid.x] + blockSums[wid.x];
+  let start = starts[gid.x] + blockSums[wid.x];
+  starts[gid.x] = start;
+  atomicStore(&cursor[gid.x], start);
 }
 
 // ---- pass 3: scatter into bucket order --------------------------------------
