@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Sharp Relief — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="The ferrofluid crown in three dimensions: 26,000 mutually magnetized SPH particles in a dish, splatted into a 128³ field and surfaced every frame — by marching tetrahedra, then surface nets, then dual contouring, which is the one that keeps the spike tips sharp."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount via src/pages/strange-matter/relief.ts -->
+    <header class="hero">
+      <div data-demo="hero-relief"></div>
+      <div class="hero-title">
+        <h1>Sharp Relief</h1>
+        <p class="subtitle">
+          The crown, finally in the round. Twenty-six thousand particles
+          magnetize each other in a dish; a quarter-million-voxel field is
+          rebuilt from them every frame; and the surface you are looking at is
+          re-extracted from that field every frame too — by dual contouring,
+          the extractor that refuses to round off a spike. Drag to orbit.
+          Hover to park a magnet over the pool.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        This series has been writing itself a promissory note for two articles
+        straight. <a href="/pages/strange-matter/ferro.html">Part one</a> built
+        the pipeline — particles to field to <em>geometry</em>, every frame —
+        and admitted in its coda that the geometry was line segments and the
+        world was a flatland. <a href="/pages/strange-matter/crown.html">Part
+        two</a> built the physics — mutual magnetization, the current-loop
+        force — and grew a crown of spikes that space themselves, still in
+        cross-section. Both articles ended pointing at the same door: marching
+        squares wants to become marching cubes, segments want to become
+        triangles, and the spike tips that define this liquid will want dual
+        contouring. This article walks through the door, and it turns out the
+        door is three doors.
+      </p>
+      <p>
+        Everything from part two survives the move intact — the same kernels,
+        the same warm-started moment solver, the same pair force with the same
+        inward-pointing sign. What's genuinely new is on the rendering side of
+        the pipeline, where "extract the surface" stops being one obvious
+        algorithm and becomes a choice with consequences. We will make the
+        choice three times, each time differently, on the same liquid, and the
+        third choice is the reason for the title.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · What the dish owes the paper</span>
+        <p>
+          The physics here is still Shao, Huang &amp; Michels' current loop
+          model (2022) — this is the dimension their paper actually lives in.
+          Their comparison scene is a 6&nbsp;×&nbsp;6&nbsp;×&nbsp;1.5&nbsp;cm
+          box of 52,000 particles; their crown forms under a uniform vertical
+          field of 1.3·10⁵&nbsp;A/m, exactly the experiment the hero above is
+          running in cartoon units. What they compute with offline care —
+          exact pair-force integrals baked into polynomial tables, implicit
+          incompressible pressure solves — this page approximates at sixty
+          frames per second, and the coda keeps an honest ledger of the
+          differences.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The dimension tax</span>Everything times itself</h2>
+      <p>
+        Adding a dimension to a particle simulation is mostly bookkeeping, but
+        the bookkeeping compounds. The sorting grid grows from 256² cells to
+        64³ — a quarter the cells, amusingly, but each particle's neighbor
+        search now visits a 3&nbsp;×&nbsp;3&nbsp;×&nbsp;3 block of them, 27
+        cells instead of 9. The counting sort itself barely notices: histogram,
+        prefix scan, scatter, the same three passes the series has used since
+        the water article, except the scan now folds 1,024 block sums instead
+        of 256. The particle, though, has gotten fat: position, velocity,
+        magnetic moment, and the cached magnetic acceleration are each three
+        components now, sixty-four bytes a particle, and all of it rides
+        through the scatter together.
+      </p>
+      <p>
+        The real tax collector is the magnetic neighborhood. Part two
+        truncated pair magnetics at four kernel radii, an 81-cell sweep. The
+        same reach in three dimensions is 9³&nbsp;=&nbsp;729 cells, which is a
+        budget, not a neighborhood. This article pulls the cutoff in to three
+        radii — 343 cells, roughly nine hundred neighbors — and keeps it
+        honest with a check: the near field that gathers fluid into columns
+        lives inside two radii, and the first lobe of far-field repulsion that
+        makes adjacent columns keep their distance peaks just beyond it. What
+        the truncation discards is the long 1/r⁴ tail, which in a dish this
+        size mostly cancels anyway. The paper, computing offline, simply sums
+        every pair against every pair and points at fast multipole methods for
+        anyone who minds; a browser tab minds.
+      </p>
+      <p>
+        The amortization trick from part two carries over unchanged and
+        matters more here: the moment solve and the pair forces run <em>once
+        per frame</em>, on the first of four substeps, and the resulting
+        acceleration is cached on the particle and reused by the other three.
+        Within a sixtieth of a second the particles barely move; the cache is
+        honest, and it converts the most expensive passes in the simulation
+        from a per-substep cost into a per-frame one.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Native dimension</span>The apology, withdrawn</h2>
+      <p>
+        One pleasant surprise in the port: the magnetic mathematics required
+        no porting at all. The smoothed dipole — the kernel W, its
+        ball-average W̄, the gradient with the canceling singularities — was
+        derived in three dimensions from the start, by Huang et&nbsp;al. in
+        2019, for exactly this use. Part two borrowed it into flatland with a
+        small apology about slab approximations and tuning constants absorbing
+        the difference. Here the apology is withdrawn. The moment a particle
+        carries is a genuine 3-vector; the field it feels from a neighbor is
+        the genuine solution of the magnetostatic Poisson equation for a
+        blurred dipole; the crown that forms is the instability operating in
+        its native geometry, free to choose spike positions on a surface
+        rather than along a line. Watch the hero long enough through one slow
+        breath of its field and you can see the choice being made: bumps
+        appear, negotiate their spacing sideways — a freedom the 2D crown
+        never had — and settle into the staggered, nearly hexagonal packing
+        that laboratory dishes produce.
+      </p>
+      <p>
+        The uniform field still does none of the pulling, and it's worth
+        repeating why, because in 3D the effect is even more striking: a
+        uniform field has no gradient and exerts zero net force. Its only job
+        is to magnetize. Every newton that raises a spike is
+        particle-on-particle — head-to-tail attraction gathering columns,
+        side-by-side repulsion spacing them — and gravity and surface tension
+        close the books. The cursor magnet, when you bring it in, is the
+        gradient: one more smoothed dipole, big and movable, and the fluid
+        chases it across the dish.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · A field with no pixels</span>Splatting a volume</h2>
+      <p>
+        Part one splatted particles into a texture by drawing little blurry
+        quads and letting the blending hardware add them up. A volume has no
+        blending hardware to lean on, so the splat becomes a compute pass:
+        each particle walks the 5³ block of voxels inside its radius and adds
+        its kernel weight to each. The field is 128³ — two million voxels,
+        eight megabytes — and one frame's worth of fluid deposits about three
+        million additions into it, concurrently, from thousands of threads.
+      </p>
+      <p>
+        Concurrent additions want atomics, and here WGSL has an opinion:
+        there are no floating-point atomics. The workaround is older than
+        GPUs — fixed-point arithmetic. Scale the kernel weight by 256, round
+        to an integer, <code>atomicAdd</code> it into a 32-bit unsigned voxel,
+        and divide the 256 back out at read time. The quantization error is a
+        fraction of a percent of the surface threshold, far below anything the
+        extractors can see, and integer atomic addition is associative — the
+        one mathematical property floating-point addition famously lacks —
+        so the field is not just race-free but <em>deterministic</em>, byte
+        for byte, regardless of which thread arrives first. A small irony:
+        the cheap trick is also the more correct one.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Triangles from a field</span>The table and the dodge</h2>
+      <p>
+        Now the choice. The field is a number at every voxel; the surface is
+        where those numbers cross the threshold; the renderer wants triangles.
+        The canonical answer since 1987 has been <em>marching cubes</em>:
+        visit every 2×2×2 cell of voxels, classify its eight corners as above
+        or below, and look the answer up. Two hundred fifty-six corner
+        patterns, each mapping to a recipe of up to five triangles — a lookup
+        table with four thousand and ninety-six entries, traditionally
+        copy-pasted from one implementation to the next like a sacred text,
+        because deriving it by hand is an afternoon of error-prone solid
+        geometry and getting one entry wrong puts a hole in every mesh you
+        ever extract.
+      </p>
+      <p>
+        Part one's history aside told the other half of this story: the
+        algorithm was patented, the community invented <em>marching
+        tetrahedra</em> largely to dodge the license, and the patent died in
+        2005. This article resurrects the dodge for a different reason. Split
+        each cell into six tetrahedra around its main diagonal and the
+        256-case table evaporates: a tetrahedron has four corners, sixteen
+        sign patterns, and every one of them is trivial — empty, full, one
+        corner clipped (a triangle), or split down the middle (two triangles
+        making a quad). Sixteen cases you can write by hand and verify by
+        eye. The price is honesty in triangle count: the tets cut the cell
+        finer than the surface needs, so the same fluid costs roughly twice
+        the triangles of true marching cubes, with a faint diagonal grain in
+        the mesh where the tetrahedra all lean the same way. The patent dodge
+        returns as a table dodge.
+      </p>
+      <div data-demo="pipeline"></div>
+      <p>
+        The whole 3D pipeline, live: particles to volume to triangles, twice a
+        frame's worth of work in one canvas. The <em>view</em> button drops to
+        the raw particles (brightness is magnetization — the moment solve made
+        visible, no arrows required in 3D, the glow says it). The
+        <em>extract</em> button is this article's argument in physical form —
+        cycle it and the same field grows three different skins. Stay on
+        <em>marching tets</em> for now and look closely at a spike while the
+        crown is up: the tip is there, but it is a little… polite. Rounded.
+        Hold that thought; it is the next two sections.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: six tetrahedra, one diagonal, and winding nobody checks</summary>
+        <div class="fold-body">
+          <p>
+            The six tetrahedra share the cell's main diagonal (corner 0 to
+            corner 6), fanning around it like orange segments; every face
+            between two tets is interior to the cell, and the faces on the
+            cell's boundary tile each square face with two triangles whose
+            shared edge agrees with the neighboring cell's decomposition —
+            which is what makes the extracted surface watertight across
+            cells. Crossing points interpolate along edges exactly as
+            marching squares did, and normals come not from the triangle
+            (flat, faceted, ugly) but from the <em>field gradient</em>
+            interpolated to the crossing point — the same trick part one's
+            glossy fill used, promoted from pixels to vertices. One more
+            sloth-powered simplification: the triangles are emitted with no
+            particular winding order, because the renderer doesn't cull and
+            the fragment shader flips any normal that faces away from the
+            eye. An hour of orientation bookkeeping, deleted by one
+            <code>if</code>.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 5 · The dual idea</span>One vertex per cell</h2>
+      <p>
+        Both marching algorithms share an assumption so basic it's easy to
+        miss: vertices live on cell <em>edges</em>, and each cell is processed
+        in splendid isolation. The dual family flips the assumption. Put one
+        vertex <em>inside</em> each cell the surface passes through —
+        positioned wherever best represents the surface in that cell — and
+        then connect vertices of <em>neighboring</em> cells into faces. The
+        mesh's connectivity stops being a 256-case riddle and becomes almost
+        embarrassingly simple: every lattice edge that crosses the threshold
+        is shared by exactly four cells, and those four cells' vertices form
+        one quad. That's the entire algorithm. No table for the vertices, no
+        table for the faces, watertight by construction.
+      </p>
+      <p>
+        The simplest member of this family is the <em>surface net</em>
+        (Gibson, 1998 — invented for smoothing the staircase artifacts out of
+        segmented medical scans, a noble first job for an algorithm). It
+        places each cell's vertex at the <em>mass point</em>: the average of
+        the cell's edge crossings. Averages are smooth, conservative,
+        slightly shy — they pull every vertex a little toward the middle of
+        its cell, which is to say surface nets round things. For a blobby
+        liquid that's nearly free. For the one liquid whose entire visual
+        identity is a field of needle tips, "slightly rounded everywhere" is
+        exactly the artifact we came here to kill.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 6 · The sharp edge</span>Dual contouring</h2>
+      <p>
+        <em>Dual contouring</em> (Ju, Losasso, Schaefer &amp; Warren, 2002)
+        keeps the surface net's connectivity and fixes its vertex placement
+        with one more piece of information the field was offering all along:
+        the gradient. At each edge crossing we know not just <em>where</em>
+        the surface passes but <em>which way it faces</em> — position plus
+        normal, a tangent plane, what the literature calls Hermite data. The
+        right vertex position is the point that agrees with all of the cell's
+        tangent planes at once; the paper finds it by minimizing a quadratic
+        error function over the planes. Where the surface is flat, the planes
+        agree everywhere and the answer is the mass point. Where the surface
+        creases or spikes, the planes <em>intersect</em>, and their
+        intersection is the feature itself — the vertex snaps to the tip,
+        and the tip survives extraction.
+      </p>
+      <p>
+        The full QEF minimization is a small singular-value decomposition per
+        cell, which is more linear algebra than a shader wants to host for
+        two hundred thousand cells a frame. This demo uses the standard
+        real-time substitute, due to Schmitz: start at the mass point and
+        walk. Each iteration measures the vertex's signed distance to every
+        tangent plane and steps along the sum of the corrections; ten
+        iterations converge to within a fraction of a voxel of the true
+        minimizer, and the step scale is exposed as the <em>sharpness</em>
+        slider in the demo below. At zero the walk never starts and you have
+        surface nets exactly. At one the vertex chases the planes'
+        intersection into the corner of the cell. The slider is, quite
+        literally, an interpolation between two published algorithms.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why sharpness is a slider and not a switch</span>
+        <p>
+          The QEF has a failure mode the original paper spends an appendix
+          on: with noisy normals — and normals differenced from a field that
+          25,000 particles re-deposit every frame are noisy — the minimizer
+          can sit outside its cell, producing self-intersections that flicker
+          frame to frame. Clamping the vertex to its cell (this demo does)
+          tames the worst of it, and backing the sharpness off from 1.0
+          trades a little tip acuity for temporal calm. Production
+          implementations make the same trade with more ceremony, weighting
+          the mass point into the QEF as a regularizer. Watch a single spike
+          tip while sweeping the slider and you can see the whole trade-off
+          space in about two seconds.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 7 · Assembly</span>The dish</h2>
+      <p>
+        Everything, together, interrogable: the magnetized pool, the breathing
+        of χ and field strength and tension from part two (now with a whole
+        extra axis to be unstable in), the surface level (the threshold —
+        slide it down and the skin inflates around the particles, slide it up
+        and it shrink-wraps), the extractor menu, and the sharpness slider
+        doing its two-algorithm interpolation. The triangle counter in the
+        readout is worth a glance while you switch extractors: marching tets
+        spends about three times the triangles of the dual meshes for the same
+        fluid, and all of them breathe with the crown — more surface, more
+        triangles, allocated by atomic counter and drawn by indirect draw,
+        with the CPU never once hearing a number it would have to wait for.
+      </p>
+      <div data-demo="relief"></div>
+      <p>
+        Things worth trying, in ascending order of violence: hover the magnet
+        just above a calm pool and lift a single tent of fluid; set χ high and
+        tension low and watch the crown over-commit into a forest; drop the
+        surface level until the skin barely contains the particles and the
+        extractors disagree most visibly about what the tips look like; and
+        switch to the particle view during a full crown to see the moment
+        field glowing brightest up the spike columns — the 3D version of part
+        two's arrows, the feedback loop caught mid-loop.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The ledger</h2>
+      <p>
+        What the paper still does that this dish doesn't: solve pressure
+        implicitly (DFSPH/IISPH — the very capability the current-loop force's
+        inward sign was invented to unlock), integrate the pair force over the
+        kernel overlap instead of sampling it at centers, sum magnetics over
+        every pair instead of three radii, and run to 93,000 particles with
+        adaptive time steps — for seconds per frame, exported at 200 frames a
+        second, not sixty frames per second in a browser tab. What the tab
+        does that the paper doesn't ask for: the whole pipeline — sort,
+        magnetize, force, splat, extract, shade — resident on one GPU with the
+        CPU reduced to writing forty-eight bytes of uniforms a frame.
+      </p>
+      <p>
+        And the series' own ledger, three articles in: particles → field →
+        geometry, now in any number of dimensions this site is likely to
+        need; a magnetization solver that never finishes and never needs to;
+        two force models and the sign that separates them; and four surface
+        extractors — marching squares, marching tetrahedra, surface nets,
+        dual contouring — each one a different answer to the same question of
+        where, exactly, the liquid ends. The open road from here: a second
+        simulated phase (the lava lamp's buoyancy, earned honestly this
+        time), the paper's suggested FLIP hybrid as a faster backbone, and
+        somewhere past that, the helix scene — droplets spiraling down a
+        carved groove, which is the kind of sentence that gets a series a
+        part four.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Strange Matter, part three ·
+        <a href="/pages/strange-matter/ferro.html">part one: The Ferrofluid</a> ·
+        <a href="/pages/strange-matter/crown.html">part two: The Crown</a> ·
+        the <a href="/pages/particle-worlds/part1.html">gravity</a>,
+        <a href="/pages/bounced-light/lava.html">light</a>, and
+        <a href="/pages/living-music/vibration.html">music</a> series that precede it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1109/TVCG.2022.3211414">Shao, Huang &amp; Michels, "A Current Loop Model for the Fast Simulation of Ferrofluids" (2022)</a> ·
+        <a href="https://doi.org/10.1145/37402.37422">Lorensen &amp; Cline, "Marching Cubes" (1987)</a> ·
+        Doi &amp; Koide, "An Efficient Method of Triangulating Equi-Valued Surfaces by Using Tetrahedral Cells" (1991) ·
+        <a href="https://doi.org/10.1007/BFb0056277">Gibson, "Constrained Elastic Surface Nets" (1998)</a> ·
+        <a href="https://doi.org/10.1145/566654.566586">Ju, Losasso, Schaefer &amp; Warren, "Dual Contouring of Hermite Data" (2002)</a> ·
+        Schmitz, Dietrich &amp; Comba, "Efficient and Quality Contouring of Isosurfaces on Uniform Grids" (2009)
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/strange-matter/relief.ts"></script>
+  </body>
+</html>

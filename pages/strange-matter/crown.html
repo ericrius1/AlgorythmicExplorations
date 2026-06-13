@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Crown — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="Part one's magnet pulled on inert particles. This time the fluid magnetizes itself: a moment per particle solved every frame, pairwise current-loop forces that point inward instead of out, and a crown of spikes that spaces itself under a perfectly uniform field."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- demos mount from src/pages/strange-matter/crown.ts -->
+    <header class="hero">
+      <div data-demo="hero-crown"></div>
+      <div class="hero-title">
+        <h1>The Crown</h1>
+        <p class="subtitle">
+          No cursor required this time. The field over this pool is perfectly
+          uniform — it pulls nothing anywhere — and the spikes grow anyway,
+          because every particle is now a magnet and the crown is what their
+          mutual forces agree on. (The cursor still works. It is just no longer
+          doing the interesting part.)
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        <a href="/pages/strange-matter/ferro.html">Part one</a> ended with a
+        confession dressed as a feature: "with one moving magnet, this demo
+        grows them one or two at a time." The magnet pulled, the fluid obeyed,
+        and the famous Rosensweig crown — a whole surface erupting into evenly
+        spaced spikes at once — never appeared, because the simulation was
+        missing the property that defines the material. Each particle felt the
+        magnet, but no particle <em>was</em> one. Real ferrofluid magnetizes:
+        the grains align with the field, the aligned grains produce a field of
+        their own, and the spikes are a negotiation among trillions of tiny
+        magnets, not a tug-of-war against one big one.
+      </p>
+      <p>
+        This article adds that negotiation, following
+        <a href="https://computationalsciences.org/publications/shao-2022-ferrofluids.html">Shao,
+        Huang &amp; Michels' "A Current Loop Model for the Fast Simulation of
+        Ferrofluids"</a> (2022). The paper contributes two things this page
+        needs: a way to compute every particle's magnetic moment (a linear
+        system, solved here by a trick of patience), and a pair force whose
+        crucial virtue is its <em>sign</em> — it points into the fluid at the
+        surface, where the textbook alternative points out. That sign is the
+        difference between a crown and a cloud of levitating spray, and the
+        duel between the two models is staged live further down.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Three papers, one liquid</span>
+        <p>
+          This is the third act of a research arc from one group at KAUST. In
+          2019, Huang, Hädrich &amp; Michels simulated ferrofluid spikes from
+          first principles for the first time in graphics — SPH particles with
+          the classical Kelvin force. In 2020, Huang &amp; Michels threw the
+          particles away entirely and computed only the surface, by boundary
+          elements. The 2022 paper returns to particles and fixes the
+          2019 model's one expensive flaw: the Kelvin force's outward push,
+          which had quietly dictated the whole simulation's architecture —
+          and its speed limit.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Becoming a magnet</span>The moment problem</h2>
+      <p>
+        A ferrofluid's response to a field is summarized by one number, the
+        <em>susceptibility</em> χ: place the material in a magnetic field H and
+        it magnetizes to M&nbsp;=&nbsp;χH, the grains aligning in proportion to
+        what they feel. Per particle, that means carrying a little arrow — a
+        magnetic moment <strong>m</strong> — alongside position and velocity.
+        Computing it would be one multiplication, except for the catch that
+        makes this section exist: the field a particle feels is the applied
+        field <em>plus the field of every other particle's moment</em>, and
+        those moments are what we're trying to compute. Everyone's answer
+        depends on everyone else's answer.
+      </p>
+      <p>
+        That circularity is a linear system. In the paper's formulation, each
+        particle's moment is proportional to the local flux density,
+      </p>
+      <pre><code>m_i = V · χ/(1+χ) · B(r_i)/μ₀     <span class="cm">// one unknown vector per particle</span>
+B(r_i) = external + Σ_j field(m_j)  <span class="cm">// ...defined by all the others</span></code></pre>
+      <p>
+        and the field of a single particle is not the textbook point dipole —
+        which blows up like 1/r³ at the origin — but a <em>kernel-smoothed</em>
+        dipole: the field of a moment smeared over the particle's SPH blur.
+        This is the same move SPH makes everywhere (replace the point with a
+        blur, integrate, keep the closed form), applied to magnetostatics. Far
+        away it is exactly the point dipole; up close it stays finite, and two
+        overlapping particles feel a gentle, well-defined field instead of a
+        singularity. No softening hack required — the smoothing <em>is</em> the
+        physics of the blur.
+      </p>
+      <div data-demo="moments"></div>
+      <p>
+        That is the moment field, drawn one arrow per particle (every other
+        one, for legibility) over the fluid body. Bring the cursor near and
+        watch the arrows swing toward it and brighten — the cursor is itself
+        just one more smoothed dipole, a big one. Notice the arrows do not
+        simply point at the magnet: each one answers the <em>sum</em> of the
+        external field and its neighbors' fields, which is why a column of
+        aligned particles brightens its own interior — alignment begets field
+        begets alignment. That feedback loop, capped by the χ/(1+χ) factor, is
+        the engine the crown runs on.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: the smoothed dipole, and why an average appears</summary>
+        <div class="fold-body">
+          <p>
+            The derivation (from the 2019 paper, reused by this one) solves the
+            magnetostatic Poisson equation ∇²φ = ∇·M for a single particle
+            whose magnetization is the kernel W. The solution has a tidy form:
+            the field at radius r depends on the kernel value W(r) and on
+            W̄(r), the <em>average</em> of W over the ball of radius r. Outside
+            the kernel's support the ball average becomes 3/(4πr³) — the whole
+            blur looks like a point, and the formula collapses to the exact
+            dipole. Inside, W̄ and W approach each other, and their difference
+            (which drives the field's angular part) fades smoothly to zero.
+            The demo implements W̄ for the cubic spline as a closed-form
+            piecewise polynomial; the singular-looking terms in the force
+            gradient cancel exactly below r = h, which is the kind of small
+            algebraic mercy you learn to be grateful for.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Solving without finishing</span>An amortized answer</h2>
+      <p>
+        The paper solves the moment system with conjugate gradients each step —
+        and scores a quiet half-contribution on the way. The 2019 work had used
+        <em>least-squares</em> conjugate gradient, the cautious choice when you
+        don't know your matrix is symmetric. But it is symmetric, and the
+        caution is expensive: least-squares CG effectively solves the normal
+        equations, which squares the system's condition number. Plain CG on the
+        original system converges in a fraction of the iterations. One line in
+        a residual plot, years of compute saved.
+      </p>
+      <p>
+        This demo is lazier still, and the laziness is load-bearing. Instead of
+        iterating to convergence, each frame applies <em>one</em> under-relaxed
+        sweep of the fixed-point update — compute the field from current
+        moments, blend each moment partway toward its implied value — and keeps
+        last frame's moments as the starting guess. The solver never finishes;
+        it is perpetually one step behind a target that moves slowly. But the
+        crown takes dozens of frames to grow, the field changes only as fast as
+        the fluid flows, and an answer that lags sixteen milliseconds behind a
+        sixty-frame process is indistinguishable from the truth. The gravity
+        series rebuilt its trees every frame because rebuilding parallelizes;
+        this page extends the family motto: re-derive what you can,
+        <em>amortize</em> what you can't.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The sign of the force</span>Kelvin vs. current loop</h2>
+      <p>
+        Moments in hand, the force remains — and here lives the paper's title.
+        Classical ferrohydrodynamics offers several force models that disagree
+        in the bulk but, by a 1977 result of Byrne, produce <em>the same
+        pressure jump across the surface</em> once their boundary terms are
+        accounted for. Same equilibrium shapes, same physics, free choice. The
+        2019 paper chose the Kelvin force, μ₀(M·∇)H. The 2022 paper chooses the
+        current loop model, which equals the Kelvin force <em>plus one bulk
+        term</em>:
+      </p>
+      <pre><code>F_CL = F_Kelvin + μ₀(∇M)·M    <span class="cm">// same pressure jump, opposite surface sign</span></code></pre>
+      <p>
+        Why bother, if the equilibrium is identical? Because a discrete
+        simulation is not an equilibrium. At the fluid surface the Kelvin
+        force points <em>outward</em> — magnetization drops to zero across the
+        interface, the field strength jumps up, and surface particles get
+        pulled off the top. The 2019 simulation only survived this because its
+        weakly compressible solver developed negative pressures that sucked
+        the escapees back — a stabilizer with a vicious bill: the time step had
+        to stay at 3·10⁻⁵ seconds. The current loop's extra term is, for
+        aligned moments, an attraction between overlapping neighbors; it flips
+        the net surface force inward, surface particles press <em>onto</em> the
+        fluid instead of lifting off, and the model drops cleanly into modern
+        incompressible solvers (DFSPH, IISPH) at time steps sixteen times
+        larger. Same physics, opposite sign, an order of magnitude of speed.
+      </p>
+      <div data-demo="duel"></div>
+      <p>
+        The duel, live. The button swaps the force model and nothing else —
+        same moments, same solver, same everything. On <em>current loop</em>,
+        spikes form and hold; the near-field attraction between aligned
+        neighbors keeps the tips coherent. Switch to <em>Kelvin</em> and watch
+        the surface: particles at the tips lift away into a glittering haze
+        that the pressure solver keeps having to recapture. (This 2D pool is
+        gentler than the paper's 3D comparison, where the Kelvin run dissolves
+        into noise — but the direction of failure is the same, and it is the
+        sign of one term.)
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · An argument settled 45 years in advance</span>
+        <p>
+          The theory underwriting the swap is older than computer graphics.
+          J. V. Byrne's 1977 paper compared the classical magnetic stress
+          formulations — Kelvin's, the current loop picture, and others — and
+          showed that once each is paired with its own surface traction, they
+          all predict the same observable: the pressure rise at a boundary.
+          The models differ only in how they distribute force between bulk and
+          surface, which physics doesn't care about. Forty-five years later, a
+          GPU does: the discretization never sees the compensating surface
+          traction, only the bulk force density — so the "equivalent" choice
+          of where the force lives becomes the difference between a stable
+          simulation and confetti.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Deep dive: what the demo computes per pair</summary>
+        <div class="fold-body">
+          <p>
+            The paper evaluates the force between two overlapping particles by
+            numerically integrating the smoothed force density over the
+            kernel support, then bakes the results into piecewise quartic
+            polynomials — three curves, tabulated to four intervals of
+            normalized distance, looked up at runtime out to 4h and replaced
+            by the closed-form dipole gradient beyond. This demo takes the
+            collocation shortcut: it evaluates the smoothed-dipole gradient
+            (the Kelvin term) and the bulk term at the particle centers
+            instead of integrating. The structure survives — far pairs feel
+            exact dipole–dipole forces, and the near field keeps the property
+            everything hinges on: under Kelvin, two aligned overlapping
+            particles <em>repel</em>; add the bulk term and they attract. The
+            forces are also equal and opposite by construction, which answers
+            a momentum-conservation worry the 2019 paper had raised about
+            current loop models.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Assembly</span>A crown from nowhere</h2>
+      <p>
+        Now the part that should feel slightly illegal. Set the external field
+        perfectly uniform — same strength, same direction, everywhere. A
+        uniform field has no gradient, so it exerts <em>zero net force</em> on
+        anything; part one's entire mechanism is switched off. The pool erupts
+        anyway. The uniform field's only job is to magnetize; every newton
+        after that is particle-on-particle. Aligned neighbors stacked
+        vertically attract, so columns gather and sharpen. Adjacent columns —
+        parallel dipoles side by side — repel, so the spikes <em>space
+        themselves</em>, the even pitch that part one could only describe in a
+        parenthesis. Gravity and surface tension set the scale (the capillary
+        length, as before); the magnetic feedback decides how hard the surface
+        fights to break flat, with χ as the knob.
+      </p>
+      <div data-demo="crown"></div>
+      <p>
+        Everything from both articles, in one dish: SPH with surface tension,
+        the per-frame moment solve, current-loop pair forces, and a surface
+        re-meshed from scratch every frame by part one's marching squares —
+        the renderer needed no changes at all, which was the point of building
+        it field-first. Sweep χ low and the fluid forgets it is magnetic;
+        sweep it high and the columns over-commit and merge. Raise tension to
+        round the crown into lobes, drop it to shatter the spikes into spray.
+        And the cursor still works — hold it near the surface and its dipole
+        gradient drags fluid sideways through a standing crown, which is the
+        moving-magnet experiment from the paper's figure 6, performed by you.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>What the paper does that this tab doesn't</h2>
+      <p>
+        The full method is three-dimensional, runs on implicit incompressible
+        solvers this 2D toy doesn't need, integrates the pair force properly
+        instead of sampling it, and simulates 32,000–93,000 particles with
+        adaptive time steps — scenes like a magnet dragging a fluid bulge
+        through an obstacle course, ferrofluid climbing a magnetized
+        hemisphere, and droplets spiraling down a helix groove, each frame in
+        seconds rather than the minutes the 2019 stabilizer demanded. The
+        authors point at fast multipole methods for the long-range field sums
+        (this demo simply truncates at 4h and accepts the small lie) and at
+        FLIP-style hybrid solvers as the next backbone. Meanwhile this series
+        still owes its surface a dimension: marching squares wants to become
+        marching cubes, segments want to become triangles, and the spike tips
+        that define this liquid will want dual contouring — same field, sharper
+        knife. That debt is now paid:
+        <a href="/pages/strange-matter/relief.html">part three</a> takes the
+        crown into three dimensions and extracts it three different ways.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Strange Matter, part two ·
+        <a href="/pages/strange-matter/ferro.html">part one: The Ferrofluid</a> ·
+        continued in <a href="/pages/strange-matter/relief.html">part three: Sharp Relief</a> ·
+        the <a href="/pages/particle-worlds/part1.html">gravity</a>,
+        <a href="/pages/bounced-light/lava.html">light</a>, and
+        <a href="/pages/living-music/vibration.html">music</a> series that precede it
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://doi.org/10.1109/TVCG.2022.3211414">Shao, Huang &amp; Michels, "A Current Loop Model for the Fast Simulation of Ferrofluids" (2022)</a> ·
+        <a href="https://doi.org/10.1145/3306346.3322973">Huang, Hädrich &amp; Michels, "On the Accurate Large-Scale Simulation of Ferrofluids" (2019)</a> ·
+        <a href="https://doi.org/10.1145/3414685.3417799">Huang &amp; Michels, "Surface-Only Ferrofluids" (2020)</a> ·
+        <a href="https://doi.org/10.1049/piee.1977.0224">Byrne, "Ferrofluid hydrostatics according to classical and recent theories of the stresses" (1977)</a> ·
+        <a href="https://doi.org/10.1145/2786784.2786796">Bender &amp; Koschier, "Divergence-Free Smoothed Particle Hydrodynamics" (2015)</a> ·
+        <a href="https://doi.org/10.1109/TVCG.2013.105">Ihmsen et al., "Implicit Incompressible SPH" (2014)</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/strange-matter/crown.ts"></script>
+  </body>
+</html>

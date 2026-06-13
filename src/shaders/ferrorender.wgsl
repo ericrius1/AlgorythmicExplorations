@@ -290,3 +290,50 @@ fn fsDots(in: DotOut) -> @location(0) vec4f {
   let col = mix(vec3f(0.18, 0.24, 0.42), vec3f(0.95, 0.65, 0.35), s);
   return vec4f(col * a, a);
 }
+
+// ---- 6. magnetic moments as arrows (part two's teaching view) ---------------------
+// Each particle's aux.xy is its magnetic moment. _pad repurposed:
+// _pad.x = moment → length scale, _pad.y = instance stride (draw every k-th).
+
+struct ArrowOut {
+  @builtin(position) pos: vec4f,
+  @location(0) local: vec2f, // x along the moment, y across
+  @location(1) mag: f32,     // |m|, scaled
+}
+
+@vertex
+fn vsArrows(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> ArrowOut {
+  var corners = array<vec2f, 6>(
+    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0),
+  );
+  let stride = max(u32(RP._pad.y), 1u);
+  let p = parts[ii * stride];
+  let corner = corners[vi];
+  let m = p.aux.xy;
+  let ml = length(m);
+  var dir = vec2f(0.0, 1.0);
+  if (ml > 1e-6) { dir = m / ml; }
+  let mag = clamp(ml * RP._pad.x, 0.0, 1.0);
+  let len = RP.dotSize * (0.8 + 2.6 * mag);
+  let wd = RP.dotSize * 0.34;
+  let perp = vec2f(-dir.y, dir.x);
+  let world = p.pv.xy + dir * corner.x * len + perp * corner.y * wd;
+  var out: ArrowOut;
+  out.pos = vec4f(world * RP.viewScale, 0.0, 1.0);
+  out.local = corner;
+  out.mag = mag;
+  return out;
+}
+
+@fragment
+fn fsArrows(in: ArrowOut) -> @location(0) vec4f {
+  // taper to a point at the head, fade the tail — reads as an arrow without
+  // needing extra geometry
+  let head = (in.local.x + 1.0) * 0.5;
+  let halfW = 1.0 - head * head;
+  if (abs(in.local.y) > halfW) { discard; }
+  let a = (0.25 + 0.75 * head) * (0.35 + 0.65 * in.mag);
+  let col = mix(vec3f(0.35, 0.4, 0.6), vec3f(1.0, 0.62, 0.25), in.mag);
+  return vec4f(col * a, a);
+}

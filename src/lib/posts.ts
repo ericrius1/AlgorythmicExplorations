@@ -20,7 +20,7 @@ export const SERIES_TAGLINES: Record<string, string> = {
   "Bounced Light":
     "Light transport through radiance cascades, participating media, sphere tracing, path tracing, and spectral refraction.",
   "Strange Matter":
-    "A magnetic liquid simulation whose surface is reconstructed every frame.",
+    "A magnetic liquid that grows spikes — its surface remeshed every frame, its particles taught to magnetize each other.",
   "Living Music":
     "Interactive explanations of sound, tuning, scales, chords, rhythm, and generative accompaniment.",
   "Waking Bodies":
@@ -124,6 +124,20 @@ export const POSTS: Post[] = [
     part: 1,
     title: "The Ferrofluid",
     subtitle: "Magnetic SPH and a surface reconstructed with marching squares every frame",
+  },
+  {
+    href: "/pages/strange-matter/crown.html",
+    series: "Strange Matter",
+    part: 2,
+    title: "The Crown",
+    subtitle: "Mutual magnetization and an inward-pointing force grow self-spacing Rosensweig spikes",
+  },
+  {
+    href: "/pages/strange-matter/relief.html",
+    series: "Strange Matter",
+    part: 3,
+    title: "Sharp Relief",
+    subtitle: "The crown in 3D — marching tetrahedra, surface nets, and dual contouring keep the spikes sharp",
   },
   {
     href: "/pages/living-music/vibration.html",
