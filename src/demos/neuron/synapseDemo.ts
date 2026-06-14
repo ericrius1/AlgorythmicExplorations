@@ -3,7 +3,7 @@
 
 import { Shell, type Demo } from "../../lib/demoShell";
 import { DEFAULT_SYNAPSE, restingSynapse, stepSynapse, synapticCurrent, triggerRelease } from "../../lib/neuron/synapse";
-import { DEFAULT_PARAMS, REST, restingState, stepMembrane } from "../../lib/neuron/membrane";
+import { REST, stepLIF, type LIFNeuron } from "../../lib/neuron/membrane";
 
 export function mountSynapse(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.55);
@@ -14,7 +14,7 @@ export function mountSynapse(container: HTMLElement): Demo {
 
   const synParams = { ...DEFAULT_SYNAPSE };
   let syn = restingSynapse();
-  let post = restingState();
+  let post: LIFNeuron = { v: REST, refractory: 0 };
   const postHistory: number[] = [];
   const cols = Math.floor(W / px(3));
   let preSpike = 0;
@@ -42,7 +42,7 @@ export function mountSynapse(container: HTMLElement): Demo {
 
       syn = stepSynapse(syn, dt, synParams);
       const iSyn = synapticCurrent(syn.conductance, synParams);
-      post = stepMembrane(post, dt, DEFAULT_PARAMS, iSyn);
+      post = stepLIF(post, dt, iSyn, 14).state;
       preSpike *= 0.88;
 
       postHistory.push(post.v);

@@ -35,15 +35,18 @@ export function triggerRelease(s: SynapseState, p: SynapseParams): SynapseState 
 }
 
 export function stepSynapse(s: SynapseState, dt: number, p: SynapseParams): SynapseState {
-  const tDecay = Math.exp(-dt * 1000 / p.tauTransmitter);
-  const gDecay = Math.exp(-dt * 1000 / p.tauConductance);
+  // Match membrane demo time scale (dt × 100 ≈ 0.8 ms per frame at 120 fps).
+  const tMs = dt * 100;
+  const tDecay = Math.exp(-tMs / p.tauTransmitter);
+  const gDecay = Math.exp(-tMs / p.tauConductance);
+  const binding = s.transmitter * 0.6 * Math.abs(p.weight);
   const transmitter = s.transmitter * tDecay;
-  const conductance = s.conductance * gDecay + transmitter * 0.6 * Math.abs(p.weight);
+  const conductance = s.conductance * gDecay + binding;
   const vesicles = Math.min(1, s.vesicles + dt * 0.08);
   return { vesicles, transmitter, conductance };
 }
 
 // Postsynaptic current from open channels (positive = depolarizing EPSP).
 export function synapticCurrent(g: number, p: SynapseParams, eRev = 0): number {
-  return g * p.weight * (eRev - (-70)) * 0.15;
+  return g * p.weight * (eRev - (-70)) * 0.55;
 }

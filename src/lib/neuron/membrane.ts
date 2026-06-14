@@ -58,12 +58,34 @@ function betaN(v: number): number {
   return 0.125 * Math.exp(-(v + 65) / 80);
 }
 
-export function restingState(): MembraneState {
-  const v = REST;
+function gatesAt(v: number): { m: number; h: number; n: number } {
   const m = alphaM(v) / (alphaM(v) + betaM(v));
   const h = alphaH(v) / (alphaH(v) + betaH(v));
   const n = alphaN(v) / (alphaN(v) + betaN(v));
+  return { m, h, n };
+}
+
+function totalIonicCurrent(v: number, m: number, h: number, n: number, p: MembraneParams): number {
+  const iNa = p.gNa * m * m * m * h * (v - p.eNa);
+  const iK = p.gK * n * n * n * n * (v - p.eK);
+  const iLeak = p.gLeak * (v - p.eLeak);
+  return iNa + iK + iLeak;
+}
+
+export function restingState(p: MembraneParams = DEFAULT_PARAMS): MembraneState {
+  // Find V where ionic currents balance (fixed point for the HH gates).
+  let v = REST;
+  for (let i = 0; i < 24; i++) {
+    const { m, h, n } = gatesAt(v);
+    const i = totalIonicCurrent(v, m, h, n, p);
+    v -= i * 0.15;
+  }
+  const { m, h, n } = gatesAt(v);
   return { v, m, h, n, refractory: 0 };
+}
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
 }
 
 // One integration step. `iSyn` is injected synaptic current (µA/cm² scale).
@@ -73,38 +95,47 @@ export function stepMembrane(
   p: MembraneParams,
   iSyn = 0,
 ): MembraneState {
-  if (s.refractory > 0) {
-    return {
-      ...s,
-      refractory: Math.max(0, s.refractory - dt * 1000),
-      v: REST + (s.v - REST) * Math.exp(-dt * 8),
+  const steps = 8;
+  const h = dt / steps;
+  let state = s;
+
+  for (let i = 0; i < steps; i++) {
+    if (state.refractory > 0) {
+      state = {
+        ...state,
+        refractory: Math.max(0, state.refractory - h * 1000),
+        v: state.v + (REST - state.v) * (1 - Math.exp(-h * 8)),
+      };
+      continue;
+    }
+
+    const { v, m, h: hg, n } = state;
+    const iNa = p.gNa * m * m * m * hg * (v - p.eNa);
+    const iK = p.gK * n * n * n * n * (v - p.eK);
+    const iLeak = p.gLeak * (v - p.eLeak);
+    const dv = (-(iNa + iK + iLeak) + iSyn) / p.cm;
+
+    const dm = alphaM(v) * (1 - m) - betaM(v) * m;
+    const dh = alphaH(v) * (1 - hg) - betaH(v) * hg;
+    const dn = alphaN(v) * (1 - n) - betaN(v) * n;
+
+    let nv = v + dv * h * 100; // scale dt for visible dynamics
+    let fired = false;
+    if (nv >= THRESH && v < THRESH) {
+      nv = PEAK;
+      fired = true;
+    }
+
+    state = {
+      v: Math.max(-95, Math.min(PEAK, nv)),
+      m: clamp01(m + dm * h * 100),
+      h: clamp01(hg + dh * h * 100),
+      n: clamp01(n + dn * h * 100),
+      refractory: fired ? REFRACTORY_MS : 0,
     };
   }
 
-  const { v, m, h, n } = s;
-  const iNa = p.gNa * m * m * m * h * (v - p.eNa);
-  const iK = p.gK * n * n * n * n * (v - p.eK);
-  const iLeak = p.gLeak * (v - p.eLeak);
-  const dv = (-(iNa + iK + iLeak) + iSyn) / p.cm;
-
-  const dm = alphaM(v) * (1 - m) - betaM(v) * m;
-  const dh = alphaH(v) * (1 - h) - betaH(v) * h;
-  const dn = alphaN(v) * (1 - n) - betaN(v) * n;
-
-  let nv = v + dv * dt * 100; // scale dt for visible dynamics
-  let fired = false;
-  if (nv >= THRESH && v < THRESH) {
-    nv = PEAK;
-    fired = true;
-  }
-
-  return {
-    v: nv,
-    m: m + dm * dt * 100,
-    h: h + dh * dt * 100,
-    n: n + dn * dt * 100,
-    refractory: fired ? REFRACTORY_MS : 0,
-  };
+  return state;
 }
 
 // Leaky integrate-and-fire for network demos (faster, cheaper).
