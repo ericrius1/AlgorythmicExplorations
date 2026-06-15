@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#062d29" />
+    <title>Heliotrope — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A procedural seamless-looping solar-punk sculpture, generated live in WebGPU."
+    />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="solar-punk-page">
+    <main class="solar-punk-stage">
+      <div class="solar-punk-canvas" data-demo="solar-punk"></div>
+      <div class="solar-punk-vignette" aria-hidden="true"></div>
+      <div class="solar-punk-copy">
+        <a href="/index.html" class="solar-punk-back">Algorythmic Explorations</a>
+        <p class="solar-punk-kicker">Interactive kinetic garden · Cycle 07</p>
+        <h1>Heliotrope</h1>
+        <p>
+          Synchronize the daylight current before the cycle fades.
+        </p>
+      </div>
+
+      <section class="solar-punk-hud" aria-label="Heliotrope status">
+        <div class="solar-punk-objective">
+          <div class="solar-punk-objective-head">
+            <span>Garden resonance</span>
+            <strong data-solar-charge>018%</strong>
+          </div>
+          <div class="solar-punk-meter" aria-hidden="true">
+            <span data-solar-charge-fill></span>
+          </div>
+          <div class="solar-punk-objective-foot">
+            <span data-solar-status>Pulse when the phase ring turns gold.</span>
+            <span data-solar-streak>chain x0</span>
+          </div>
+        </div>
+
+        <div class="solar-punk-telemetry" aria-label="Cycle telemetry">
+          <span><small>cycle</small><strong data-solar-time>35.0</strong></span>
+          <span><small>resonance</small><strong data-solar-score>000000</strong></span>
+        </div>
+      </section>
+
+      <div class="solar-punk-action">
+        <button class="solar-punk-pulse" data-solar-pulse type="button">
+          <span class="solar-punk-phase-dial" aria-hidden="true">
+            <i data-solar-phase></i>
+          </span>
+          <strong>Sync pulse</strong>
+          <small>space / tap</small>
+        </button>
+      </div>
+
+      <div class="solar-punk-toolbar" aria-label="Game controls">
+        <button data-solar-pause type="button">Pause</button>
+        <button data-solar-sound data-state="off" type="button">Sound</button>
+        <button data-solar-restart type="button">Restart</button>
+      </div>
+
+      <div class="solar-punk-modal" data-solar-modal role="dialog" aria-live="polite">
+        <div class="solar-punk-modal-card">
+          <span data-solar-modal-kicker>Cycle complete</span>
+          <h2 data-solar-modal-title>Garden awake</h2>
+          <p data-solar-modal-body></p>
+          <button data-solar-modal-action type="button">Begin new cycle</button>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/pages/core/solarPunk.ts"></script>
+  </body>
+</html>

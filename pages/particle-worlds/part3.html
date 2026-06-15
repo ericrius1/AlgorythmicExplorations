@@ -120,13 +120,35 @@
       <div data-demo="grid-cursor"></div>
 
       <p>
-        On the CPU this is a solved problem: build an array of little lists, one per
-        cell, in a single pass. And here the GPU becomes the obstacle. "Append to a
-        list" means pointers, allocation, and a write position that depends on who
-        appended before you — the same serial dependency that complicated the Barnes–Hut
-        tree build. Ten thousand threads cannot politely take turns appending.
-        Whatever structure we build must be built the GPU way: every thread at once,
-        no one waiting.
+        A CPU implementation is almost suspiciously small. Convert each position to
+        one integer cell key, append particle indices to that bucket, then visit the
+        3×3 block around the particle:
+      </p>
+      <pre><code>const buckets = Array.from({ length: grid * grid }, () =&gt; []);
+
+for (let i = 0; i &lt; particles.length; i++) {
+  buckets[cellOf(particles[i].position)].push(i);
+}
+
+function testNeighbours(i) {
+  const [cx, cy] = cellCoord(particles[i].position);
+  for (let oy = -1; oy &lt;= 1; oy++) {
+    for (let ox = -1; ox &lt;= 1; ox++) {
+      const cell = cellAt(cx + ox, cy + oy);
+      if (cell === undefined) continue;           // outside the box
+      for (const j of buckets[cell]) {
+        if (j &gt; i) testPair(i, j);                // each pair once
+      }
+    }
+  }
+}</code></pre>
+      <p>
+        The query is solved; the innocent-looking <code>push</code> is the GPU
+        obstacle. Appending to a list means pointers, allocation, and a write position
+        that depends on who appended before you — the same serial dependency that
+        complicated the Barnes–Hut tree build. Ten thousand threads cannot politely
+        take turns appending. Whatever structure we build must be built the GPU way:
+        every thread at once, no one waiting.
       </p>
       <p>
         Part one escaped this trap by making the tree implicit — pure arithmetic,
@@ -153,6 +175,25 @@
       <pre><code>counts[cell]++                       // 1. histogram      (one pass)
 starts[c] = counts[0..c-1] summed    // 2. prefix sum     (the interesting bit)
 slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre>
+      <p>
+        In serial JavaScript, the whole sort is the following. The GPU version keeps
+        the same arrays and the same three phases; only the loops become compute
+        dispatches and the two increments become atomics:
+      </p>
+      <pre><code>const counts = new Uint32Array(cellCount);
+for (const p of particles) counts[cellOf(p)]++;          // histogram
+
+const starts = new Uint32Array(cellCount);
+for (let c = 1; c &lt; cellCount; c++) {
+  starts[c] = starts[c - 1] + counts[c - 1];             // exclusive scan
+}
+
+const cursor = starts.slice();
+const sorted = new Array(particles.length);
+for (const p of particles) {
+  const cell = cellOf(p);
+  sorted[cursor[cell]++] = p;                             // scatter
+}</code></pre>
       <p>
         Step 2 — turning per-cell counts into running totals — looks like the one
         inherently serial part. A running total seems to demand a single accumulator
@@ -222,6 +263,33 @@ slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre
             workgroup scans the 256 block totals; a final sweep adds each block's
             total back onto its cells. About a tenth of a millisecond, all told.
           </p>
+          <pre><code>pass.setPipeline(scanBlocks);  pass.dispatchWorkgroups(256);
+pass.setPipeline(scanSums);    pass.dispatchWorkgroups(1);
+pass.setPipeline(scanAdd);     pass.dispatchWorkgroups(256);</code></pre>
+          <p>
+            Inside the first two dispatches, each 256-thread group performs a
+            Hillis–Steele scan in fast workgroup memory. The offset doubles after
+            every barrier, so all threads read the previous round before any thread
+            starts the next:
+          </p>
+          <pre><code>var&lt;workgroup&gt; values: array&lt;u32, 256&gt;;
+var&lt;workgroup&gt; scratch: array&lt;u32, 256&gt;;
+
+fn scan(lid: u32) {
+  var offset = 1u;
+  loop {
+    if (offset &gt;= 256u) { break; }
+
+    var next = values[lid];
+    if (lid &gt;= offset) { next += values[lid - offset]; }
+    scratch[lid] = next;
+    workgroupBarrier();
+
+    values[lid] = scratch[lid];
+    workgroupBarrier();
+    offset = offset &lt;&lt; 1u;
+  }
+}</code></pre>
         </div>
       </details>
 
@@ -236,6 +304,24 @@ count    → every particle atomically bumps its cell    (histogram)
 scan     → starts[] from counts[]                      (3 dispatches)
 scatter  → every particle copies itself to its slot    (one atomicAdd each)
 forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
+      <p>
+        The histogram and scatter kernels are each only a few lines of WGSL. Atomics
+        do not impose an order; they only guarantee that no two particles receive the
+        same ticket:
+      </p>
+      <pre><code>@compute @workgroup_size(256)
+fn count(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x &gt;= GP.count) { return; }
+  atomicAdd(&amp;counts[cellOf(partsIn[gid.x].xy)], 1u);
+}
+
+@compute @workgroup_size(256)
+fn scatter(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x &gt;= GP.count) { return; }
+  let p = partsIn[gid.x];
+  let slot = atomicAdd(&amp;cursor[cellOf(p.xy)], 1u);
+  sorted[slot] = p;
+}</code></pre>
       <p>
         Two details matter here. The scatter copies each particle's
         <em>entire state</em> into the sorted array, not just an index — so after the
@@ -300,6 +386,31 @@ forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
 // pass 2 — pressure force: push from crowded toward roomy
 P_i  = k · (ρ_i − ρ_rest)
 acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
+      <p>
+        The sort turns “over neighbours” into two ordinary integer ranges. This is
+        the inner loop of the density pass: visit nine cells, read each contiguous
+        run, then reject candidates outside the smoothing radius.
+      </p>
+      <pre><code>for (var oy = -1; oy &lt;= 1; oy++) {
+  for (var ox = -1; ox &lt;= 1; ox++) {
+    let cell = cellCoord(pi) + vec2i(ox, oy);
+    if (cell.x &lt; 0 || cell.y &lt; 0 ||
+        cell.x &gt;= i32(SP.grid) || cell.y &gt;= i32(SP.grid)) { continue; }
+
+    let key = u32(cell.y) * SP.grid + u32(cell.x);
+    let first = cellStart[key];
+    let end = first + cellCount[key];
+
+    for (var j = first; j &lt; end; j++) {
+      let d = parts[j].xy - pi;
+      let r2 = dot(d, d);
+      if (r2 &lt; h2) {
+        let w = 1.0 - sqrt(r2) / h;
+        rho += w * w;
+      }
+    }
+  }
+}</code></pre>
       <aside class="note">
         <span class="note-label">Aside · Invented for stars, ended up in Moana</span>
         <p>

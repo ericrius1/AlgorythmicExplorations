@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect x="46" y="78" width="724" height="272" rx="24" fill="#07090d" fill-opacity="0.72"/>
+  <rect x="70" y="104" width="238" height="30" rx="15" fill="#7aa2ff"/>
+  <text x="189" y="125" text-anchor="middle" fill="#07090d" font-family="Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1.5">PARTICLE WORLDS 03</text>
+  <text x="70" y="207" fill="#f4f6fb" font-family="Arial, sans-serif" font-size="70" font-weight="800" letter-spacing="-2">HOW DO YOU</text>
+  <text x="70" y="281" fill="#f4f6fb" font-family="Arial, sans-serif" font-size="70" font-weight="800" letter-spacing="-2">SORT WATER?</text>
+  <text x="73" y="324" fill="#b9c3d9" font-family="Arial, sans-serif" font-size="25" font-weight="500">50,000 particles. Every frame.</text>
+</svg>

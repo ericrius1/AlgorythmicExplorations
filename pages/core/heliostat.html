@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05231f" />
+    <title>Heliostat — Algorythmic Explorations</title>
+    <meta
+      name="description"
+      content="A procedural, seamless-looping solar-punk sculpture: a phyllotaxis dish, a smooth-minimum SDF sun-seed, and pollen on a curl-noise wind — generated live in WebGPU."
+    />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      .heliostat-page {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(120% 90% at 50% 18%, #0a352c 0%, #05201d 55%, #020e0d 100%);
+        color: #e8fff4;
+        font-family: var(--font-sans, system-ui, sans-serif);
+        overflow: hidden;
+      }
+      .heliostat-stage {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      .heliostat-canvas { position: absolute; inset: 0; }
+      .heliostat-canvas .demo,
+      .heliostat-canvas .demo-canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+      .heliostat-canvas .demo-canvas { cursor: grab; }
+      .heliostat-canvas .demo-canvas:active { cursor: grabbing; }
+      .heliostat-vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(2, 14, 13, 0.72) 100%);
+      }
+      .heliostat-copy {
+        position: absolute;
+        left: clamp(1.2rem, 4vw, 3.5rem);
+        bottom: clamp(1.2rem, 5vh, 3rem);
+        max-width: 30rem;
+        pointer-events: none;
+        text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
+      }
+      .heliostat-copy h1 {
+        margin: 0.2rem 0 0.5rem;
+        font-size: clamp(2.2rem, 6vw, 3.6rem);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .heliostat-copy p { margin: 0; line-height: 1.5; color: #c5f1df; }
+      .heliostat-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #6fe6b8;
+      }
+      .heliostat-back {
+        pointer-events: auto;
+        display: inline-block;
+        margin-bottom: 0.6rem;
+        font-size: 0.82rem;
+        color: #8ff0c8;
+        text-decoration: none;
+        opacity: 0.85;
+      }
+      .heliostat-back:hover { opacity: 1; text-decoration: underline; }
+      .heliostat-canvas .demo-controls {
+        position: absolute;
+        right: clamp(1rem, 3vw, 2.5rem);
+        bottom: clamp(1rem, 4vh, 2.5rem);
+        left: auto;
+        background: rgba(4, 24, 20, 0.5);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(120, 255, 210, 0.18);
+        border-radius: 12px;
+        padding: 0.6rem 0.8rem;
+      }
+      @media (max-width: 640px) {
+        .heliostat-copy { max-width: 88vw; }
+      }
+    </style>
+  </head>
+  <body class="heliostat-page">
+    <main class="heliostat-stage">
+      <div class="heliostat-canvas" data-demo="heliostat"></div>
+      <div class="heliostat-vignette" aria-hidden="true"></div>
+      <div class="heliostat-copy">
+        <a href="/index.html" class="heliostat-back">← Algorythmic Explorations</a>
+        <p class="heliostat-kicker">Procedural kinetic sculpture · 12-second seamless loop</p>
+        <h1>Heliostat</h1>
+        <p>
+          A sunflower dish of brass-and-glass panels furls and turns; a molten
+          sun-seed — pure distance field — burns at the heart; and pollen drifts
+          on a divergence-free wind. The last frame is exactly the first.
+        </p>
+      </div>
+    </main>
+    <script type="module" src="/src/pages/core/heliostat.ts"></script>
+  </body>
+</html>
