@@ -217,9 +217,11 @@ force    → tree walk + 9 buckets, integrate  // new        (1 dispatch, both a
         with debris settling around it. A planetesimal.
       </p>
       <p>
-        The difference is one term in the contact force. The spring–dashpot contact,
-        unchanged from part three's sand, pushes overlapping grains apart <em>and
-        bleeds off their approach velocity</em>. The dashpot makes collisions
+        The difference is one term in the contact force. The contact model, unchanged
+        from part three's sand, is a <em>spring&ndash;dashpot</em>: a spring that pushes
+        overlapping grains apart, paired with a dashpot &mdash; a velocity damper, the
+        mechanical equivalent of a piston pushed through fluid &mdash; that <em>bleeds
+        off their approach velocity</em>. The dashpot makes collisions
         inelastic: every bump converts a little ordered falling-motion into nothing
         (in real dust, into heat). Slide the <em>stickiness</em> slider to zero and
         the collapse turns into a bouncing swarm that never settles — gravity plus
