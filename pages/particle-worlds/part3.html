@@ -131,10 +131,10 @@ for (let i = 0; i &lt; particles.length; i++) {
 }
 
 function testNeighbours(i) {
-  const [cx, cy] = cellCoord(particles[i].position);
-  for (let oy = -1; oy &lt;= 1; oy++) {
-    for (let ox = -1; ox &lt;= 1; ox++) {
-      const cell = cellAt(cx + ox, cy + oy);
+  const [cellX, cellY] = cellCoord(particles[i].position);
+  for (let offsetY = -1; offsetY &lt;= 1; offsetY++) {
+    for (let offsetX = -1; offsetX &lt;= 1; offsetX++) {
+      const cell = cellAt(cellX + offsetX, cellY + offsetY);
       if (cell === undefined) continue;           // outside the box
       for (const j of buckets[cell]) {
         if (j &gt; i) testPair(i, j);                // each pair once
@@ -391,9 +391,9 @@ acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
         the inner loop of the density pass: visit nine cells, read each contiguous
         run, then reject candidates outside the smoothing radius.
       </p>
-      <pre><code>for (var oy = -1; oy &lt;= 1; oy++) {
-  for (var ox = -1; ox &lt;= 1; ox++) {
-    let cell = cellCoord(pi) + vec2i(ox, oy);
+      <pre><code>for (var offsetY = -1; offsetY &lt;= 1; offsetY++) {
+  for (var offsetX = -1; offsetX &lt;= 1; offsetX++) {
+    let cell = cellCoord(pos) + vec2i(offsetX, offsetY);
     if (cell.x &lt; 0 || cell.y &lt; 0 ||
         cell.x &gt;= i32(SP.grid) || cell.y &gt;= i32(SP.grid)) { continue; }
 
@@ -402,11 +402,11 @@ acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
     let end = first + cellCount[key];
 
     for (var j = first; j &lt; end; j++) {
-      let d = parts[j].xy - pi;
-      let r2 = dot(d, d);
-      if (r2 &lt; h2) {
-        let w = 1.0 - sqrt(r2) / h;
-        rho += w * w;
+      let delta = parts[j].xy - pos;
+      let distSq = dot(delta, delta);
+      if (distSq &lt; h2) {
+        let weight = 1.0 - sqrt(distSq) / h;
+        rho += weight * weight;
       }
     }
   }
