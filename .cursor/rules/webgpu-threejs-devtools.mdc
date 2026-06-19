@@ -1,0 +1,64 @@
+---
+description: Three.js / raw WebGPU dev HUD — Tweakpane, stats, WGSL layout, param schema
+globs: "{src/**/*.{ts,wgsl},**/*.wgsl}"
+alwaysApply: false
+---
+
+# WebGPU / Three.js dev tooling
+
+New sketches and demos use the shared dev HUD in `src/lib/devTools.ts`.
+
+## Required layout
+
+| Concern | Location |
+|---------|----------|
+| Param defaults + Tweakpane ranges | `*params.ts` next to the demo (see `devTools.params.example.ts`) |
+| WGSL | `src/shaders/<name>.wgsl` — import with `?raw` |
+| Dev HUD wiring | `createDevTools()` in demo entry |
+
+## Param schema (single source of truth)
+
+Define defaults and pane metadata together. Bump `SCHEMA_VERSION` when folders/keys change — localStorage is discarded on mismatch (no migration of old schemas).
+
+```ts
+export const SCHEMA_VERSION = "my-demo-v2";
+export const PARAM_SCHEMA = {
+  particles: { count: { value: 65536, min: 1024, max: 1e6, step: 1024 } },
+  debug: { landmarks: { value: false, label: "landmark overlays" } },
+} satisfies ParamSchema;
+```
+
+## Dev HUD behavior
+
+- **/** toggles **both** fps/ms stats and Tweakpane together (visible by default)
+- **.** resets all params to code defaults and clears stored values
+- **m** toggles `debug.landmarks` (also in Debug folder)
+- Params persist in `localStorage` keyed by `storageKey` + `schemaVersion`
+
+## WGSL
+
+Never inline large shader strings in `.ts` files. Keep `.wgsl` files separate for editor highlighting:
+
+```ts
+import simShader from "../shaders/sim.wgsl?raw";
+```
+
+## Wiring snippet
+
+```ts
+import { createDevTools } from "../lib/devTools";
+import { PARAM_SCHEMA, SCHEMA_VERSION } from "./myDemo.params";
+
+const dev = createDevTools({
+  schema: PARAM_SCHEMA,
+  schemaVersion: SCHEMA_VERSION,
+  storageKey: "my-demo-params",
+  onChange: (p) => applyUniforms(p),
+  onLandmarksChange: (on) => landmarkLayer.visible = on,
+});
+
+// each frame:
+dev.tick();
+```
+
+Dependencies: `tweakpane`, `stats.js`.
