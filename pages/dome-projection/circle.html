@@ -55,10 +55,10 @@ y = r * sin(theta)
 r     = sqrt(x*x + y*y)
 theta = atan2(y, x)</code></pre>
       <p>
-        <code>atan2</code> is the quiet hero. A plain arctangent can tell you a
-        slope, but it cannot tell which quadrant the point lives in. Dome mapping
-        needs the full direction around the circle, so always reach for
-        <code>atan2(y, x)</code> when recovering an angle from a vector.
+        Use <code>atan2(y, x)</code> when recovering an angle from a vector. A
+        plain arctangent can tell you a slope, but it cannot tell which quadrant
+        the point lives in. Dome mapping needs the full direction around the
+        circle, including the sign of both coordinates.
       </p>
 
       <!-- ================================================================ -->

@@ -861,3 +861,231 @@ export function mountWarpBlendShow(container: HTMLElement): Demo {
     },
   };
 }
+
+type RealtimeMode = "direct" | "master";
+
+const PROJECTOR_COLORS = ["#7aa2ff", "#ffb86b", "#7dd6a0", "#d89cff"];
+
+function sectorPath(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  a0: number,
+  a1: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r, a0, a1);
+  ctx.closePath();
+}
+
+function drawPipelineBox(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, text: string, color: string): void {
+  ctx.fillStyle = "rgba(17, 19, 28, 0.86)";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
+  ctx.stroke();
+  label(ctx, text, x + w / 2, y + h / 2, { color: C.text, size: 12, align: "center" });
+}
+
+function drawRealtimeProjectors(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  mode: RealtimeMode,
+  projectorCount: number,
+  overlap: number,
+  warp: number,
+  time: number,
+): void {
+  clear(ctx, w, h);
+  const mobile = w < 520;
+  const cx = w * 0.34;
+  const cy = h * (mobile ? 0.33 : 0.43);
+  const r = Math.min(w * (mobile ? 0.28 : 0.22), h * 0.29);
+  const n = Math.max(1, Math.round(projectorCount));
+  const slice = TAU / n;
+  const overlapA = (overlap * slice) / 2;
+
+  ctx.fillStyle = "rgba(122, 162, 255, 0.035)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = C.accent;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  for (let ring = 0.25; ring <= 1; ring += 0.25) {
+    ctx.strokeStyle = ring >= 1 ? C.accent : C.grid;
+    ctx.lineWidth = ring >= 1 ? 1.8 : 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * ring, 0, TAU);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    line(ctx, cx, cy, cx + Math.cos(a) * r, cy + Math.sin(a) * r, C.grid);
+  }
+
+  // Animated scene content in dome coordinates, not a pre-rendered video.
+  for (let i = 0; i < 34; i++) {
+    const a = i * 1.618 + time * (0.25 + (i % 5) * 0.015);
+    const rr = r * (0.14 + 0.8 * (((i * 37) % 100) / 100));
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a * 0.81) * rr * 0.78;
+    dot(ctx, x, y, 2.4 + (i % 4) * 0.6, i % 3 === 0 ? C.warm : C.accent);
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < n; i++) {
+    const centerA = -Math.PI / 2 + i * slice;
+    const color = PROJECTOR_COLORS[i % PROJECTOR_COLORS.length];
+    sectorPath(ctx, cx, cy, r, centerA - slice / 2 - overlapA, centerA + slice / 2 + overlapA);
+    ctx.fillStyle = color.replace(")", ", 0.11)").replace("#", "");
+    ctx.fillStyle = `${color}22`;
+    ctx.fill();
+    line(ctx, cx, cy, cx + Math.cos(centerA - slice / 2) * r, cy + Math.sin(centerA - slice / 2) * r, `${color}99`, 1.4);
+    line(ctx, cx, cy, cx + Math.cos(centerA + slice / 2) * r, cy + Math.sin(centerA + slice / 2) * r, `${color}99`, 1.4);
+  }
+  ctx.restore();
+
+  // Projector positions and frusta.
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + i * slice;
+    const color = PROJECTOR_COLORS[i % PROJECTOR_COLORS.length];
+    const px = cx + Math.cos(a) * r * 1.55;
+    const py = cy + Math.sin(a) * r * 1.55;
+    const left = a + Math.PI - slice * 0.36;
+    const right = a + Math.PI + slice * 0.36;
+    ctx.fillStyle = `${color}14`;
+    ctx.strokeStyle = `${color}aa`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(cx + Math.cos(left) * r * 0.92, cy + Math.sin(left) * r * 0.92);
+    ctx.lineTo(cx + Math.cos(right) * r * 0.92, cy + Math.sin(right) * r * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    dot(ctx, px, py, 5.2, color);
+    label(ctx, `P${i + 1}`, px + Math.cos(a) * 13, py + Math.sin(a) * 13, { color, size: 11, align: "center", mono: true });
+  }
+
+  label(ctx, "physical dome", cx, cy + r + 24, { color: C.text, size: 13, align: "center" });
+  label(ctx, `${n} projector${n === 1 ? "" : "s"} · ${(overlap * 100).toFixed(0)}% angular overlap`, cx, cy + r + 45, {
+    color: C.muted,
+    size: 11,
+    align: "center",
+    mono: true,
+  });
+
+  const bx = mobile ? w * 0.08 : w * 0.62;
+  const by = mobile ? h * 0.68 : h * 0.2;
+  const bw = mobile ? w * 0.84 : w * 0.3;
+  const bh = 44;
+  const gap = 24;
+  if (mode === "direct") {
+    drawPipelineBox(ctx, bx, by, bw, bh, "Three.js scene state", C.good);
+    drawPipelineBox(ctx, bx, by + bh + gap, bw, bh, `${n} projector cameras`, C.accent);
+    drawPipelineBox(ctx, bx, by + (bh + gap) * 2, bw, bh, "mesh warp + edge blend", C.warm);
+    drawPipelineBox(ctx, bx, by + (bh + gap) * 3, bw, bh, "projectors", C.text);
+    label(ctx, "no fulldome video/master required", bx + bw / 2, by - 24, { color: C.good, size: 13, align: "center" });
+  } else {
+    drawPipelineBox(ctx, bx, by, bw, bh, "Three.js scene state", C.good);
+    drawPipelineBox(ctx, bx, by + bh + gap, bw, bh, "cubemap / fisheye target", C.accent);
+    drawPipelineBox(ctx, bx, by + (bh + gap) * 2, bw, bh, `${n} projector samplers`, C.warm);
+    drawPipelineBox(ctx, bx, by + (bh + gap) * 3, bw, bh, "mesh warp + edge blend", C.text);
+    label(ctx, "shared master helps portability", bx + bw / 2, by - 24, { color: C.accent, size: 13, align: "center" });
+  }
+  for (let i = 0; i < 3; i++) {
+    const y = by + bh + gap * 0.5 + i * (bh + gap);
+    line(ctx, bx + bw / 2, y, bx + bw / 2, y + gap * 0.8, C.muted, 1.2);
+  }
+
+  const metricY = mobile ? h * 0.58 : h * 0.84;
+  const renderCount = mode === "direct" ? String(n) : "1 fisheye or 5-6 cubemap";
+  const sampleCost = mode === "direct" ? "warp pass per projector" : "master sample per projector";
+  label(ctx, `scene renders/frame: ${renderCount}`, w * 0.08, metricY, { color: C.text, size: 12, mono: true });
+  label(ctx, `correction: ${sampleCost}`, w * 0.08, metricY + 22, { color: C.muted, size: 12, mono: true });
+  label(ctx, `calibration mesh displacement: ${warp.toFixed(2)}`, w * 0.08, metricY + 44, { color: C.muted, size: 12, mono: true });
+}
+
+export function mountRealtimeProjectors(container: HTMLElement): Demo {
+  const shell = new Shell(container, 0.78);
+  let mode: RealtimeMode = "direct";
+  let projectors = 3;
+  let overlap = 0.14;
+  let warp = 0.35;
+  let time = 0;
+  let last = performance.now();
+
+  shell.button("direct projector cameras", () => {
+    mode = "direct";
+    syncModeButton();
+  });
+  const directButton = shell.controls.lastElementChild as HTMLButtonElement;
+  shell.button("shared fisheye/cubemap", () => {
+    mode = "master";
+    syncModeButton();
+  });
+  const masterButton = shell.controls.lastElementChild as HTMLButtonElement;
+  const syncModeButton = (): void => {
+    directButton.textContent = mode === "direct" ? "direct projector cameras ✓" : "direct projector cameras";
+    masterButton.textContent = mode === "master" ? "shared fisheye/cubemap ✓" : "shared fisheye/cubemap";
+  };
+  syncModeButton();
+
+  shell.slider({
+    label: "projectors",
+    min: 1,
+    max: 4,
+    step: 1,
+    value: projectors,
+    format: (v) => String(Math.round(v)),
+    onInput: (v) => {
+      projectors = Math.round(v);
+    },
+  });
+  shell.slider({
+    label: "overlap",
+    min: 0.04,
+    max: 0.28,
+    step: 0.01,
+    value: overlap,
+    format: (v) => `${Math.round(v * 100)}%`,
+    onInput: (v) => {
+      overlap = v;
+    },
+  });
+  shell.slider({
+    label: "warp strength",
+    min: 0,
+    max: 1,
+    step: 0.01,
+    value: warp,
+    format: (v) => v.toFixed(2),
+    onInput: (v) => {
+      warp = v;
+    },
+  });
+
+  shell.setInfo(() =>
+    mode === "direct"
+      ? `dome-native realtime · ${projectors} scene render${projectors === 1 ? "" : "s"} per frame · no fulldome master`
+      : `realtime master · fisheye/cubemap render target · projector passes sample it`,
+  );
+
+  return {
+    frame() {
+      const now = performance.now();
+      time += Math.min((now - last) / 1000, 0.08);
+      last = now;
+      withCanvas(shell.canvas, (ctx, w, h) => drawRealtimeProjectors(ctx, w, h, mode, projectors, overlap, warp, time));
+      shell.tick();
+    },
+  };
+}

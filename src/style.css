@@ -263,6 +263,139 @@ aside.note strong {
   color: var(--text);
 }
 
+/* ---- dome projection comparison diagrams ---- */
+
+.dome-flow-diagram {
+  margin: 1.6rem 0 1.8rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.dome-flow-row {
+  display: grid;
+  grid-template-columns: 7.5rem repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
+  margin: 0.65rem 0;
+}
+
+.dome-flow-label {
+  align-self: center;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dome-flow-step {
+  min-height: 3.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(10, 11, 16, 0.45);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.dome-flow-step.good {
+  border-color: rgba(125, 214, 160, 0.45);
+  background: rgba(125, 214, 160, 0.08);
+}
+
+.dome-flow-step.accent {
+  border-color: rgba(122, 162, 255, 0.48);
+  background: rgba(122, 162, 255, 0.09);
+}
+
+.dome-flow-step.warm {
+  border-color: rgba(255, 184, 107, 0.5);
+  background: rgba(255, 184, 107, 0.08);
+}
+
+.dome-flow-step.wide {
+  grid-column: span 2;
+}
+
+.dome-flow-diagram figcaption {
+  margin-top: 0.9rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.dome-case-list {
+  margin: 1.4rem 0 1.6rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.dome-case {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.46fr) 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid rgba(35, 38, 54, 0.72);
+}
+
+.dome-case:first-child {
+  border-top: 0;
+}
+
+.dome-case h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  color: #eef1f8;
+}
+
+.dome-case p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.58;
+}
+
+.dome-case strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.better-direct {
+  color: var(--accent);
+}
+
+.better-shared {
+  color: var(--accent-warm);
+}
+
+.better-hybrid {
+  color: #7dd6a0;
+}
+
+@media (max-width: 46rem) {
+  .dome-flow-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dome-flow-step.wide {
+    grid-column: auto;
+  }
+
+  .dome-case {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+}
+
 /* ---- foldout deep dives ---- */
 
 details.fold {

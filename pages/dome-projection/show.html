@@ -97,8 +97,8 @@ show cues    -> scene changes that happen on musical boundaries</code></pre>
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 4 · Sensors are noisy instruments</span>Smoothing, calibration, and latency</h2>
       <p>
-        Sensors are not magic intent readers. They are noisy instruments. A depth
-        camera loses hands, a phone jitters, a pressure mat drifts, and a
+        Sensors are noisy measurement devices. A depth camera loses hands, a
+        phone jitters, a pressure mat drifts, and a
         microcontroller sends values at its own cadence. Put a smoothing layer
         between raw input and render state, then design the visuals to tolerate
         missing data.
@@ -141,6 +141,11 @@ display, measure, adjust, repeat</code></pre>
         bypass the math; they drive the state that the math displays.
       </p>
       <p>
+        <strong>Continued in <a href="/pages/dome-projection/realtime.html">Part four: Dome-Native Three.js</a></strong> —
+        direct projector cameras, live render targets, calibration meshes, and
+        when to skip the fisheye master.
+      </p>
+      <p>
         &larr; <a href="/pages/dome-projection/fisheye.html">Part two: The Fisheye Map</a>
       </p>
     </main>
@@ -149,7 +154,8 @@ display, measure, adjust, repeat</code></pre>
       <p>
         Part three of the Dome Projection series ·
         <a href="/pages/dome-projection/circle.html">Part one</a> ·
-        <a href="/pages/dome-projection/fisheye.html">Part two</a>
+        <a href="/pages/dome-projection/fisheye.html">Part two</a> ·
+        <a href="/pages/dome-projection/realtime.html">Part four</a>
       </p>
     </footer>
 

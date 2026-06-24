@@ -100,6 +100,13 @@ export const POSTS: Post[] = [
     subtitle: "Warp meshes, edge blends, calibration, music clocks, sensors, and real-time visuals across projectors",
   },
   {
+    href: "/pages/dome-projection/realtime.html",
+    series: "Dome Projection",
+    part: 4,
+    title: "Dome-Native Three.js",
+    subtitle: "Realtime scene rendering for domes: direct projector cameras, render targets, calibration meshes, and when fisheye masters still help",
+  },
+  {
     href: "/pages/bounced-light/lava.html",
     series: "Bounced Light",
     part: 1,
