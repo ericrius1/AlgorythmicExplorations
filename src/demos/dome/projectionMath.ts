@@ -96,14 +96,45 @@ function withCanvas(
   draw(ctx, cssW, cssH);
 }
 
-function drawPolar(ctx: CanvasRenderingContext2D, w: number, h: number, theta: number, radius: number): void {
-  clear(ctx, w, h);
+function pointerPoint(canvas: HTMLCanvasElement, e: PointerEvent): { x: number; y: number } {
+  const rect = canvas.getBoundingClientRect();
+  const w = canvas.clientWidth || rect.width;
+  const h = canvas.clientHeight || rect.height;
+  return {
+    x: ((e.clientX - rect.left) / Math.max(rect.width, 1)) * w,
+    y: ((e.clientY - rect.top) / Math.max(rect.height, 1)) * h,
+  };
+}
+
+function dist2(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy;
+}
+
+function normAngle(theta: number): number {
+  return ((theta % TAU) + TAU) % TAU;
+}
+
+function polarMetrics(w: number, h: number, theta: number, radius: number) {
   const mobile = w < 520;
   const s = Math.min(w, h) * 0.26;
   const cx = w * 0.29;
   const cy = h * 0.43;
   const px = cx + Math.cos(theta) * radius * s;
   const py = cy - Math.sin(theta) * radius * s;
+  const rx = w * 0.56;
+  const ry = h * 0.18;
+  const rw = w * 0.34;
+  const rh = h * 0.49;
+  const ux = rx + (theta / TAU) * rw;
+  const uy = ry + rh - radius * rh;
+  return { mobile, s, cx, cy, px, py, rx, ry, rw, rh, ux, uy };
+}
+
+function drawPolar(ctx: CanvasRenderingContext2D, w: number, h: number, theta: number, radius: number): void {
+  clear(ctx, w, h);
+  const { mobile, s, cx, cy, px, py, rx, ry, rw, rh, ux, uy } = polarMetrics(w, h, theta, radius);
 
   // Circle diagram.
   for (let r = 0.25; r <= 1.001; r += 0.25) {
@@ -148,10 +179,6 @@ function drawPolar(ctx: CanvasRenderingContext2D, w: number, h: number, theta: n
   }
 
   // Unwrapped polar texture.
-  const rx = w * 0.56;
-  const ry = h * 0.18;
-  const rw = w * 0.34;
-  const rh = h * 0.49;
   ctx.fillStyle = C.panel;
   ctx.fillRect(rx, ry, rw, rh);
   ctx.strokeStyle = "#30364d";
@@ -167,8 +194,6 @@ function drawPolar(ctx: CanvasRenderingContext2D, w: number, h: number, theta: n
     line(ctx, rx, y, rx + rw, y, i === 4 ? "#424862" : C.grid);
   }
 
-  const ux = rx + (theta / TAU) * rw;
-  const uy = ry + rh - radius * rh;
   ctx.fillStyle = "rgba(122, 162, 255, 0.12)";
   ctx.fillRect(rx, uy, ux - rx, ry + rh - uy);
   line(ctx, ux, ry, ux, ry + rh, C.good, 2);
@@ -212,6 +237,7 @@ export function mountPolarCircle(container: HTMLElement): Demo {
   let theta = 1.05;
   let radius = 0.72;
   let orbiting = false;
+  let dragging: "circle" | "uv" | null = null;
 
   const angleSlider = shell.slider({
     label: "angle",
@@ -224,7 +250,7 @@ export function mountPolarCircle(container: HTMLElement): Demo {
       theta = v;
     },
   });
-  shell.slider({
+  const radiusSlider = shell.slider({
     label: "radius",
     min: 0,
     max: 1,
@@ -242,9 +268,80 @@ export function mountPolarCircle(container: HTMLElement): Demo {
   const orbitButton = shell.controls.lastElementChild as HTMLButtonElement;
   shell.button("snap seam", () => syncSlider(angleSlider, 0));
 
+  const syncState = (): void => {
+    syncSlider(angleSlider, theta);
+    syncSlider(radiusSlider, radius);
+  };
+
+  const hitHandle = (x: number, y: number): "circle" | "uv" | null => {
+    const m = polarMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, theta, radius);
+    const grabR = Math.max(18, m.s * 0.07);
+    const circleHit = dist2(x, y, m.px, m.py) <= grabR * grabR;
+    const uvHit = dist2(x, y, m.ux, m.uy) <= grabR * grabR;
+    if (circleHit && uvHit) return dist2(x, y, m.px, m.py) < dist2(x, y, m.ux, m.uy) ? "circle" : "uv";
+    if (circleHit) return "circle";
+    if (uvHit) return "uv";
+    if (Math.hypot(x - m.cx, y - m.cy) <= m.s) return "circle";
+    if (x >= m.rx && x <= m.rx + m.rw && y >= m.ry && y <= m.ry + m.rh) return "uv";
+    return null;
+  };
+
+  const applyDrag = (handle: "circle" | "uv", e: PointerEvent): void => {
+    const p = pointerPoint(shell.canvas, e);
+    const m = polarMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, theta, radius);
+    if (handle === "circle") {
+      const dx = p.x - m.cx;
+      const dy = m.cy - p.y;
+      theta = normAngle(Math.atan2(dy, dx));
+      radius = clamp(Math.hypot(dx, dy) / m.s, 0, 1);
+    } else {
+      theta = clamp((p.x - m.rx) / m.rw, 0, 1) * TAU;
+      radius = clamp(1 - (p.y - m.ry) / m.rh, 0, 1);
+    }
+    syncState();
+  };
+
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = pointerPoint(shell.canvas, e);
+    const handle = hitHandle(p.x, p.y);
+    if (!handle) return;
+    e.preventDefault();
+    dragging = handle;
+    orbiting = false;
+    orbitButton.textContent = "orbit";
+    shell.canvas.setPointerCapture(e.pointerId);
+    shell.canvas.style.cursor = "grabbing";
+    applyDrag(handle, e);
+  });
+  shell.canvas.addEventListener("pointermove", (e) => {
+    if (dragging) {
+      e.preventDefault();
+      applyDrag(dragging, e);
+      return;
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  });
+  const stopDrag = (e: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = null;
+    try {
+      shell.canvas.releasePointerCapture(e.pointerId);
+    } catch {
+      // The browser may already have released capture during cancellation.
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  };
+  shell.canvas.addEventListener("pointerup", stopDrag);
+  shell.canvas.addEventListener("pointercancel", stopDrag);
+  shell.canvas.addEventListener("pointerleave", () => {
+    if (!dragging) shell.canvas.style.cursor = "default";
+  });
+
   shell.setInfo(() => {
     const u = theta / TAU;
-    return `theta ${(theta * 180 / Math.PI).toFixed(1)} deg · r ${radius.toFixed(2)} · texture u ${u.toFixed(3)}`;
+    return `drag blue handles · theta ${(theta * 180 / Math.PI).toFixed(1)} deg · r ${radius.toFixed(2)} · texture u ${u.toFixed(3)}`;
   });
 
   return {
@@ -263,26 +360,55 @@ type FisheyeMode = {
   name: string;
   formula: string;
   project(theta: number, maxTheta: number): number;
+  unproject(rho: number, maxTheta: number): number;
 };
 
 const FISHEYE_MODES: FisheyeMode[] = [
-  { name: "equidistant", formula: "rho = theta / thetaMax", project: (theta, maxTheta) => theta / maxTheta },
+  {
+    name: "equidistant",
+    formula: "rho = theta / thetaMax",
+    project: (theta, maxTheta) => theta / maxTheta,
+    unproject: (rho, maxTheta) => rho * maxTheta,
+  },
   {
     name: "equisolid",
     formula: "rho = sin(theta/2) / sin(thetaMax/2)",
     project: (theta, maxTheta) => Math.sin(theta / 2) / Math.sin(maxTheta / 2),
+    unproject: (rho, maxTheta) => 2 * Math.asin(clamp(rho * Math.sin(maxTheta / 2), -1, 1)),
   },
   {
     name: "orthographic",
     formula: "rho = sin(theta) / sin(thetaMax)",
     project: (theta, maxTheta) => Math.sin(theta) / Math.sin(maxTheta),
+    unproject: (rho, maxTheta) => Math.asin(clamp(rho * Math.sin(maxTheta), -1, 1)),
   },
   {
     name: "stereographic",
     formula: "rho = tan(theta/2) / tan(thetaMax/2)",
     project: (theta, maxTheta) => Math.tan(theta / 2) / Math.tan(maxTheta / 2),
+    unproject: (rho, maxTheta) => 2 * Math.atan(rho * Math.tan(maxTheta / 2)),
   },
 ];
+
+function fisheyeMetrics(w: number, h: number, thetaDeg: number, phi: number, fovDeg: number, mode: FisheyeMode) {
+  const mobile = w < 520;
+  const maxTheta = (fovDeg * Math.PI) / 360;
+  const theta = clamp((thetaDeg * Math.PI) / 180, 0, maxTheta);
+  const rho = clamp(mode.project(theta, maxTheta), 0, 1);
+  const rayX = Math.sin(theta) * Math.cos(phi);
+  const rayY = Math.sin(theta) * Math.sin(phi);
+  const rayZ = Math.cos(theta);
+  const fc = { x: w * 0.29, y: h * 0.45 };
+  const fr = Math.min(w, h) * 0.26;
+  const sampleX = fc.x + Math.cos(phi) * rho * fr;
+  const sampleY = fc.y - Math.sin(phi) * rho * fr;
+  const dcx = w * 0.73;
+  const dcy = h * 0.72;
+  const dr = Math.min(w, h) * 0.31;
+  const sideX = dcx + Math.sin(theta) * dr;
+  const sideY = dcy - Math.cos(theta) * dr;
+  return { mobile, maxTheta, theta, rho, rayX, rayY, rayZ, fc, fr, sampleX, sampleY, dcx, dcy, dr, sideX, sideY };
+}
 
 function drawFisheye(
   ctx: CanvasRenderingContext2D,
@@ -294,16 +420,8 @@ function drawFisheye(
   mode: FisheyeMode,
 ): void {
   clear(ctx, w, h);
-  const mobile = w < 520;
-  const maxTheta = (fovDeg * Math.PI) / 360;
-  const theta = clamp((thetaDeg * Math.PI) / 180, 0, maxTheta);
-  const rho = clamp(mode.project(theta, maxTheta), 0, 1);
-  const rayX = Math.sin(theta) * Math.cos(phi);
-  const rayY = Math.sin(theta) * Math.sin(phi);
-  const rayZ = Math.cos(theta);
-
-  const fc = { x: w * 0.29, y: h * 0.45 };
-  const fr = Math.min(w, h) * 0.26;
+  const { mobile, maxTheta, theta, rho, rayX, rayY, rayZ, fc, fr, sampleX, sampleY, dcx, dcy, dr, sideX, sideY } =
+    fisheyeMetrics(w, h, thetaDeg, phi, fovDeg, mode);
   ctx.strokeStyle = C.accent;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -322,8 +440,6 @@ function drawFisheye(
     line(ctx, fc.x, fc.y, fc.x + Math.cos(a) * fr, fc.y - Math.sin(a) * fr, i % 4 === 0 ? "#3a4260" : C.grid);
   }
 
-  const sampleX = fc.x + Math.cos(phi) * rho * fr;
-  const sampleY = fc.y - Math.sin(phi) * rho * fr;
   line(ctx, fc.x, fc.y, sampleX, sampleY, C.warm, 2);
   dot(ctx, sampleX, sampleY, 6, C.accent);
   dot(ctx, fc.x, fc.y, 4, C.text);
@@ -331,9 +447,6 @@ function drawFisheye(
   label(ctx, "azimuth phi", fc.x + fr * 0.28, fc.y - fr * 0.12, { color: C.warm, size: 12, mono: true });
   if (!mobile) label(ctx, mode.name, fc.x, fc.y + fr + 28, { color: C.accent, size: 13, align: "center", mono: true });
 
-  const dcx = w * 0.73;
-  const dcy = h * 0.72;
-  const dr = Math.min(w, h) * 0.31;
   line(ctx, dcx - dr * 1.12, dcy, dcx + dr * 1.12, dcy, "#424862", 1.5);
   ctx.strokeStyle = C.accent;
   ctx.lineWidth = 2;
@@ -341,8 +454,6 @@ function drawFisheye(
   ctx.arc(dcx, dcy, dr, Math.PI, 0);
   ctx.stroke();
 
-  const sideX = dcx + Math.sin(theta) * dr;
-  const sideY = dcy - Math.cos(theta) * dr;
   line(ctx, dcx, dcy, sideX, sideY, C.warm, 3);
   dot(ctx, sideX, sideY, 6, C.accent);
   dot(ctx, dcx, dcy, 4, C.text);
@@ -385,6 +496,7 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
   let fovDeg = 180;
   let modeIndex = 0;
   let spinning = false;
+  let dragging: "fisheye" | "dome" | null = null;
 
   const phiSlider = shell.slider({
     label: "azimuth",
@@ -397,7 +509,7 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
       phi = v;
     },
   });
-  shell.slider({
+  const thetaSlider = shell.slider({
     label: "zenith angle",
     min: 0,
     max: 90,
@@ -430,9 +542,83 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
   });
   const spinButton = shell.controls.lastElementChild as HTMLButtonElement;
 
+  const syncFisheyeState = (): void => {
+    syncSlider(phiSlider, phi);
+    syncSlider(thetaSlider, thetaDeg);
+  };
+
+  const hitHandle = (x: number, y: number): "fisheye" | "dome" | null => {
+    const m = fisheyeMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, thetaDeg, phi, fovDeg, FISHEYE_MODES[modeIndex]);
+    const grabR = Math.max(18, m.fr * 0.08);
+    const fisheyeHit = dist2(x, y, m.sampleX, m.sampleY) <= grabR * grabR;
+    const domeHit = dist2(x, y, m.sideX, m.sideY) <= grabR * grabR;
+    if (fisheyeHit && domeHit) return dist2(x, y, m.sampleX, m.sampleY) < dist2(x, y, m.sideX, m.sideY) ? "fisheye" : "dome";
+    if (fisheyeHit) return "fisheye";
+    if (domeHit) return "dome";
+    if (Math.hypot(x - m.fc.x, y - m.fc.y) <= m.fr) return "fisheye";
+    if (Math.hypot(x - m.dcx, y - m.dcy) <= m.dr && y <= m.dcy + 8) return "dome";
+    return null;
+  };
+
+  const applyDrag = (handle: "fisheye" | "dome", e: PointerEvent): void => {
+    const p = pointerPoint(shell.canvas, e);
+    const mode = FISHEYE_MODES[modeIndex];
+    const m = fisheyeMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, thetaDeg, phi, fovDeg, mode);
+    if (handle === "fisheye") {
+      const dx = p.x - m.fc.x;
+      const dy = m.fc.y - p.y;
+      phi = normAngle(Math.atan2(dy, dx));
+      const rho = clamp(Math.hypot(dx, dy) / m.fr, 0, 1);
+      thetaDeg = (mode.unproject(rho, m.maxTheta) * 180) / Math.PI;
+    } else {
+      const dx = p.x - m.dcx;
+      const dy = m.dcy - p.y;
+      thetaDeg = (clamp(Math.atan2(dx, dy), 0, m.maxTheta) * 180) / Math.PI;
+    }
+    syncFisheyeState();
+  };
+
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = pointerPoint(shell.canvas, e);
+    const handle = hitHandle(p.x, p.y);
+    if (!handle) return;
+    e.preventDefault();
+    dragging = handle;
+    spinning = false;
+    spinButton.textContent = "spin phi";
+    shell.canvas.setPointerCapture(e.pointerId);
+    shell.canvas.style.cursor = "grabbing";
+    applyDrag(handle, e);
+  });
+  shell.canvas.addEventListener("pointermove", (e) => {
+    if (dragging) {
+      e.preventDefault();
+      applyDrag(dragging, e);
+      return;
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  });
+  const stopDrag = (e: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = null;
+    try {
+      shell.canvas.releasePointerCapture(e.pointerId);
+    } catch {
+      // The browser may already have released capture during cancellation.
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  };
+  shell.canvas.addEventListener("pointerup", stopDrag);
+  shell.canvas.addEventListener("pointercancel", stopDrag);
+  shell.canvas.addEventListener("pointerleave", () => {
+    if (!dragging) shell.canvas.style.cursor = "default";
+  });
+
   shell.setInfo(() => {
     const maxTheta = fovDeg / 2;
-    return `${FISHEYE_MODES[modeIndex].name} · theta ${Math.min(thetaDeg, maxTheta).toFixed(1)} deg of ${maxTheta.toFixed(0)} deg`;
+    return `drag blue handles · ${FISHEYE_MODES[modeIndex].name} · theta ${Math.min(thetaDeg, maxTheta).toFixed(1)} deg of ${maxTheta.toFixed(0)} deg`;
   });
 
   return {
