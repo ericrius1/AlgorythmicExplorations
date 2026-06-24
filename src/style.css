@@ -458,6 +458,36 @@ header.hero .demo-controls {
   margin: 0 auto;
 }
 
+.demo.demo-fullscreen {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: #06070b;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo.demo-fullscreen .demo-canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+
+.demo.demo-fullscreen .demo-controls,
+.demo.demo-fullscreen .demo-readout {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+}
+
+.demo.demo-fullscreen.demo-ui-hidden .demo-canvas {
+  flex: 1 1 100%;
+}
+
 .demo-fallback {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.9rem;

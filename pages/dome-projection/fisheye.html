@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Fisheye Map — Dome Projection</title>
+    <meta
+      name="description"
+      content="Part two of a dome projection series: dome directions, fisheye projection formulas, inverse mapping, and sampling a fulldome master."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>The Fisheye Map</h1>
+      <p>
+        <a href="/pages/dome-projection/circle.html">Part one</a> named points
+        on a circle. A dome adds one more idea: each point on the image
+        represents a <em>direction in space</em>. The center of the fisheye is the
+        zenith above the viewer. The edge is the horizon. The angle around the
+        image is the compass direction.
+      </p>
+      <p>
+        This is why dome renders usually start as a circular fisheye master. The
+        master is not trying to look natural on a flat monitor. It is a lookup
+        table for directions.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Direction first</span>From hemisphere to image</h2>
+      <p>
+        A point on the dome can be described by two angles: azimuth
+        <code>&phi;</code>, the direction around the room, and zenith angle
+        <code>&theta;</code>, the tilt away from straight up. For a 180 degree
+        dome master, <code>&theta; = 0</code> is the center and
+        <code>&theta; = 90&deg;</code> is the circular edge.
+      </p>
+
+      <div data-demo="fisheye-map"></div>
+
+      <pre><code>// direction from dome angles, z is up
+dir.x = sin(theta) * cos(phi)
+dir.y = sin(theta) * sin(phi)
+dir.z = cos(theta)</code></pre>
+      <p>
+        That vector is the real object. The fisheye image is just one way to pack
+        it into pixels. Change the projection button in the demo and the same
+        dome direction lands at a different radius in the image. The azimuth stays
+        the same; only the radial law changes.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Fisheye projection families</span>Different lenses, different radii</h2>
+      <p>
+        A fisheye projection chooses a radius <code>&rho;</code> for a given
+        zenith angle. Equidistant fisheye is the cleanest mental model:
+        equal angle steps make equal pixel steps. Other lenses preserve other
+        properties, such as area or straightness near the center.
+      </p>
+      <pre><code>equidistant   rho = theta / thetaMax
+equisolid     rho = sin(theta/2) / sin(thetaMax/2)
+orthographic  rho = sin(theta) / sin(thetaMax)
+stereographic rho = tan(theta/2) / tan(thetaMax/2)</code></pre>
+      <p>
+        Content pipelines often use an equidistant 180 degree master because it
+        is simple and predictable. Camera lenses, projector lenses, and mapping
+        tools may use a different law internally. Do not guess. Name the
+        projection, write the formula down, and test it with a grid before
+        trusting the show file.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The projector asks backward</span>Inverse mapping onto the dome</h2>
+      <p>
+        In a real room, the projector is not at the dome center, the lens has
+        distortion, and the dome may not be a perfect hemisphere. The robust
+        renderer still asks the same backward question per output pixel:
+      </p>
+      <pre><code>projectorPixel -> projectorRay
+projectorRay   -> intersection point on dome
+dome point     -> normalized direction from dome center
+direction      -> fisheye uv
+fisheye uv     -> source color</code></pre>
+      <p>
+        Calibration is the process of making those arrows match the physical
+        room. The math gives you the ideal answer. Control points, mesh warps,
+        lens correction, and edge blend masks turn the ideal answer into a
+        practical one.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Forward maps create holes</span>
+        <p>
+          If you push source pixels forward onto the dome, some output pixels
+          receive no source and others receive several. That is how cracks and
+          sparkle appear. Inverse mapping is boring by design: every displayed
+          pixel asks where it should sample from, exactly once.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Seams, poles, and grids</span>How to debug a bad map</h2>
+      <p>
+        The fastest dome debugging texture is not beautiful. It is a grid with
+        labeled azimuths, latitude rings, a clear center mark, and a visible seam.
+        If the seam opens, the azimuth wrap is wrong. If rings bunch up, the
+        fisheye projection law is wrong. If labels drift between projectors, the
+        calibration mesh is wrong.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: cubemaps are another master format</summary>
+        <div class="fold-body">
+          <p>
+            A fisheye image is not the only way to store directions. A cubemap
+            stores the same sphere as six square faces. Real-time engines often
+            render cubemaps first because cameras with 90 degree fields of view
+            are easy, then convert the cubemap to a fisheye master or directly
+            sample it in the projector warp shader. The invariant is still the
+            direction vector.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>The map is only half the show</h2>
+      <p>
+        At this point you can describe where every dome pixel should come from.
+        Part three adds the production layer: projector overlap, soft edge
+        blending, calibration meshes, music timing, sensor smoothing, and the
+        state loop that keeps a live show coherent.
+      </p>
+      <p>
+        <strong>Continued in <a href="/pages/dome-projection/show.html">Part three: The Dome Show</a></strong> —
+        turning the projection math into a responsive multi-projector system.
+      </p>
+      <p>
+        &larr; <a href="/pages/dome-projection/circle.html">Part one: The Circle Under the Dome</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part two of the Dome Projection series ·
+        <a href="/pages/dome-projection/circle.html">Part one</a> ·
+        <a href="/pages/dome-projection/show.html">Part three</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/dome-projection/fisheye.ts"></script>
+  </body>
+</html>

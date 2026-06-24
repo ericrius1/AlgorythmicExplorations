@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Dome Show — Dome Projection</title>
+    <meta
+      name="description"
+      content="Part three of a dome projection series: warp meshes, edge blending, calibration, music clocks, sensor input, and seamless real-time dome visuals."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>The Dome Show</h1>
+      <p>
+        <a href="/pages/dome-projection/fisheye.html">Part two</a> gave every
+        dome pixel a source coordinate. A show adds the parts that make that map
+        survive a room full of equipment: warp meshes, edge blends, color
+        matching, timing, and inputs. The math is still there, but now it is
+        inside a system.
+      </p>
+      <p>
+        The demo below compresses a two-projector dome rig into one diagram. The
+        blue side and orange side overlap in the middle. The mesh lines stand for
+        calibration warps. The timeline is the show clock. The sensor slider feeds
+        the render state after smoothing, which is what a real depth camera,
+        MIDI controller, phone, or microcontroller should do.
+      </p>
+
+      <div data-demo="warp-blend-show"></div>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Warp before blend</span>Calibration meshes</h2>
+      <p>
+        A projector draws a rectangle. A dome is curved. The warp mesh is the
+        editable function between those two facts. In a simple installation, each
+        mesh vertex stores a source coordinate in the fisheye master and a
+        destination coordinate on the projector output. Moving the vertex bends
+        the sampling so the grid lands on the physical dome.
+      </p>
+      <pre><code>projector output pixel
+  -> triangle in calibration mesh
+  -> interpolated source uv
+  -> sample fisheye or cubemap master</code></pre>
+      <p>
+        Calibration starts with boring patterns: rings, meridians, labels, and
+        crosshairs. Adjust geometry first. A soft edge blend cannot hide a warped
+        line that misses its neighbor.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Blend without a scar</span>Overlap, gamma, and black level</h2>
+      <p>
+        Adjacent projectors need overlap because no real edge is perfect. In the
+        overlap, projector A fades down while projector B fades up. The sum should
+        look like one projector, not a bright stripe or a dim valley. That is why
+        the demo exposes edge gamma: the fade curve matters as much as the overlap
+        width.
+      </p>
+      <pre><code>final = colorA * weightA + colorB * weightB
+
+// good overlap target
+weightA + weightB ~= 1
+colors match
+black levels match</code></pre>
+      <p>
+        Black level is the detail beginners underestimate. Projectors cannot
+        project darker than their own black, and two projectors in an overlap can
+        make the "black" overlap brighter than the rest of the dome. Serious
+        systems compensate with masks and projector settings, not only with the
+        content file.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Music is a clock</span>Beats, cues, and render state</h2>
+      <p>
+        For a music-driven dome show, audio should not be an afterthought glued
+        onto the visuals. Treat it as a clock and a control signal. The clock
+        gives reliable phase: bars, beats, and cue points. Analysis gives slower
+        envelopes: bass energy, onset strength, spectral centroid, or loudness.
+      </p>
+      <pre><code>clock phase  -> repeatable motion, beat hits, cue changes
+audio energy -> intensity, bloom, particle emission, color pressure
+show cues    -> scene changes that happen on musical boundaries</code></pre>
+      <p>
+        The practical rule: clocks trigger structure; analysis modulates texture.
+        If every scene change depends on raw microphone amplitude, the show will
+        feel twitchy. If every visual detail is locked to a rigid timeline, the
+        show will ignore the room. Use both.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Sensors are noisy instruments</span>Smoothing, calibration, and latency</h2>
+      <p>
+        Sensors are not magic intent readers. They are noisy instruments. A depth
+        camera loses hands, a phone jitters, a pressure mat drifts, and a
+        microcontroller sends values at its own cadence. Put a smoothing layer
+        between raw input and render state, then design the visuals to tolerate
+        missing data.
+      </p>
+      <pre><code>rawSensor     = readInput()
+calibrated    = map(rawSensor, minSeen, maxSeen, 0, 1)
+smoothed      += (calibrated - smoothed) * response
+visualControl = clamp(smoothed, 0, 1)</code></pre>
+      <p>
+        Latency is part of the instrument. A slow, dreamy dome can tolerate
+        100 ms of smoothing. A drum-triggered flash cannot. Fast controls need
+        prediction or less filtering; slow controls need enough damping that the
+        audience sees intention instead of measurement noise.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · OSC, MIDI, WebSocket, serial</span>
+        <p>
+          The transport matters less than the contract. Name every control, define
+          its range, decide whether it is momentary or continuous, and document its
+          expected rate. A clean <code>sensor.handHeight: 0..1</code> signal is more
+          valuable than a clever protocol with unclear semantics.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>The full loop</h2>
+      <p>
+        A reliable dome show is the same loop repeated every frame:
+      </p>
+      <pre><code>read music clock and sensors
+update smoothed show state
+render one seamless master
+sample it through each projector warp
+apply edge blend and color correction
+display, measure, adjust, repeat</code></pre>
+      <p>
+        The artistic ceiling is high, but the technical shape is manageable.
+        Circles become directions. Directions become fisheye pixels. Fisheye
+        pixels pass through calibrated projector meshes. Music and sensors do not
+        bypass the math; they drive the state that the math displays.
+      </p>
+      <p>
+        &larr; <a href="/pages/dome-projection/fisheye.html">Part two: The Fisheye Map</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part three of the Dome Projection series ·
+        <a href="/pages/dome-projection/circle.html">Part one</a> ·
+        <a href="/pages/dome-projection/fisheye.html">Part two</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/dome-projection/show.ts"></script>
+  </body>
+</html>

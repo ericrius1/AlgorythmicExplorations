@@ -17,6 +17,8 @@ export interface Post {
 export const SERIES_TAGLINES: Record<string, string> = {
   "Particle Worlds":
     "A step-by-step n-body simulation, from two falling dots to 300,000 gravitating bodies.",
+  "Dome Projection":
+    "Fulldome projection math from polar coordinates to fisheye maps, calibrated blends, music clocks, and sensor-driven shows.",
   "Bounced Light":
     "Light transport through radiance cascades, participating media, sphere tracing, path tracing, and spectral refraction.",
   "Strange Matter":
@@ -75,6 +77,27 @@ export const POSTS: Post[] = [
     part: 6,
     title: "The Fluid Instrument",
     subtitle: "Stable fluids, curl noise, particle trails, and hand tracking",
+  },
+  {
+    href: "/pages/dome-projection/circle.html",
+    series: "Dome Projection",
+    part: 1,
+    title: "The Circle Under the Dome",
+    subtitle: "Polar coordinates, radians, seams, and normalized UVs before any projector enters the room",
+  },
+  {
+    href: "/pages/dome-projection/fisheye.html",
+    series: "Dome Projection",
+    part: 2,
+    title: "The Fisheye Map",
+    subtitle: "Turning dome directions into fisheye pixels, inverse mapping, projection lenses, and sampler seams",
+  },
+  {
+    href: "/pages/dome-projection/show.html",
+    series: "Dome Projection",
+    part: 3,
+    title: "The Dome Show",
+    subtitle: "Warp meshes, edge blends, calibration, music clocks, sensors, and real-time visuals across projectors",
   },
   {
     href: "/pages/bounced-light/lava.html",

@@ -34,37 +34,61 @@ export class OrbitCamera {
   private lastInteraction = 0;
 
   attach(canvas: HTMLCanvasElement): void {
-    let dragging = false;
+    let orbiting = false;
+    let dollying = false;
     let lx = 0;
     let ly = 0;
-    canvas.addEventListener("pointerdown", (e) => {
-      dragging = true;
-      lx = e.clientX;
-      ly = e.clientY;
-      canvas.setPointerCapture(e.pointerId);
-    });
-    canvas.addEventListener("pointerup", () => (dragging = false));
-    canvas.addEventListener("pointercancel", () => (dragging = false));
-    canvas.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      this.azimuth -= (e.clientX - lx) * 0.005;
-      this.elevation = Math.min(1.5, Math.max(-0.2, this.elevation + (e.clientY - ly) * 0.005));
-      lx = e.clientX;
-      ly = e.clientY;
+
+    const dollyBy = (delta: number): void => {
+      this.distance = Math.min(8, Math.max(1.0, this.distance * Math.exp(delta)));
       this.lastInteraction = performance.now();
+    };
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (e.button === 0) {
+        orbiting = true;
+        lx = e.clientX;
+        ly = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+      } else if (e.button === 1) {
+        dollying = true;
+        ly = e.clientY;
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+      }
+    });
+    canvas.addEventListener("pointerup", (e) => {
+      if (e.button === 0) orbiting = false;
+      if (e.button === 1) dollying = false;
+    });
+    canvas.addEventListener("pointercancel", () => {
+      orbiting = false;
+      dollying = false;
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (orbiting) {
+        this.azimuth -= (e.clientX - lx) * 0.005;
+        this.elevation = Math.min(1.5, Math.max(-0.2, this.elevation + (e.clientY - ly) * 0.005));
+        lx = e.clientX;
+        ly = e.clientY;
+        this.lastInteraction = performance.now();
+      } else if (dollying) {
+        dollyBy((e.clientY - ly) * 0.005);
+        ly = e.clientY;
+      }
     });
     canvas.addEventListener(
       "wheel",
       (e) => {
-        // Plain wheel keeps scrolling the page; ctrl/⌘+wheel (and trackpad
-        // pinch, which arrives as ctrl+wheel) zooms the camera.
-        if (!e.ctrlKey && !e.metaKey) return;
+        // Two-finger trackpad scroll, mouse wheel, and pinch (ctrl+wheel) all dolly.
         e.preventDefault();
-        this.distance = Math.min(8, Math.max(1.0, this.distance * Math.exp(e.deltaY * 0.001)));
-        this.lastInteraction = performance.now();
+        dollyBy(e.deltaY * 0.001);
       },
       { passive: false },
     );
+    canvas.addEventListener("auxclick", (e) => {
+      if (e.button === 1) e.preventDefault();
+    });
   }
 
   // Returns viewProj plus the camera's right/up axes for billboarding.

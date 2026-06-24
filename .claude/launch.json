@@ -21,6 +21,13 @@
       "runtimeArgs": ["run", "dev", "--prefix", "/Users/eric/codeprojects/LavaLamp", "--", "--port", "5199"],
       "port": 5199,
       "autoPort": true
+    },
+    {
+      "name": "spider-dance",
+      "runtimeExecutable": "/Users/eric/.nvm/versions/node/v22.12.0/bin/node",
+      "runtimeArgs": ["/Users/eric/codeprojects/levani/SpiderDance/node_modules/vite/bin/vite.js", "/Users/eric/codeprojects/levani/SpiderDance", "--port", "5201"],
+      "port": 5201,
+      "autoPort": true
     }
   ]
 }

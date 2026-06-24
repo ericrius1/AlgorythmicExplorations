@@ -1,6 +1,6 @@
 // Shared three.js stage for the creature and terrain series: a WebGPURenderer
 // bound to the Shell's canvas (three falls back to WebGL2 on its own), the
-// site's orbit feel (drag to turn, ctrl/⌘+wheel to zoom, slow auto-spin when
+// site's orbit feel (drag to turn, two-finger scroll / wheel / middle-drag to dolly, slow auto-spin when
 // idle), a gradient-sky background, and configurable lights/fog — so a bird
 // turntable and a mountain flyover can share one chassis.
 
@@ -21,35 +21,62 @@ export class Orbit3D {
   private lastInteraction = 0;
 
   attach(canvas: HTMLCanvasElement): void {
-    let dragging = false;
+    let orbiting = false;
+    let dollying = false;
     let lx = 0, ly = 0;
+
+    const dollyBy = (delta: number): void => {
+      this.distance = Math.min(this.maxDistance, Math.max(this.minDistance, this.distance * Math.exp(delta)));
+      this.lastInteraction = performance.now();
+    };
+
     canvas.addEventListener("pointerdown", (e) => {
       if (!this.enabled) return;
-      dragging = true;
-      lx = e.clientX;
-      ly = e.clientY;
-      canvas.setPointerCapture(e.pointerId);
+      if (e.button === 0) {
+        orbiting = true;
+        lx = e.clientX;
+        ly = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+      } else if (e.button === 1) {
+        dollying = true;
+        ly = e.clientY;
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+      }
     });
-    canvas.addEventListener("pointerup", () => (dragging = false));
-    canvas.addEventListener("pointercancel", () => (dragging = false));
+    canvas.addEventListener("pointerup", (e) => {
+      if (e.button === 0) orbiting = false;
+      if (e.button === 1) dollying = false;
+    });
+    canvas.addEventListener("pointercancel", () => {
+      orbiting = false;
+      dollying = false;
+    });
     canvas.addEventListener("pointermove", (e) => {
-      if (!dragging || !this.enabled) return;
-      this.azimuth -= (e.clientX - lx) * 0.005;
-      this.elevation = Math.min(this.maxElevation, Math.max(this.minElevation, this.elevation + (e.clientY - ly) * 0.005));
-      lx = e.clientX;
-      ly = e.clientY;
-      this.lastInteraction = performance.now();
+      if (!this.enabled) return;
+      if (orbiting) {
+        this.azimuth -= (e.clientX - lx) * 0.005;
+        this.elevation = Math.min(this.maxElevation, Math.max(this.minElevation, this.elevation + (e.clientY - ly) * 0.005));
+        lx = e.clientX;
+        ly = e.clientY;
+        this.lastInteraction = performance.now();
+      } else if (dollying) {
+        dollyBy((e.clientY - ly) * 0.005);
+        ly = e.clientY;
+      }
     });
     canvas.addEventListener(
       "wheel",
       (e) => {
-        if (!e.ctrlKey && !e.metaKey) return; // plain wheel keeps scrolling the page
+        if (!this.enabled) return;
         e.preventDefault();
-        this.distance = Math.min(this.maxDistance, Math.max(this.minDistance, this.distance * Math.exp(e.deltaY * 0.001)));
-        this.lastInteraction = performance.now();
+        dollyBy(e.deltaY * 0.001);
       },
       { passive: false },
     );
+    canvas.addEventListener("auxclick", (e) => {
+      if (e.button === 1) e.preventDefault();
+    });
   }
 
   apply(camera: THREE.PerspectiveCamera): void {
