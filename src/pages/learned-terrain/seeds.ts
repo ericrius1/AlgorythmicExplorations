@@ -1,3 +1,6 @@
 import { wirePage } from "../../core/wirePage";
+import { mountSeededNoise } from "../../demos/learnedTerrain";
 
-wirePage();
+wirePage({
+  "seeded-noise": mountSeededNoise,
+});

@@ -92,6 +92,17 @@ x_next = numerator / denominator</code></pre>
         than one denoising path, so the boundary becomes a blending zone rather
         than a cut.
       </p>
+
+      <div data-demo="diffusion-tiles"></div>
+
+      <p>
+        The top strip is the landscape structure we wish the model knew. The
+        middle strip shows the failure of independent tiles: each half denoises
+        toward something plausible, but the seam has no shared context. The
+        bottom strip uses overlapping windows. Increase the mismatch to make
+        the independent seam worse, then increase overlap to see why a blending
+        region is the basic ingredient InfiniteDiffusion will reuse.
+      </p>
       <p>
         But ordinary MultiDiffusion still assumes there is a finite canvas whose
         numerator and denominator can be stored. It stretches the rectangle. It

@@ -1,3 +1,6 @@
 import { wirePage } from "../../core/wirePage";
+import { mountDiffusionTiles } from "../../demos/learnedTerrain";
 
-wirePage();
+wirePage({
+  "diffusion-tiles": mountDiffusionTiles,
+});

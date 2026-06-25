@@ -1,3 +1,6 @@
 import { wirePage } from "../../core/wirePage";
+import { mountTerrainPipeline } from "../../demos/learnedTerrain";
 
-wirePage();
+wirePage({
+  "terrain-pipeline": mountTerrainPipeline,
+});

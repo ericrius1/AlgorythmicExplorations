@@ -1,3 +1,6 @@
 import { wirePage } from "../../core/wirePage";
+import { mountInfiniteWindows } from "../../demos/learnedTerrain";
 
-wirePage();
+wirePage({
+  "infinite-windows": mountInfiniteWindows,
+});

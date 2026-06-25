@@ -75,6 +75,17 @@
   -> decoded elevation / climate tile
   -> game or visualization</code></pre>
 
+      <div data-demo="terrain-pipeline"></div>
+
+      <p>
+        The left side is the open-world query pattern: the player moves, nearby
+        tiles are requested, and cached context stays useful. The right side is
+        the model stack. Step east for a warm neighboring query, or teleport to
+        force a cold cache miss. The point is not the exact toy timing; it is
+        the difference between first-tile cost and steady movement through
+        already-nearby context.
+      </p>
+
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · The reported result</span>Quality and latency</h2>
       <p>
