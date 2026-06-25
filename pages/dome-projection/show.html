@@ -10,7 +10,7 @@
     <title>The Dome Show — Dome Projection</title>
     <meta
       name="description"
-      content="Part three of a dome projection series: warp meshes, edge blending, calibration, music clocks, sensor input, and seamless real-time dome visuals."
+      content="Part three of a dome projection series: projector cameras, warp meshes, edge blending, color matching, and seamless dome visuals."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -19,23 +19,41 @@
       <h1>The Dome Show</h1>
       <p>
         <a href="/pages/dome-projection/fisheye.html">Part two</a> gave every
-        dome pixel a source coordinate. A show adds the parts that make that map
-        survive a room full of equipment: warp meshes, edge blends, color
-        matching, timing, and inputs. The math is still there, but now it is
-        inside a system.
+        dome pixel a source coordinate. A real room adds a physical question:
+        which projector puts that pixel on the dome, and how does its image line
+        up with the projector beside it?
       </p>
       <p>
-        The demo below compresses a two-projector dome rig into one diagram. The
-        blue side and orange side overlap in the middle. The mesh lines stand for
-        calibration warps. The timeline is the show clock. The sensor slider feeds
-        the render state after smoothing, which is what a real depth camera,
-        MIDI controller, phone, or microcontroller should do.
+        The demo below is only about the visual system. The blue and orange dots
+        are the projector camera positions: each physical projector is modeled as
+        a camera looking at part of the dome. Their images overlap in the middle,
+        where one fades down while the other fades up. The sparse grid is the
+        calibration mesh that bends each projector image until rings and lines
+        meet on the dome.
       </p>
 
       <div data-demo="warp-blend-show"></div>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Warp before blend</span>Calibration meshes</h2>
+      <h2><span class="kicker">Step 1 · Place the views</span>Projector cameras</h2>
+      <p>
+        In dome work, a "projector camera" is not the audience camera. It is a
+        calibrated model of one physical projector: where the projector sits, what
+        direction it points, and what cone of the dome it can cover. In a
+        two-projector rig, each camera owns a large region plus a shared overlap
+        region.
+      </p>
+      <pre><code>projector position  -> where the hardware is mounted
+projector view cone -> what part of the dome it reaches
+coverage mask       -> which pixels belong to that projector</code></pre>
+      <p>
+        Drawing the camera positions first keeps the rest of the pipeline
+        grounded. The warp mesh and blend mask are corrections applied to a
+        specific physical view, not abstract effects floating over the dome.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Warp before blend</span>Calibration meshes</h2>
       <p>
         A projector draws a rectangle. A dome is curved. The warp mesh is the
         editable function between those two facts. In a simple installation, each
@@ -54,7 +72,7 @@
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Blend without a scar</span>Overlap, gamma, and black level</h2>
+      <h2><span class="kicker">Step 3 · Blend without a scar</span>Overlap, gamma, and black level</h2>
       <p>
         Adjacent projectors need overlap because no real edge is perfect. In the
         overlap, projector A fades down while projector B fades up. The sum should
@@ -77,49 +95,29 @@ black levels match</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Music is a clock</span>Beats, cues, and render state</h2>
+      <h2><span class="kicker">Step 4 · Match the pictures</span>Color, focus, and test patterns</h2>
       <p>
-        For a music-driven dome show, audio should not be an afterthought glued
-        onto the visuals. Treat it as a clock and a control signal. The clock
-        gives reliable phase: bars, beats, and cue points. Analysis gives slower
-        envelopes: bass energy, onset strength, spectral centroid, or loudness.
+        Geometry is only the first visible failure mode. Two projectors can agree
+        on line position and still disagree on brightness, black level, focus, or
+        white point. That is why calibration uses boring images before beautiful
+        ones: rings, meridians, numbered zones, grayscale ramps, and solid fields.
       </p>
-      <pre><code>clock phase  -> repeatable motion, beat hits, cue changes
-audio energy -> intensity, bloom, particle emission, color pressure
-show cues    -> scene changes that happen on musical boundaries</code></pre>
+      <pre><code>rings and meridians -> geometry and seam alignment
+grayscale ramps     -> brightness, gamma, black level
+solid color fields  -> white point and projector matching
+small labels        -> focus and orientation</code></pre>
       <p>
-        The practical rule: clocks trigger structure; analysis modulates texture.
-        If every scene change depends on raw microphone amplitude, the show will
-        feel twitchy. If every visual detail is locked to a rigid timeline, the
-        show will ignore the room. Use both.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Sensors are noisy instruments</span>Smoothing, calibration, and latency</h2>
-      <p>
-        Sensors are noisy measurement devices. A depth camera loses hands, a
-        phone jitters, a pressure mat drifts, and a
-        microcontroller sends values at its own cadence. Put a smoothing layer
-        between raw input and render state, then design the visuals to tolerate
-        missing data.
-      </p>
-      <pre><code>rawSensor     = readInput()
-calibrated    = map(rawSensor, minSeen, maxSeen, 0, 1)
-smoothed      += (calibrated - smoothed) * response
-visualControl = clamp(smoothed, 0, 1)</code></pre>
-      <p>
-        Latency is part of the instrument. A slow, dreamy dome can tolerate
-        100 ms of smoothing. A drum-triggered flash cannot. Fast controls need
-        prediction or less filtering; slow controls need enough damping that the
-        audience sees intention instead of measurement noise.
+        If a test grid does not line up, the content cannot fix it. If a flat
+        gray field shows a vertical stripe in the overlap, the blend or black
+        level is wrong. Visual calibration is mostly the discipline of making the
+        plain patterns boring before judging the artwork.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · OSC, MIDI, WebSocket, serial</span>
+        <span class="note-label">Practical check</span>
         <p>
-          The transport matters less than the contract. Name every control, define
-          its range, decide whether it is momentary or continuous, and document its
-          expected rate. A clean <code>sensor.handHeight: 0..1</code> signal is more
-          valuable than a clever protocol with unclear semantics.
+          Calibrate in the same order the eye notices errors: line position first,
+          then overlap brightness, then color. A soft blend cannot hide a bad
+          mesh, and color correction cannot hide a bright overlap stripe.
         </p>
       </aside>
 
@@ -128,22 +126,22 @@ visualControl = clamp(smoothed, 0, 1)</code></pre>
       <p>
         A reliable dome show is the same loop repeated every frame:
       </p>
-      <pre><code>read music clock and sensors
-update smoothed show state
-render one seamless master
-sample it through each projector warp
-apply edge blend and color correction
+      <pre><code>render or load one seamless dome image
+for each projector camera:
+  sample the image through its calibrated warp mesh
+  apply edge blend, black-level, and color correction
 display, measure, adjust, repeat</code></pre>
       <p>
         The artistic ceiling is high, but the technical shape is manageable.
         Circles become directions. Directions become fisheye pixels. Fisheye
-        pixels pass through calibrated projector meshes. Music and sensors do not
-        bypass the math; they drive the state that the math displays.
+        pixels pass through calibrated projector meshes. The room only looks
+        seamless when each projector camera, warp mesh, and overlap mask agrees
+        about the same dome geometry.
       </p>
       <p>
         <strong>Continued in <a href="/pages/dome-projection/realtime.html">Part four: Dome-Native Three.js</a></strong> —
-        direct projector cameras, live render targets, calibration meshes, and
-        when to skip the fisheye master.
+        the difference between rendering one shared master image and rendering
+        directly from each projector camera.
       </p>
       <p>
         &larr; <a href="/pages/dome-projection/fisheye.html">Part two: The Fisheye Map</a>

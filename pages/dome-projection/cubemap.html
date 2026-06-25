@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Cubemap or Fisheye Master — Dome Projection</title>
+    <meta
+      name="description"
+      content="Part three of a dome projection series: choosing between fisheye masters, cubemaps, and hybrid realtime dome pipelines."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Cubemap or Fisheye Master</h1>
+      <p>
+        <a href="/pages/dome-projection/fisheye.html">Part two</a> described a
+        fisheye master as a lookup table for directions. A cubemap is another
+        lookup table for the same thing. The format changes; the underlying
+        object does not. The stable object is still a normalized direction vector
+        from the dome center.
+      </p>
+      <p>
+        This choice matters because it changes the render path, the preview path,
+        the calibration path, and sometimes the performance budget. A fisheye is
+        usually the delivery format for fulldome video. A cubemap is often the
+        easier render target for a realtime 3D engine. A working dome system may
+        use both.
+      </p>
+
+      <div data-demo="master-formats"></div>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Same direction</span>Two storage layouts</h2>
+      <p>
+        Start with a direction, not an image format. If a shader asks for the
+        color at one point on the dome, it first finds the direction from the
+        dome center to that point. After that, it can ask a fisheye master or a
+        cubemap for a color.
+      </p>
+      <pre><code>dir = normalize(domePoint - domeCenter)
+
+fisheye lookup:
+  radius  = projectionLaw(zenithAngle(dir))
+  angle   = atan2(dir.y, dir.x)
+  uv      = radiusAngleToUv(radius, angle)
+
+cubemap lookup:
+  face    = majorAxis(dir)
+  uv      = directionToFaceUv(dir, face)</code></pre>
+      <p>
+        In the demo, drag either blue handle. The point moves in both formats
+        because both are just different addresses for the same direction.
+      </p>
+
+      <figure class="dome-flow-diagram" aria-label="Fisheye and cubemap direction lookup comparison">
+        <div class="dome-flow-row">
+          <div class="dome-flow-label">Fisheye</div>
+          <div class="dome-flow-step good">direction vector</div>
+          <div class="dome-flow-step accent">zenith angle + azimuth</div>
+          <div class="dome-flow-step accent">one circular image</div>
+          <div class="dome-flow-step warm">sample in projector warp</div>
+        </div>
+        <div class="dome-flow-row">
+          <div class="dome-flow-label">Cubemap</div>
+          <div class="dome-flow-step good">direction vector</div>
+          <div class="dome-flow-step accent">choose cube face</div>
+          <div class="dome-flow-step accent">face-local uv</div>
+          <div class="dome-flow-step warm">sample or convert</div>
+        </div>
+        <figcaption>
+          The direction vector is the contract. Fisheye and cubemap are storage
+          choices around that contract.
+        </figcaption>
+      </figure>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Fisheye master</span>Choose it when delivery matters</h2>
+      <p>
+        A fisheye master stores the dome as one circular image. The center is the
+        zenith. The circular edge is the horizon for a 180 degree dome. The angle
+        around the image is azimuth.
+      </p>
+      <pre><code>good fit:
+  fulldome video files
+  one-projector fisheye lens setups
+  venue systems that expect a dome master
+  easy monitor preview and recording
+  offline rendering that will tour between domes</code></pre>
+      <p>
+        The advantage is practical compatibility. A fisheye file is a compact
+        artifact you can hand to another dome pipeline. Calibration software can
+        warp that one master into whatever projector layout the room uses.
+      </p>
+      <p>
+        The tradeoff is that a fisheye is a specialized projection. Sampling is
+        dense near some regions and stretched in others depending on the fisheye
+        law. The center is a polar singularity. The circular edge and seam need
+        deliberate testing. For realtime 3D, rendering a true fisheye directly
+        may require a custom shader or a conversion pass.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Cubemap</span>Choose it when rendering the 3D scene is the hard part</h2>
+      <p>
+        A cubemap stores directions as six square faces. Each face is a normal
+        perspective camera with a 90 degree field of view. For an upper dome you
+        usually care about the top face and the upper halves of the four side
+        faces. A full sphere uses all six.
+      </p>
+      <pre><code>good fit:
+  realtime Three.js scenes
+  environment maps and reflections
+  engines built around perspective cameras
+  direct sampling in a projector warp shader
+  conversion to several output formats from one render target</code></pre>
+      <p>
+        The advantage is that renderers already know how to draw perspective
+        cameras. Shadows, culling, post effects, and material systems tend to be
+        easier to reason about in 90 degree chunks than in one 180 degree fisheye
+        view.
+      </p>
+      <p>
+        The cost is render count and seams. A cubemap is often five or six scene
+        renders before you start the projector passes. Faces must match at their
+        borders. Screen-space effects such as bloom, motion blur, temporal
+        antialiasing, and SSAO can reveal face edges if they are applied per face
+        without care.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Conversion</span>Where the extra pass appears</h2>
+      <p>
+        Cubemap and fisheye are not opposing religions. They are often two stages
+        in one pipeline. A realtime scene can render to a cubemap, then a shader
+        can sample that cubemap into a fisheye master for recording or venue
+        playback. The same cubemap can also be sampled directly by each projector
+        calibration mesh.
+      </p>
+      <pre><code>cubemap -> fisheye:
+  for each fisheye pixel:
+    dir   = fisheyeUvToDirection(uv)
+    color = sampleCubemap(dir)
+
+fisheye -> projector:
+  for each projector pixel:
+    dir   = calibratedPixelToDomeDirection(pixel)
+    uv    = directionToFisheyeUv(dir)
+    color = sampleFisheye(uv)
+
+cubemap -> projector:
+  for each projector pixel:
+    dir   = calibratedPixelToDomeDirection(pixel)
+    color = sampleCubemap(dir)</code></pre>
+      <p>
+        The last path skips the circular master, but it does not skip texture
+        sampling. It changes which texture is sampled.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Examples</span>When to choose each one</h2>
+      <section class="dome-case-list" aria-label="Fisheye and cubemap choice examples">
+        <article class="dome-case">
+          <h3>Festival submission or touring fulldome film</h3>
+          <p>
+            <strong class="better-fisheye">Choose fisheye.</strong>
+            The file needs to travel. A venue can map a fisheye master through
+            its own calibration system without knowing your scene graph or
+            projector layout.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>Realtime Three.js world with meshes, shadows, and particles</h3>
+          <p>
+            <strong class="better-cubemap">Choose cubemap first.</strong>
+            Six 90 degree cameras match the way the engine already renders. You
+            can then convert to fisheye or sample the cubemap directly in the
+            projector correction pass.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>Single projector with a fisheye lens</h3>
+          <p>
+            <strong class="better-fisheye">Choose fisheye.</strong>
+            The display hardware already wants the circular image. A cubemap
+            would only add a conversion step unless it is easier for your engine
+            to render the scene that way.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>Heavy shader that covers the whole dome</h3>
+          <p>
+            <strong class="better-fisheye">Usually choose a direct fisheye render.</strong>
+            If the shader can evaluate the dome direction analytically in one
+            pass, a cubemap can repeat the same expensive effect across multiple
+            faces.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>3D scene with strong culling and localized detail</h3>
+          <p>
+            <strong class="better-cubemap">Cubemap can be better.</strong>
+            Each face is a conventional camera, so the engine can cull objects,
+            manage LOD, and run familiar render passes. This is especially useful
+            when only part of the world is detailed at any moment.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>Multi-projector room with a custom calibration shader</h3>
+          <p>
+            <strong class="better-hybrid">Use either, or use both.</strong>
+            If the calibration shader can sample cubemaps, keep the cubemap. If
+            the mapping software expects a fulldome master, convert to fisheye.
+            The projector warps are the final authority either way.
+          </p>
+        </article>
+
+        <article class="dome-case">
+          <h3>Video plates, 360 footage, and generated realtime layers</h3>
+          <p>
+            <strong class="better-hybrid">Hybrid is normal.</strong>
+            Pre-rendered material may arrive as fisheye or equirectangular video,
+            while live 3D layers render to cubemap. Composite in the direction
+            space that loses the least detail, then output to the format the room
+            needs.
+          </p>
+        </article>
+      </section>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Decision rules</span>A short checklist</h2>
+      <p>
+        Use these questions before choosing the intermediate:
+      </p>
+      <pre><code>Do I need to deliver one file to another dome?
+  choose fisheye
+
+Am I rendering a live 3D scene with ordinary cameras?
+  choose cubemap first
+
+Can my effect compute color from a dome direction in one shader pass?
+  consider direct fisheye
+
+Does my calibration system sample cubemaps directly?
+  cubemap can stay in the pipeline
+
+Does my venue or playback stack only understand fulldome masters?
+  convert to fisheye before output</code></pre>
+      <p>
+        The wrong choice is usually the one made implicitly. Pick the format that
+        matches the expensive part of the job: delivery, rendering, calibration,
+        or recording.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Debugging</span>What breaks differently</h2>
+      <p>
+        Fisheye mistakes usually show up as radial errors: rings bunch up,
+        latitude spacing feels wrong, the center has a spoke, or the seam at
+        <code>0/2&pi;</code> opens. Cubemap mistakes usually show up as face
+        errors: borders do not match, a face is flipped, the top face is rotated,
+        or screen-space effects stop at face edges.
+      </p>
+      <pre><code>fisheye debug texture:
+  azimuth labels around the circle
+  latitude rings from center to edge
+  visible seam
+  center crosshair
+
+cubemap debug texture:
+  face names on every square
+  arrows showing each face's up direction
+  shared labels across face borders
+  horizon line across the four side faces</code></pre>
+      <p>
+        Test with labels before testing with art. A beautiful nebula can hide a
+        flipped face until the show is already in the room.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Epilogue</span>The master is not the room</h2>
+      <p>
+        A fisheye and a cubemap are both intermediates. The physical room still
+        needs projector cameras, calibration meshes, edge blending, and color
+        matching. That is the next visual layer.
+      </p>
+      <p>
+        <strong>Continued in <a href="/pages/dome-projection/show.html">Part four: The Dome Show</a></strong> —
+        turning the chosen master format into a calibrated multi-projector system.
+      </p>
+      <p>
+        &larr; <a href="/pages/dome-projection/fisheye.html">Part two: The Fisheye Map</a>
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Part three of the Dome Projection series ·
+        <a href="/pages/dome-projection/circle.html">Part one</a> ·
+        <a href="/pages/dome-projection/fisheye.html">Part two</a> ·
+        <a href="/pages/dome-projection/show.html">Part four</a> ·
+        <a href="/pages/dome-projection/realtime.html">Part five</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/dome-projection/cubemap.ts"></script>
+  </body>
+</html>

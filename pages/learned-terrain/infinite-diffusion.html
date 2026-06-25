@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Only Compute the Window You Need — Learned Terrain</title>
+    <meta
+      name="description"
+      content="Part three of Learned Terrain: InfiniteDiffusion as lazily evaluated overlapping denoising windows over an implicit infinite tensor."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Only Compute the Window You Need</h1>
+      <p>
+        InfiniteDiffusion changes the question from "how do we generate an
+        infinite image?" to "which finite windows affect the finite region we
+        asked for?" That sounds modest, but it is the entire trick. Infinity
+        becomes an address space, not a workload.
+      </p>
+      <p>
+        Think of the output as an implicit tensor with no stored boundary. The
+        tensor has values everywhere, but values are materialized only when a
+        query asks for them. The model is still finite. The windows are still
+        finite. The visible region is finite. Only the coordinate system keeps
+        going.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Region first</span>The query is the unit of work</h2>
+      <p>
+        Let <code>R</code> be the region the caller wants: maybe a terrain tile,
+        maybe a strip of chunks, maybe a camera-centered patch. InfiniteDiffusion
+        finds every denoising window whose influence intersects <code>R</code>.
+        Windows outside that influence cone do not matter and are not computed.
+      </p>
+      <pre><code>query(seed, R):
+  windows = windows_that_overlap_the_query(R)
+
+  for denoising step t:
+    for W in windows:
+      update W using the diffusion model
+    blend the window updates over R
+
+  return R</code></pre>
+      <p>
+        The region can be anywhere. The cost for a fixed-size region stays
+        bounded because only a bounded neighborhood of windows can contribute.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · The infinite sum is local</span>Blending without a global canvas</h2>
+      <p>
+        MultiDiffusion blends overlapping window predictions with a numerator
+        and denominator. On an infinite canvas, the formal sum ranges over
+        infinitely many windows, but almost all of them have zero weight at a
+        particular pixel. InfiniteDiffusion evaluates only the nonzero terms.
+      </p>
+      <pre><code>value_at_pixel =
+  sum(weight_i * prediction_i) / sum(weight_i)
+
+// In practice:
+// ignore every window whose weight is zero at that pixel.</code></pre>
+      <p>
+        This is the same move procedural noise has always made. A point in
+        gradient noise is affected by a small number of lattice corners. A point
+        in InfiniteDiffusion is affected by a small number of overlapping model
+        windows. The neighborhood is larger and learned, but the locality is the
+        reason the method can be queried.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The seed fixes the world</span>Consistency and order independence</h2>
+      <p>
+        A procedural generator cannot change its mind because the player visited
+        the east chunk first. InfiniteDiffusion preserves this by tying the
+        underlying noise field to the seed and coordinates. If two region
+        queries overlap, their shared pixels refer back to the same implicit
+        denoising state.
+      </p>
+      <p>
+        That gives the method its procedural guarantees:
+      </p>
+      <pre><code>same seed + same coordinate -> same value
+fixed-size region           -> bounded work
+independent windows          -> parallel evaluation</code></pre>
+      <p>
+        The paper emphasizes these properties because they are the difference
+        between a big image generator and an open-world generator. A giant image
+        is still an asset. A coordinate-stable query is infrastructure.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · Memory becomes a cache</span>First tile, second tile</h2>
+      <p>
+        The first query may need to build fresh window state. A neighboring
+        query can reuse much of it. That is why the paper reports two different
+        latency ideas: time to first tile and time to second tile. The first
+        measures a cold query. The second measures interactive movement after
+        nearby context is already cached.
+      </p>
+      <p>
+        The cache is not the world. It is only a speedup. If the cache evicts a
+        window, the same seed and coordinate can recreate it. That is exactly
+        how chunk streaming works in hand-written terrain engines, but now the
+        chunk contents are produced by a learned denoising process.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why this is not just bigger tiling</span>
+        <p>
+          A tiler stores or generates adjacent images and tries to hide the
+          edges. InfiniteDiffusion defines a single implicit sample and lets
+          each query return a slice of it. The visible tile is a view into the
+          process, not the process itself.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>Learned procedural noise</h2>
+      <p>
+        This is why the paper frames InfiniteDiffusion as a bridge between
+        learned fidelity and procedural utility. It is not faster than classic
+        noise in the microsecond sense, but it aims at the same role: a
+        deterministic function over an unbounded domain. The next post explains
+        what happens when that function is trained specifically for terrain.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Learned Terrain, part three · sources:
+        <a href="https://arxiv.org/abs/2512.08309">InfiniteDiffusion paper</a> ·
+        <a href="https://xandergos.github.io">project page</a> ·
+        <a href="https://arxiv.org/abs/2302.08113">MultiDiffusion</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/learned-terrain/infinite-diffusion.ts"></script>
+  </body>
+</html>

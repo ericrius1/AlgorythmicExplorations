@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>A World Is a Function — Learned Terrain</title>
+    <meta
+      name="description"
+      content="Part one of a four-part series on InfiniteDiffusion: seeds, coordinates, procedural noise, and why infinite terrain starts as an API."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>A World Is a Function</h1>
+      <p>
+        Alexander Goslin introduces <em>InfiniteDiffusion</em> as a way to make
+        diffusion models behave more like procedural generators: not a single
+        finished image, but something you can query forever. Before the paper's
+        neural machinery makes sense, the old procedural trick has to be clear:
+        an infinite world is usually not stored anywhere. It is a function.
+      </p>
+      <p>
+        A terrain generator takes a seed and a coordinate and returns an answer.
+        Ask for the height at <code>(x, z)</code>, the biome at the same point,
+        or the tree placement in a nearby chunk, and the world recomputes that
+        answer from arithmetic. There is no complete map hiding behind the
+        curtain.
+      </p>
+      <pre><code>height = terrain(seed, x, z)
+biome  = climate(seed, x, z)
+tree   = placement(seed, chunk_x, chunk_z)</code></pre>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · The contract</span>Procedural terrain is an API</h2>
+      <p>
+        A procedural world promises three things. First, <strong>seed
+        consistency</strong>: the same seed and coordinate return the same
+        result tomorrow. Second, <strong>random access</strong>: the engine can
+        jump to a faraway chunk without generating every chunk in between.
+        Third, <strong>unbounded extent</strong>: there is no natural edge,
+        because the coordinate system keeps going.
+      </p>
+      <p>
+        These properties are more important than any individual noise function.
+        They are why a game can discard a chunk behind the player and recreate
+        it later without anyone noticing. They are why multiplayer clients agree
+        on where the same hill is. They are why a world can be bigger than
+        memory.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · Random, but repeatable</span>Hashing the coordinates</h2>
+      <p>
+        White noise is easy: give every point an independent random value. It is
+        also useless for terrain, because neighboring points have no
+        relationship. The procedural move is to put repeatable randomness on a
+        lattice. A hash turns an integer coordinate into a pseudorandom gradient
+        or value, then interpolation makes the space between lattice points
+        smooth.
+      </p>
+      <pre><code>g00 = gradient(hash(seed, ix,     iz))
+g10 = gradient(hash(seed, ix + 1, iz))
+g01 = gradient(hash(seed, ix,     iz + 1))
+g11 = gradient(hash(seed, ix + 1, iz + 1))
+
+height = smooth_blend(g00, g10, g01, g11)</code></pre>
+      <p>
+        This is the small miracle behind classic terrain. The mountain is random
+        in the statistical sense and fixed in the engineering sense. The world
+        does not need storage because the hash is the storage.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · Scale enters</span>Fractal noise</h2>
+      <p>
+        One layer of noise gives rolling hills. Real terrain has structure at
+        many scales: continents, ranges, ridges, gullies, and surface roughness.
+        So procedural terrain stacks noise at rising frequency and falling
+        amplitude. The result is fractional Brownian motion, or fBm.
+      </p>
+      <pre><code>sum = 0
+amp = 1
+freq = 1
+
+for octave in octaves:
+  sum += amp * noise(seed, freq * x, freq * z)
+  freq *= lacunarity
+  amp  *= persistence</code></pre>
+      <p>
+        This already gives a usable landscape. Fold the noise around zero and
+        ridges appear. Warp the input coordinates with another noise field and
+        the terrain starts to flow. The <a href="/pages/ground-truth/heightfield.html">Ground Truth</a>
+        series builds exactly that kind of world from hand-written functions.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · The failure mode</span>Noise does not know geography</h2>
+      <p>
+        Procedural noise is fast, infinite, and controllable, but it does not
+        understand landscapes. It approximates terrain as a texture. It can make
+        roughness at many scales, but it does not naturally learn that mountain
+        ranges organize valleys, valleys organize river basins, and climate
+        variables correlate with elevation.
+      </p>
+      <p>
+        That is the opening tension in Goslin's paper. Procedural noise has the
+        right <em>utility</em>. Learned generative models have the right
+        <em>fidelity</em>. The hard problem is keeping the procedural contract
+        while replacing the hand-written texture with a model trained from real
+        terrain.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Coda</span>The target</h2>
+      <p>
+        The series target is now precise. A learned terrain generator should
+        behave like a function:
+      </p>
+      <pre><code>terrain_model(seed, region) -> elevation, climate, biome</code></pre>
+      <p>
+        It should be deterministic for a seed. It should answer a region query
+        without generating the whole planet. It should let neighboring queries
+        agree at their borders. And it should capture structure that procedural
+        noise only hints at. The next post asks what diffusion models contribute
+        to that bargain, and why they immediately run into the edge of the
+        canvas.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Learned Terrain, part one · sources:
+        <a href="https://x.com/xandurglar/status/2070179038417821777">Goslin's announcement thread</a> ·
+        <a href="https://arxiv.org/abs/2512.08309">InfiniteDiffusion paper</a> ·
+        <a href="https://doi.org/10.1145/325165.325247">Perlin, "An Image Synthesizer"</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/learned-terrain/seeds.ts"></script>
+  </body>
+</html>

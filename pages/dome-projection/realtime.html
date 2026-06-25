@@ -18,38 +18,37 @@
     <main>
       <h1>Dome-Native Three.js</h1>
       <p>
-        <a href="/pages/dome-projection/show.html">Part three</a> described a
-        production pipeline in terms of a master image and projector warps. That
-        is useful for video playback and portable fulldome content, but a
-        realtime Three.js show does not have to start as a 2D fisheye movie.
+        <a href="/pages/dome-projection/show.html">Part three</a> separated the
+        physical rig into projector cameras, warp meshes, and overlap masks. This
+        page asks where the rendered image comes from before those corrections
+        happen.
       </p>
       <p>
-        The scene can stay live. The renderer can evaluate particles, meshes,
-        post effects, audio reactions, and sensor input every frame, then render
-        the result for each physical projector. You avoid baking a fisheye video.
-        You do not avoid all texture lookups: render targets, post-processing,
-        calibration meshes, and edge blend masks are still normal GPU tools.
+        There are two common choices. You can render one shared dome image first,
+        usually a fisheye or cubemap, then let every projector sample from it. Or
+        you can skip the shared master and render the scene once from each
+        projector camera. Both still use the same visual corrections at the end:
+        warp meshes, edge blends, black-level masks, and color correction.
       </p>
       <p>
-        This is not automatically faster. The rough comparison is:
-        <code>N</code> projector renders for direct output versus one or more
-        master renders plus <code>N</code> projector correction passes for the
-        shared-master path. Direct rendering wins only when those projector views
-        are cheaper than building a full-dome master.
+        The methods are easy to confuse because both eventually make one image
+        per projector. The difference is the intermediate: one full-dome master
+        that all projectors share, or separate projector-camera renders that are
+        already close to each projector's point of view.
       </p>
 
       <div data-demo="realtime-projectors"></div>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Path 1 · Shared master</span>Render a realtime fisheye or cubemap</h2>
+      <h2><span class="kicker">Method 1 · Shared master</span>Render a realtime fisheye or cubemap</h2>
       <p>
-        The conservative realtime path is still master-based, but the master is
-        generated live. A Three.js scene renders from the dome center into a
-        cubemap or fisheye render target. Each projector then samples that target
-        through its calibration mesh and edge blend.
+        The shared-master method keeps the same mental model as a fulldome movie,
+        but generates the master live. A Three.js scene renders from the dome
+        center into a fisheye or cubemap render target. Each projector then
+        samples that target through its own calibration mesh and edge blend.
       </p>
-      <pre><code>update scene from music + sensors
-render scene from dome center -> cubemap or fisheye target
+      <pre><code>update one scene state
+render from dome center -> fisheye or cubemap master
 for each projector:
   draw calibrated mesh
   sample the shared target
@@ -65,7 +64,7 @@ for each projector:
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Path 2 · Direct projectors</span>Render from each projector camera</h2>
+      <h2><span class="kicker">Method 2 · Direct projectors</span>Render from each projector camera</h2>
       <p>
         The dome-native path treats every physical projector as a camera. Instead
         of first making a fisheye master, you render the Three.js scene from each
@@ -73,17 +72,18 @@ for each projector:
         small correction pass, but there is no single 180 degree image sitting in
         the middle.
       </p>
-      <pre><code>update scene from music + sensors
+      <pre><code>update one scene state
 for each projector:
   set calibrated projector camera
   render scene to that projector's render target
   draw the projector output through warp/blend/color correction</code></pre>
       <p>
-        This approach is attractive when the show is interactive, never needs to
-        become a portable video file, and has effects that should respond to the
-        actual projector coverage. It is not a speed optimization by default.
-        Three projectors usually means three scene renders per frame before
-        post-processing.
+        This approach is attractive when the installation is the target and the
+        projector layout is part of the design. It can also make culling and
+        local visual effects easier because each render sees the same region that
+        one physical projector covers. It is not a speed optimization by default:
+        three projectors usually means three scene renders per frame before the
+        final correction pass.
       </p>
       <aside class="note">
         <span class="note-label">Important distinction</span>
@@ -114,10 +114,10 @@ one full dome master may be:
   five or six cubemap renders</code></pre>
       <p>
         The warp and blend passes are usually not the expensive part. The
-        expensive part is whatever your scene does: particles, shadows, raymarch
-        steps, post effects, transparent layers, video decoding, physics-driven
-        meshes, and sensor-reactive shaders. Direct rendering is faster only
-        when the combined projector views are cheaper than the full-dome master.
+        expensive part is whatever the image needs: particles, shadows, raymarch
+        steps, post effects, transparent layers, video decoding, and
+        high-resolution materials. Direct rendering is faster only when the
+        combined projector views are cheaper than the full-dome master.
       </p>
 
       <figure class="dome-flow-diagram" aria-label="Direct projector renders compared with a shared master render">
@@ -180,14 +180,14 @@ one full dome master may be:
         </article>
 
         <article class="dome-case">
-          <h3>Sensor zones tied to physical projectors</h3>
+          <h3>Visual effects tied to physical regions</h3>
           <p>
             <strong class="better-direct">Direct projector cameras can be better.</strong>
-            If a lidar zone, camera tracker, or performer position maps to a
-            specific part of the room, projector-native outputs make it natural
-            to test the response in the same coordinate frame that will be
-            displayed. You still calibrate the output, but you do not have to
-            keep translating every local effect through a shared fisheye image.
+            If a glow, mask, shadow, label, or architectural accent belongs to a
+            specific part of the room, projector-native outputs let you inspect it
+            in the same view that will be displayed. You still calibrate the
+            output, but you do not have to keep translating every local visual
+            through a shared fisheye image.
           </p>
         </article>
 
@@ -208,9 +208,9 @@ one full dome master may be:
             <strong class="better-hybrid">A hybrid is often the practical answer.</strong>
             Video plates, pre-rendered skies, and recorded segments can live in a
             shared fisheye or cubemap master. Local interactive particles,
-            silhouettes, sensor effects, or projector-edge fixes can render
-            directly into each projector output. Real systems often combine the
-            two paths instead of treating them as exclusive.
+            silhouettes, masks, or projector-edge fixes can render directly into
+            each projector output. Real systems often combine the two paths
+            instead of treating them as exclusive.
           </p>
         </article>
       </section>
@@ -246,13 +246,10 @@ color correction      -> match brightness and white point</code></pre>
       <h2><span class="kicker">Implementation shape</span>A practical Three.js loop</h2>
       <p>
         A minimal direct-projector loop has one shared scene update and one render
-        pass per projector. Sensor input and audio analysis happen before any
-        projector render, so all projectors see the same world state for that
-        frame.
+        pass per projector. The important detail is that all projectors see the
+        same scene state for that frame; only the camera changes.
       </p>
       <pre><code>function frame(dt) {
-  updateAudioClock(dt)
-  updateSensors(dt)
   updateScene(dt)
 
   for (const projector of projectors) {
@@ -279,8 +276,7 @@ color correction      -> match brightness and white point</code></pre>
         The fisheye master is not mandatory. It is an intermediate representation.
         For realtime Three.js dome work, choose it when it helps previewing,
         recording, or tool compatibility. Skip it when the installation is the
-        only target and direct projector renders make calibration or interaction
-        simpler.
+        only target and direct projector renders make the visual mapping simpler.
       </p>
       <p>
         &larr; <a href="/pages/dome-projection/show.html">Part three: The Dome Show</a>

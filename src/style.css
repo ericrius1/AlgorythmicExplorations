@@ -381,6 +381,14 @@ aside.note strong {
   color: #7dd6a0;
 }
 
+.better-fisheye {
+  color: var(--accent-warm);
+}
+
+.better-cubemap {
+  color: var(--accent);
+}
+
 @media (max-width: 46rem) {
   .dome-flow-row {
     grid-template-columns: 1fr;

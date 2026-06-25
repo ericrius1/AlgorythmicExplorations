@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Terrain Diffusion — Learned Terrain</title>
+    <meta
+      name="description"
+      content="Part four of Learned Terrain: Terrain Diffusion's hierarchy, encodings, latency, limitations, and the paper's central explanation."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Terrain Diffusion</h1>
+      <p>
+        The paper has two connected contributions. <em>InfiniteDiffusion</em>
+        is the general algorithm for querying a learned infinite sample.
+        <em>Terrain Diffusion</em> is the terrain system built on top of it: a
+        learned procedural terrain generator that can be streamed like noise but
+        trained from real geography.
+      </p>
+      <p>
+        The easiest way to read the paper is to keep the layers separate. One
+        layer is the procedural API. One layer is the infinite denoising
+        algorithm. The final layer is the terrain-specific model stack that
+        makes Earth-like heightfields practical.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 1 · Terrain is not just RGB</span>Encoding the ground</h2>
+      <p>
+        Elevation is difficult data. A model has to represent flat plains,
+        ocean floors, high mountains, and sharp local relief without letting the
+        tallest regions dominate training. Terrain Diffusion uses transforms
+        designed for that numerical problem rather than treating the height map
+        as a normal image.
+      </p>
+      <p>
+        The paper uses signed square-root compression to reduce extreme dynamic
+        range, then Laplacian-style low-frequency and residual representations
+        so broad geography and local detail can be modeled at different scales.
+        The point is not only visual quality. It is stability: the model needs
+        to preserve both planetary structure and local terrain texture.
+      </p>
+      <pre><code>raw elevation
+  -> compressed elevation
+  -> coarse low-frequency structure
+  -> residual detail
+  -> decoded terrain tile</code></pre>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 2 · A hierarchy, not one model</span>From global context to local tile</h2>
+      <p>
+        Terrain Diffusion uses a coarse-to-fine hierarchy. A coarse model
+        supplies global context. A latent diffusion model produces the main
+        terrain structure. A fast decoder turns that structure into high-detail
+        output. Climate variables and geographic context guide the result, so
+        the model is not only hallucinating plausible mountains; it is learning
+        relationships between elevation, location, and environment.
+      </p>
+      <p>
+        This is why InfiniteDiffusion matters. A hierarchy can give each tile
+        wider context without requiring the whole planet to be generated at
+        once. The user queries a local region. The method pulls only the
+        necessary context through the cascade.
+      </p>
+      <pre><code>query region
+  -> coarse context window
+  -> latent terrain window
+  -> decoded elevation / climate tile
+  -> game or visualization</code></pre>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 3 · The reported result</span>Quality and latency</h2>
+      <p>
+        The paper reports that naive tiling performs far worse than the learned
+        infinite method. In the terrain FID comparison, Perlin-style blending
+        and naive tiles are distant from the model distribution, while
+        InfiniteDiffusion with two blending steps is much closer to the base
+        consistency model.
+      </p>
+      <p>
+        The practical numbers are the more important reading. The highest
+        quality configuration reports about <strong>1.72 seconds</strong> to the
+        first 512 by 512 tile and about <strong>0.66 seconds</strong> to a
+        neighboring second tile on the tested setup. That second number is the
+        open-world number: once the player is moving through nearby space,
+        cached context makes the next query cheaper.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why the Minecraft demo matters</span>
+        <p>
+          The Minecraft integration is not just a cute renderer. It tests the
+          actual contract: the game asks for terrain as it streams the world.
+          The generator must answer local queries fast enough, consistently
+          enough, and without visible tile seams.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Step 4 · What it does not solve</span>Limitations</h2>
+      <p>
+        InfiniteDiffusion is not free procedural noise. It is still a neural
+        generator running over windows. The paper calls out three practical
+        limits. Ambiguous prompts can need more blending steps to avoid
+        artifacts. Very small scattered point queries are inefficient when they
+        miss the cache, because the method wants to compute windows, not single
+        coordinates. And the coarsest training layer is still a data problem:
+        global structure has to come from somewhere.
+      </p>
+      <p>
+        Those limits are useful because they show where the abstraction is real.
+        Terrain Diffusion is strongest when the caller asks for contiguous
+        regions, as games and map viewers usually do. It is weaker when the
+        caller asks for unrelated pinpricks across the planet.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2><span class="kicker">Final explanation</span>The whole paper in one pass</h2>
+      <p>
+        InfiniteDiffusion takes the overlapping-window idea from MultiDiffusion
+        and makes the target image implicit and unbounded. Instead of generating
+        a whole world, it lazily computes only the denoising windows needed for
+        a requested region, caching intermediate work. Because the seed fixes
+        the underlying noise field and each coordinate maps to the same window
+        computations, overlapping queries agree no matter what order they are
+        requested in.
+      </p>
+      <p>
+        Terrain Diffusion applies that algorithm to Earth-scale terrain. It
+        uses terrain-specific encodings, a coarse-to-fine hierarchy, and fast
+        consistency decoding so elevation and climate tiles can be queried like
+        procedural noise while preserving learned geographic structure. That is
+        the bridge the title promises: learned fidelity with procedural utility.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Learned Terrain, part four · sources:
+        <a href="https://arxiv.org/abs/2512.08309">InfiniteDiffusion paper</a> ·
+        <a href="https://x.com/xandurglar/status/2070179038417821777">Goslin's announcement thread</a> ·
+        <a href="https://www.minecraft.net/">Minecraft</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/learned-terrain/terrain-diffusion.ts"></script>
+  </body>
+</html>

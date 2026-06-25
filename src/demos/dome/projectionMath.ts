@@ -23,10 +23,6 @@ function smooth01(x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function mix(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
 function clear(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const g = ctx.createLinearGradient(0, 0, w, h);
   g.addColorStop(0, "#070914");
@@ -633,15 +629,377 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
   };
 }
 
-function masterColor(u: number, v: number, beat: number, sensor: number, cue: number): [number, number, number] {
-  const rings = Math.sin(TAU * (v * 5.5 - beat * 0.045));
-  const sweep = Math.sin(TAU * (u * 3 + beat * 0.065));
-  const beatPulse = Math.pow(Math.max(0, Math.sin(TAU * beat)), 8);
-  const brightness = 0.46 + 0.2 * rings + 0.16 * sweep + 0.24 * sensor + 0.26 * beatPulse + cue * 0.25;
-  const warm = clamp(0.35 + 0.35 * sweep + sensor * 0.3, 0, 1);
-  const r = clamp(55 + brightness * mix(80, 190, warm), 0, 255);
-  const g = clamp(75 + brightness * mix(140, 105, warm), 0, 255);
-  const b = clamp(120 + brightness * mix(200, 80, warm), 0, 255);
+type CubeFace = "+X" | "-X" | "+Y" | "-Y" | "+Z" | "-Z";
+
+type Vec3 = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+const CUBE_FACE_POS: Record<CubeFace, { col: number; row: number; label: string }> = {
+  "+Z": { col: 1, row: 0, label: "+Z zenith" },
+  "-X": { col: 0, row: 1, label: "-X west" },
+  "+Y": { col: 1, row: 1, label: "+Y north" },
+  "+X": { col: 2, row: 1, label: "+X east" },
+  "-Y": { col: 3, row: 1, label: "-Y south" },
+  "-Z": { col: 1, row: 2, label: "-Z floor" },
+};
+
+const CUBE_FACE_ORDER: CubeFace[] = ["+Z", "-X", "+Y", "+X", "-Y", "-Z"];
+
+function normalize3(v: Vec3): Vec3 {
+  const len = Math.hypot(v.x, v.y, v.z) || 1;
+  return { x: v.x / len, y: v.y / len, z: v.z / len };
+}
+
+function domeDirection(azimuth: number, zenith: number): Vec3 {
+  return {
+    x: Math.sin(zenith) * Math.cos(azimuth),
+    y: Math.sin(zenith) * Math.sin(azimuth),
+    z: Math.cos(zenith),
+  };
+}
+
+function cubeFaceForDirection(dir: Vec3): CubeFace {
+  const ax = Math.abs(dir.x);
+  const ay = Math.abs(dir.y);
+  const az = Math.abs(dir.z);
+  if (az >= ax && az >= ay) return dir.z >= 0 ? "+Z" : "-Z";
+  if (ax >= ay && ax >= az) return dir.x >= 0 ? "+X" : "-X";
+  return dir.y >= 0 ? "+Y" : "-Y";
+}
+
+function cubeFaceUv(face: CubeFace, dir: Vec3): { u: number; v: number } {
+  let s = 0;
+  let t = 0;
+  if (face === "+X") {
+    s = dir.y / Math.max(Math.abs(dir.x), 0.0001);
+    t = -dir.z / Math.max(Math.abs(dir.x), 0.0001);
+  } else if (face === "-X") {
+    s = -dir.y / Math.max(Math.abs(dir.x), 0.0001);
+    t = -dir.z / Math.max(Math.abs(dir.x), 0.0001);
+  } else if (face === "+Y") {
+    s = -dir.x / Math.max(Math.abs(dir.y), 0.0001);
+    t = -dir.z / Math.max(Math.abs(dir.y), 0.0001);
+  } else if (face === "-Y") {
+    s = dir.x / Math.max(Math.abs(dir.y), 0.0001);
+    t = -dir.z / Math.max(Math.abs(dir.y), 0.0001);
+  } else if (face === "+Z") {
+    s = dir.x / Math.max(Math.abs(dir.z), 0.0001);
+    t = -dir.y / Math.max(Math.abs(dir.z), 0.0001);
+  } else {
+    s = dir.x / Math.max(Math.abs(dir.z), 0.0001);
+    t = dir.y / Math.max(Math.abs(dir.z), 0.0001);
+  }
+  return { u: clamp(0.5 + s * 0.5, 0, 1), v: clamp(0.5 + t * 0.5, 0, 1) };
+}
+
+function cubeDirectionFromFace(face: CubeFace, u: number, v: number): Vec3 {
+  const s = (u - 0.5) * 2;
+  const t = (v - 0.5) * 2;
+  if (face === "+X") return normalize3({ x: 1, y: s, z: -t });
+  if (face === "-X") return normalize3({ x: -1, y: -s, z: -t });
+  if (face === "+Y") return normalize3({ x: -s, y: 1, z: -t });
+  if (face === "-Y") return normalize3({ x: s, y: -1, z: -t });
+  if (face === "+Z") return normalize3({ x: s, y: -t, z: 1 });
+  return normalize3({ x: s, y: t, z: -1 });
+}
+
+function masterFormatMetrics(w: number, h: number, azimuth: number, zenith: number) {
+  const mobile = w < 560;
+  const dir = domeDirection(azimuth, zenith);
+  const rho = zenith / (Math.PI / 2);
+  const fc = { x: mobile ? w * 0.5 : w * 0.27, y: h * (mobile ? 0.24 : 0.42) };
+  const fr = Math.min(w * (mobile ? 0.31 : 0.2), h * (mobile ? 0.19 : 0.27));
+  const fx = fc.x + Math.cos(azimuth) * rho * fr;
+  const fy = fc.y - Math.sin(azimuth) * rho * fr;
+  const cell = Math.min(w * (mobile ? 0.19 : 0.095), h * (mobile ? 0.12 : 0.16));
+  const netX = mobile ? (w - cell * 4) / 2 : w * 0.56;
+  const netY = h * (mobile ? 0.5 : 0.24);
+  const faceRects = {} as Record<CubeFace, { x: number; y: number; w: number; h: number }>;
+  for (const face of CUBE_FACE_ORDER) {
+    const pos = CUBE_FACE_POS[face];
+    faceRects[face] = {
+      x: netX + pos.col * cell,
+      y: netY + pos.row * cell,
+      w: cell,
+      h: cell,
+    };
+  }
+  const face = cubeFaceForDirection(dir);
+  const cubeUv = cubeFaceUv(face, dir);
+  const cubeRect = faceRects[face];
+  const cubeX = cubeRect.x + cubeUv.u * cubeRect.w;
+  const cubeY = cubeRect.y + cubeUv.v * cubeRect.h;
+  return { mobile, dir, rho, fc, fr, fx, fy, cell, netX, netY, faceRects, face, cubeUv, cubeX, cubeY };
+}
+
+function drawCubeFaceGrid(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, face: CubeFace): void {
+  ctx.strokeStyle = "rgba(215, 219, 230, 0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const x = rect.x + (i / 4) * rect.w;
+    const y = rect.y + (i / 4) * rect.h;
+    line(ctx, x, rect.y, x, rect.y + rect.h, "rgba(215, 219, 230, 0.12)");
+    line(ctx, rect.x, y, rect.x + rect.w, y, "rgba(215, 219, 230, 0.12)");
+  }
+  if (face !== "+Z" && face !== "-Z") {
+    line(ctx, rect.x, rect.y + rect.h * 0.5, rect.x + rect.w, rect.y + rect.h * 0.5, C.good, 1.2);
+  }
+}
+
+function drawMasterFormats(ctx: CanvasRenderingContext2D, w: number, h: number, azimuth: number, zenith: number): void {
+  clear(ctx, w, h);
+  const m = masterFormatMetrics(w, h, azimuth, zenith);
+
+  ctx.strokeStyle = C.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(m.fc.x, m.fc.y, m.fr, 0, TAU);
+  ctx.stroke();
+  for (let ring = 0.25; ring <= 1.001; ring += 0.25) {
+    ctx.strokeStyle = ring >= 1 ? C.accent : C.grid;
+    ctx.lineWidth = ring >= 1 ? 1.8 : 1;
+    ctx.beginPath();
+    ctx.arc(m.fc.x, m.fc.y, m.fr * ring, 0, TAU);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    line(ctx, m.fc.x, m.fc.y, m.fc.x + Math.cos(a) * m.fr, m.fc.y - Math.sin(a) * m.fr, i % 3 === 0 ? "#3a4260" : C.grid);
+  }
+  line(ctx, m.fc.x, m.fc.y, m.fx, m.fy, C.warm, 2);
+  dot(ctx, m.fx, m.fy, 6, C.accent);
+  dot(ctx, m.fc.x, m.fc.y, 4, C.text);
+  label(ctx, "fisheye master", m.fc.x - m.fr, m.fc.y - m.fr - (m.mobile ? 14 : 22), {
+    color: C.text,
+    size: m.mobile ? 12 : 14,
+  });
+  label(ctx, "one circular image", m.fc.x, m.fc.y + m.fr + (m.mobile ? 16 : 26), {
+    color: C.muted,
+    size: m.mobile ? 10 : 12,
+    align: "center",
+    mono: true,
+  });
+
+  for (const face of CUBE_FACE_ORDER) {
+    const rect = m.faceRects[face];
+    const isActive = face === m.face;
+    ctx.fillStyle = face === "-Z" ? "rgba(17, 19, 28, 0.35)" : "rgba(17, 19, 28, 0.86)";
+    ctx.strokeStyle = isActive ? C.accent : face === "-Z" ? "rgba(138, 145, 165, 0.25)" : "#30364d";
+    ctx.lineWidth = isActive ? 2.2 : 1.2;
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.w, rect.h);
+    ctx.fill();
+    ctx.stroke();
+    if (face !== "-Z") drawCubeFaceGrid(ctx, rect, face);
+    if (face !== "+Z" && face !== "-Z") {
+      ctx.fillStyle = "rgba(10, 11, 16, 0.48)";
+      ctx.fillRect(rect.x, rect.y + rect.h * 0.5, rect.w, rect.h * 0.5);
+    }
+    label(ctx, face, rect.x + rect.w / 2, rect.y + rect.h / 2, {
+      color: face === "-Z" ? "#596074" : C.text,
+      size: m.mobile ? 10 : 11,
+      align: "center",
+      mono: true,
+    });
+  }
+
+  dot(ctx, m.cubeX, m.cubeY, 6, C.accent);
+  label(ctx, "cubemap", m.netX, m.netY - (m.mobile ? 14 : 22), {
+    color: C.text,
+    size: m.mobile ? 12 : 14,
+  });
+  label(ctx, "six square cameras", m.netX + m.cell * 4, m.netY + m.cell * 3 + (m.mobile ? 16 : 24), {
+    color: C.muted,
+    size: m.mobile ? 10 : 12,
+    align: "right",
+    mono: true,
+  });
+
+  if (!m.mobile) {
+    const midY = h * 0.74;
+    label(ctx, "same direction vector", w * 0.08, midY, { color: C.text, size: 13, mono: true });
+    line(ctx, w * 0.29, midY, w * 0.53, midY, C.muted, 1);
+    label(ctx, "stored as radius/angle or face/uv", w * 0.55, midY, { color: C.muted, size: 13, mono: true });
+  }
+
+  const bottom = h * (m.mobile ? 0.89 : 0.86);
+  const fisheyeU = 0.5 + Math.cos(azimuth) * m.rho * 0.5;
+  const fisheyeV = 0.5 - Math.sin(azimuth) * m.rho * 0.5;
+  label(ctx, `dir = (${m.dir.x.toFixed(2)}, ${m.dir.y.toFixed(2)}, ${m.dir.z.toFixed(2)})`, w * 0.08, bottom, {
+    color: C.text,
+    size: m.mobile ? 11 : 13,
+    mono: true,
+  });
+  label(ctx, `fisheye uv = (${fisheyeU.toFixed(3)}, ${fisheyeV.toFixed(3)})`, w * 0.08, bottom + (m.mobile ? 18 : 24), {
+    color: C.muted,
+    size: m.mobile ? 11 : 13,
+    mono: true,
+  });
+  label(ctx, `cubemap = ${m.face} (${m.cubeUv.u.toFixed(3)}, ${m.cubeUv.v.toFixed(3)})`, w * 0.08, bottom + (m.mobile ? 36 : 48), {
+    color: C.muted,
+    size: m.mobile ? 11 : 13,
+    mono: true,
+  });
+}
+
+function cubeFaceAt(m: ReturnType<typeof masterFormatMetrics>, x: number, y: number): CubeFace | null {
+  for (const face of CUBE_FACE_ORDER) {
+    if (face === "-Z") continue;
+    const rect = m.faceRects[face];
+    if (x < rect.x || x > rect.x + rect.w || y < rect.y || y > rect.y + rect.h) continue;
+    if (face !== "+Z" && y > rect.y + rect.h * 0.5) return null;
+    return face;
+  }
+  return null;
+}
+
+export function mountMasterFormats(container: HTMLElement): Demo {
+  const shell = new Shell(container, 0.88);
+  let azimuth = 0.8;
+  let zenith = 0.62;
+  let orbiting = false;
+  let dragging: "fisheye" | CubeFace | null = null;
+
+  const azimuthSlider = shell.slider({
+    label: "azimuth",
+    min: 0,
+    max: TAU,
+    step: 0.001,
+    value: azimuth,
+    format: (v) => `${((v * 180) / Math.PI).toFixed(0)} deg`,
+    onInput: (v) => {
+      azimuth = v;
+    },
+  });
+  const zenithSlider = shell.slider({
+    label: "zenith angle",
+    min: 0,
+    max: Math.PI / 2,
+    step: 0.001,
+    value: zenith,
+    format: (v) => `${((v * 180) / Math.PI).toFixed(0)} deg`,
+    onInput: (v) => {
+      zenith = v;
+    },
+  });
+
+  shell.button("orbit", () => {
+    orbiting = !orbiting;
+    orbitButton.textContent = orbiting ? "pause orbit" : "orbit";
+  });
+  const orbitButton = shell.controls.lastElementChild as HTMLButtonElement;
+  shell.button("zenith", () => {
+    azimuth = 0;
+    zenith = 0;
+    syncState();
+  });
+  shell.button("horizon", () => {
+    zenith = Math.PI / 2;
+    syncState();
+  });
+
+  const syncState = (): void => {
+    syncSlider(azimuthSlider, azimuth);
+    syncSlider(zenithSlider, zenith);
+  };
+
+  const hitHandle = (x: number, y: number): "fisheye" | CubeFace | null => {
+    const m = masterFormatMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, azimuth, zenith);
+    const grabR = Math.max(18, m.fr * 0.08);
+    const fisheyeHit = dist2(x, y, m.fx, m.fy) <= grabR * grabR;
+    const cubeHit = dist2(x, y, m.cubeX, m.cubeY) <= grabR * grabR;
+    if (fisheyeHit && cubeHit) return dist2(x, y, m.fx, m.fy) < dist2(x, y, m.cubeX, m.cubeY) ? "fisheye" : m.face;
+    if (fisheyeHit) return "fisheye";
+    if (cubeHit) return m.face;
+    if (Math.hypot(x - m.fc.x, y - m.fc.y) <= m.fr) return "fisheye";
+    return cubeFaceAt(m, x, y);
+  };
+
+  const applyDrag = (handle: "fisheye" | CubeFace, e: PointerEvent): void => {
+    const p = pointerPoint(shell.canvas, e);
+    const m = masterFormatMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, azimuth, zenith);
+    if (handle === "fisheye") {
+      const dx = p.x - m.fc.x;
+      const dy = m.fc.y - p.y;
+      azimuth = normAngle(Math.atan2(dy, dx));
+      zenith = clamp(Math.hypot(dx, dy) / m.fr, 0, 1) * (Math.PI / 2);
+    } else {
+      const rect = m.faceRects[handle];
+      const u = clamp((p.x - rect.x) / rect.w, 0, 1);
+      const v = handle === "+Z" ? clamp((p.y - rect.y) / rect.h, 0, 1) : clamp((p.y - rect.y) / rect.h, 0, 0.5);
+      const dir = cubeDirectionFromFace(handle, u, v);
+      azimuth = normAngle(Math.atan2(dir.y, dir.x));
+      zenith = Math.acos(clamp(dir.z, 0, 1));
+    }
+    syncState();
+  };
+
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = pointerPoint(shell.canvas, e);
+    const handle = hitHandle(p.x, p.y);
+    if (!handle) return;
+    e.preventDefault();
+    dragging = handle;
+    orbiting = false;
+    orbitButton.textContent = "orbit";
+    shell.canvas.setPointerCapture(e.pointerId);
+    shell.canvas.style.cursor = "grabbing";
+    applyDrag(handle, e);
+  });
+  shell.canvas.addEventListener("pointermove", (e) => {
+    if (dragging) {
+      e.preventDefault();
+      applyDrag(dragging, e);
+      return;
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  });
+  const stopDrag = (e: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = null;
+    try {
+      shell.canvas.releasePointerCapture(e.pointerId);
+    } catch {
+      // The browser may already have released capture during cancellation.
+    }
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitHandle(p.x, p.y) ? "grab" : "default";
+  };
+  shell.canvas.addEventListener("pointerup", stopDrag);
+  shell.canvas.addEventListener("pointercancel", stopDrag);
+  shell.canvas.addEventListener("pointerleave", () => {
+    if (!dragging) shell.canvas.style.cursor = "default";
+  });
+
+  shell.setInfo(() => {
+    const m = masterFormatMetrics(shell.canvas.clientWidth, shell.canvas.clientHeight, azimuth, zenith);
+    return `drag blue handles · same direction · cubemap ${m.face} · zenith ${((zenith * 180) / Math.PI).toFixed(0)} deg`;
+  });
+
+  return {
+    frame() {
+      if (orbiting) {
+        azimuth = (azimuth + 0.006) % TAU;
+        syncSlider(azimuthSlider, azimuth);
+      }
+      withCanvas(shell.canvas, (ctx, w, h) => drawMasterFormats(ctx, w, h, azimuth, zenith));
+      shell.tick();
+    },
+  };
+}
+
+function domeTestColor(u: number, v: number): [number, number, number] {
+  const rings = 0.5 + 0.5 * Math.sin(TAU * v * 4);
+  const spokes = 0.5 + 0.5 * Math.sin(TAU * u * 12);
+  const centerLift = 1 - smooth01(v);
+  const brightness = 0.34 + rings * 0.16 + spokes * 0.08 + centerLift * 0.1;
+  const r = clamp(70 + brightness * 120, 0, 255);
+  const g = clamp(82 + brightness * 128, 0, 255);
+  const b = clamp(108 + brightness * 142, 0, 255);
   return [r, g, b];
 }
 
@@ -651,15 +1009,15 @@ function rgb(r: number, g: number, b: number, a = 1): string {
 
 function drawWarpMesh(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   ctx.save();
-  ctx.strokeStyle = "rgba(215, 219, 230, 0.18)";
+  ctx.strokeStyle = "rgba(215, 219, 230, 0.16)";
   ctx.lineWidth = 1;
-  for (let ring = 0.2; ring <= 1.001; ring += 0.2) {
+  for (let ring = 0.25; ring <= 1.001; ring += 0.25) {
     ctx.beginPath();
     ctx.arc(cx, cy, r * ring, 0, TAU);
     ctx.stroke();
   }
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * TAU;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
@@ -668,56 +1026,91 @@ function drawWarpMesh(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: 
   ctx.restore();
 }
 
-function drawTimeline(ctx: CanvasRenderingContext2D, w: number, h: number, beat: number, sensor: number, bpm: number, mobile: boolean): void {
-  const x = w * 0.09;
-  const y = h * (mobile ? 0.68 : 0.84);
-  const bw = w * 0.82;
-  const bh = h * 0.045;
-  ctx.fillStyle = C.panel;
-  ctx.fillRect(x, y, bw, bh);
-  ctx.strokeStyle = "#30364d";
-  ctx.strokeRect(x, y, bw, bh);
+function drawProjectorCone(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  color: string,
+): void {
+  ctx.save();
+  ctx.fillStyle = `${color}1f`;
+  ctx.strokeStyle = `${color}9c`;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
 
-  for (let i = 0; i <= 16; i++) {
-    const px = x + (i / 16) * bw;
-    line(ctx, px, y, px, y + bh, i % 4 === 0 ? "#58617f" : C.grid);
-    if (i < 16 && i % 4 === 0) {
-      dot(ctx, px + (bw / 16) * 0.5, y + bh * 0.5, Math.max(4, bh * 0.16), i === 0 ? C.warm : C.accent);
-    }
+function drawProjectorCamera(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  color: string,
+  name: string,
+  mobile: boolean,
+): void {
+  ctx.save();
+  ctx.fillStyle = "#11131c";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - 11, y - 8, 22, 16, 4);
+  ctx.fill();
+  ctx.stroke();
+  dot(ctx, x, y, 3.8, color);
+  ctx.strokeStyle = `${color}80`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(x, y, 18, 0, TAU);
+  ctx.stroke();
+  const labelX = x;
+  label(ctx, name, labelX, y + (mobile ? 24 : 30), { color, size: mobile ? 10 : 12, align: "center" });
+  if (!mobile) {
+    label(ctx, "projector camera", labelX, y + 47, {
+      color: C.muted,
+      size: 10,
+      align: "center",
+      mono: true,
+    });
   }
-
-  const playX = x + ((beat % 16) / 16) * bw;
-  line(ctx, playX, y - 7, playX, y + bh + 7, C.good, 3);
-  label(ctx, `${Math.round(bpm)} bpm clock`, x, y - (mobile ? 16 : 24), { color: C.text, size: mobile ? 11 : 13, mono: true });
-
-  const sx = x;
-  const sy = y + bh + 34;
-  const sw = bw;
-  const sh = 12;
-  ctx.fillStyle = "#1a1e2c";
-  ctx.fillRect(sx, sy, sw, sh);
-  ctx.fillStyle = C.warm;
-  ctx.fillRect(sx, sy, sw * sensor, sh);
-  label(ctx, `sensor envelope ${sensor.toFixed(2)}`, sx, sy + (mobile ? 24 : 30), { color: C.muted, size: mobile ? 10 : 12, mono: true });
+  ctx.restore();
 }
 
 function drawShowRig(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  beat: number,
-  sensor: number,
   overlap: number,
   edgeGamma: number,
-  cue: number,
-  bpm: number,
 ): void {
   clear(ctx, w, h);
   const mobile = w < 520;
   const cx = w * 0.5;
-  const cy = h * (mobile ? 0.34 : 0.4);
-  const r = mobile ? Math.min(w * 0.29, h * 0.26) : Math.min(w * 0.34, h * 0.31);
+  const cy = h * (mobile ? 0.36 : 0.43);
+  const r = mobile ? Math.min(w * 0.34, h * 0.27) : Math.min(w * 0.26, h * 0.31);
   const step = Math.max(7, Math.floor(w / 150));
+  const camA = {
+    x: cx - r * (mobile ? 1.0 : 1.55),
+    y: cy + r * (mobile ? 1.28 : 1.34),
+  };
+  const camB = {
+    x: cx + r * (mobile ? 1.0 : 1.55),
+    y: cy + r * (mobile ? 1.28 : 1.34),
+  };
+  const topY = cy - r * 0.9;
+  const lowerY = cy + r * 0.5;
+
+  drawProjectorCone(ctx, camA.x, camA.y, cx - r * 0.94, lowerY, cx + overlap * r, topY, C.accent);
+  drawProjectorCone(ctx, camB.x, camB.y, cx - overlap * r, topY, cx + r * 0.94, lowerY, C.warm);
 
   for (let y = Math.floor(cy - r); y <= cy + r; y += step) {
     for (let x = Math.floor(cx - r); x <= cx + r; x += step) {
@@ -728,7 +1121,7 @@ function drawShowRig(
       const rad = Math.sqrt(rr);
       const az = Math.atan2(ny, nx);
       const u = (az / TAU + 1) % 1;
-      const [baseR, baseG, baseB] = masterColor(u, rad, beat, sensor, cue);
+      const [baseR, baseG, baseB] = domeTestColor(u, rad);
       let wa = 0;
       let wb = 0;
       if (nx < -overlap) {
@@ -753,10 +1146,12 @@ function drawShowRig(
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, TAU);
   ctx.clip();
-  ctx.fillStyle = "rgba(122, 162, 255, 0.09)";
+  ctx.fillStyle = "rgba(122, 162, 255, 0.1)";
   ctx.fillRect(cx - r, cy - r, r * (1 + overlap), r * 2);
-  ctx.fillStyle = "rgba(255, 184, 107, 0.09)";
+  ctx.fillStyle = "rgba(255, 184, 107, 0.1)";
   ctx.fillRect(cx - r * overlap, cy - r, r * (1 + overlap), r * 2);
+  ctx.fillStyle = "rgba(215, 219, 230, 0.08)";
+  ctx.fillRect(cx - overlap * r, cy - r, overlap * r * 2, r * 2);
   ctx.restore();
 
   drawWarpMesh(ctx, cx, cy, r);
@@ -768,30 +1163,32 @@ function drawShowRig(
   line(ctx, cx - overlap * r, cy - r * 0.94, cx - overlap * r, cy + r * 0.94, "rgba(122, 162, 255, 0.65)", 2);
   line(ctx, cx + overlap * r, cy - r * 0.94, cx + overlap * r, cy + r * 0.94, "rgba(255, 184, 107, 0.65)", 2);
 
-  if (!mobile) {
-    label(ctx, "projector A warp mesh", cx - r * 0.95, cy - r - 24, { color: C.accent, size: 13 });
-    label(ctx, "projector B", cx + r * 0.28, cy - r - 24, { color: C.warm, size: 13 });
-    label(ctx, "edge blend overlap", cx, cy + r + 24, { color: C.text, size: 13, align: "center" });
-    label(ctx, `gamma ${edgeGamma.toFixed(2)}`, cx, cy + r + 46, { color: C.muted, size: 12, align: "center", mono: true });
-  }
+  drawProjectorCamera(ctx, camA.x, camA.y, C.accent, "A", mobile);
+  drawProjectorCamera(ctx, camB.x, camB.y, C.warm, "B", mobile);
 
-  drawTimeline(ctx, w, h, beat, sensor, bpm, mobile);
+  if (!mobile) {
+    label(ctx, "top-down dome view", cx, cy - r - 28, { color: C.text, size: 14, align: "center" });
+    label(ctx, "A image", cx - r * 0.55, cy - r * 0.55, { color: C.accent, size: 13, align: "center" });
+    label(ctx, "B image", cx + r * 0.55, cy - r * 0.55, { color: C.warm, size: 13, align: "center" });
+    label(ctx, "edge blend overlap", cx, cy + r + 24, { color: C.text, size: 13, align: "center" });
+    label(ctx, `blend curve ${edgeGamma.toFixed(2)}`, cx, cy + r + 46, { color: C.muted, size: 12, align: "center", mono: true });
+    label(ctx, "colored cones show what each projector camera covers", cx, h - 26, {
+      color: C.muted,
+      size: 12,
+      align: "center",
+    });
+  } else {
+    label(ctx, "projector cameras", cx, h - 18, { color: C.muted, size: 10, align: "center", mono: true });
+  }
 }
 
 export function mountWarpBlendShow(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.98);
+  const shell = new Shell(container, 0.72);
   let overlap = 0.18;
   let edgeGamma = 1.0;
-  let bpm = 124;
-  let sensorTarget = 0.45;
-  let sensor = sensorTarget;
-  let running = true;
-  let beat = 0;
-  let cue = 0;
-  let last = performance.now();
 
   shell.slider({
-    label: "projector overlap",
+    label: "overlap band",
     min: 0.06,
     max: 0.38,
     step: 0.01,
@@ -802,7 +1199,7 @@ export function mountWarpBlendShow(container: HTMLElement): Demo {
     },
   });
   shell.slider({
-    label: "edge gamma",
+    label: "blend softness",
     min: 0.5,
     max: 2.6,
     step: 0.01,
@@ -812,51 +1209,14 @@ export function mountWarpBlendShow(container: HTMLElement): Demo {
       edgeGamma = v;
     },
   });
-  shell.slider({
-    label: "bpm",
-    min: 72,
-    max: 156,
-    step: 1,
-    value: bpm,
-    format: (v) => `${Math.round(v)}`,
-    onInput: (v) => {
-      bpm = v;
-    },
-  });
-  shell.slider({
-    label: "sensor",
-    min: 0,
-    max: 1,
-    step: 0.01,
-    value: sensorTarget,
-    format: (v) => v.toFixed(2),
-    onInput: (v) => {
-      sensorTarget = v;
-    },
-  });
-  shell.button("pause clock", () => {
-    running = !running;
-    clockButton.textContent = running ? "pause clock" : "run clock";
-  });
-  const clockButton = shell.controls.lastElementChild as HTMLButtonElement;
-  shell.button("trigger cue", () => {
-    cue = 1;
-  });
 
   shell.setInfo(() => {
-    const bar = Math.floor((beat % 16) / 4) + 1;
-    return `bar ${bar} · sensor ${sensor.toFixed(2)} · overlap ${Math.round(overlap * 100)}%`;
+    return `visual rig · overlap ${Math.round(overlap * 100)}% · blend softness ${edgeGamma.toFixed(2)}`;
   });
 
   return {
     frame() {
-      const now = performance.now();
-      const dt = Math.min((now - last) / 1000, 0.08);
-      last = now;
-      if (running) beat += (dt * bpm) / 60;
-      sensor += (sensorTarget - sensor) * 0.08;
-      cue *= 0.91;
-      withCanvas(shell.canvas, (ctx, w, h) => drawShowRig(ctx, w, h, beat, sensor, overlap, edgeGamma, cue, bpm));
+      withCanvas(shell.canvas, (ctx, w, h) => drawShowRig(ctx, w, h, overlap, edgeGamma));
       shell.tick();
     },
   };
@@ -975,6 +1335,21 @@ function drawRealtimeProjectors(
     label(ctx, `P${i + 1}`, px + Math.cos(a) * 13, py + Math.sin(a) * 13, { color, size: 11, align: "center", mono: true });
   }
 
+  if (mobile) {
+    label(ctx, `${n} projector camera${n === 1 ? "" : "s"}`, cx, h * 0.83, {
+      color: C.text,
+      size: 12,
+      align: "center",
+    });
+    label(ctx, `${(overlap * 100).toFixed(0)}% overlap + warp/blend`, cx, h * 0.9, {
+      color: C.muted,
+      size: 10,
+      align: "center",
+      mono: true,
+    });
+    return;
+  }
+
   label(ctx, "physical dome", cx, cy + r + 24, { color: C.text, size: 13, align: "center" });
   label(ctx, `${n} projector${n === 1 ? "" : "s"} · ${(overlap * 100).toFixed(0)}% angular overlap`, cx, cy + r + 45, {
     color: C.muted,
@@ -983,9 +1358,9 @@ function drawRealtimeProjectors(
     mono: true,
   });
 
-  const bx = mobile ? w * 0.08 : w * 0.62;
-  const by = mobile ? h * 0.68 : h * 0.2;
-  const bw = mobile ? w * 0.84 : w * 0.3;
+  const bx = w * 0.62;
+  const by = h * 0.2;
+  const bw = w * 0.3;
   const bh = 44;
   const gap = 24;
   if (mode === "direct") {
@@ -1006,7 +1381,7 @@ function drawRealtimeProjectors(
     line(ctx, bx + bw / 2, y, bx + bw / 2, y + gap * 0.8, C.muted, 1.2);
   }
 
-  const metricY = mobile ? h * 0.58 : h * 0.84;
+  const metricY = h * 0.84;
   const renderCount = mode === "direct" ? String(n) : "1 fisheye or 5-6 cubemap";
   const sampleCost = mode === "direct" ? "warp pass per projector" : "master sample per projector";
   label(ctx, `scene renders/frame: ${renderCount}`, w * 0.08, metricY, { color: C.text, size: 12, mono: true });
