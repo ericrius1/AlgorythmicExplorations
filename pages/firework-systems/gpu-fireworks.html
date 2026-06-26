@@ -279,7 +279,7 @@ drawIndirect     <span class="cm">// render exactly the compacted live list</spa
           may use" number. For this renderer, the useful diagnostic is therefore the
           storage binding limit plus the actual GPU allocations made by the fireworks
           system. The first tells you the largest legal particle buffer; the second
-          tells you what the effect currently reserved.
+          tells you what the effect currently reserves.
         </p>
       </aside>
 
@@ -368,11 +368,11 @@ const info = await module.getCompilationInfo();</code></pre>
         The debug overlay is intentionally small. It shows FPS, frame time, active
         particles, particle capacity, draw slots, active fireworks, queued bursts,
         particles emitted this frame, overflow, fireworks GPU memory, and the storage
-        binding limit. That is enough to answer the questions that came up during
-        testing:
+        binding limit. That is enough to answer the questions that come up when
+        something looks wrong:
       </p>
       <p>
-        Are particles disappearing because the capacity was exceeded? Check overflow.
+        Are particles disappearing because capacity is exceeded? Check overflow.
         Is the app slow because hundreds of thousands of invisible particles remain
         active? Check active particles after the effect has faded. Is draw work still
         happening when the scene is empty? Check slots drawn. Is the cap a magic
@@ -396,10 +396,10 @@ const info = await module.getCompilationInfo();</code></pre>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 8 · Why the solar-system demo mattered</span>One frame as a graph</h2>
+      <h2><span class="kicker">Step 8 · Why the solar-system demo matters</span>One frame as a graph</h2>
       <p>
-        The strongest influence from the particle series was not a specific force
-        law. It was the shape of the accretion demo in
+        The strongest influence from the particle series is not a specific force
+        law. It is the shape of the accretion demo in
         <a href="/pages/particle-worlds/part4.html">part four</a>. That demo combines
         gravity and collisions by building GPU data structures in phases: sort into a
         spatial hash, reduce into a gravity pyramid, run a force pass, render the
@@ -428,7 +428,7 @@ the renderer consumes the state that the simulation just produced</code></pre>
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 9 · Philosophy</span>Remove policy, keep physics</h2>
       <p>
-        The guiding principle was not "optimize everything." It was more specific:
+        The guiding principle is not "optimize everything." It is more specific:
         remove artificial policy from the hot path and make the remaining constraints
         visible.
       </p>

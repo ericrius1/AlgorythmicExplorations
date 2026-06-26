@@ -4,6 +4,15 @@ type Ctx = CanvasRenderingContext2D;
 
 const TAU = Math.PI * 2;
 
+// Figures draw straight into device pixels, so a literal 13px label is only
+// ~6px on a 2x display — unreadable next to 18px body copy. Scale type and
+// strokes with the canvas width, clamped so phones keep their size and very
+// wide screens do not turn chunky. setFigureScale runs once per frame in clear.
+let FS = 1;
+function setFigureScale(w: number): void {
+  FS = Math.min(2.6, Math.max(1, w / 680));
+}
+
 function hash01(n: number): number {
   const value = Math.sin(n * 12.9898 + 78.233) * 43758.5453123;
   return value - Math.floor(value);
@@ -24,6 +33,7 @@ function formatBytes(bytes: number): string {
 }
 
 function clear(ctx: Ctx, w: number, h: number, top = "#06070b", bottom = "#11131c"): void {
+  setFigureScale(w);
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, top);
   g.addColorStop(1, bottom);
@@ -44,7 +54,7 @@ function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: numb
 
 function text(ctx: Ctx, value: string, x: number, y: number, size = 13, color = "#d7dbe6", align: CanvasTextAlign = "left"): void {
   ctx.fillStyle = color;
-  ctx.font = `${size}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.font = `${size * FS}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.fillText(value, x, y);
@@ -52,7 +62,7 @@ function text(ctx: Ctx, value: string, x: number, y: number, size = 13, color = 
 
 function mono(ctx: Ctx, value: string, x: number, y: number, size = 12, color = "#c4cdf0", align: CanvasTextAlign = "left"): void {
   ctx.fillStyle = color;
-  ctx.font = `${size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  ctx.font = `${size * FS}px ui-monospace, SFMono-Regular, Menlo, monospace`;
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.fillText(value, x, y);
@@ -74,15 +84,16 @@ function arrow(ctx: Ctx, x1: number, y1: number, x2: number, y2: number, color =
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * FS;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
+  const head = 10 * FS;
   ctx.beginPath();
   ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - Math.cos(a - 0.48) * 10, y2 - Math.sin(a - 0.48) * 10);
-  ctx.lineTo(x2 - Math.cos(a + 0.48) * 10, y2 - Math.sin(a + 0.48) * 10);
+  ctx.lineTo(x2 - Math.cos(a - 0.48) * head, y2 - Math.sin(a - 0.48) * head);
+  ctx.lineTo(x2 - Math.cos(a + 0.48) * head, y2 - Math.sin(a + 0.48) * head);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -357,18 +368,18 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
       const blocks = [
         { label: "beginFrame", sub: "reset write + overflow", x: 0.08, y: 0.27 },
         { label: "simulateCompact", sub: "read A, append live to B", x: 0.29, y: 0.27 },
-        { label: "emitParticles", sub: "commands -> new particles", x: 0.5, y: 0.27 },
-        { label: "finishFrame", sub: "write counters + indirect args", x: 0.71, y: 0.27 },
+        { label: "emitParticles", sub: "commands → particles", x: 0.5, y: 0.27 },
+        { label: "finishFrame", sub: "write counters + draw args", x: 0.71, y: 0.27 },
         { label: "drawIndirect", sub: "render exactly live count", x: 0.39, y: 0.66 },
       ];
+      const bw = w * 0.19;
       for (let i = 0; i < 3; i++) {
-        arrow(ctx, w * (blocks[i].x + 0.15), h * blocks[i].y, w * blocks[i + 1].x - 8, h * blocks[i + 1].y, "#5f677e");
+        arrow(ctx, w * blocks[i].x + bw, h * blocks[i].y, w * blocks[i + 1].x - 8, h * blocks[i + 1].y, "#5f677e");
       }
       arrow(ctx, w * 0.79, h * 0.4, w * 0.58, h * 0.61, "#5f677e");
 
       for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i];
-        const bw = w * 0.17;
         const bh = h * 0.18;
         const x = w * b.x;
         const y = h * b.y - bh * 0.5;

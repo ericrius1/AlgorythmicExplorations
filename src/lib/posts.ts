@@ -33,8 +33,6 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "A bald eagle lofted ring by ring, feathered quill by quill, rigged, animated, and flown with a real aerodynamic model.",
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
-  "Learned Terrain":
-    "A four-part bridge from procedural noise to InfiniteDiffusion, Terrain Diffusion, and learned procedural worlds.",
   "Spark & Signal":
     "Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.",
 };
@@ -340,34 +338,6 @@ export const POSTS: Post[] = [
     part: 6,
     title: "The Horizon",
     subtitle: "Chunks, LOD rings, skirts, and a millisecond build budget for continuous terrain streaming",
-  },
-  {
-    href: "/pages/learned-terrain/seeds.html",
-    series: "Learned Terrain",
-    part: 1,
-    title: "A World Is a Function",
-    subtitle: "Seeds, coordinates, procedural noise, and why infinite terrain is an API before it is an image",
-  },
-  {
-    href: "/pages/learned-terrain/diffusion.html",
-    series: "Learned Terrain",
-    part: 2,
-    title: "The Bounded Dream",
-    subtitle: "Diffusion models can learn landscape structure, but ordinary image generation ends at the canvas edge",
-  },
-  {
-    href: "/pages/learned-terrain/infinite-diffusion.html",
-    series: "Learned Terrain",
-    part: 3,
-    title: "Only Compute the Window You Need",
-    subtitle: "InfiniteDiffusion turns overlapping denoising windows into a seed-stable infinite image query",
-  },
-  {
-    href: "/pages/learned-terrain/terrain-diffusion.html",
-    series: "Learned Terrain",
-    part: 4,
-    title: "Terrain Diffusion",
-    subtitle: "The paper's learned terrain generator, from global hierarchy to real-time open-world queries",
   },
   {
     href: "/pages/spark-signal/signaling.html",
