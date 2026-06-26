@@ -151,16 +151,8 @@ export function mountHeroFireworks(container: HTMLElement): Demo {
         const hue = b % 3 === 0 ? "255, 187, 84" : b % 3 === 1 ? "94, 192, 255" : "248, 106, 255";
         if (phase < 0.32) {
           const launch = phase / 0.32;
-          const sx = cx + Math.sin(b * 2.1) * w * 0.04;
-          const sy = h * 0.9;
-          const x = lerp(sx, cx, launch);
-          const y = lerp(sy, cy, 1 - Math.pow(1 - launch, 2));
-          ctx.strokeStyle = `rgba(${hue}, ${0.25 + launch * 0.65})`;
-          ctx.lineWidth = Math.max(1, w * 0.002);
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(x, y);
-          ctx.stroke();
+          const x = lerp(cx + Math.sin(b * 2.1) * w * 0.04, cx, launch);
+          const y = lerp(h * 0.9, cy, 1 - Math.pow(1 - launch, 2));
           sparkle(ctx, x, y, h * 0.035, `rgba(${hue}, 1)`, 0.6);
         } else {
           const age = (phase - 0.32) / 0.68;
