@@ -17,6 +17,8 @@ export interface Post {
 export const SERIES_TAGLINES: Record<string, string> = {
   "Particle Worlds":
     "A step-by-step n-body simulation, from two falling dots to 300,000 gravitating bodies.",
+  "Firework Systems":
+    "A WebGPU fireworks renderer designed around GPU-owned particles, compact emit commands, and live-list drawing.",
   "Dome Projection":
     "Fulldome projection math from polar coordinates to fisheye maps, projector cameras, calibrated blends, and realtime render paths.",
   "Bounced Light":
@@ -79,6 +81,13 @@ export const POSTS: Post[] = [
     part: 6,
     title: "The Fluid Instrument",
     subtitle: "Stable fluids, curl noise, particle trails, and hand tracking",
+  },
+  {
+    href: "/pages/firework-systems/gpu-fireworks.html",
+    series: "Firework Systems",
+    part: 1,
+    title: "Fireworks at GPU Scale",
+    subtitle: "Emit commands, live-list compaction, indirect drawing, and why the CPU should describe intent instead of particles",
   },
   {
     href: "/pages/dome-projection/circle.html",

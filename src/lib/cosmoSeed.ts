@@ -109,7 +109,9 @@ export function seedZeldovich(o: CosmoSeedOptions): CosmoIC {
       // collapses into a single pancake instead of a web.
       const lowCut = (k2 / (k2 + 9)) ** 2;
       const p = Math.pow(k, o.tilt) * Math.exp(-(k2 / (kcut * kcut))) * lowCut;
-      const s = Math.sqrt(p) / k2; // √P(k) and the 1/k² of the inverse Laplacian
+      // √P(k), plus the inverse-Laplacian 1/k² factor: in frequency space,
+      // undoing a second derivative is just division by k².
+      const s = Math.sqrt(p) / k2;
       // multiply δ_k by i·k·s: (re,im) → (-im, re) per axis component
       xr[i] = -di[i] * kx * s;
       xi[i] = dr[i] * kx * s;

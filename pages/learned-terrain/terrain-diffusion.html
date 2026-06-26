@@ -42,10 +42,11 @@
       </p>
       <p>
         The paper uses signed square-root compression to reduce extreme dynamic
-        range, then Laplacian-style low-frequency and residual representations
-        so broad geography and local detail can be modeled at different scales.
-        The point is not only visual quality. It is stability: the model needs
-        to preserve both planetary structure and local terrain texture.
+        range, then a Laplacian-style pyramid: a blurred low-frequency terrain
+        layer plus residual layers that store what the blur removed. That lets
+        broad geography and local detail be modeled at different scales. The
+        point is not only visual quality. It is stability: the model needs to
+        preserve both planetary structure and local terrain texture.
       </p>
       <pre><code>raw elevation
   -> compressed elevation
