@@ -150,6 +150,7 @@ export async function mountPlayground(container: HTMLElement, opts: PlaygroundOp
   const camera = new OrbitCamera();
   camera.distance = 2.9;
   camera.autoSpin = 0.0009;
+  if (opts.hero) camera.zoomEnabled = false;
   camera.attach(shell.canvas);
 
   // ---- compute pipelines ----------------------------------------------------

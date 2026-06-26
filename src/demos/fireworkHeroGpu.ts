@@ -254,10 +254,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
 function hash01(n: number): number {
   const value = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
   return value - Math.floor(value);
@@ -501,6 +497,12 @@ class HeroFireworks {
 
     this.attachParallax();
     this.resize();
+    const seedNow = performance.now() / 1000;
+    for (let i = 0; i < 4; i++) {
+      const point: Vec2 = [randomRange(-0.7, 0.7), randomRange(0.05, 0.65)];
+      this.launchFromPoint(this.spreadLaunchPoint(point, i, 4), i % 2 === 0 ? CLASSIC_SYSTEM_ID : ACCRETION_SYSTEM_ID, seedNow - randomRange(0.1, 0.55));
+    }
+    this.nextAutoLaunch = seedNow + 0.15;
   }
 
   private createSimulateBindGroup(readIndex: number, writeIndex: number): GPUBindGroup {
@@ -803,7 +805,7 @@ class HeroFireworks {
     });
 
     if (!mini) {
-      const satellites = 4 + Math.floor(Math.random() * 3);
+      const satellites = 5 + Math.floor(Math.random() * 4);
       for (let i = 0; i < satellites; i++) {
         const angle = (i / satellites) * TAU + randomRange(-0.18, 0.18);
         const radius = randomRange(0.08, 0.18);
@@ -902,13 +904,6 @@ class HeroFireworks {
       size: this.emitCommandCapacity * EMIT_COMMAND_BYTES,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
-    this.particleGpuMemoryBytes =
-      this.particleCapacity * PARTICLE_STRIDE * 2 +
-      UNIFORM_FLOATS * 4 +
-      COUNTER_BYTES +
-      DRAW_INDIRECT_BYTES +
-      DISPATCH_INDIRECT_BYTES +
-      this.emitCommandCapacity * EMIT_COMMAND_BYTES;
     this.emitBindGroups = [this.createEmitBindGroup(0), this.createEmitBindGroup(1)];
   }
 

@@ -30,6 +30,7 @@ export class OrbitCamera {
   elevation = 0.45;
   distance = 2.6;
   autoSpin = 0.0012;
+  zoomEnabled = true;
 
   private lastInteraction = 0;
 
@@ -40,6 +41,7 @@ export class OrbitCamera {
     let ly = 0;
 
     const dollyBy = (delta: number): void => {
+      if (!this.zoomEnabled) return;
       this.distance = Math.min(8, Math.max(1.0, this.distance * Math.exp(delta)));
       this.lastInteraction = performance.now();
     };
@@ -50,7 +52,7 @@ export class OrbitCamera {
         lx = e.clientX;
         ly = e.clientY;
         canvas.setPointerCapture(e.pointerId);
-      } else if (e.button === 1) {
+      } else if (e.button === 1 && this.zoomEnabled) {
         dollying = true;
         ly = e.clientY;
         e.preventDefault();
@@ -80,6 +82,7 @@ export class OrbitCamera {
     canvas.addEventListener(
       "wheel",
       (e) => {
+        if (!this.zoomEnabled) return; // let the page scroll
         // Two-finger trackpad scroll, mouse wheel, and pinch (ctrl+wheel) all dolly.
         e.preventDefault();
         dollyBy(e.deltaY * 0.001);
