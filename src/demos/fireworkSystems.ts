@@ -1,4 +1,5 @@
 import { Shell, type Demo } from "../lib/demoShell";
+import { mountFireworkHeroGpu } from "./fireworkHeroGpu";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -60,6 +61,11 @@ function text(ctx: Ctx, value: string, x: number, y: number, size = 13, color = 
   ctx.fillText(value, x, y);
 }
 
+function textWidth(ctx: Ctx, value: string, size = 13): number {
+  ctx.font = `${size * FS}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`;
+  return ctx.measureText(value).width;
+}
+
 function mono(ctx: Ctx, value: string, x: number, y: number, size = 12, color = "#c4cdf0", align: CanvasTextAlign = "left"): void {
   ctx.fillStyle = color;
   ctx.font = `${size * FS}px ui-monospace, SFMono-Regular, Menlo, monospace`;
@@ -110,10 +116,18 @@ function sparkle(ctx: Ctx, x: number, y: number, r: number, color: string, alpha
   ctx.fill();
 }
 
-export function mountHeroFireworks(container: HTMLElement): Demo {
+export async function mountHeroFireworks(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.46);
   shell.controls.style.display = "none";
   shell.readout.parentElement?.remove();
+
+  const gpu = await mountFireworkHeroGpu(shell.canvas);
+  if (gpu) return gpu;
+
+  return mountHeroFireworksCanvas(shell);
+}
+
+function mountHeroFireworksCanvas(shell: Shell): Demo {
   const ctx = shell.canvas.getContext("2d")!;
 
   return {
@@ -171,9 +185,30 @@ export function mountHeroFireworks(container: HTMLElement): Demo {
         }
       }
 
-      text(ctx, "CPU: launch intent", 24, h - 50, 13, "#8a91a5");
-      arrow(ctx, 150, h - 50, 245, h - 50, "#5f677e");
-      text(ctx, "GPU: millions of independent fragments of light", 260, h - 50, 13, "#d7dbe6");
+      const cpuLabel = "CPU: launch intent";
+      const gpuLabel = "GPU: millions of independent fragments of light";
+      const captionSize = 13;
+      const marginX = 24;
+      const gap = 12 * FS;
+      const arrowSpan = 32 * FS;
+      const captionY = h - 50;
+      const cpuW = textWidth(ctx, cpuLabel, captionSize);
+      const gpuW = textWidth(ctx, gpuLabel, captionSize);
+      const rowW = cpuW + gap + arrowSpan + gap + gpuW;
+
+      if (rowW <= w - marginX * 2) {
+        text(ctx, cpuLabel, marginX, captionY, captionSize, "#8a91a5");
+        const ax1 = marginX + cpuW + gap;
+        arrow(ctx, ax1, captionY, ax1 + arrowSpan, captionY, "#5f677e");
+        text(ctx, gpuLabel, ax1 + arrowSpan + gap, captionY, captionSize, "#d7dbe6");
+      } else {
+        const lineStep = 20 * FS;
+        const topY = captionY - lineStep * 0.5;
+        const bottomY = captionY + lineStep * 0.5;
+        text(ctx, cpuLabel, marginX, topY, captionSize, "#8a91a5");
+        arrow(ctx, marginX + cpuW + gap, topY, marginX + cpuW + gap + arrowSpan, topY, "#5f677e");
+        text(ctx, gpuLabel, marginX, bottomY, captionSize, "#d7dbe6");
+      }
     },
   };
 }
