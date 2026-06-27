@@ -75,3 +75,28 @@ export function seedDome(count: number, opts: { radius?: number; spin?: number }
   }
   return b;
 }
+
+// A pool of fluid resting in the lower dome. The SPH gravity points along -z and
+// the shell has a floor at z = 0, so particles seeded as a half-ball sitting on
+// that floor settle into a still pool. Start near rest; tiny jitter breaks the
+// sampling lattice so the solver doesn't lock into a frozen grid.
+export function seedDomeFluid(count: number, opts: { radius?: number } = {}): Bodies3D {
+  const R = opts.radius ?? 0.83;
+  const b = alloc(count);
+  for (let i = 0; i < count; i++) {
+    // rejection-sample a uniform point in the unit ball, fold to the upper half
+    let x: number, y: number, z: number;
+    do {
+      x = Math.random() * 2 - 1;
+      y = Math.random() * 2 - 1;
+      z = Math.random() * 2 - 1;
+    } while (x * x + y * y + z * z > 1);
+    b.pos[i * 4 + 0] = x * R;
+    b.pos[i * 4 + 1] = y * R;
+    b.pos[i * 4 + 2] = Math.abs(z) * R;
+    b.vel[i * 4 + 0] = randn() * 0.02;
+    b.vel[i * 4 + 1] = randn() * 0.02;
+    b.vel[i * 4 + 2] = randn() * 0.02;
+  }
+  return b;
+}

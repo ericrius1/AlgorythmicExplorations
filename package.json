@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/stats.js": "^0.17.4",
     "@types/three": "^0.184.1",
     "@webgpu/types": "^0.1.40",
     "typescript": "^5.6.0",
@@ -17,7 +18,9 @@
   },
   "dependencies": {
     "@svenflow/micro-handpose": "^0.3.0",
+    "stats.js": "^0.17.0",
     "three": "^0.184.0",
-    "tone": "^15.1.22"
+    "tone": "^15.1.22",
+    "tweakpane": "^4.0.5"
   }
 }
