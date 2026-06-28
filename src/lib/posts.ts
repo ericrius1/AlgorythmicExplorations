@@ -228,6 +228,13 @@ export const POSTS: Post[] = [
     subtitle: "Real-time key estimation, chord inference, voice leading, and generated accompaniment",
   },
   {
+    href: "/pages/living-music/acoustic-space.html",
+    series: "Living Music",
+    part: 8,
+    title: "Rooms That Play Back",
+    subtitle: "Probe-based acoustic simulation, sparse pathing, material transmittance, and generative spatial sound",
+  },
+  {
     href: "/pages/waking-bodies/bear.html",
     series: "Waking Bodies",
     part: 1,

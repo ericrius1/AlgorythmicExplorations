@@ -528,8 +528,17 @@ details.fold pre {
   padding: 0.9rem;
 }
 
+.demo-slot:not(.demo) {
+  min-height: min(58vw, 28rem);
+  margin: 1.8rem -3rem 2.4rem;
+  border: 1px dashed rgba(122, 162, 255, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(122, 162, 255, 0.05), rgba(255, 184, 107, 0.025));
+}
+
 @media (max-width: 60rem) {
-  .demo {
+  .demo,
+  .demo-slot:not(.demo) {
     margin-left: 0;
     margin-right: 0;
   }
