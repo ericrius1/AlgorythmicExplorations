@@ -27,6 +27,8 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "A magnetic liquid that grows spikes — its surface remeshed every frame, its particles taught to magnetize each other.",
   "Living Music":
     "Interactive explanations of sound, tuning, scales, chords, rhythm, and generative accompaniment.",
+  "Acoustic Spaces":
+    "Spatial audio as an instrument: band-limited materials, sparse routes, media, and shareable musical rooms.",
   "Waking Bodies":
     "A procedural bear modeled from triangles, rigged by distance, and animated with inverse kinematics and springs.",
   "Feather & Bone":
@@ -228,11 +230,18 @@ export const POSTS: Post[] = [
     subtitle: "Real-time key estimation, chord inference, voice leading, and generated accompaniment",
   },
   {
-    href: "/pages/living-music/acoustic-space.html",
-    series: "Living Music",
-    part: 8,
+    href: "/pages/acoustic-spaces/acoustic-space.html",
+    series: "Acoustic Spaces",
+    part: 1,
     title: "Rooms That Play Back",
     subtitle: "Probe-based acoustic simulation, sparse pathing, material transmittance, and generative spatial sound",
+  },
+  {
+    href: "/pages/acoustic-spaces/room-instrument.html",
+    series: "Acoustic Spaces",
+    part: 2,
+    title: "The Room Instrument",
+    subtitle: "A shareable spatial-audio music toy for composing with materials, media, distance, and routed sound",
   },
   {
     href: "/pages/waking-bodies/bear.html",

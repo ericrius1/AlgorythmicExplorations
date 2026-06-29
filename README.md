@@ -51,7 +51,7 @@ tracer (one random wavelength per sample, Cauchy dispersion, Fresnel coin
 flips) producing real caustics, rainbow caustics, and thin-lens depth of
 field.
 
-**Living Music** — a six-part music theory series where every figure
+**Living Music** — a seven-part music theory series where every figure
 makes real sound (Tone.js) and every visual is a WebGPU fragment shader fed by
 live analyser data. Part one (`vibration.html`) dissects a single note: an
 oscilloscope you can play, a wave-equation string you pluck (audio synthesized
@@ -67,7 +67,16 @@ puts triads under a harmonic-alignment microscope (with a clickable piano) and
 runs four-chord loops through a minimal-motion voice-leading search with a
 live tension lane. Part six (`jukebox.html`) assembles the series into a
 generative band: Euclidean drums, a gravity-guided random-walk melody, a
-seeded progression grammar, and an FFT-driven nebula.
+seeded progression grammar, and an FFT-driven nebula. Part seven
+(`accompanist.html`) turns the theory around: play notes and a live
+accompanist infers key, harmony, restraint, and response.
+
+**Acoustic Spaces** — a spatial-audio series about rooms as instruments. Part
+one (`acoustic-space.html`) builds a probe-based acoustic system with direct
+audibility, sparse routed paths, material transmittance, media loss, and
+band-limited control buses. Part two (`room-instrument.html`) turns the same
+ideas into a shareable music toy: drag sound stones, a listener, a wall, and
+water to compose a room, then copy a link that restores the creation.
 
 Music-series plumbing: `src/lib/audio.ts` (shared Tone.js master bus +
 analysers, lookahead StepClock, music math), `src/lib/shaderCanvas.ts`
@@ -77,7 +86,8 @@ colocated in its demo file), `src/lib/piano.ts` (DOM keyboard widget).
 Site navigation (top bar, post menu, read-next cards) is injected by
 `src/lib/siteNav.ts` from the registry in `src/lib/posts.ts` — adding a post
 means: write the `*.html`, add a `src/<name>.ts` entry that calls `initNav()`,
-register it in `posts.ts`, and list it in `vite.config.ts`.
+and register it in `posts.ts`. Vite collects every HTML file under `pages/`
+automatically.
 
 ```bash
 npm install

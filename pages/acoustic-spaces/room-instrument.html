@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Room Instrument — Acoustic Spaces</title>
+    <meta
+      name="description"
+      content="A shareable spatial-audio music toy: drag sound stones, a listener, acoustic materials, and water to compose with room simulation."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>The Room Instrument</h1>
+      <p>
+        The previous article turned a room into a small set of audio control
+        signals: direct low/mid/high, routed low/mid/high, distance, material
+        color, and media loss. This page uses those same signals as an
+        instrument. There is less to read here because the point is to play it.
+      </p>
+      <p>
+        Drag the sound stones, listener, wall, and water. Horizontal motion
+        chooses notes from a friendly scale. Vertical motion shifts rhythm and
+        register. The room decides how much body, presence, and sparkle survive.
+        A blocked direct ray is not just quieter; it becomes warmer, wetter, and
+        more indirect.
+      </p>
+
+      <div class="demo-slot" data-demo="instrument"></div>
+
+      <p>
+        The share button writes the whole room into the URL. Send that link and
+        the recipient lands on the same composition: same stone positions, same
+        listener, same wall and water, same scale, tempo, and material settings.
+      </p>
+
+      <h2><span class="kicker">What is happening</span>The article as a toy</h2>
+      <p>
+        Each stone asks the acoustic solver for a band-limited path to the
+        listener. The green direct line is immediate audibility. The amber corner
+        route is the slower routed energy. The wall mostly leaks lows. The water
+        eats highs. Those values open filters, pan the notes, set delay/reverb
+        weight, and choose how hard each note speaks.
+      </p>
+      <p>
+        The musical side is intentionally forgiving: pentatonic and modal scales,
+        slow envelopes, sparse rhythms, and soft delay. That lets the acoustic
+        movement do the expressive work. Move a stone behind the wall and it
+        becomes a memory. Pull it through water and it loses its glitter. Bring
+        it close to the listener and the room gives it back its edge.
+      </p>
+
+      <h2><span class="kicker">Make it yours</span>Small edits, large changes</h2>
+      <p>
+        Try one quiet bass stone near the listener, then put the chimes behind
+        the wall. Move the water over only one path. Raise wall leak until the
+        hidden notes are present but soft. Change scale last; the room usually
+        matters more than the notes.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/pages/acoustic-spaces/acoustic-space.html">← Part one: Rooms That Play Back</a> ·
+        <a href="/pages/living-music/vibration.html">Living Music: The Anatomy of a Note</a>
+      </p>
+      <p>
+        Built with Web Audio and live canvas interaction. Shared rooms are
+        encoded in the link; no server storage is needed.
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/acoustic-spaces/room-instrument.ts"></script>
+  </body>
+</html>
