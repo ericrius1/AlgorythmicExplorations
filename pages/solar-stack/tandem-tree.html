@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Tandem Tree — Solar Stack</title>
+    <meta
+      name="description"
+      content="An interactive essay about the technical lineage that led to perovskite/silicon tandem solar cells, from silicon PV to bandgap tuning and passivated interfaces."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>The Tandem Tree</h1>
+      <p class="subtitle">
+        Why the most interesting solar cell today is not a replacement for
+        silicon, but a very thin, very picky crystal grown on top of it.
+      </p>
+
+      <p>
+        The first version of this page was a lab instrument: particles, layers,
+        sliders, and not much argument. That was the wrong center of gravity.
+        A perovskite/silicon tandem cell is interesting because it is not one
+        invention. It is a convergence: semiconductor band theory, fifty years
+        of silicon interface engineering, solution-processed thin films,
+        molecular passivation, and an industrial wager that the silicon module
+        does not need to be thrown away to get better.
+      </p>
+      <p>
+        The short version is simple. Silicon is excellent but spectrally
+        wasteful. A single bandgap cannot use the whole sun efficiently. A
+        tandem cell stacks two absorbers with different bandgaps: the top cell
+        takes high-energy photons, the bottom cell takes the red and infrared
+        photons that pass through. Perovskites became the obvious top-cell
+        candidate because their bandgap can be tuned by chemistry and their
+        films can be only hundreds of nanometers thick.
+      </p>
+
+      <div data-demo="tandem-tree"></div>
+
+      <h2><span class="kicker">The old problem</span>One bandgap sees one slice of the sun</h2>
+      <p>
+        A photovoltaic absorber is a gate. Photons below its bandgap do not
+        have enough energy to free an electron and hole. Photons above the
+        bandgap can be absorbed, but the excess energy rapidly becomes heat.
+        This is the core tradeoff behind the Shockley-Queisser limit: choose a
+        low bandgap and you catch more photons but waste more heat; choose a
+        high bandgap and you waste less heat but miss the redder photons.
+      </p>
+      <p>
+        Silicon's bandgap is about 1.12 eV, which is a strong compromise for a
+        single-junction cell. It is not a perfect answer. Blue and green
+        photons arrive with more energy than silicon needs, and that excess is
+        thermalized. Tandems attack that waste by making the first absorber a
+        better match for high-energy light, then letting silicon do what it
+        already does well underneath.
+      </p>
+      <aside class="note">
+        <span class="note-label">The useful mental model</span>
+        <p>
+          A tandem is not "twice the solar panel." It is a spectral sorting
+          machine. The top cell should absorb enough blue-green light to make
+          the same current as the silicon bottom cell makes from transmitted
+          red-infrared light. In a series-connected tandem, the weaker current
+          limits the whole stack.
+        </p>
+      </aside>
+
+      <div data-demo="spectrum-splitter"></div>
+
+      <h2><span class="kicker">Why perovskite</span>The top cell can be tuned by composition</h2>
+      <p>
+        "Perovskite" names a crystal structure rather than one exact material.
+        The lead-halide perovskites used in high-performance tandems are
+        compositionally flexible: formamidinium, cesium, and rubidium can share
+        the A-site; iodide and bromide share the halide site. Raise the bromide
+        fraction and the bandgap rises. Lower it and the top cell absorbs more
+        of the visible spectrum.
+      </p>
+      <p>
+        That chemical freedom is why formulas such as
+        <code>FA0.78Cs0.17Rb0.05Pb(I0.65Br0.35)3</code> show up in papers. The
+        formula is not ornament. It is the control surface. Bromide tunes the
+        bandgap toward the 1.7-1.75 eV region that pairs well with silicon, but
+        too much bromide can increase phase segregation risk. The best recipe
+        is therefore not the absorber with the most impressive isolated
+        absorption. It is the absorber that makes the two subcells agree.
+      </p>
+      <p>
+        This is also why the supporting layers matter. Transparent conductive
+        oxides collect charge without blocking light. Self-assembled monolayers
+        act as hole-selective interfaces. C60 and SnO2 extract electrons.
+        Passivation molecules reduce defects where carriers would otherwise
+        recombine. The stack succeeds when every interface is slightly less
+        hostile to the carrier that needs to cross it.
+      </p>
+
+      <div data-demo="layer-tradeoffs"></div>
+
+      <h2><span class="kicker">The silicon inheritance</span>Tandems stand on industrial wafers</h2>
+      <p>
+        Perovskites did not make silicon obsolete. They made silicon more
+        valuable. The bottom cell in a tandem can be a high-quality HJT or
+        TOPCon-style silicon device with excellent passivated contacts. That
+        matters because the tandem inherits the voltage, current collection,
+        module packaging, and manufacturing discipline of a huge existing
+        industry.
+      </p>
+      <p>
+        The practical question is therefore less romantic than "what is the
+        future material?" It is: can a thin perovskite process be added on top
+        of silicon wafers without wrecking yield, lifetime, cost, or module
+        reliability? Laboratory cells in the mid-30% range show why the attempt
+        is worth making. Fielded modules have to survive heat, moisture,
+        ultraviolet light, electrical bias, and imperfect encapsulation for
+        years.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: why passivation keeps appearing</summary>
+        <div class="fold-body">
+          <p>
+            Photovoltaics is a surface problem disguised as a bulk-material
+            problem. Absorbers create electron-hole pairs in the volume, but
+            useful power is lost when those carriers hit dangling bonds,
+            vacancies, rough contacts, or chemically unstable interfaces before
+            they are collected. Silicon learned this slowly through oxides,
+            texturing, PERC, HJT, and TOPCon. Perovskites are learning it faster
+            because nearly every layer in the stack is an interface.
+          </p>
+          <p>
+            Passivation does not make the material magical. It removes traps
+            from the carrier's path. That is why molecules such as melamine or
+            pyridine/imidazolium-style additives matter: they are small chemical
+            patches at places where the electrical model would otherwise leak.
+          </p>
+        </div>
+      </details>
+
+      <h2><span class="kicker">Where the cutting edge is</span>From record cells to products</h2>
+      <p>
+        The record-efficiency race is real, but it is not the whole story.
+        Certified perovskite/silicon tandem cells have moved beyond 30% and
+        into the mid-30% range. That is far above ordinary commercial silicon
+        modules, and it is close enough to theoretical promise that investors
+        and manufacturers have to pay attention.
+      </p>
+      <p>
+        The hard part is that a record cell is small, watched carefully, and
+        optimized for a measurement. A product is large, repeated thousands of
+        times, laminated, shipped, heated, cooled, shaded, biased, and expected
+        to keep working. The cutting edge is therefore half physics and half
+        manufacturing: wider bandgap stability, textured silicon compatibility,
+        low-temperature processing, lead containment, scalable deposition,
+        encapsulation, and bankable lifetime data.
+      </p>
+      <p>
+        That is why the technology tree above ends at "factories begin," not
+        "problem solved." The exciting claim is not that perovskites already
+        replaced silicon. The exciting claim is subtler: the silicon solar
+        panel may have a second act, and it is made from a film thin enough to
+        look like chemistry but precise enough to behave like a semiconductor.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Solar Stack, part one · a historical map of perovskite/silicon tandem
+        cells and why the stack is now plausible.
+      </p>
+      <p>
+        Standing on the shoulders of:
+        <a href="https://www.nrel.gov/pv/cell-efficiency.html">NREL Best Research-Cell Efficiency Chart</a> ·
+        <a href="https://doi.org/10.1063/1.1736034">Shockley &amp; Queisser, 1961</a> ·
+        <a href="https://doi.org/10.1021/ja809598r">Kojima et al., 2009</a> ·
+        <a href="https://doi.org/10.1126/science.1228604">Lee et al., 2012</a> ·
+        <a href="https://www.oxfordpv.com/">Oxford PV</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/solar-stack/tandem-tree.ts"></script>
+  </body>
+</html>

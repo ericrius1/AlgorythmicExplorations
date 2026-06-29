@@ -118,6 +118,12 @@ main {
   padding-top: 3.5rem;
 }
 
+@media (max-width: 42rem) {
+  .site-nav + main {
+    padding-top: 5.4rem;
+  }
+}
+
 h2 {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 1.7rem;
@@ -600,6 +606,8 @@ header.hero .demo {
   font: 0.74rem ui-monospace, Menlo, monospace;
   color: var(--accent-warm);
   padding: 0.45rem 0.3rem 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 header.hero .demo-readout,
@@ -643,6 +651,155 @@ header.hero .demo-controls {
   font-size: 0.9rem;
   color: var(--accent-warm);
   padding: 1rem;
+}
+
+/* ---- solar stack explainer ---- */
+
+.solar-tree-demo {
+  padding: 0;
+  overflow: hidden;
+}
+
+.solar-tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.solar-tree-toolbar strong {
+  color: #f2f4fa;
+  font-size: 0.9rem;
+}
+
+.solar-tree-toolbar span {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.solar-tree-viewport {
+  height: min(62vh, 35rem);
+  min-height: 24rem;
+  background:
+    linear-gradient(rgba(122, 162, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122, 162, 255, 0.055) 1px, transparent 1px),
+    radial-gradient(circle at 20% 30%, rgba(122, 162, 255, 0.12), transparent 35%),
+    #06070b;
+  background-size: 44px 44px, 44px 44px, auto, auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.solar-tree-viewport:active {
+  cursor: grabbing;
+}
+
+.solar-tree-viewport svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+}
+
+.solar-tree-edge {
+  fill: none;
+  stroke: rgba(170, 180, 212, 0.34);
+  stroke-width: 2;
+}
+
+.solar-tree-edge-label,
+.solar-tree-year,
+.solar-tree-title,
+.solar-tree-group {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  pointer-events: none;
+}
+
+.solar-tree-edge-label {
+  fill: rgba(255, 184, 107, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.solar-tree-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.solar-tree-node rect {
+  fill: rgba(17, 19, 28, 0.9);
+  stroke: var(--node-color);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.38));
+}
+
+.solar-tree-node:hover rect,
+.solar-tree-node:focus rect,
+.solar-tree-node.is-selected rect {
+  fill: rgba(26, 30, 44, 0.97);
+  stroke-opacity: 1;
+  stroke-width: 2.5;
+}
+
+.solar-tree-year {
+  fill: var(--node-color);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.solar-tree-title {
+  fill: #f2f4fa;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.solar-tree-group {
+  fill: rgba(215, 219, 230, 0.56);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.solar-tree-detail {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(10, 11, 16, 0.5);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.solar-tree-detail span {
+  color: var(--accent-warm);
+  font: 700 0.75rem ui-monospace, Menlo, monospace;
+}
+
+.solar-tree-detail strong {
+  color: #f2f4fa;
+  font-size: 1rem;
+}
+
+.solar-tree-detail p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.48;
+}
+
+@media (max-width: 42rem) {
+  .solar-tree-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .solar-tree-viewport {
+    min-height: 28rem;
+  }
 }
 
 /* ---- music series ---- */

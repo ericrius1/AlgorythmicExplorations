@@ -35,6 +35,8 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "A bald eagle lofted ring by ring, feathered quill by quill, rigged, animated, and flown with a real aerodynamic model.",
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
+  "Solar Stack":
+    "The technology tree behind perovskite/silicon tandem solar cells: bandgaps, passivated interfaces, and the long second act of silicon.",
   "Spark & Signal":
     "Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.",
 };
@@ -354,6 +356,13 @@ export const POSTS: Post[] = [
     part: 6,
     title: "The Horizon",
     subtitle: "Chunks, LOD rings, skirts, and a millisecond build budget for continuous terrain streaming",
+  },
+  {
+    href: "/pages/solar-stack/tandem-tree.html",
+    series: "Solar Stack",
+    part: 1,
+    title: "The Tandem Tree",
+    subtitle: "The technical lineage that led to perovskite/silicon tandem solar cells",
   },
   {
     href: "/pages/spark-signal/signaling.html",
