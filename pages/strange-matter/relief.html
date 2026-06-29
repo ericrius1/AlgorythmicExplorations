@@ -78,6 +78,18 @@
         magnetic moment, and the cached magnetic acceleration are each three
         components now, and all of those fields are scattered together.
       </p>
+      <pre><code>let center = cellOf(p.position);
+for (let dz = -cutoff; dz &lt;= cutoff; dz++) {
+  for (let dy = -cutoff; dy &lt;= cutoff; dy++) {
+    for (let dx = -cutoff; dx &lt;= cutoff; dx++) {
+      let c = center + vec3i(dx, dy, dz);
+      for (let k = starts[c]; k &lt; starts[c + 1]; k++) {
+        accumulatePairForce(p, sortedParticles[k]);
+      }
+    }
+  }
+}
+<span class="cm">// cutoff = 1 → 27 hydro cells; cutoff = 3 → 343 magnetic cells</span></code></pre>
       <p>
         The largest cost is the magnetic neighborhood. Part two
         truncated pair magnetics at four kernel radii, an 81-cell sweep. The
@@ -100,6 +112,12 @@
         result converts the most expensive passes from a per-substep cost into
         a per-frame one with little visible error.
       </p>
+      <p>
+        The diagram below turns those loop bounds into a shape: first the old
+        two-dimensional grid query, then the 3D block, then the larger magnetic
+        cutoff and the per-frame cache that keeps it affordable.
+      </p>
+      <div data-scrolly="relief-neighbors"></div>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 2 · Native dimension</span>Three-dimensional magnetics</h2>
@@ -149,6 +167,13 @@
         so the field is not just race-free but <em>deterministic</em>, byte
         for byte, regardless of which thread arrives first.
       </p>
+      <pre><code><span class="cm">// WGSL: fixed-point density deposit into a 3D voxel buffer</span>
+let weight = kernel(length(voxelCenter - particle.position));
+let q = u32(round(weight * 256.0));
+atomicAdd(&amp;field[voxelIndex], q);
+
+<span class="cm">// later, when extracting the surface</span>
+let density = f32(atomicLoad(&amp;field[voxelIndex])) / 256.0;</code></pre>
 
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 4 · Triangles from a field</span>Marching tetrahedra</h2>
@@ -178,6 +203,17 @@
         twice the triangles of true marching cubes, with a faint diagonal
         pattern in the mesh from the shared tetrahedron orientation.
       </p>
+      <pre><code>for (let tet of cellTets) {
+  let mask = classify4Corners(tet, surfaceLevel);
+  let crossings = interpolateEdges(tet, field, surfaceLevel);
+  emitTetCase(mask, crossings); <span class="cm">// 0, 1, or 2 triangles</span>
+}</code></pre>
+      <p>
+        The next diagram draws the same extraction problem as a 2D slice. It
+        shows why edge-based methods round tips, why surface nets are smoother,
+        and what dual contouring adds with normals.
+      </p>
+      <div data-scrolly="relief-extractors"></div>
       <div data-demo="pipeline"></div>
       <p>
         This demo shows the complete 3D pipeline from particles to a volume to
@@ -267,6 +303,16 @@
         interpolates between surface nets and this iterative dual-contouring
         approximation.
       </p>
+      <pre><code>var x = massPoint;
+for (var iter = 0u; iter &lt; 10u; iter++) {
+  var correction = vec3f(0.0);
+  for (var i = 0u; i &lt; planeCount; i++) {
+    let plane = planes[i]; <span class="cm">// position + gradient at an edge crossing</span>
+    correction += plane.normal * dot(plane.normal, plane.point - x);
+  }
+  x += sharpness * correction / f32(planeCount);
+}
+x = clamp(x, cellMin, cellMax);</code></pre>
       <aside class="note">
         <span class="note-label">Aside · Why sharpness is a slider and not a switch</span>
         <p>

@@ -1,7 +1,7 @@
 // The dish: part two's magnetized SPH in three dimensions, surfaced every
 // frame by marching tetrahedra, surface nets, or dual contouring, and shaded
-// as glossy ink. Drag orbits; hovering parks a dipole magnet over the pool;
-// ctrl/⌘+wheel zooms.
+// as glossy ink. Drag orbits; hovering parks a dipole magnet over the pool.
+// Non-hero figures also support ctrl/⌘+wheel zoom.
 
 import renderShader from "../../shaders/ferrorender3.wgsl?raw";
 import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
@@ -48,6 +48,7 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
   const surface = new Surface3(dev, sim.field);
 
   const camera = new OrbitCamera();
+  camera.zoomEnabled = !opts.hero;
   camera.attach(shell.canvas);
   camera.distance = opts.hero ? 2.0 : 1.9;
   camera.elevation = opts.hero ? 0.42 : 0.52;
