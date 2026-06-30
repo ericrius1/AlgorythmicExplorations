@@ -1,12 +1,36 @@
 import { wirePage } from "../../core/wirePage";
 import {
+  mountBandgapLossMap,
+  mountBandAlignment,
+  mountCarrierJourney,
+  mountCompositionCompass,
+  mountCostYieldMap,
+  mountDegradationMap,
+  mountJVCurveExplorer,
   mountLayerTradeoffs,
+  mountManufacturingGauntlet,
+  mountProcessWindow,
+  mountSiliconArchitecture,
   mountSpectrumSplitter,
   mountTandemTechTree,
+  mountTandemCircuit,
+  mountTextureCoating,
 } from "../../demos/solar/tandemExplainers";
 
 wirePage({
   "tandem-tree": mountTandemTechTree,
+  "bandgap-loss-map": mountBandgapLossMap,
+  "carrier-journey": mountCarrierJourney,
+  "silicon-architecture": mountSiliconArchitecture,
+  "band-alignment": mountBandAlignment,
   "spectrum-splitter": mountSpectrumSplitter,
+  "composition-compass": mountCompositionCompass,
+  "tandem-circuit": mountTandemCircuit,
+  "texture-coating": mountTextureCoating,
   "layer-tradeoffs": mountLayerTradeoffs,
+  "jv-curve": mountJVCurveExplorer,
+  "degradation-map": mountDegradationMap,
+  "process-window": mountProcessWindow,
+  "manufacturing-gauntlet": mountManufacturingGauntlet,
+  "cost-yield-map": mountCostYieldMap,
 });

@@ -10,7 +10,7 @@
     <title>The Tandem Tree — Solar Stack</title>
     <meta
       name="description"
-      content="An interactive essay about the technical lineage that led to perovskite/silicon tandem solar cells, from silicon PV to bandgap tuning and passivated interfaces."
+      content="A deep interactive essay about the physics, chemistry, manufacturing, and technology lineage behind perovskite/silicon tandem solar cells."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,159 +18,1509 @@
     <main>
       <h1>The Tandem Tree</h1>
       <p class="subtitle">
-        Why the most interesting solar cell today is not a replacement for
-        silicon, but a very thin, very picky crystal grown on top of it.
+        The deep technology lineage behind perovskite/silicon tandem solar
+        cells: photon economics, semiconductor limits, passivated silicon,
+        tunable halide crystals, interface chemistry, module reliability, and
+        the factory math that decides whether a record becomes a product.
       </p>
 
       <p>
-        The first version of this page was a lab instrument: particles, layers,
-        sliders, and not much argument. That was the wrong center of gravity.
-        A perovskite/silicon tandem cell is interesting because it is not one
-        invention. It is a convergence: semiconductor band theory, fifty years
-        of silicon interface engineering, solution-processed thin films,
-        molecular passivation, and an industrial wager that the silicon module
-        does not need to be thrown away to get better.
+        A perovskite/silicon tandem solar cell looks simple from far away. It
+        is a silicon solar cell with an extra light-absorbing film on top. That
+        description is accurate enough to identify the object, but it hides the
+        reason the object matters. The tandem is not just a new coating. It is a
+        stack of solved and unsolved problems arranged in the only order that
+        can make the sun's spectrum look less wasteful.
       </p>
       <p>
-        The short version is simple. Silicon is excellent but spectrally
-        wasteful. A single bandgap cannot use the whole sun efficiently. A
-        tandem cell stacks two absorbers with different bandgaps: the top cell
-        takes high-energy photons, the bottom cell takes the red and infrared
-        photons that pass through. Perovskites became the obvious top-cell
-        candidate because their bandgap can be tuned by chemistry and their
-        films can be only hundreds of nanometers thick.
+        The bottom layer is silicon, the old champion. It is not there because
+        researchers lacked imagination. Silicon is stable, abundant, already
+        manufactured at planetary scale, and supported by an enormous supply
+        chain of wafers, dopants, contacts, glass, encapsulants, inverters,
+        installers, reliability tests, and bank financing. The top layer is the
+        newer wager: a lead-halide perovskite absorber only hundreds of
+        nanometers thick, tuned so that it captures high-energy photons before
+        they dump excess energy into silicon as heat.
+      </p>
+      <p>
+        The promise is not that perovskite replaces silicon. The promise is
+        that silicon may be upgradable. That is a much more interesting claim.
+        A replacement technology has to beat silicon on efficiency, cost,
+        lifetime, scale, reliability, and trust all at once. An upgrade path can
+        ask a narrower question: can a thin top cell add enough watts to an
+        already bankable silicon module without wrecking yield, lifetime, or
+        cost?
+      </p>
+      <p>
+        To answer that, you have to follow several branches of the tree at
+        once. One branch is old semiconductor physics: bandgaps, photon energy,
+        current, voltage, and the single-junction limit. One branch is silicon
+        manufacturing: wafer quality, surface passivation, textured optics,
+        passivated contacts, and module reliability. One branch is perovskite
+        chemistry: iodide, bromide, formamidinium, cesium, additives, grain
+        boundaries, phase segregation, and transport layers. One branch is
+        industrial reality: coating uniformity, thermal budgets, lamination,
+        lead containment, damp heat, warranty risk, and cost per watt.
+      </p>
+      <p>
+        The tree below is zoomable and pannable. It is not a complete history
+        of photovoltaics. It is a map of the pieces that had to exist before
+        perovskite/silicon tandem modules could become a serious commercial
+        subject.
       </p>
 
       <div data-demo="tandem-tree"></div>
 
-      <h2><span class="kicker">The old problem</span>One bandgap sees one slice of the sun</h2>
+      <h2><span class="kicker">The first principle</span>The sun is not one color and a cell is not one bucket</h2>
       <p>
-        A photovoltaic absorber is a gate. Photons below its bandgap do not
-        have enough energy to free an electron and hole. Photons above the
-        bandgap can be absorbed, but the excess energy rapidly becomes heat.
-        This is the core tradeoff behind the Shockley-Queisser limit: choose a
-        low bandgap and you catch more photons but waste more heat; choose a
-        high bandgap and you waste less heat but miss the redder photons.
+        Sunlight is a distribution. Some photons arrive with low energy in the
+        red and near-infrared. Some arrive with higher energy in the blue and
+        violet. A solar cell does not pour all of that energy into an electrical
+        tank. It asks each photon a yes-or-no question: do you have enough
+        energy to move an electron across this material's bandgap?
       </p>
       <p>
-        Silicon's bandgap is about 1.12 eV, which is a strong compromise for a
-        single-junction cell. It is not a perfect answer. Blue and green
-        photons arrive with more energy than silicon needs, and that excess is
-        thermalized. Tandems attack that waste by making the first absorber a
-        better match for high-energy light, then letting silicon do what it
-        already does well underneath.
+        A bandgap is a threshold. Below it, a photon is usually too weak to
+        create a mobile electron and a mobile hole. Above it, a photon can be
+        absorbed, but the cell does not keep the whole packet of photon energy.
+        The extra energy above the bandgap quickly becomes heat. That heat is
+        not a defect in the wiring. It is a thermodynamic consequence of asking
+        a single material to process a broad spectrum.
+      </p>
+      <p>
+        This is the first reason single-junction cells have a ceiling. Pick a
+        low bandgap and the cell catches more photons, but it loses more energy
+        from the blue and green photons as heat. Pick a high bandgap and each
+        absorbed photon can preserve more voltage, but the redder photons pass
+        through. The device designer is balancing current against voltage.
+      </p>
+      <p>
+        Silicon's bandgap, about 1.12 eV at room temperature, is a very useful
+        compromise. It collects a lot of the solar spectrum, and it does so in a
+        material that can survive decades outside. But the compromise is not
+        magic. Blue photons still bring more energy than silicon can convert
+        into voltage. Infrared photons below the threshold still pass through.
+        A tandem cell exists because one absorber cannot be ideal for the whole
+        spectrum.
+      </p>
+
+      <div data-demo="bandgap-loss-map"></div>
+
+      <p>
+        The figure above is deliberately simplified, but the shape of the
+        tradeoff is the important part. The vertical gate is the absorber
+        bandgap. Move it left and more of the spectrum is above threshold, but
+        the high-energy photons waste more excess energy. Move it right and the
+        thermalization waste falls, but transmitted waste rises. The single
+        absorber has no way to make both changes at once.
+      </p>
+      <p>
+        A tandem is the obvious trick once you think in thresholds. Put a
+        wide-bandgap absorber on top. Let it take the blue-green photons where
+        silicon wastes the most excess energy. Let lower-energy photons pass
+        through to silicon. The top cell raises the voltage contribution from
+        high-energy light. The bottom cell keeps silicon's excellent use of red
+        and near-infrared light.
+      </p>
+      <p>
+        That idea is old. Multi-junction cells have been used for space and
+        concentrator photovoltaics for a long time. The hard part is not the
+        concept. The hard part is finding a second absorber that can sit above
+        silicon, absorb strongly in a very thin film, transmit the right
+        wavelengths, connect electrically, and be made over large areas without
+        pricing itself out of the terrestrial solar market.
+      </p>
+
+      <h2><span class="kicker">Shockley and Queisser</span>The limit was a map, not a defeat</h2>
+      <p>
+        Shockley and Queisser's 1961 detailed-balance argument is often
+        summarized as "there is a single-junction efficiency limit." That is
+        true, but the more useful reading is that the paper tells you where the
+        losses live. It separates the idealized conversion problem into photon
+        absorption, radiative recombination, voltage, and the entropy cost of
+        converting a hot, broad photon distribution into electrical work.
+      </p>
+      <p>
+        The limit is not a manufacturing complaint. It does not say your metal
+        grid was bad, your wafer was dirty, or your encapsulant yellowed. It
+        says that even a perfect single-junction device loses energy because it
+        has only one threshold. That is why a tandem is not a gimmick. It is a
+        direct response to the dominant ideal loss channel in a single absorber.
+      </p>
+      <p>
+        There is a second subtlety. A tandem does not simply "add efficiency."
+        It adds constraints. The top and bottom subcells have to work under the
+        same sunlight, at the same temperature, with optical filters and
+        transport layers between them. In the common two-terminal architecture,
+        they also have to carry the same current. The spectral split has to be
+        electrically honest.
       </p>
       <aside class="note">
-        <span class="note-label">The useful mental model</span>
+        <span class="note-label">Mental model</span>
         <p>
-          A tandem is not "twice the solar panel." It is a spectral sorting
-          machine. The top cell should absorb enough blue-green light to make
-          the same current as the silicon bottom cell makes from transmitted
-          red-infrared light. In a series-connected tandem, the weaker current
-          limits the whole stack.
+          A tandem is a spectral sorting machine. The top absorber should take
+          photons that are too energetic for silicon to use efficiently. It
+          should leave enough red and near-infrared photons for silicon. In a
+          two-terminal device, the stack is current-limited by the weaker
+          subcell.
         </p>
       </aside>
 
+      <h2><span class="kicker">From photon to power</span>Absorption is only the first event</h2>
+      <p>
+        It is tempting to talk as if solar cells convert photons directly into
+        electrons in a wire. The actual sequence is more demanding. A photon is
+        absorbed. An electron-hole pair is created. The electron and hole have
+        to avoid recombination. Built-in electric fields, concentration
+        gradients, and selective contacts have to separate them. The electron
+        must reach an electron-selective contact. The hole must reach a
+        hole-selective contact. Both contacts have to extract carriers without
+        blocking too much light or creating new defects.
+      </p>
+      <p>
+        This is where photovoltaic devices become interface machines. A
+        beautiful absorber with terrible contacts is not a good solar cell. A
+        high bandgap with trap-heavy grain boundaries loses voltage. A
+        transparent conductive oxide that absorbs blue light can erase a top
+        cell's spectral advantage. A transport layer with the wrong energy
+        alignment can collect one carrier slowly and let the opposite carrier
+        leak back.
+      </p>
+      <p>
+        In perovskite/silicon tandems, this carrier journey happens twice: once
+        in the perovskite top cell and once in the silicon bottom cell. Between
+        them sits a recombination junction, sometimes called an interconnect,
+        where electrons from one subcell and holes from the other recombine so
+        the series circuit can continue. That sounds like a loss, but in the
+        series architecture it is the intended electrical handshake.
+      </p>
+
+      <div data-demo="carrier-journey"></div>
+
+      <p>
+        The knobs in that diagram are not literal device parameters. They are
+        the three pressures that show up everywhere in the stack. Built-in field
+        gives carriers a direction. Lifetime gives them time to travel.
+        Contact selectivity makes sure each carrier exits through the right
+        layer. A tandem cell that fails any one of those tests can still absorb
+        light, but it will not preserve voltage or fill factor.
+      </p>
+      <p>
+        This distinction matters because perovskites became famous for fast
+        efficiency gains. The absorber itself was impressive: strong optical
+        absorption, long apparent carrier diffusion lengths, and tunable
+        bandgap. But the highest-performance cells were not made by absorber
+        chemistry alone. They came from progressively better control of
+        surfaces, transport layers, passivation, defects, and interfaces.
+      </p>
+
+      <h2><span class="kicker">The silicon inheritance</span>The mature layer was once the fragile layer</h2>
+      <p>
+        Silicon looks inevitable in hindsight because it now dominates the
+        solar market. It was not inevitable at the beginning. Selenium cells
+        showed that solids could convert light to electricity, but they were
+        inefficient. The 1954 Bell Labs silicon cell was a genuine device, but
+        it was expensive. Early silicon photovoltaics made sense first in space,
+        where reliability and power density mattered more than module cost.
+      </p>
+      <p>
+        Terrestrial silicon solar became cheap because many improvements
+        compounded. Crystal growth improved. Wafer slicing improved. Dopant
+        diffusion, screen printing, metallization, anti-reflection coatings,
+        texturing, encapsulation, module assembly, and factory throughput all
+        improved. None of those steps alone explains modern PV. The important
+        point is that silicon became a system, not merely a material.
+      </p>
+      <p>
+        At the cell level, silicon's long lesson was that surfaces are
+        dangerous. A perfect crystal in the middle of a wafer is not enough.
+        The cell has front and rear surfaces, metal contacts, doped regions,
+        defects, and optical textures. Every surface can host dangling bonds
+        and electronic states that let electrons and holes recombine. Every
+        recombination event is a carrier pair that no longer contributes to
+        current or voltage.
+      </p>
+      <p>
+        Passivation is the name for making those surfaces less harmful. It can
+        be chemical, by satisfying dangling bonds. It can be field-effect
+        passivation, by using charge to repel one carrier type from a surface.
+        It can be structural, by designing contacts that let majority carriers
+        through while suppressing minority-carrier recombination. Silicon's
+        modern architectures are best read as increasingly sophisticated
+        passivation strategies.
+      </p>
+      <p>
+        Aluminum back-surface-field cells were robust and manufacturable, but
+        they wasted voltage at the rear. PERC added passivated rear surfaces and
+        local contacts. TOPCon uses a thin tunnel oxide and doped polysilicon
+        contact to reduce contact recombination. HJT uses thin amorphous silicon
+        layers to passivate crystalline silicon surfaces while transparent
+        conductive oxides collect current. These are not just brand names. They
+        are answers to the same physical question: how do you touch a
+        semiconductor without ruining it?
+      </p>
+
+      <div data-demo="silicon-architecture"></div>
+
+      <p>
+        A tandem top cell inherits this silicon progress. If the bottom cell is
+        mediocre, the perovskite layer is trying to decorate a leaky machine.
+        If the bottom cell has high voltage, strong passivated contacts, and
+        good optics, the perovskite has something valuable to amplify. This is
+        one reason perovskite/silicon tandem work often uses HJT or TOPCon-like
+        bottom cells rather than older low-cost silicon designs.
+      </p>
+      <p>
+        The inheritance is also industrial. Silicon manufacturers already know
+        how to make wafers, interconnect cells, laminate modules, test them,
+        ship them, and finance warranties. A tandem company does not get that
+        infrastructure for free, but it can try to plug into it. The commercial
+        question is not "can perovskites beat silicon in a clean-room duel?" It
+        is "can a perovskite top-cell process ride on top of the silicon
+        platform without breaking the platform's economics?"
+      </p>
+
+      <h2><span class="kicker">Band alignment</span>The stack needs electrical diplomacy</h2>
+      <p>
+        Once you start stacking materials, bandgap is not enough. Each layer
+        also has energy levels. A hole transport layer should line up so holes
+        can leave the absorber easily while electrons are blocked. An electron
+        transport layer should do the opposite. A transparent conductive oxide
+        should collect lateral current without stealing too many photons. The
+        recombination junction should connect the two subcells electrically
+        without becoming an optical sponge or a recombination disaster in the
+        wrong place.
+      </p>
+      <p>
+        Energy alignment is a polite phrase for a hard problem. If the offset
+        is too large, a carrier sees a barrier. If it is too favorable in the
+        wrong direction, the contact may inject or leak the wrong carrier. If
+        the interface is chemically rough, it can introduce trap states inside
+        the bandgap. Those trap states provide shortcuts for non-radiative
+        recombination, which usually lowers open-circuit voltage.
+      </p>
+      <p>
+        Self-assembled monolayers, often shortened to SAMs, became important in
+        high-performance perovskite devices because they can tune the hole
+        contact with very little optical penalty. C60, SnO2, and related
+        electron-selective layers became important because they can extract
+        electrons while remaining thin and reasonably transparent. Buffer layers
+        often appear because sputtering a transparent conductor directly onto a
+        soft perovskite stack can damage it.
+      </p>
+
+      <div data-demo="band-alignment"></div>
+
+      <p>
+        In a simple textbook drawing, energy bands are clean horizontal lines.
+        In a real tandem stack, those lines bend, shift, and acquire messy
+        interface states. A dipole at a monolayer can change the effective work
+        function. A contact can pin the Fermi level. A defect-rich interface can
+        act like a recombination highway. A good stack is not merely a list of
+        transparent layers. It is a negotiated energy landscape.
+      </p>
+
+      <h2><span class="kicker">The perovskite detour</span>A crystal structure becomes a tuning platform</h2>
+      <p>
+        Perovskite originally names a crystal structure, not a single solar
+        material. The high-performing solar absorbers in this family are
+        usually lead-halide perovskites with an ABX3-like structure. In the
+        common shorthand, A is a cation such as methylammonium,
+        formamidinium, cesium, or a mixture. B is typically lead for the
+        highest-performing devices. X is a halide such as iodide, bromide, or a
+        mixture of halides.
+      </p>
+      <p>
+        The early photovoltaic story ran through dye-sensitized solar cells.
+        Those devices separated light absorption, charge transport, and contact
+        selectivity in a way that made solution-processed photovoltaic
+        experiments feel plausible. In 2009, organometal halide perovskites
+        appeared as light absorbers in that context. The first devices were not
+        stable enough for the real world, but the absorption was striking.
+      </p>
+      <p>
+        The 2012 shift to solid-state perovskite devices was one of the field's
+        turning points. Removing the liquid electrolyte made perovskites look
+        less like a fragile dye-cell variant and more like a thin-film
+        semiconductor platform. The efficiency rise after that was unusually
+        fast because the material had several favorable properties at once:
+        strong absorption, reasonably long carrier diffusion lengths, low
+        temperature processing, and a bandgap that could be tuned chemically.
+      </p>
+      <p>
+        Bandgap tuning is the critical tandem feature. Pure iodide-rich
+        lead-halide perovskites can have bandgaps too low for the ideal silicon
+        top-cell role. Adding bromide raises the bandgap. Mixing cations can
+        adjust stability, lattice strain, crystallization, and defect
+        chemistry. Additives and surface treatments can passivate defects. The
+        absorber becomes a chemical control surface.
+      </p>
+      <p>
+        That freedom is powerful and dangerous. A high bromide fraction can push
+        the bandgap toward the desired 1.7-1.75 eV region for silicon tandems,
+        but wide-bandgap iodide-bromide perovskites can suffer from
+        light-induced halide segregation. Under illumination, iodide-rich and
+        bromide-rich regions can form, shifting the local bandgap and hurting
+        voltage. A composition that looks perfect by bandgap may be unstable
+        under real operating conditions.
+      </p>
+
+      <div data-demo="composition-compass"></div>
+
+      <p>
+        A formula like <code>FA0.78Cs0.17Rb0.05Pb(I0.65Br0.35)3</code> can look
+        like alphabet soup. In a tandem context it is closer to a recipe card.
+        The formamidinium-rich A-site helps reach a useful baseline structure.
+        Cesium and rubidium-like additions can help tune phase behavior and
+        crystallization. The iodide-bromide ratio tunes the bandgap. The exact
+        recipe is not universal, but the logic is: tune absorption, stability,
+        lattice quality, and interfaces at the same time.
+      </p>
+      <p>
+        This is why perovskite research often sounds obsessively incremental.
+        A paper might change a salt concentration, an anneal time, a surface
+        molecule, a contact layer, a solvent, a buffer, or the order of
+        deposition. Those changes are not trivia. Perovskite devices are
+        sensitive to crystallization pathway, grain boundary chemistry,
+        residual strain, ion migration, and contact reactions. The top cell is
+        a thin film, but it is not a simple paint.
+      </p>
+
+      <h2><span class="kicker">Current matching</span>The tandem works only if the subcells agree</h2>
+      <p>
+        In a two-terminal tandem, the top and bottom subcells are wired in
+        series. That gives a clean module architecture: two external terminals,
+        higher voltage, and a device that can look electrically similar to an
+        ordinary cell string. The penalty is current matching. The same current
+        must flow through both subcells, so the lower-current subcell limits the
+        whole stack.
+      </p>
+      <p>
+        The perovskite top cell therefore has a strangely specific job. It must
+        absorb enough high-energy light to make a strong current, but it must
+        not absorb so much or so far into the red that the silicon bottom cell
+        is starved. Its bandgap, thickness, texture, optical constants, and
+        parasitic absorption in contacts all matter. The target is not maximum
+        top-cell current. The target is maximum matched tandem power.
+      </p>
+      <p>
+        The incoming spectrum also moves. Real modules see morning and evening
+        light, clouds, haze, seasonal air mass changes, temperature shifts, and
+        angular effects. A two-terminal tandem optimized under the standard
+        test spectrum can see current mismatch under other spectra. That does
+        not make the architecture wrong, but it means energy yield is a better
+        question than one standard-test efficiency number.
+      </p>
+
       <div data-demo="spectrum-splitter"></div>
 
-      <h2><span class="kicker">Why perovskite</span>The top cell can be tuned by composition</h2>
       <p>
-        "Perovskite" names a crystal structure rather than one exact material.
-        The lead-halide perovskites used in high-performance tandems are
-        compositionally flexible: formamidinium, cesium, and rubidium can share
-        the A-site; iodide and bromide share the halide site. Raise the bromide
-        fraction and the bandgap rises. Lower it and the top cell absorbs more
-        of the visible spectrum.
+        In the diagram, increasing bromide raises the perovskite bandgap. That
+        can pass more red light to silicon, but it also changes the top-cell
+        current and stability risk. Defects and passivation change how much of
+        the photogenerated current survives. The toy model is not predicting a
+        certified efficiency. It is showing the three simultaneous negotiations:
+        spectral split, current match, and non-radiative loss.
+      </p>
+
+      <h2><span class="kicker">2T, 3T, 4T</span>The circuit topology is a philosophy</h2>
+      <p>
+        The phrase "perovskite/silicon tandem" hides multiple electrical
+        architectures. A two-terminal tandem connects the subcells in series and
+        exposes one pair of external contacts. A four-terminal tandem lets the
+        top and bottom cells operate more independently, often by stacking a
+        semi-transparent top module over a silicon bottom module. Three-terminal
+        approaches try to share contacts and split the difference.
       </p>
       <p>
-        That chemical freedom is why formulas such as
-        <code>FA0.78Cs0.17Rb0.05Pb(I0.65Br0.35)3</code> show up in papers. The
-        formula is not ornament. It is the control surface. Bromide tunes the
-        bandgap toward the 1.7-1.75 eV region that pairs well with silicon, but
-        too much bromide can increase phase segregation risk. The best recipe
-        is therefore not the absorber with the most impressive isolated
-        absorption. It is the absorber that makes the two subcells agree.
+        The two-terminal design is attractive because it can fit most naturally
+        into existing module wiring. It also adds the top and bottom subcell
+        voltages directly. But it demands current matching and a very good
+        recombination junction between subcells. The four-terminal design can
+        tolerate spectral mismatch better because each subcell has its own
+        operating point, but it usually pays with extra transparent electrodes,
+        optical losses, wiring complexity, and less elegant manufacturing.
       </p>
       <p>
-        This is also why the supporting layers matter. Transparent conductive
-        oxides collect charge without blocking light. Self-assembled monolayers
-        act as hole-selective interfaces. C60 and SnO2 extract electrons.
-        Passivation molecules reduce defects where carriers would otherwise
-        recombine. The stack succeeds when every interface is slightly less
-        hostile to the carrier that needs to cross it.
+        This is not only a device-physics choice. It is a product choice. A
+        small research cell can explore exotic terminals. A commercial module
+        must be laminated, interconnected, bypassed, certified, installed, and
+        integrated with power electronics. The best physics architecture is not
+        automatically the best module architecture.
+      </p>
+
+      <div data-demo="tandem-circuit"></div>
+
+      <p>
+        The current-matching penalty in a two-terminal tandem is real, but the
+        reward is also real: one stack, one current path, two voltage
+        contributions. That is why so much industrial attention goes to
+        two-terminal monolithic tandems. They are unforgiving, but if they work
+        they are the cleanest upgrade path for silicon modules.
+      </p>
+
+      <h2><span class="kicker">Texture</span>The silicon surface is not flat, and that matters</h2>
+      <p>
+        High-efficiency silicon cells are often textured. Microscopic pyramids
+        or related surface structures reduce reflection and increase the path
+        length of light inside the wafer. Texturing is one of the tricks that
+        helped silicon squeeze more current from each wafer. For a tandem,
+        texture is both a gift and a problem.
+      </p>
+      <p>
+        The gift is optical. A textured surface can help trap light and reduce
+        reflection, improving current in the bottom cell and sometimes the top
+        cell. The problem is coating. A perovskite film that forms beautifully
+        on a flat lab substrate may not coat sharp silicon pyramids uniformly.
+        Thin spots can become shunts. Thick spots can alter current matching.
+        Voids and pinholes can become reliability failures.
+      </p>
+      <p>
+        Planarizing the silicon makes coating easier but may lose optical
+        advantages. Fully textured tandems can preserve optical performance but
+        require deposition processes that can coat rough topography. Hybrid
+        approaches texture one side, smooth another, or use optical management
+        layers to recover some light trapping. Again, the tandem is a stack of
+        compromises, not a single material decision.
+      </p>
+
+      <div data-demo="texture-coating"></div>
+
+      <p>
+        The deeper lesson is that "add a perovskite layer" is not a literal
+        instruction. The surface underneath determines the coating process. The
+        coating process determines grain structure and pinhole statistics. The
+        grain structure and pinholes determine recombination, shunting, and
+        stability. The optical texture that helped silicon can become a
+        manufacturing challenge for the top cell.
+      </p>
+
+      <h2><span class="kicker">Layer stack</span>Every layer has a job and every job has a side effect</h2>
+      <p>
+        A finished tandem cross-section can look like a pile of thin colored
+        stripes. The pile is more disciplined than it appears. Glass and
+        encapsulant protect the module while admitting light. A transparent
+        conductive oxide spreads current across the top cell. A hole-selective
+        layer extracts holes and blocks electrons. The perovskite absorber
+        converts high-energy photons. An electron-selective layer extracts
+        electrons and blocks holes. A recombination junction connects the two
+        subcells. The silicon bottom cell absorbs transmitted light. Rear
+        contacts close the circuit.
+      </p>
+      <p>
+        The trouble is that no layer performs only its intended job. Transparent
+        conductive oxides can absorb or reflect light. Sputtered layers can
+        damage soft organic or perovskite layers below them. Transport layers
+        can chemically react with the absorber. Metal contacts can diffuse.
+        Passivation molecules can help one interface while complicating the next
+        deposition step. Encapsulation can protect from moisture but introduce
+        thermal or mechanical stress.
+      </p>
+      <p>
+        The stack is full of parasitic losses. A little absorption in a contact
+        layer steals photons before they reach the absorber. A little series
+        resistance reduces fill factor. A little shunt leakage drains current.
+        A few interface traps lower voltage. A small instability that is
+        invisible in a short test can accumulate during years of operation.
       </p>
 
       <div data-demo="layer-tradeoffs"></div>
 
-      <h2><span class="kicker">The silicon inheritance</span>Tandems stand on industrial wafers</h2>
       <p>
-        Perovskites did not make silicon obsolete. They made silicon more
-        valuable. The bottom cell in a tandem can be a high-quality HJT or
-        TOPCon-style silicon device with excellent passivated contacts. That
-        matters because the tandem inherits the voltage, current collection,
-        module packaging, and manufacturing discipline of a huge existing
-        industry.
+        That is why interface passivation keeps reappearing. It is not
+        decorative chemistry. It removes or neutralizes trap states that would
+        otherwise give carriers an easy recombination path. In silicon,
+        passivation was learned over decades. In perovskites, the same lesson
+        arrived compressed into a faster and messier research cycle because
+        every layer is thin, every interface is close, and every defect can
+        matter.
       </p>
-      <p>
-        The practical question is therefore less romantic than "what is the
-        future material?" It is: can a thin perovskite process be added on top
-        of silicon wafers without wrecking yield, lifetime, cost, or module
-        reliability? Laboratory cells in the mid-30% range show why the attempt
-        is worth making. Fielded modules have to survive heat, moisture,
-        ultraviolet light, electrical bias, and imperfect encapsulation for
-        years.
-      </p>
+
       <details class="fold">
-        <summary>Deep dive: why passivation keeps appearing</summary>
+        <summary>Deep dive: why open-circuit voltage is so sensitive</summary>
         <div class="fold-body">
           <p>
-            Photovoltaics is a surface problem disguised as a bulk-material
-            problem. Absorbers create electron-hole pairs in the volume, but
-            useful power is lost when those carriers hit dangling bonds,
-            vacancies, rough contacts, or chemically unstable interfaces before
-            they are collected. Silicon learned this slowly through oxides,
-            texturing, PERC, HJT, and TOPCon. Perovskites are learning it faster
-            because nearly every layer in the stack is an interface.
+            Open-circuit voltage is not just a materials number. It reflects how
+            far the electron and hole quasi-Fermi levels split under
+            illumination. Non-radiative recombination reduces that splitting.
+            Defect states at grain boundaries, surfaces, and contacts make
+            non-radiative recombination easier, so they lower voltage even when
+            optical absorption looks strong.
           </p>
           <p>
-            Passivation does not make the material magical. It removes traps
-            from the carrier's path. That is why molecules such as melamine or
-            pyridine/imidazolium-style additives matter: they are small chemical
-            patches at places where the electrical model would otherwise leak.
+            This is why a cell can have excellent short-circuit current and
+            still be disappointing. It may absorb photons and create carriers,
+            but if recombination is too fast the device cannot sustain a high
+            voltage. Tandem cells need high current and high voltage from both
+            subcells, so voltage loss at the perovskite top-cell interfaces is
+            especially expensive.
           </p>
         </div>
       </details>
 
-      <h2><span class="kicker">Where the cutting edge is</span>From record cells to products</h2>
+      <h2><span class="kicker">Measurement</span>A record efficiency is a compressed story</h2>
       <p>
-        The record-efficiency race is real, but it is not the whole story.
-        Certified perovskite/silicon tandem cells have moved beyond 30% and
-        into the mid-30% range. That is far above ordinary commercial silicon
-        modules, and it is close enough to theoretical promise that investors
-        and manufacturers have to pay attention.
+        A certified efficiency number is usually calculated from the current
+        density-voltage curve under standardized illumination. The cell is swept
+        through voltage values while current is measured. The maximum-power
+        point is where voltage times current is largest. Efficiency is that
+        maximum electrical power divided by incoming optical power over the cell
+        area.
       </p>
       <p>
-        The hard part is that a record cell is small, watched carefully, and
-        optimized for a measurement. A product is large, repeated thousands of
-        times, laminated, shipped, heated, cooled, shaded, biased, and expected
-        to keep working. The cutting edge is therefore half physics and half
-        manufacturing: wider bandgap stability, textured silicon compatibility,
-        low-temperature processing, lead containment, scalable deposition,
-        encapsulation, and bankable lifetime data.
+        Several quantities hide inside the final number. Short-circuit current
+        tells you how much photocurrent the device can provide near zero
+        voltage. Open-circuit voltage tells you how much voltage the illuminated
+        device can sustain when no current is drawn. Fill factor tells you how
+        square the J-V curve is, or how close the real maximum-power rectangle
+        comes to the ideal rectangle implied by current and voltage. Series
+        resistance, shunts, and recombination all deform the curve.
       </p>
       <p>
-        That is why the technology tree above ends at "factories begin," not
-        "problem solved." The exciting claim is not that perovskites already
-        replaced silicon. The exciting claim is subtler: the silicon solar
-        panel may have a second act, and it is made from a film thin enough to
-        look like chemistry but precise enough to behave like a semiconductor.
+        Perovskites added another measurement complication: hysteresis. Ion
+        motion, interfacial charge accumulation, and slow internal relaxation
+        can make the measured J-V curve depend on scan direction and scan rate.
+        The field has learned to handle this more carefully, but it is one
+        reason serious claims need certified measurements, stabilized maximum
+        power point tracking, and transparent test conditions.
+      </p>
+
+      <div data-demo="jv-curve"></div>
+
+      <p>
+        This measurement perspective helps separate three claims that are often
+        mixed together. First, a record cell proves a stack can reach a certain
+        peak under controlled conditions. Second, a stable lab device proves
+        that the number is not merely a scan artifact. Third, a product proves
+        that the stack can be made repeatedly, packaged, shipped, and operated
+        outside for years. Each claim is harder than the previous one.
+      </p>
+
+      <h2><span class="kicker">Degradation</span>The failure modes are physical, chemical, and architectural</h2>
+      <p>
+        Silicon modules earned trust because they can last. A product may be
+        sold with a warranty measured in decades. Perovskite/silicon tandems
+        must enter that trust regime, not just a research chart. That means
+        degradation is not a side topic. It is central to whether the technology
+        can matter at scale.
+      </p>
+      <p>
+        Perovskite materials can be sensitive to moisture and oxygen. They can
+        suffer under heat. Halide ions can migrate under illumination and bias.
+        Wide-bandgap iodide-bromide compositions can phase-segregate under
+        light. Contacts can react with the perovskite or transport layers.
+        Transparent conductive oxides and sputter processes can introduce
+        damage. Encapsulation can slow ingress, but edges, interfaces, and
+        thermal cycling remain real stress points.
+      </p>
+      <p>
+        A tandem adds another layer of reliability coupling. If the top cell
+        degrades faster than the bottom cell, current matching changes. If the
+        recombination junction changes resistance, fill factor falls. If a
+        transport layer absorbs more light after aging, the spectral split
+        moves. If moisture reaches a sensitive interface, it may not merely
+        lower perovskite performance; it can also affect contact adhesion and
+        module isolation.
+      </p>
+
+      <div data-demo="degradation-map"></div>
+
+      <p>
+        Good encapsulation is necessary but not sufficient. The absorber itself
+        needs more stable compositions. Interfaces need fewer reactive pathways.
+        Contacts need diffusion barriers. Edge seals need to survive damp heat.
+        Modules need accelerated testing that correlates with outdoor field
+        data. The most credible tandem progress is therefore not just higher
+        efficiency. It is higher efficiency plus slower degradation under
+        stresses that resemble reality.
+      </p>
+      <p>
+        Lead is part of this conversation. The highest-performing perovskite
+        absorbers are lead based. The amount of lead in a thin perovskite film
+        is small compared with many industrial material flows, but toxicity
+        still matters because modules break, burn, flood, and age. Serious
+        commercialization needs lead containment, recycling plans, encapsulation
+        strategies, and credible lifecycle accounting. Ignoring the issue is
+        not engineering. Designing for containment is.
+      </p>
+
+      <h2><span class="kicker">Process windows</span>What works on a spin coater may not work in a factory</h2>
+      <p>
+        The earliest impressive perovskite cells were often made with lab-scale
+        processes such as spin coating. Spin coating is excellent for research
+        because it makes small uniform films quickly and lets scientists explore
+        compositions. It is not the natural way to coat millions of full-size
+        wafers or modules. Industrial production needs scalable deposition:
+        slot-die coating, blade coating, evaporation, hybrid vapor-solution
+        routes, sputter-compatible buffers, or other processes that can be
+        controlled over large areas.
+      </p>
+      <p>
+        Scaling a perovskite film is not only a question of making a bigger wet
+        patch. Crystallization is dynamic. Solvent evaporation, supersaturation,
+        nucleation, grain growth, additives, antisolvent timing, humidity,
+        temperature, and substrate texture can all change film quality. A recipe
+        that gives beautiful grains on a small glass sample may produce
+        streaks, pinholes, nonuniform thickness, or local stoichiometry changes
+        when translated to a faster line.
+      </p>
+      <p>
+        A silicon tandem process also has to respect the bottom cell. Some
+        high-performance silicon architectures dislike high thermal budgets.
+        Some surfaces are textured. Some contacts are sensitive to later
+        processing. A perovskite process must crystallize the top absorber,
+        protect interfaces, and create transparent contacts while staying
+        compatible with the wafer underneath.
+      </p>
+
+      <div data-demo="process-window"></div>
+
+      <p>
+        Factory recipes live in process windows. Too slow and the line loses
+        throughput. Too fast and the film loses uniformity. Too hot and the
+        bottom cell or contacts may suffer. Too gentle and the perovskite may
+        not crystallize properly. Too much solvent sensitivity and humidity
+        becomes a production variable. The winning process is not the most
+        elegant lab chemistry. It is the chemistry with a wide enough process
+        window to make good devices repeatedly.
+      </p>
+
+      <h2><span class="kicker">Record cell vs module</span>Area changes the statistics</h2>
+      <p>
+        A record cell can be small, carefully selected, and measured under
+        controlled conditions. That is not a criticism. Research records are
+        useful because they show what is physically possible. But a module is a
+        population of cells and interconnects over a large area. It has edge
+        seals, glass, encapsulants, busbars, bypass diodes, junction boxes,
+        frames, and packaging. It is handled by machines and people. It sits
+        outside.
+      </p>
+      <p>
+        Scaling changes defect statistics. A rare pinhole on a square
+        centimeter becomes less rare across a full module. A local shunt that
+        barely affects a tiny test cell can matter when repeated. A coating
+        gradient that is invisible in a narrow sample can shift current matching
+        across a large aperture. A lab cell can be measured soon after
+        fabrication. A product has to survive shipping, installation, heat,
+        cold, humidity, UV, wind, and electrical operation.
+      </p>
+      <p>
+        This is why industrial-format module results are important even when
+        their efficiencies trail tiny champion cells. A full-sized or
+        residential-format tandem module is a different claim. It says the
+        technology is leaving the single-cell proof stage and entering the
+        repeatability stage. Fraunhofer ISE and Oxford PV's industrial-format
+        25% module announcement in 2024 mattered for that reason: it was not
+        the absolute cell record, but it was closer to the object the market
+        buys.
+      </p>
+
+      <div data-demo="manufacturing-gauntlet"></div>
+
+      <p>
+        The gauntlet is long because the product must pass all gates at once.
+        A module with high initial efficiency and poor damp-heat stability is
+        not ready. A stable module with low yield may be too expensive. A high
+        yield process with too much parasitic absorption may not justify the
+        perovskite step. A beautiful cell that cannot be laminated or
+        interconnected is not yet a product. Commercialization is the art of
+        making every gate boring.
+      </p>
+
+      <h2><span class="kicker">Factory economics</span>The value proposition is watts per trusted dollar</h2>
+      <p>
+        Solar manufacturing is brutally sensitive to cost per watt. A tandem
+        module can be more expensive per square meter and still win if it
+        produces enough extra watts from the same area. That matters for roofs,
+        land, racking, wiring, labor, permitting, and balance-of-system costs.
+        Higher efficiency can lower costs outside the module itself. But the
+        perovskite step has to preserve enough yield and reliability for those
+        gains to survive.
+      </p>
+      <p>
+        The value equation is not just efficiency minus cost. It includes added
+        capital equipment, consumables, throughput, downtime, scrap, quality
+        control, encapsulation changes, warranty reserves, bankability, and
+        customer trust. A small efficiency gain with high process risk is not
+        attractive. A large efficiency gain with moderate added complexity can
+        be attractive if the module remains reliable and manufacturable.
+      </p>
+      <p>
+        Bankability is a technical word with financial consequences. Lenders
+        and project owners do not only ask whether a module is efficient. They
+        ask whether its degradation is predictable, whether warranties are
+        credible, whether the manufacturer will exist, whether field data
+        supports the claims, and whether insurers and certification bodies are
+        comfortable. For a new PV technology, trust compounds more slowly than
+        lab efficiency.
+      </p>
+
+      <div data-demo="cost-yield-map"></div>
+
+      <p>
+        This is why the best commercial story for tandems is not "new material
+        beats old material." It is "a controlled top-cell process adds a
+        meaningful energy-yield gain to silicon without asking the whole solar
+        industry to rebuild itself." The module can be premium first: rooftops
+        with limited area, high-value installations, or customers who care about
+        watts per panel. Broader adoption requires the premium to shrink and
+        field data to grow.
+      </p>
+
+      <h2><span class="kicker">Optical accounting</span>The photons have to survive the whole stack</h2>
+      <p>
+        It is easy to talk about the perovskite top cell as if it simply catches
+        blue light and lets red light pass. The optical problem is more
+        detailed. Every layer has a refractive index. Every interface can
+        reflect. Every film has some absorption. A transparent conductive oxide
+        is transparent only within limits. A hole transport layer can steal
+        ultraviolet or blue photons. A metal grid shades part of the aperture.
+        Textured silicon scatters light. Encapsulation changes angles and
+        reflection. The current that reaches each subcell is the result of the
+        entire optical stack, not just the absorber bandgaps.
+      </p>
+      <p>
+        External quantum efficiency, or EQE, is one way researchers unpack that
+        accounting. EQE asks how many collected electrons emerge per incoming
+        photon at each wavelength. In a tandem, the top and bottom subcell EQE
+        curves reveal the spectral split. If the top cell has a weak EQE in the
+        blue, a transport layer may be absorbing or recombination may be too
+        high. If the bottom silicon EQE is starved near the visible-red edge,
+        the perovskite may be too thick or too low-bandgap. If both curves look
+        strong but the J-V curve is weak, the problem may be voltage, series
+        resistance, or current matching under the test spectrum.
+      </p>
+      <p>
+        Optical design becomes more complicated under real sunlight because
+        spectrum and angle change. At noon under clear sky, the spectrum differs
+        from late afternoon light passing through more atmosphere. A rooftop at
+        high latitude sees different angular distributions than a desert
+        tracker. Bifacial modules receive rear-side light with different
+        spectra and intensities. A tandem can be optimized for standard test
+        conditions and still have energy-yield behavior that depends on climate.
+        That is why the best module question is not only "what is the STC
+        efficiency?" but "what is the annual energy yield in the intended
+        deployment?"
+      </p>
+      <p>
+        Parasitic absorption is especially painful in a tandem top stack because
+        it steals photons before they are assigned to either subcell. If a
+        contact layer absorbs blue light, it reduces top-cell current. If an
+        interconnect or transport layer absorbs red light, it reduces the
+        silicon bottom-cell current. If a transparent electrode is too resistive,
+        the cell may need a denser metal grid, which shades more light. Optical
+        and electrical optimization are coupled: a layer that is better
+        electrically can be worse optically, and the right answer depends on
+        the whole stack.
+      </p>
+      <p>
+        Anti-reflection coatings and texture help, but they do not remove the
+        accounting problem. Texture can reduce front reflection and improve
+        light trapping, but it changes the local angle at which light meets the
+        perovskite film. A top cell grown on a textured surface may absorb
+        differently than a planar-film model predicts. Scattering that helps
+        silicon can create a longer optical path through parasitic layers.
+        Industrial tandem design therefore leans on optical simulation,
+        measured EQE, reflectance, transmittance, and module-level energy-yield
+        models rather than a single bandgap calculation.
+      </p>
+
+      <h2><span class="kicker">Thermal reality</span>Efficiency lives at operating temperature, not just 25 C</h2>
+      <p>
+        Standard test conditions use 25 C cell temperature, but modules in the
+        field often run much hotter. Rooftop modules can operate tens of
+        degrees above ambient temperature. Desert modules see high irradiance,
+        high ambient heat, and thermal cycling. Silicon has a temperature
+        coefficient: as temperature rises, voltage falls. Perovskite layers also
+        have temperature-dependent bandgaps, transport behavior, and
+        degradation pathways. A tandem is not immune to heat just because it has
+        a higher efficiency.
+      </p>
+      <p>
+        Higher module efficiency can reduce heat per watt delivered because
+        more incoming energy becomes electricity rather than heat. But the
+        module still absorbs a large fraction of solar power as heat. The
+        perovskite top cell may change the absorption profile, and the
+        additional layers can change thermal transport. Encapsulants, glass,
+        backsheets, frames, mounting, and airflow all influence operating
+        temperature. A module's thermal behavior is therefore a product
+        property, not only a cell property.
+      </p>
+      <p>
+        Thermal stress also attacks interfaces. Materials expand at different
+        rates. Daily cycling can create mechanical strain, delamination risk,
+        and microcracks. A thin perovskite film may be mechanically compliant in
+        some ways, but the full stack includes brittle oxides, metal grids,
+        organic layers, silicon wafers, encapsulants, and glass. A contact that
+        looks stable in a short lab test may behave differently after thousands
+        of thermal cycles.
+      </p>
+      <p>
+        Temperature also affects current matching. Bandgaps shift with
+        temperature, and the two subcells may not shift identically. The
+        top-cell absorption edge, bottom-cell voltage, recombination rates, and
+        series resistance can all move. A two-terminal tandem that is perfectly
+        matched at 25 C and one spectrum may become less matched at a hotter
+        operating point. This does not doom the design, but it makes field
+        energy-yield modeling essential.
+      </p>
+      <p>
+        Heat is also a reliability accelerator. Many degradation tests use high
+        temperature because chemical reaction rates often increase with
+        temperature. Damp heat testing combines heat and humidity. Thermal
+        cycling alternates high and low temperature. UV exposure, electrical
+        bias, and heat can interact. A perovskite/silicon module must therefore
+        be judged not only by initial efficiency at a neat test condition, but
+        by how it behaves under coupled stress.
+      </p>
+
+      <h2><span class="kicker">The interconnect</span>The quiet middle layer can make or break the tandem</h2>
+      <p>
+        In a monolithic two-terminal tandem, the subcells are stacked in series.
+        Somewhere between them, electrons from one subcell and holes from the
+        other have to recombine so current can continue through the device. That
+        region is often called the recombination junction, tunnel junction, or
+        interconnecting layer, depending on the exact design. It is easy to skip
+        over because it is not the light absorber. That is a mistake. The middle
+        layer is a central part of the tandem.
+      </p>
+      <p>
+        A good interconnect has contradictory requirements. It should be
+        electrically conductive enough to avoid series resistance. It should
+        allow the intended recombination between subcells. It should block
+        chemical damage between neighboring layers. It should remain optically
+        transparent to photons that need to reach silicon. It should survive
+        later deposition steps. It should be compatible with texture, thermal
+        budget, and module processing. In a device only micrometers thick, the
+        interconnect is both an electrical component and a process shield.
+      </p>
+      <p>
+        If the interconnect absorbs light, silicon current falls. If it is too
+        resistive, fill factor falls. If it reacts chemically, stability falls.
+        If it has poor coverage over textured features, shunts can appear. If
+        it is damaged by sputtering or thermal processing, both subcells can
+        suffer. A tandem failure may therefore show up as a weak J-V curve even
+        though each absorber looked strong in isolation.
+      </p>
+      <p>
+        This is another reason tandem optimization is not the sum of two
+        single-junction optimizations. The top cell, interconnect, and bottom
+        cell are coupled. Changing a top-cell transport layer can force a
+        different interconnect. Changing the silicon texture can force a
+        different perovskite deposition route. Changing the transparent
+        conductor can change optical losses and contact resistance. The
+        interconnect is where these choices collide.
+      </p>
+
+      <h2><span class="kicker">Metrology</span>Seeing inside a tandem is harder than measuring one cell</h2>
+      <p>
+        Tandems need more diagnostic tools than ordinary single-junction cells
+        because the final J-V curve blends multiple subcell behaviors. If the
+        stack current is low, is the top cell weak, the bottom cell starved, or
+        a transport layer absorbing light? If voltage is low, is the top
+        absorber defective, the silicon bottom cell leaky, the interconnect bad,
+        or an interface recombining? If fill factor is low, is the problem
+        series resistance, shunting, ion motion, contact barriers, or current
+        mismatch?
+      </p>
+      <p>
+        Spectral response measurements help separate the subcells. Light-bias
+        techniques can hold one subcell near operating conditions while probing
+        the other. Photoluminescence can reveal non-radiative recombination and
+        voltage losses. Electroluminescence can show shunts, cracks, and
+        inactive regions. Lock-in thermography can reveal local heating from
+        shunts or resistive losses. Cross-sectional microscopy and spectroscopy
+        can show layer coverage, diffusion, and chemical changes.
+      </p>
+      <p>
+        Module metrology adds another layer. A cell may look good before
+        lamination and worse after. Lamination pressure, temperature, and
+        encapsulant chemistry can alter interfaces. Interconnection can crack
+        brittle layers. Edge seals can determine moisture ingress. Hot spots can
+        appear under partial shade. A tandem module may need diagnostics that
+        distinguish perovskite top-cell degradation from silicon bottom-cell
+        behavior across many cells.
+      </p>
+      <p>
+        Good metrology is not just for academic understanding. It is factory
+        infrastructure. Production lines need fast inspection methods that can
+        catch pinholes, coating nonuniformity, shunts, bad contacts, and
+        lamination defects before expensive downstream steps. A slow microscope
+        can explain a failure. A factory needs inline measurements that prevent
+        thousands of repeated failures.
+      </p>
+
+      <h2><span class="kicker">Standards</span>Reliability has to become comparable</h2>
+      <p>
+        Silicon modules benefited from standardized testing and decades of
+        field data. Tests such as damp heat, thermal cycling, humidity-freeze,
+        mechanical load, hail, UV exposure, insulation, and potential-induced
+        degradation do not perfectly predict every climate, but they create a
+        shared language for reliability. Perovskite/silicon modules have to
+        enter that language while also proving that the tests stress the
+        relevant perovskite failure modes.
+      </p>
+      <p>
+        Accelerated testing is difficult because acceleration can change
+        mechanisms. A high-temperature test may exaggerate one reaction pathway
+        while missing another. Continuous illumination may not mimic day-night
+        cycling. Indoor spectra may not reproduce outdoor UV and infrared
+        balance. Electrical bias can interact with ion migration differently
+        depending on temperature and humidity. The challenge is not merely to
+        pass a test, but to know what passing means.
+      </p>
+      <p>
+        Field data matters because modules are exposed to combinations of
+        stresses. A coastal site adds salt and humidity. A desert site adds heat
+        and sand. A snowy site adds freeze-thaw cycles and mechanical loads. A
+        rooftop installation may run hotter than an open-rack system. A tandem
+        design that is stable in one climate may need different encapsulation or
+        operating assumptions in another.
+      </p>
+      <p>
+        Standards also affect finance. Project owners and lenders need
+        comparable degradation curves, warranty assumptions, and failure-rate
+        data. A module can be scientifically exciting and still move slowly into
+        utility-scale deployment if the risk model is unclear. This is why
+        early commercial tandem deployments are likely to be watched closely:
+        every fielded module is also a data point in the bankability story.
+      </p>
+
+      <h2><span class="kicker">The silicon counterattack</span>The incumbent is still improving</h2>
+      <p>
+        A new technology does not compete against a frozen incumbent. Silicon
+        keeps improving. TOPCon, HJT, back-contact designs, better metallization,
+        thinner wafers, lower silver use, better passivation, larger wafers,
+        bifacial modules, and manufacturing scale all continue to push the
+        baseline. Tandems therefore chase a moving target. The perovskite layer
+        has to add value above whatever silicon can deliver by itself at the
+        same time.
+      </p>
+      <p>
+        This matters for market timing. If mainstream silicon modules are cheap
+        and efficient enough for many installations, a tandem product needs a
+        clear premium use case. Area-constrained rooftops are obvious because
+        extra watts per panel can matter more than the lowest module price.
+        High-labor installations may value fewer panels for the same power.
+        Utility projects may be more sensitive to bankability and module cost,
+        but even there high efficiency can reduce land, racking, wiring, and
+        labor.
+      </p>
+      <p>
+        The incumbent's strength is also the tandem's opportunity. Because the
+        bottom cell is silicon, improvements in silicon can help tandems too.
+        Better passivated contacts raise the tandem baseline. Better wafers
+        improve voltage and current. Better module packaging helps the whole
+        stack. The competition is partly symbiotic: the perovskite top cell
+        needs silicon to stay excellent.
+      </p>
+      <p>
+        This is why the "replacement" narrative is misleading. Perovskite-only
+        products may eventually matter in lightweight, flexible, or
+        building-integrated markets, but perovskite/silicon tandems are more
+        like an advanced silicon architecture. They use a new semiconductor to
+        extend the incumbent's performance. The better silicon becomes, the
+        harder the benchmark becomes, but the more valuable a successful tandem
+        bottom cell can be.
+      </p>
+
+      <h2><span class="kicker">Alternative paths</span>Perovskite/silicon is not the only tandem idea</h2>
+      <p>
+        Perovskite/silicon is the most commercially visible tandem path because
+        silicon is already everywhere. But the broader tandem landscape is
+        larger. III-V multi-junction cells achieve very high efficiencies,
+        especially under concentration or in space, but their cost structure is
+        not suited to ordinary flat-plate terrestrial modules. Perovskite/CIGS
+        tandems pair a perovskite top cell with a thin-film bottom cell.
+        All-perovskite tandems pair a wide-bandgap perovskite top cell with a
+        lower-bandgap perovskite or tin-lead perovskite bottom cell. Triple
+        junctions add still more spectral slices.
+      </p>
+      <p>
+        Each path trades one difficulty for another. III-V tandems have superb
+        material quality but expensive epitaxy. CIGS brings thin-film
+        flexibility but has its own manufacturing and materials constraints.
+        All-perovskite tandems could be lightweight and low-temperature, but
+        low-bandgap tin-lead perovskites bring oxidation and stability
+        challenges. Triple junctions can raise theoretical ceilings but multiply
+        current matching, optical loss, and process complexity.
+      </p>
+      <p>
+        Silicon tandems are compelling because they choose a mature bottom cell
+        and concentrate the new risk in the top cell. That is conservative in
+        the best engineering sense. It does not eliminate risk, but it localizes
+        the most unfamiliar process. The industrial question becomes whether
+        that localized risk is small enough and valuable enough to attach to an
+        enormous existing manufacturing base.
+      </p>
+
+      <h2><span class="kicker">Deployment niches</span>Where the first wins may show up</h2>
+      <p>
+        The first successful tandem products do not have to conquer every solar
+        market at once. They need places where the extra efficiency is worth the
+        premium and where the reliability data is convincing enough for the
+        buyer. Residential rooftops are a natural early niche because roof area
+        is limited and installation soft costs are high. A higher-wattage module
+        can reduce the number of panels needed for a given system size or raise
+        system size on a constrained roof.
+      </p>
+      <p>
+        Commercial rooftops and space-constrained industrial sites are similar.
+        There may be value in more power from the same roof area, especially
+        where structural, permitting, or interconnection constraints limit
+        expansion. Premium modules can also appeal to customers who want maximum
+        output from a specific surface. These markets may tolerate higher
+        module cost if the installed-system value is clear.
+      </p>
+      <p>
+        Utility-scale adoption may be slower because the buyer is often highly
+        cost-sensitive and bankability-focused. But high efficiency can still
+        matter at utility scale by reducing land use, racking, trackers,
+        cabling, labor, and some balance-of-system costs. The barrier is trust:
+        project finance wants long-term degradation data and predictable
+        warranty risk. Tandems need time in the field to earn that trust.
+      </p>
+      <p>
+        There are also special cases. Tandem modules could be valuable where
+        shipping weight, area, or installation labor dominates. They could pair
+        with building-integrated products if aesthetics and form factor align.
+        They could matter in markets with high electricity prices or limited
+        land. The broad market will care about cost per delivered kilowatt-hour,
+        but the first market may care about watts per scarce surface.
+      </p>
+
+      <h2><span class="kicker">A practical glossary</span>The terms that keep doing work</h2>
+      <p>
+        Bandgap is the photon-energy threshold that determines which photons an
+        absorber can use. A wider bandgap generally gives higher voltage and
+        lower current; a narrower bandgap generally gives lower voltage and
+        higher current. In a tandem, the top bandgap should be wide enough to
+        harvest high-energy photons efficiently while leaving lower-energy
+        photons for the bottom cell.
+      </p>
+      <p>
+        Current matching is the requirement that series-connected subcells
+        carry the same current. It is central to two-terminal tandems. If the
+        top cell makes less current than the silicon bottom cell, top current
+        limits the stack. If the top cell absorbs too much and leaves too little
+        light for silicon, bottom current limits the stack. The best top cell is
+        tuned for the pair.
+      </p>
+      <p>
+        Passivation means reducing electronically active defects at surfaces,
+        grain boundaries, or contacts. It can raise voltage, improve fill
+        factor, and slow degradation. In silicon, passivation is a decades-old
+        industrial discipline. In perovskites, passivation includes additives,
+        surface treatments, contact engineering, and molecules that neutralize
+        traps or improve energy alignment.
+      </p>
+      <p>
+        Parasitic absorption is light absorbed by a layer that does not turn it
+        into useful current. Transparent electrodes, transport layers, buffers,
+        and interconnects can all have parasitic absorption. In a tandem,
+        parasitic absorption is especially expensive because it can steal
+        photons from either subcell and shift current matching.
+      </p>
+      <p>
+        Fill factor is the squareness of the J-V curve. A cell with high current
+        and voltage can still have mediocre efficiency if the curve sags because
+        of resistance, shunts, barriers, or recombination. Tandem fill factor
+        can be hurt by either subcell or by the interconnect between them.
+      </p>
+      <p>
+        Bankability means the market believes the module's performance and
+        warranty risk. It is not just certification. It includes manufacturer
+        credibility, field data, degradation models, insurance comfort, and
+        financing acceptance. For tandems, bankability may be the slowest part
+        of commercialization because trust requires time.
+      </p>
+
+      <h2><span class="kicker">The unresolved frontier</span>The hard problems are now stacked together</h2>
+      <p>
+        The first frontier is wide-bandgap stability. The top perovskite has to
+        pair well with silicon, which pushes the composition toward a wider
+        bandgap than many of the most stable single-junction perovskites.
+        Iodide-bromide mixtures can segregate under light. Researchers fight
+        this with composition tuning, additives, strain management, crystallinity
+        control, and interface engineering. The target is not only initial
+        bandgap, but stable bandgap under illumination, heat, and bias.
+      </p>
+      <p>
+        The second frontier is transparent, damage-free contacting. The top
+        cell needs conductive layers that spread current without blocking too
+        much light. Some transparent conductive oxides require sputtering, which
+        can damage delicate layers. Buffer layers can protect the stack, but
+        they add thickness, optical loss, and process complexity. Reducing
+        damage while maintaining conductivity and transparency is a recurring
+        industrial problem.
+      </p>
+      <p>
+        The third frontier is textured compatibility. Silicon likes texture for
+        optics. Perovskite films like controlled coating and crystallization.
+        Making those preferences coexist is difficult. Fully textured tandems
+        may offer better optics but require more demanding deposition.
+        Planarized tandems may coat more easily but need optical compensation.
+        The best answer may vary by manufacturer, silicon architecture, and
+        deposition process.
+      </p>
+      <p>
+        The fourth frontier is stable module packaging. The perovskite layer
+        must be protected from moisture, oxygen, UV, heat, and mechanical
+        stress. But packaging cannot add too much cost, weight, optical loss, or
+        process complexity. It also has to handle lead containment and end-of
+        life. Encapsulation is not merely a plastic wrapper; it is a reliability
+        system.
+      </p>
+      <p>
+        The fifth frontier is manufacturing control. Perovskite films are
+        sensitive to process details, and the tolerances for a high-efficiency
+        tandem are tight. A production line needs repeatable film thickness,
+        composition, crystallization, coverage, contact quality, and low defect
+        density. It needs inline metrology and feedback. It needs yield high
+        enough that added efficiency is not consumed by scrap.
+      </p>
+      <p>
+        The sixth frontier is field proof. Accelerated tests are necessary, but
+        field data is persuasive. The market needs to see how tandem modules
+        behave after seasons of heat, humidity, UV, shade, snow, salt, and
+        electrical operation. Early deployments are not only sales. They are
+        experiments in trust.
+      </p>
+
+      <h2><span class="kicker">Reading announcements</span>What the headline number does and does not say</h2>
+      <p>
+        Solar efficiency announcements are easy to misread because the same
+        word, efficiency, can refer to different objects. A champion cell can be
+        tiny. A minimodule can be larger but still not a full product. A module
+        aperture efficiency may exclude inactive borders differently than a
+        total-area efficiency. A stabilized power output can be more meaningful
+        than a fast scan. A certified independent measurement is more credible
+        than an internal measurement. The first question after any headline
+        number should be: what exactly was measured?
+      </p>
+      <p>
+        Area matters. A 1 cm2 cell is a device-physics claim. A 100 cm2
+        minimodule is a process-uniformity claim. A full-size module is a
+        product-integration claim. Each is valuable, but they are not
+        interchangeable. The smaller cell may reach a higher efficiency because
+        it can be made more carefully, selected from many attempts, and avoid
+        large-area defect statistics. The larger module may have lower
+        efficiency but be far more meaningful for commercialization.
+      </p>
+      <p>
+        Certification matters because perovskites have a history of measurement
+        sensitivity. A certified result from an independent lab does not prove a
+        product is reliable, but it reduces ambiguity about the initial
+        performance number. Stabilized maximum power point tracking matters
+        because it shows whether the device can sustain output rather than only
+        flash a favorable J-V scan. For tandems, spectral conditions and
+        subcell calibration matter because the current match depends on the
+        illumination spectrum.
+      </p>
+      <p>
+        Stability claims also need context. "Stable for 1000 hours" is not one
+        statement unless you know the test. Was it in nitrogen or air? Was it
+        encapsulated? Was it under continuous illumination? Was it at maximum
+        power point? What temperature and humidity were used? Was there UV?
+        Were there thermal cycles? Did the cell recover in the dark? Was the
+        area representative? A stability number without a stress condition is
+        closer to a mood than a reliability claim.
+      </p>
+      <p>
+        Manufacturing announcements have their own translation problem. A pilot
+        line proves something different from a gigawatt-scale factory. A working
+        tool proves something different from a high-yield process. A first
+        shipment proves something different from a warranty-backed fleet with
+        years of field data. The most meaningful commercialization signals are
+        not only "we made a module" but "we made many modules with a tight
+        distribution, shipped them, monitored them, and saw predictable
+        degradation."
+      </p>
+      <p>
+        This does not mean skepticism should flatten every announcement. The
+        field has genuinely moved. But the right response to a tandem headline
+        is layered. Ask about cell area, aperture area, certification,
+        stabilized output, subcell EQE, temperature, spectrum, encapsulation,
+        degradation test, sample count, yield, and whether the result was a lab
+        cell, minimodule, industrial-format module, or commercial product. The
+        deeper story is usually in those details.
+      </p>
+
+      <h2><span class="kicker">What would convince the market</span>The proof stack is bigger than the cell stack</h2>
+      <p>
+        The scientific proof stack starts with a reproducible high-efficiency
+        cell. That means multiple devices, not one lucky champion. It means
+        transparent area definition, controlled measurement, stabilized output,
+        and enough diagnostics to explain where the performance comes from. For
+        a tandem, it also means subcell currents that make sense under EQE and
+        spectral analysis. A result that cannot be reproduced is a clue, not a
+        platform.
+      </p>
+      <p>
+        The engineering proof stack adds process tolerance. Can the same stack
+        be made across many substrates? How sensitive is it to humidity,
+        temperature, coating speed, anneal time, and precursor age? What is the
+        distribution of performance, not just the best device? How often do
+        pinholes, shunts, delamination, or low-voltage outliers appear? What
+        inline measurements catch those failures before lamination? A factory
+        does not care only about the best cell; it cares about the tail of the
+        distribution.
+      </p>
+      <p>
+        The module proof stack adds packaging and interconnection. Can cells be
+        wired without damaging the top stack? Does lamination shift performance?
+        Do edge seals slow moisture ingress enough? Do bypass diodes protect the
+        module under partial shade? Does the tandem behave predictably under
+        reverse bias and hot-spot conditions? Are there new failure modes when a
+        perovskite top cell is combined with ordinary module hardware? The
+        module is not just a bigger cell. It is a different object with more
+        ways to fail.
+      </p>
+      <p>
+        The commercial proof stack adds cost and warranty. What is the added
+        cost per square meter? What is the added value per watt? How much capex
+        is required? Does the process slow the line? Does yield fall? What
+        warranty degradation rate is credible? How much field data supports it?
+        Can insurers and lenders price the risk? Does recycling or lead
+        containment add cost? A technology can be impressive and still not be
+        ready for low-margin commodity deployment.
+      </p>
+      <p>
+        The trust proof stack takes time. Silicon earned trust through billions
+        of modules and decades of field data. Tandems do not need to wait
+        decades before selling anything, but they do need staged trust. Early
+        products can enter premium niches. Monitored deployments can build
+        performance data. Certification can mature. Warranties can become less
+        speculative. Customers can learn where the product fits. The proof
+        stack grows from laboratory reproducibility to factory distributions to
+        outdoor fleets.
+      </p>
+
+      <h2><span class="kicker">Layer-by-layer stakes</span>What each part must prove</h2>
+      <p>
+        The perovskite absorber must prove that its bandgap, crystallinity, and
+        defect chemistry remain useful under operation. It must absorb strongly
+        without becoming unstable. It must tolerate light, heat, and bias. It
+        must form with good coverage over the chosen silicon surface. It must
+        not require a process so delicate that the factory spends more time
+        rescuing films than making modules.
+      </p>
+      <p>
+        The hole-selective contact must extract holes, block electrons, avoid
+        parasitic absorption, tune energy alignment, and survive neighboring
+        deposition steps. Self-assembled monolayers are attractive because they
+        can be optically thin and energetically useful, but they must be
+        uniform, durable, and compatible with large-area processing. A monolayer
+        that performs beautifully on a small sample has to become a controlled
+        manufacturing surface.
+      </p>
+      <p>
+        The electron-selective side has to do the mirror-image job while often
+        living under harsher process conditions. C60, SnO2, buffer layers, and
+        transparent conductors each bring benefits and risks. The electron
+        contact should be fast, selective, transparent, and stable. It should
+        also protect the perovskite from sputter damage or chemical attack. A
+        top contact that is electrically excellent but optically lossy can sink
+        the tandem.
+      </p>
+      <p>
+        The interconnect must connect the subcells without stealing photons or
+        adding resistance. It must survive the top-cell process and remain
+        stable during operation. It is one of the least glamorous layers and one
+        of the most important. A weak interconnect can make both subcells look
+        worse than they are.
+      </p>
+      <p>
+        The silicon bottom cell must remain a world-class silicon cell after
+        the perovskite process is added. Its passivation cannot be damaged. Its
+        texture cannot create unmanageable coating defects. Its contacts cannot
+        impose incompatible thermal budgets. Its optical design must work with
+        the top stack above it. The bottom cell is not passive real estate; it
+        is an active partner.
+      </p>
+      <p>
+        The encapsulation system must protect the whole stack without killing
+        the optics or economics. It must manage moisture, oxygen, UV, heat,
+        mechanical stress, edge ingress, and lead containment. It must be
+        manufacturable with module equipment. It must preserve the higher
+        efficiency long enough for the customer to care. Packaging is where
+        materials science meets warranty law.
+      </p>
+
+      <h2><span class="kicker">Possible futures</span>Three ways the tandem story could unfold</h2>
+      <p>
+        In the fast-success scenario, perovskite/silicon modules prove strong
+        reliability quickly in premium deployments. Yields improve, field data
+        looks clean, and the efficiency premium is large enough to justify
+        added process complexity. Tandems first dominate high-value rooftops and
+        space-constrained commercial installations, then move into broader
+        utility markets as cost falls and bankability improves. In this world,
+        tandem production becomes a normal extension of advanced silicon
+        manufacturing.
+      </p>
+      <p>
+        In the slow-success scenario, the technology works but adoption is
+        uneven. Some companies solve stability and process control better than
+        others. Early modules enter niche markets. Reliability data takes years
+        to satisfy conservative buyers. Silicon keeps improving, making the
+        tandem premium harder to defend in commodity markets. The technology
+        still matters, but it grows through premium segments, monitored
+        deployments, and gradual process learning rather than a sudden market
+        flip.
+      </p>
+      <p>
+        In the stall scenario, champion cells keep improving but module
+        reliability, yield, or cost does not converge fast enough. Silicon
+        continues to get cheaper and better. Tandem modules remain impressive
+        but too risky or too expensive for broad deployment. Some specialized
+        markets may still use them, and research may continue to feed other
+        thin-film or perovskite products, but the mainstream silicon module
+        remains mostly single-junction.
+      </p>
+      <p>
+        The point of those scenarios is not prediction theater. It is to show
+        what evidence matters. Fast success requires field stability and yield.
+        Slow success requires patient premium markets and improving
+        manufacturing distributions. Stall happens if the stack remains too
+        fragile, too costly, or too hard to trust. The next few years will be
+        read through those signals.
+      </p>
+
+      <h2><span class="kicker">Why go this deep</span>The details are the technology</h2>
+      <p>
+        The deep version of the tandem story can feel almost too full of
+        caveats. Bandgaps, current matching, passivation, contacts, texture,
+        hysteresis, ion migration, deposition windows, encapsulation, yield,
+        bankability: every topic opens another door. That complexity is not a
+        reason to dismiss the technology. It is the technology. Mature energy
+        hardware is never one clever trick. It is a chain of tolerances that
+        holds under weather, finance, and scale.
+      </p>
+      <p>
+        Perovskite/silicon tandems are exciting precisely because the chain is
+        now visible. The physics reason is clear: one bandgap wastes too much of
+        the spectrum. The materials reason is clear: lead-halide perovskites
+        can make a tunable, thin, strong top absorber. The industrial reason is
+        clear: silicon already gives the bottom cell and the manufacturing
+        platform. The unresolved question is whether all the small links can be
+        made strong enough at the same time.
+      </p>
+
+      <h2><span class="kicker">The real lesson</span>Photovoltaics advances by moving losses around until they shrink</h2>
+      <p>
+        One useful way to read the whole history of solar cells is as a history
+        of loss relocation. Early cells lost almost everything because materials
+        were poor and contacts were crude. Practical silicon reduced the basic
+        material problem but exposed optical reflection, surface recombination,
+        and contact loss. Texturing moved optical loss. Passivation moved
+        recombination loss. Better metallization moved resistance and shading
+        loss. Larger factories moved cost loss. None of those steps abolished
+        loss in one heroic gesture. They made one loss small enough that the
+        next largest loss became visible.
+      </p>
+      <p>
+        Tandems continue that pattern. The single-junction spectral loss became
+        visible because silicon had become good enough for the ideal limit to
+        matter. The perovskite top cell moves some thermalization loss into a
+        higher-voltage absorber. Then new losses become visible: current
+        mismatch, parasitic absorption, interconnect resistance, wide-bandgap
+        instability, coating defects, and module reliability. That is not a
+        contradiction. It is what progress looks like in a mature technology.
+      </p>
+      <p>
+        The same pattern explains why the field can look both thrilling and
+        frustrating. A lab breakthrough may shrink one loss dramatically while
+        another loss becomes the bottleneck. A manufacturing improvement may not
+        change the champion-cell number but may matter more for products. A
+        stability improvement may look boring until it unlocks warranty trust. A
+        better contact may be invisible in a headline but decisive in yield.
+        The tandem story rewards people who can track the bottleneck as it
+        moves.
+      </p>
+      <p>
+        That is why the most serious question is not "are perovskites good or
+        bad?" It is "which loss is limiting this stack at this scale under this
+        stress?" In a small cell, the answer might be interfacial voltage loss.
+        In a minimodule, it might be coating uniformity. In an outdoor module,
+        it might be moisture ingress or thermal cycling. In a factory, it might
+        be yield. In finance, it might be insufficient field data. Deep
+        understanding means following the bottleneck from physics to product.
+      </p>
+
+      <h2><span class="kicker">Commercial edge</span>What has actually moved from lab to market</h2>
+      <p>
+        The perovskite/silicon field has crossed several psychological lines.
+        Certified small-area tandem cells passed 30% efficiency and moved into
+        the mid-30% range on research charts. Industrial-format tandem modules
+        have been announced above the best ordinary silicon module efficiencies.
+        Oxford PV has described commercial deployment of perovskite tandem
+        modules and publicized record module results. These milestones do not
+        mean the technology is finished, but they do mean the conversation has
+        moved beyond "can this ever work?"
+      </p>
+      <p>
+        The remaining question is harsher: can it work for many years, at many
+        factories, at high yield, with enough cost advantage to matter? That is
+        why the record chart and the factory line should be read together. The
+        chart measures physical possibility. The line measures repeatability.
+        The field needs both.
+      </p>
+      <p>
+        It is also worth distinguishing perovskite/silicon tandems from
+        perovskite-only solar. Perovskite-only modules could eventually be
+        lightweight, flexible, semitransparent, or integrated into surfaces
+        where silicon is awkward. That is a different opportunity. The tandem
+        opportunity is more immediate because it piggybacks on silicon's
+        strength. It asks a thin perovskite layer to do the job it is best at:
+        handle high-energy light above a mature bottom cell.
+      </p>
+
+      <h2><span class="kicker">Why this lineage matters</span>The cutting edge is a convergence, not a miracle</h2>
+      <p>
+        The deep story is that no single invention explains the tandem. The
+        photovoltaic effect showed that light could move charge. Silicon made
+        photovoltaics a practical semiconductor technology. Space markets paid
+        for reliability before terrestrial markets paid for cost. The
+        Shockley-Queisser limit clarified the single-junction ceiling. Surface
+        passivation taught silicon how to stop wasting voltage at interfaces.
+        Thin-film and dye-sensitized work made solution-processed absorbers
+        plausible. Lead-halide perovskites supplied a tunable, strongly
+        absorbing top-cell material. Modern contacts and passivation made the
+        stack less leaky. Manufacturing pressure forced the question from cells
+        to modules.
+      </p>
+      <p>
+        That convergence is why the technology is so interesting. It does not
+        ask us to forget silicon. It asks us to understand silicon well enough
+        to improve it. It does not ask chemistry to replace semiconductor
+        physics. It asks chemistry to tune a semiconductor absorber into the
+        spectral slot that physics says is valuable. It does not ask lab records
+        to stand in for products. It asks manufacturing to prove that the record
+        can be repeated, packaged, and trusted.
+      </p>
+      <p>
+        The future of perovskite/silicon tandems will probably be decided by
+        unglamorous wins: fewer pinholes, wider process windows, better
+        wide-bandgap stability, more transparent contacts, less sputter damage,
+        stronger edge seals, better lead containment, lower yield loss, more
+        outdoor data, and clearer degradation models. Those are not small
+        details. They are the bridge between a beautiful physics argument and a
+        module someone can put on a roof.
+      </p>
+      <p>
+        If the bridge holds, the silicon solar panel gets a second act. The
+        extra layer is thin enough to feel like chemistry, precise enough to
+        behave like semiconductor engineering, and valuable enough to challenge
+        the assumption that mature silicon has no headroom left. That is the
+        real reason the tandem tree matters.
       </p>
     </main>
 
     <footer>
       <p>
-        Solar Stack, part one · a historical map of perovskite/silicon tandem
-        cells and why the stack is now plausible.
+        Solar Stack, part one · a deep historical and technical map of
+        perovskite/silicon tandem cells, from bandgap physics to module
+        manufacturing.
       </p>
       <p>
         Standing on the shoulders of:
@@ -178,6 +1528,8 @@
         <a href="https://doi.org/10.1063/1.1736034">Shockley &amp; Queisser, 1961</a> ·
         <a href="https://doi.org/10.1021/ja809598r">Kojima et al., 2009</a> ·
         <a href="https://doi.org/10.1126/science.1228604">Lee et al., 2012</a> ·
+        <a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2024/oxford-pv-and-fraunhofer-ise-develop-full-sized-tandem-pv-module-with-record-efficiency-of-25-percent.html">Fraunhofer ISE and Oxford PV module announcement</a> ·
+        <a href="https://www.oxfordpv.com/news/oxford-pv-sets-new-solar-panel-efficiency-world-record">Oxford PV 26.9% module release</a> ·
         <a href="https://www.oxfordpv.com/">Oxford PV</a>
       </p>
     </footer>
