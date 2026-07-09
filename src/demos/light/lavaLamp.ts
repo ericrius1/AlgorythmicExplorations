@@ -59,8 +59,19 @@ export async function mountLavaLamp(
   )
 
   const knobs: LavaKnobs = { ...DEFAULT_KNOBS }
+  // Hero runs a punchier flow than the interactive sandbox: a hotter coil and
+  // more buoyancy so fat blobs launch and cycle vigorously, cooling raised to
+  // keep them returning (churn, not a stalled cap), tension up for rounder
+  // pinch-off, and an extra substep so the motion reads as dynamic in a short
+  // hero capture. The sandbox keeps DEFAULT_KNOBS so sliders start from calm.
+  if (opts.hero) {
+    knobs.heatRate = 2.8
+    knobs.buoyancy = 7.4
+    knobs.coolRate = 1.2
+    knobs.tension = 2.15
+  }
   let count = opts.hero ? 9000 : 10000
-  let steps = 4
+  let steps = opts.hero ? 5 : 4
   let glow = 1.0
   let exposure = 1.35
   let debugMode = 0
