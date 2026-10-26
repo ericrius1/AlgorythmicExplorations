@@ -13,6 +13,10 @@ export interface PyramidDemoOptions {
   hero?: boolean; // no controls, fixed settings
 }
 
+// Simulated time per real second for the heroes: about a third of the
+// demo's default pace, slow enough to read as a galaxy turning.
+const HERO_PACE = 0.28;
+
 export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoOptions = {}): Promise<Demo> {
   const dev = await getDevice();
   const shell = new Shell(container, opts.hero ? 0.56 : 0.62);
@@ -21,7 +25,7 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
   const renderer = new ParticleRenderer(dev, ctx);
 
   let count = opts.count ?? 100000;
-  let steps = opts.steps ?? 2;
+  let steps = opts.steps ?? 1;
   let theta = 0.75;
   let halo = true;
   const make = (): PyramidSolver => {
@@ -39,8 +43,14 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
   let solver = make();
   renderer.bind(solver.bodies);
   // A fresh disk is smooth; the arms take a few rotations to grow. The hero
-  // fast-forwards through that so the first thing you see is a galaxy.
+  // fast-forwards through that while its canvas is still invisible, then
+  // fades in, so the first thing you see is a galaxy already turning.
   let warmup = opts.hero ? 360 : 0;
+  if (opts.hero) {
+    shell.canvas.style.opacity = "0";
+    shell.canvas.style.transition = "opacity 1.8s ease";
+  }
+  let last = performance.now();
 
   const rebuild = (): void => {
     solver.dispose();
@@ -94,12 +104,26 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
   return {
     frame() {
       shell.tick();
+      const now = performance.now();
+      const real = Math.min((now - last) / 1000, 1 / 20);
+      last = now;
       solver.theta = theta;
+      let n = steps;
+      if (warmup > 0) {
+        n = Math.min(warmup, 40);
+        warmup -= n;
+        solver.dt = 0.016;
+        if (warmup <= 0) shell.canvas.style.opacity = "1";
+      } else if (opts.hero) {
+        // Slow motion, paced by the clock rather than the frame count: one
+        // step per frame sized to elapsed time, so it turns at the same
+        // speed on a 60 Hz or 120 Hz display.
+        n = 1;
+        solver.dt = Math.min(0.016, HERO_PACE * real);
+      }
       solver.writeParams();
       const enc = dev.createCommandEncoder();
       const pass = enc.beginComputePass();
-      const n = warmup > 0 ? Math.min(warmup, 24) : steps;
-      warmup -= n;
       for (let s = 0; s < n; s++) solver.encode(pass);
       pass.end();
       renderer.encode(enc, count, {

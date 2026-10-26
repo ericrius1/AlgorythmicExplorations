@@ -11,7 +11,7 @@ import { mountBhWalk } from "../../scrolly/bhWalk";
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  hero: (el) => mountPyramidGpu(el, { count: 40000, steps: 2, hero: true }),
+  hero: (el) => mountPyramidGpu(el, { count: 40000, hero: true }),
   slingshot: mountSlingshot,
   "naive-cpu": mountNaiveCpu,
   "naive-gpu": mountNaiveGpu,

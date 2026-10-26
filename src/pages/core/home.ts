@@ -12,7 +12,7 @@ initNav();
 // ---- hero: the part-1 galaxy, running as a backdrop ------------------------
 const heroEl = document.querySelector<HTMLElement>("[data-demo='hero']");
 if (heroEl) {
-  mountLazy(heroEl, () => mountPyramidGpu(heroEl, { count: 20000, steps: 2, hero: true }));
+  mountLazy(heroEl, () => mountPyramidGpu(heroEl, { count: 20000, hero: true }));
 }
 
 // ---- stats line under the title ---------------------------------------------
