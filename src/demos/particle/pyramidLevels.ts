@@ -5,6 +5,7 @@
 import { Shell, type Demo } from "../../lib/demoShell";
 import { seedDisk, type Bodies } from "../../lib/seed";
 import { stepBarnesHut, drawBodies } from "../../lib/cpuSim";
+import { heatRgb, pixelRatio } from "../../lib/palette";
 
 const N = 4000;
 const FINEST = 7; // 128 x 128 for the visualization
@@ -35,7 +36,7 @@ export function mountPyramidLevels(container: HTMLElement): Demo {
     frame() {
       shell.tick();
       stepBarnesHut(bodies, { dt: 0.016, softening: 0.05 }, 0.8);
-      drawBodies(ctx, bodies, { scale: VIEW }, "rgba(120, 150, 235, 0.35)");
+      drawBodies(ctx, bodies, { scale: VIEW }, "rgba(120, 150, 235, 0.22)");
 
       // Bin to the finest level, then reduce down to the displayed level.
       let minX = Infinity;
@@ -90,31 +91,51 @@ export function mountPyramidLevels(container: HTMLElement): Demo {
       const ox = width / 2;
       const oy = height / 2;
       const cellW = (size / dim) * s;
+      const dpx = pixelRatio(shell.canvas);
       let maxMass = 0;
       for (let c = 0; c < cells.length; c += 3) if (cells[c] > maxMass) maxMass = cells[c];
+      // cell mass as a heat map: dark violet for light cells, yellow for heavy
       for (let iy = 0; iy < dim; iy++) {
         for (let ix = 0; ix < dim; ix++) {
           const m = cells[(iy * dim + ix) * 3];
           if (m <= 0) continue;
-          const t = Math.pow(m / maxMass, 0.4);
+          const [r, g, b] = heatRgb(0.15 + 0.85 * Math.pow(m / maxMass, 0.45));
           const px = ox + (orX + (ix / dim) * size) * s;
           const py = oy - (orY + ((iy + 1) / dim) * size) * s;
-          ctx.fillStyle = `rgba(${90 + t * 165}, ${200 - t * 60}, ${120 - t * 60}, ${0.10 + t * 0.35})`;
+          ctx.fillStyle = `rgba(${r | 0}, ${g | 0}, ${b | 0}, 0.62)`;
           ctx.fillRect(px, py, cellW, cellW);
-          ctx.strokeStyle = "rgba(80, 220, 130, 0.25)";
-          ctx.strokeRect(px, py, cellW, cellW);
         }
       }
-      ctx.fillStyle = "rgba(255, 90, 220, 0.9)";
+      // grid lines over the whole level, so empty cells still read as cells
+      if (dim <= 64) {
+        ctx.strokeStyle = "rgba(160, 170, 210, 0.13)";
+        ctx.lineWidth = dpx;
+        ctx.beginPath();
+        for (let g = 0; g <= dim; g++) {
+          const gx = ox + (orX + (g / dim) * size) * s;
+          const gy = oy - (orY + (g / dim) * size) * s;
+          ctx.moveTo(gx, oy - (orY + size) * s);
+          ctx.lineTo(gx, oy - orY * s);
+          ctx.moveTo(ox + orX * s, gy);
+          ctx.lineTo(ox + (orX + size) * s, gy);
+        }
+        ctx.stroke();
+      }
+      // centres of mass
+      const dot = Math.max(1.5, Math.min(3, cellW / 6)) * dpx;
+      ctx.fillStyle = "rgba(255, 120, 230, 0.95)";
+      ctx.beginPath();
       for (let iy = 0; iy < dim; iy++) {
         for (let ix = 0; ix < dim; ix++) {
           const c = (iy * dim + ix) * 3;
           if (cells[c] <= 0) continue;
-          const comX = cells[c + 1] / cells[c];
-          const comY = cells[c + 2] / cells[c];
-          ctx.fillRect(ox + comX * s - 1.5, oy - comY * s - 1.5, 3, 3);
+          const comX = ox + (cells[c + 1] / cells[c]) * s;
+          const comY = oy - (cells[c + 2] / cells[c]) * s;
+          ctx.moveTo(comX + dot, comY);
+          ctx.arc(comX, comY, dot, 0, Math.PI * 2);
         }
       }
+      ctx.fill();
     },
   };
 }

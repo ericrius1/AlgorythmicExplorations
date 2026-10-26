@@ -3,6 +3,9 @@
 // the versions quoted in the article.
 
 import { G, type Bodies } from "./seed";
+import { speedBuckets, SPEED_BUCKETS, pixelRatio } from "./palette";
+
+const BUCKET_FILLS = speedBuckets(0.9);
 
 export interface SimParams {
   dt: number;
@@ -132,13 +135,13 @@ export function buildQuadTree(b: Bodies): QuadTree {
       let mx = 0;
       let my = 0;
       for (let q = 0; q < 4; q++) {
+        // Empty children keep their slot: the walk skips them by mass, and
+        // clearing slot 0 would make this node look like a leaf.
         const c = child[ni * 4 + q];
         if (c >= 0 && m[c] > 0) {
           mm += m[c];
           mx += comX[c] * m[c];
           my += comY[c] * m[c];
-        } else {
-          child[ni * 4 + q] = -1;
         }
       }
       m[ni] = mm;
@@ -174,7 +177,10 @@ export function bhForce(
     const r2 = dx * dx + dy * dy + eps2;
     const w = tree.half[n] * 2;
     const leaf = tree.child[n * 4] === -1;
-    if (leaf || w * w < theta2 * r2) {
+    // Never summarize a cell you're standing in: its centre of mass can sit
+    // far enough away to pass the θ test, and then a body pulls on itself.
+    const inside = Math.abs(px - tree.cx[n]) <= tree.half[n] && Math.abs(py - tree.cy[n]) <= tree.half[n];
+    if (leaf || (!inside && w * w < theta2 * r2)) {
       const inv = (G * tree.mass[n]) / (r2 * Math.sqrt(r2));
       out.ax += dx * inv;
       out.ay += dy * inv;
@@ -193,13 +199,26 @@ export function bhForce(
 // Full Barnes-Hut step: rebuild tree, walk it once per body, integrate.
 export function stepBarnesHut(b: Bodies, p: SimParams, theta: number): { tree: QuadTree; checks: number } {
   const tree = buildQuadTree(b);
-  const { state, count } = b;
+  const { state, mass, count } = b;
   const f = { ax: 0, ay: 0 };
   let checks = 0;
+  let px = 0;
+  let py = 0;
+  let m = 0;
   for (let i = 0; i < count; i++) {
     checks += bhForce(tree, state[i * 4], state[i * 4 + 1], theta, p.softening, f);
     state[i * 4 + 2] += f.ax * p.dt;
     state[i * 4 + 3] += f.ay * p.dt;
+    px += mass[i] * state[i * 4 + 2];
+    py += mass[i] * state[i * 4 + 3];
+    m += mass[i];
+  }
+  // Approximate forces aren't exactly equal and opposite, so Barnes-Hut leaks
+  // a little momentum every step. Left alone the disk wanders off the canvas
+  // within a minute; take the drift back out.
+  for (let i = 0; i < count; i++) {
+    state[i * 4 + 2] -= px / m;
+    state[i * 4 + 3] -= py / m;
   }
   for (let i = 0; i < count; i++) {
     state[i * 4] += state[i * 4 + 2] * p.dt;
@@ -208,23 +227,37 @@ export function stepBarnesHut(b: Bodies, p: SimParams, theta: number): { tree: Q
   return { tree, checks };
 }
 
-// Canvas2d particle renderer shared by the CPU demos.
+// Canvas2d particle renderer shared by the CPU demos. Bodies are coloured by
+// speed like the GPU demos and added together, so dense regions glow.
+// Pass `color` to draw them all one flat colour instead.
 export function drawBodies(
   ctx: CanvasRenderingContext2D,
   b: Bodies,
-  view: { scale: number },
-  color = "rgba(140, 170, 255, 0.8)",
+  view: { scale: number; colorScale?: number },
+  color?: string,
 ): void {
   const { width, height } = ctx.canvas;
   ctx.fillStyle = "#06070b";
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = color;
   const s = (Math.min(width, height) / 2) * view.scale;
   const ox = width / 2;
   const oy = height / 2;
-  for (let i = 0; i < b.count; i++) {
-    const x = ox + b.state[i * 4] * s;
-    const y = oy - b.state[i * 4 + 1] * s;
-    ctx.fillRect(x, y, 1.5, 1.5);
+  const dot = 1.4 * pixelRatio(ctx.canvas);
+  const half = dot / 2;
+  const cs = view.colorScale ?? 2.2;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let k = 0; k < (color ? 1 : SPEED_BUCKETS); k++) {
+    ctx.fillStyle = color ?? BUCKET_FILLS[k];
+    ctx.beginPath();
+    for (let i = 0; i < b.count; i++) {
+      if (!color) {
+        const v = Math.hypot(b.state[i * 4 + 2], b.state[i * 4 + 3]) * cs;
+        if (Math.min(SPEED_BUCKETS - 1, (v * (SPEED_BUCKETS - 1)) | 0) !== k) continue;
+      }
+      ctx.rect(ox + b.state[i * 4] * s - half, oy - b.state[i * 4 + 1] * s - half, dot, dot);
+    }
+    ctx.fill();
   }
+  ctx.restore();
 }

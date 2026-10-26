@@ -22,7 +22,10 @@ struct GrainParams {
 }
 
 @group(0) @binding(0) var<uniform> SP: GrainParams;
-@group(0) @binding(1) var<storage, read_write> parts: array<vec4f>;
+@group(0) @binding(1) var<storage, read> parts: array<vec4f>;  // sorted, read by everyone
+// New state goes to a separate buffer: other threads are still reading
+// their neighbours out of `parts` while this one finishes.
+@group(0) @binding(5) var<storage, read_write> partsOut: array<vec4f>;
 @group(0) @binding(2) var<storage, read> cellStart: array<u32>;
 @group(0) @binding(3) var<storage, read> cellCount: array<u32>;
 @group(0) @binding(4) var<storage, read_write> density: array<vec2f>; // unused; layout shared with sph
@@ -81,5 +84,5 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   var vel = (p.zw + acc * SP.dt) * 0.999;
   let speed = length(vel);
   if (speed > 3.0) { vel *= 3.0 / speed; }
-  parts[i] = vec4f(p.xy + vel * SP.dt, vel);
+  partsOut[i] = vec4f(p.xy + vel * SP.dt, vel);
 }

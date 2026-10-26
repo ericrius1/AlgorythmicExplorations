@@ -5,7 +5,7 @@ import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { ParticleRenderer } from "../../lib/particleRenderer";
 import { PyramidSolver } from "../../lib/pyramidSolver";
-import { seedDisk } from "../../lib/seed";
+import { seedDisk, DEFAULT_HALO, HALO_DISPERSION } from "../../lib/seed";
 
 export interface PyramidDemoOptions {
   count?: number;
@@ -20,15 +20,31 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
   const ctx = configureContext(shell.canvas, dev);
   const renderer = new ParticleRenderer(dev, ctx);
 
-  let count = opts.count ?? 20000;
+  let count = opts.count ?? 100000;
   let steps = opts.steps ?? 2;
   let theta = 0.75;
-  let solver = new PyramidSolver(dev, seedDisk(count));
+  let halo = true;
+  const make = (): PyramidSolver => {
+    const s = new PyramidSolver(
+      dev,
+      seedDisk(count, {
+        profile: "exponential",
+        halo: halo ? DEFAULT_HALO : undefined,
+        dispersion: halo ? HALO_DISPERSION : undefined,
+      }),
+    );
+    s.halo = halo ? DEFAULT_HALO : null;
+    return s;
+  };
+  let solver = make();
   renderer.bind(solver.bodies);
+  // A fresh disk is smooth; the arms take a few rotations to grow. The hero
+  // fast-forwards through that so the first thing you see is a galaxy.
+  let warmup = opts.hero ? 360 : 0;
 
   const rebuild = (): void => {
     solver.dispose();
-    solver = new PyramidSolver(dev, seedDisk(count));
+    solver = make();
     renderer.bind(solver.bodies);
   };
 
@@ -62,6 +78,11 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
       value: theta,
       onInput: (v) => (theta = v),
     });
+    const haloButton = shell.button("dark halo: on", () => {
+      halo = !halo;
+      haloButton.textContent = halo ? "dark halo: on" : "dark halo: off";
+      rebuild();
+    });
     shell.button("re-seed", rebuild);
   }
   shell.setInfo(() =>
@@ -77,9 +98,18 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
       solver.writeParams();
       const enc = dev.createCommandEncoder();
       const pass = enc.beginComputePass();
-      for (let s = 0; s < steps; s++) solver.encode(pass);
+      const n = warmup > 0 ? Math.min(warmup, 24) : steps;
+      warmup -= n;
+      for (let s = 0; s < n; s++) solver.encode(pass);
       pass.end();
-      renderer.encode(enc, count, { scale: 0.9, size: count > 400000 ? 0.0012 : count > 100000 ? 0.002 : 0.003 });
+      renderer.encode(enc, count, {
+        scale: 0.9,
+        size: count > 400000 ? 0.0012 : count > 100000 ? 0.002 : 0.003,
+        palette: "galaxy",
+        colorScale: 1.9,
+        // more bodies means more light; keep the exposure roughly steady
+        intensity: Math.sqrt(20000 / count),
+      });
       dev.queue.submit([enc.finish()]);
     },
     dispose() {

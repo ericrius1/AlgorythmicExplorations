@@ -26,6 +26,8 @@ export class Shell {
   private fpsEma = 60;
   private last = performance.now();
   private info: (() => string) | null = null;
+  private fpsEl = document.createElement("span");
+  private infoEl = document.createElement("span");
 
   constructor(container: HTMLElement, aspect = 0.62) {
     container.classList.add("demo");
@@ -35,6 +37,15 @@ export class Shell {
     // Heroes stretch to the full window width, so render them at native size
     // (capped in device pixels) — the 900px article cap leaves them blurry.
     const hero = container.closest("header.hero") !== null;
+    // Series pages lay the title over the hero, so let it fill most of the
+    // window instead of a fixed 16:9-ish strip.
+    if (hero && document.body.classList.contains("series-pw")) {
+      const w = container.clientWidth || window.innerWidth;
+      // .hero-title-below keeps the title under the canvas (for scenes whose
+      // action is at the bottom) and the demo's own aspect
+      const below = container.closest(".hero-title-below") !== null;
+      if (!below) aspect = Math.min(0.75, Math.max(0.45, (window.innerHeight * 0.86) / w));
+    }
     const w = hero
       ? Math.min(container.clientWidth || 1280, 2560 / dpr)
       : Math.min(container.clientWidth || 720, 900);
@@ -49,6 +60,9 @@ export class Shell {
     const bar = document.createElement("div");
     bar.className = "demo-readout";
     this.readout = document.createElement("span");
+    this.fpsEl.className = "demo-fps";
+    this.infoEl.className = "demo-info";
+    this.readout.append(this.fpsEl, this.infoEl);
     bar.appendChild(this.readout);
     container.appendChild(bar);
   }
@@ -57,6 +71,13 @@ export class Shell {
     const wrap = document.createElement("label");
     wrap.className = "demo-slider";
     const text = document.createElement("span");
+    text.className = "demo-slider-text";
+    const name = document.createElement("span");
+    name.className = "demo-slider-name";
+    name.textContent = spec.label;
+    const value = document.createElement("span");
+    value.className = "demo-slider-value";
+    text.append(name, value);
     const input = document.createElement("input");
     input.type = "range";
     const enc = (v: number): number => (spec.log ? Math.log10(v) : v);
@@ -67,7 +88,11 @@ export class Shell {
     input.value = String(enc(spec.value));
     const fmt = spec.format ?? ((v: number) => String(Math.round(v * 1000) / 1000));
     const sync = (v: number): void => {
-      text.textContent = `${spec.label}: ${fmt(v)}`;
+      value.textContent = fmt(v);
+      // how far along the track the thumb is, for the filled-track style
+      const lo = Number(input.min);
+      const hi = Number(input.max);
+      input.style.setProperty("--fill", `${((Number(input.value) - lo) / (hi - lo || 1)) * 100}%`);
     };
     sync(spec.value);
     input.addEventListener("input", () => {
@@ -82,12 +107,13 @@ export class Shell {
     return input;
   }
 
-  button(label: string, onClick: () => void): void {
+  button(label: string, onClick: () => void): HTMLButtonElement {
     const b = document.createElement("button");
     b.className = "demo-button";
     b.textContent = label;
     b.addEventListener("click", onClick);
     this.controls.appendChild(b);
+    return b;
   }
 
   setInfo(fn: () => string): void {
@@ -99,8 +125,10 @@ export class Shell {
     const dt = now - this.last;
     this.last = now;
     this.fpsEma += (1000 / Math.max(dt, 0.01) - this.fpsEma) * 0.05;
-    const extra = this.info ? ` · ${this.info()}` : "";
-    this.readout.textContent = `${this.fpsEma.toFixed(0)} fps${extra}`;
+    // a demo that wrote its own readout text detached these; put them back
+    if (this.fpsEl.parentNode !== this.readout) this.readout.replaceChildren(this.fpsEl, this.infoEl);
+    this.fpsEl.textContent = `${this.fpsEma.toFixed(0)} fps`;
+    this.infoEl.textContent = this.info ? this.info() : "";
   }
 }
 

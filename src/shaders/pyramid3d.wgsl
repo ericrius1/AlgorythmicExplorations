@@ -257,7 +257,12 @@ fn force(@builtin(global_invocation_id) gid: vec3u) {
       let d = com - p;
       let rr = dot(d, d) + eps2;
       acc = acc + d * (P.g * m / (rr * sqrt(rr)));
-    } else if (w * w < theta2 * r2) {
+      continue;
+    }
+    // Never summarize the cell this body sits in, or it would pull on itself.
+    let shift = FINEST - lvl;
+    let mine = ix == (myIx >> shift) && iy == (myIy >> shift) && iz == (myIz >> shift);
+    if (!mine && w * w < theta2 * r2) {
       acc = acc + d0 * (P.g * n.w / (r2 * sqrt(r2)));
     } else if (sp <= 55) {
       let cl = lvl + 1u;

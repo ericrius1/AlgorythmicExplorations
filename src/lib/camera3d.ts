@@ -2,6 +2,9 @@
 
 export type Mat4 = Float32Array;
 
+// Vertical field of view of every orbit camera, in radians.
+export const FOV_Y = 0.9;
+
 export function perspective(fovY: number, aspect: number, near: number, far: number): Mat4 {
   const f = 1 / Math.tan(fovY / 2);
   const out = new Float32Array(16);
@@ -31,6 +34,9 @@ export class OrbitCamera {
   distance = 2.6;
   autoSpin = 0.0012;
   zoomEnabled = true;
+  // Point the camera orbits and looks at. Raise z for scenes that sit above
+  // the floor (the dome) so they frame in the middle of the canvas.
+  target: [number, number, number] = [0, 0, 0];
 
   private lastInteraction = 0;
 
@@ -82,8 +88,10 @@ export class OrbitCamera {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        if (!this.zoomEnabled) return; // let the page scroll
-        // Two-finger trackpad scroll, mouse wheel, and pinch (ctrl+wheel) all dolly.
+        // A plain wheel or two-finger swipe scrolls the article; only pinch
+        // (which browsers report as ctrl+wheel) or ⌘/ctrl+scroll zooms.
+        // Otherwise a figure under the pointer would trap the page.
+        if (!this.zoomEnabled || !(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
         dollyBy(e.deltaY * 0.001);
       },
@@ -98,13 +106,14 @@ export class OrbitCamera {
   matrices(aspect: number): { viewProj: Mat4; right: [number, number, number]; up: [number, number, number] } {
     if (performance.now() - this.lastInteraction > 2500) this.azimuth += this.autoSpin;
     const ce = Math.cos(this.elevation);
+    const [tx, ty, tz] = this.target;
     const eye = [
-      Math.cos(this.azimuth) * ce * this.distance,
-      Math.sin(this.azimuth) * ce * this.distance,
-      Math.sin(this.elevation) * this.distance,
+      tx + Math.cos(this.azimuth) * ce * this.distance,
+      ty + Math.sin(this.azimuth) * ce * this.distance,
+      tz + Math.sin(this.elevation) * this.distance,
     ];
     // look-at with +z up
-    const f = normalize([-eye[0], -eye[1], -eye[2]]);
+    const f = normalize([tx - eye[0], ty - eye[1], tz - eye[2]]);
     const r = normalize(cross(f, [0, 0, 1]));
     const u = cross(r, f);
     const view = new Float32Array(16);
@@ -115,7 +124,7 @@ export class OrbitCamera {
     view[13] = -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]);
     view[14] = f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2];
     view[15] = 1;
-    const proj = perspective(0.9, aspect, 0.05, 50);
+    const proj = perspective(FOV_Y, aspect, 0.05, 50);
     return { viewProj: multiply(proj, view), right: r, up: u };
   }
 }

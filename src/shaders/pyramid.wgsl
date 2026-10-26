@@ -27,7 +27,11 @@ struct SimParams {
   theta: f32,
   damping: f32,
   maxSpeed: f32,
+  haloV2: f32,   // static halo strength (0 = no halo)
+  haloCore: f32,
+  pad0: f32,
   pad1: f32,
+  pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> P: SimParams;
@@ -244,7 +248,12 @@ fn force(@builtin(global_invocation_id) gid: vec3u) {
       let d = com - pos;
       let rr = dot(d, d) + eps2;
       acc = acc + d * (P.g * m / (rr * sqrt(rr)));
-    } else if (w * w < theta2 * r2) {
+      continue;
+    }
+    // Never summarize the cell this body sits in, or it would pull on itself.
+    let shift = FINEST - lvl;
+    let mine = ix == (myIx >> shift) && iy == (myIy >> shift);
+    if (!mine && w * w < theta2 * r2) {
       acc = acc + d0 * (P.g * n.z / (r2 * sqrt(r2)));
     } else if (sp <= 40) {
       let cl = lvl + 1u;
@@ -256,6 +265,13 @@ fn force(@builtin(global_invocation_id) gid: vec3u) {
       stack[sp + 3] = (cl << 28u) | ((by + 1u) << 14u) | (bx + 1u);
       sp = sp + 4;
     }
+  }
+
+  // Optional dark-matter halo: one analytic pull toward the centre, on top
+  // of everything the bodies do to each other.
+  if (P.haloV2 > 0.0) {
+    let r2h = dot(pos, pos);
+    acc = acc - pos * (P.haloV2 / (r2h + P.haloCore * P.haloCore));
   }
 
   vel = (vel + acc * P.dt) * P.damping;

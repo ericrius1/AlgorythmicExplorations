@@ -71,7 +71,7 @@ export async function mountNaive3D(container: HTMLElement): Promise<Demo> {
     },
   });
   shell.button("re-seed", rebuild);
-  shell.setInfo(() => `O(n²) in 3D · drag to orbit, ctrl+scroll to zoom`);
+  shell.setInfo(() => `O(n²) in 3D · drag to orbit, pinch or ⌘-scroll to zoom`);
 
   return {
     frame() {

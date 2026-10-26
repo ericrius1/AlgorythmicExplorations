@@ -26,11 +26,14 @@ export async function mountPyramid3D(container: HTMLElement, opts: Pyramid3DOpti
   if (opts.dome) {
     renderer.camera.elevation = 0.55;
     renderer.camera.distance = 2.4;
+    // the hero's title covers the bottom of the frame, so sit the dome higher
+    renderer.camera.target = opts.hero ? [0, 0, 0.06] : [0, 0, 0.32];
   }
 
   let count = opts.count ?? 20000;
   let steps = opts.steps ?? 2;
   let shellK = opts.dome ? 6 : 0;
+  let theta = 0.8; // lives here so a re-seed or new body count keeps it
   // The hero runs forever in the page header: no damping (cooling collapses
   // everything into one clump) and gentler gravity so it keeps flowing.
   let damping = opts.dome && !opts.hero ? 0.999 : 1.0;
@@ -78,8 +81,8 @@ export async function mountPyramid3D(container: HTMLElement, opts: Pyramid3DOpti
         min: 0.4,
         max: 1.4,
         step: 0.05,
-        value: 0.8,
-        onInput: (v) => (solver.theta = v),
+        value: theta,
+        onInput: (v) => (theta = v),
       });
     }
     shell.slider({
@@ -94,7 +97,7 @@ export async function mountPyramid3D(container: HTMLElement, opts: Pyramid3DOpti
   }
   shell.setInfo(() =>
     opts.hero
-      ? `${count.toLocaleString()} bodies on a dome · drag to orbit, ctrl+scroll to zoom`
+      ? `${count.toLocaleString()} bodies on a dome · drag to orbit, pinch or ⌘-scroll to zoom`
       : opts.domeSlider
         ? `${count.toLocaleString()} bodies · octree ${solver.gridDim}³ · drag the dome slider`
         : `${count.toLocaleString()} bodies · octree pyramid, ${solver.gridDim}³ finest grid · drag to orbit`,
@@ -105,6 +108,7 @@ export async function mountPyramid3D(container: HTMLElement, opts: Pyramid3DOpti
       shell.tick();
       solver.shellK = shellK;
       solver.damping = damping;
+      solver.theta = theta;
       solver.writeParams();
       const enc = dev.createCommandEncoder();
       const pass = enc.beginComputePass();

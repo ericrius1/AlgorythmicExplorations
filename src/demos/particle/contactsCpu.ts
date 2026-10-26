@@ -3,6 +3,9 @@
 // returns zero force. Poke the pile with your cursor.
 
 import { Shell, type Demo } from "../../lib/demoShell";
+import { speedBuckets, SPEED_BUCKETS, pixelRatio } from "../../lib/palette";
+
+const DISC_FILLS = speedBuckets(0.92);
 
 const R = 0.016; // disc radius
 const VIEW = 0.92;
@@ -81,21 +84,28 @@ export function drawContacts(ctx: CanvasRenderingContext2D, sim: ContactSim, mou
   const sc = (Math.min(width, height) / 2) * VIEW;
   const ox = width / 2;
   const oy = height / 2;
-  ctx.strokeStyle = "rgba(80, 90, 120, 0.5)";
-  ctx.lineWidth = 1;
+  const dpx = pixelRatio(ctx.canvas);
+  ctx.strokeStyle = "rgba(110, 122, 160, 0.45)";
+  ctx.lineWidth = dpx;
   ctx.strokeRect(ox - sc, oy - sc, sc * 2, sc * 2);
-  ctx.fillStyle = "rgba(140, 170, 255, 0.85)";
-  ctx.beginPath();
+  // colour by speed: the resting pile reads blue, anything you knock loose warms up
   const pr = Math.max(R * sc, 1.2);
-  for (let i = 0; i < sim.count; i++) {
-    const x = ox + sim.state[i * 4] * sc;
-    const y = oy - sim.state[i * 4 + 1] * sc;
-    ctx.moveTo(x + pr, y);
-    ctx.arc(x, y, pr, 0, Math.PI * 2);
+  for (let k = 0; k < SPEED_BUCKETS; k++) {
+    ctx.fillStyle = DISC_FILLS[k];
+    ctx.beginPath();
+    for (let i = 0; i < sim.count; i++) {
+      const v = Math.hypot(sim.state[i * 4 + 2], sim.state[i * 4 + 3]) * 0.9 + 0.12;
+      if (Math.min(SPEED_BUCKETS - 1, (v * (SPEED_BUCKETS - 1)) | 0) !== k) continue;
+      const x = ox + sim.state[i * 4] * sc;
+      const y = oy - sim.state[i * 4 + 1] * sc;
+      ctx.moveTo(x + pr, y);
+      ctx.arc(x, y, pr, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
-  ctx.fill();
   if (mouse) {
-    ctx.strokeStyle = "rgba(255, 205, 80, 0.4)";
+    ctx.strokeStyle = "rgba(255, 205, 80, 0.45)";
+    ctx.lineWidth = 1.5 * dpx;
     ctx.beginPath();
     ctx.arc(ox + mouse[0] * sc, oy - mouse[1] * sc, 0.25 * sc, 0, Math.PI * 2);
     ctx.stroke();

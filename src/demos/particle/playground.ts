@@ -542,7 +542,7 @@ export async function mountPlayground(container: HTMLElement, opts: PlaygroundOp
       pf[4] = preset.buoy; pf[5] = preset.centerPull; pf[6] = preset.drag; pf[7] = preset.dyeDecay;
       pf[8] = preset.speedLimit; pf[9] = preset.drift; pf[10] = preset.lifeMin; pf[11] = preset.lifeMax;
       pu[12] = count; pu[14] = preset.mode; pf[15] = preset.flow;
-      pf[16] = camFwd[0]; pf[17] = camFwd[1]; pf[18] = camFwd[2]; pf[19] = 0;
+      pf[16] = camFwd[0]; pf[17] = camFwd[1]; pf[18] = camFwd[2]; pf[19] = frameDt; // particle step (axis.w)
       pu[13] = stirrers.pack(pf, 20);
       dev.queue.writeBuffer(params, 0, pf as BufferSource);
 

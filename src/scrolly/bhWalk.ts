@@ -15,7 +15,8 @@ interface Cell {
   points: number[]; // indices, only for leaves
 }
 
-const THETA = 0.85;
+const THETA = 0.6;
+const EPS2 = 0.02 * 0.02; // softening, in unit-square lengths
 const MAX_DEPTH = 5;
 
 function buildTree(px: number[], py: number[]): Cell {
@@ -105,6 +106,25 @@ export function mountBhWalk(el: HTMLElement): void {
     for (const ch of c.children) walk(ch);
   };
   walk(tree);
+
+  // The real sums, so the captions and the final arrow can't drift from what
+  // the walk actually did. Every body has equal mass here.
+  const pull = (x: number, y: number, m: number, acc: [number, number]): void => {
+    const dx = x - bodyX;
+    const dy = y - bodyY;
+    const r2 = dx * dx + dy * dy + EPS2;
+    const inv = m / (r2 * Math.sqrt(r2));
+    acc[0] += dx * inv;
+    acc[1] += dy * inv;
+  };
+  const exactF: [number, number] = [0, 0];
+  for (let i = 0; i < N; i++) pull(px[i], py[i], 1, exactF);
+  const treeF: [number, number] = [0, 0];
+  for (const c of accepted) pull(c.comX, c.comY, c.count, treeF);
+  for (const i of exact) pull(px[i], py[i], 1, treeF);
+  const terms = accepted.length + exact.length;
+  const errPct = (Math.hypot(treeF[0] - exactF[0], treeF[1] - exactF[1]) / Math.hypot(exactF[0], exactF[1])) * 100;
+
   accepted.sort((a, b) => {
     const da = Math.hypot(a.comX - bodyX, a.comY - bodyY);
     const db = Math.hypot(b.comX - bodyX, b.comY - bodyY);
@@ -122,10 +142,10 @@ export function mountBhWalk(el: HTMLElement): void {
     screens: 4,
     aspect: 0.62,
     steps: [
-      { at: 0, text: "One body, asking for its force. The honest answer: one line to every other body — 320 of them here, 300,000 in the hero demo." },
-      { at: 0.2, text: "Build the quadtree: split any square holding more than one body, recursively. Every cell stores its total mass and centre of mass." },
-      { at: 0.42, text: "The walk. Each cell takes one test: width < θ × distance? If yes, the whole cell collapses into a single point mass (orange dot, one arrow). Far cells pass easily; near cells split open." },
-      { at: 0.78, text: "Result: a few dozen cluster terms plus a handful of exact near neighbours, summed into one acceleration — within a fraction of a percent of the exact answer." },
+      { at: 0, text: `One body wants to know its force. The exact answer takes a line to each of the other ${N} bodies. In the galaxy at the top of the page it's 40,000 lines, for every body, every step.` },
+      { at: 0.2, text: "Build the quadtree: any square holding more than one body splits into four, and so on down. Each cell stores its total mass and centre of mass." },
+      { at: 0.42, text: "Now walk it from the top. Each cell gets one test: is its width less than θ times its distance? If so the whole cell becomes one point mass (orange dot, one arrow). Far cells pass easily. Near ones get split open." },
+      { at: 0.78, text: `What's left: ${accepted.length} cluster terms plus ${exact.length} nearby bodies done exactly, ${terms} terms instead of ${N}. The white arrow is their sum, and it's ${errPct.toFixed(1)}% off the exact force.` },
     ],
     draw(ctx, w, h, t) {
       const m = 14;
@@ -164,7 +184,7 @@ export function mountBhWalk(el: HTMLElement): void {
         ctx.globalAlpha = 0.3 * lineAlpha;
         ctx.strokeStyle = PAL.accent;
         ctx.lineWidth = 0.6;
-        for (let i = 0; i < N; i += 2) {
+        for (let i = 0; i < N; i++) {
           const g = phase(pLines, (i / N) * 0.6, (i / N) * 0.6 + 0.4);
           if (g <= 0) continue;
           ctx.beginPath();
@@ -201,17 +221,11 @@ export function mountBhWalk(el: HTMLElement): void {
       ctx.globalAlpha = 1;
 
       // Accepted cells: highlight box, grow COM dot, arrow to body.
-      let nx = 0;
-      let ny = 0;
       accepted.forEach((c, i) => {
         const k = collapsed(i);
         if (k <= 0) return;
         const ax = X(c.comX);
         const ay = Y(c.comY);
-        const d2 = Math.hypot(c.comX - bodyX, c.comY - bodyY);
-        const f = c.count / (d2 * d2 + 0.02);
-        nx += ((c.comX - bodyX) / d2) * f;
-        ny += ((c.comY - bodyY) / d2) * f;
 
         ctx.save();
         ctx.globalAlpha = k * (1 - 0.85 * pSum);
@@ -244,11 +258,11 @@ export function mountBhWalk(el: HTMLElement): void {
         ctx.restore();
       }
 
-      // Net force arrow.
+      // Net force arrow: the tree's answer, near-field terms included.
       if (pSum > 0) {
-        const len = Math.hypot(nx, ny) || 1;
-        const ux = nx / len;
-        const uy = ny / len;
+        const len = Math.hypot(treeF[0], treeF[1]) || 1;
+        const ux = treeF[0] / len;
+        const uy = treeF[1] / len;
         const L = S * 0.16 * pSum;
         arrow(ctx, X(bodyX), Y(bodyY), X(bodyX) + ux * L, Y(bodyY) + uy * L, "#ffffff", 2.5, 9);
       }
@@ -263,18 +277,18 @@ export function mountBhWalk(el: HTMLElement): void {
       ctx.stroke();
 
       // Term counter.
-      const naive = N - 1;
-      let terms = naive;
+      const naive = N;
+      let shown = naive;
       if (t > 0.42) {
         let done = 0;
         accepted.forEach((_, i) => {
           if (collapsed(i) > 0.5) done++;
         });
         const remaining = accepted.length - done;
-        terms = Math.round(lerp(naive, accepted.length + exact.length, done / Math.max(1, accepted.length)));
-        if (remaining === 0) terms = accepted.length + exact.length;
+        shown = Math.round(lerp(naive, terms, done / Math.max(1, accepted.length)));
+        if (remaining === 0) shown = terms;
       }
-      label(ctx, `force terms: ${terms}`, w - 16, 22, { color: PAL.warm, size: 13, align: "right", mono: true });
+      label(ctx, `force terms: ${shown}`, w - 16, 22, { color: PAL.warm, size: 13, align: "right", mono: true });
       if (t > 0.42) {
         label(ctx, `θ = ${THETA}`, w - 16, 40, { color: PAL.muted, size: 11, align: "right", mono: true });
       }

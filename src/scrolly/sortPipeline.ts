@@ -49,21 +49,23 @@ export function mountSortPipeline(el: HTMLElement): void {
     steps: [
       { at: 0, text: "18 particles in a strip of 6 cells, coloured by which cell they fall in. The goal: every cell's particles contiguous in one array, no lists, no pointers." },
       { at: 0.14, text: "Pass 1 — histogram. Every particle atomically bumps its cell's counter. Thousands of threads can do this at once; order doesn't matter, only the totals." },
-      { at: 0.34, text: "Pass 2 — scan. Where does each cell's run start? That's the running total of all counts before it. Hillis–Steele: every element adds the value 1 to its left, then 2, then 4. After log₂(n) rounds, done — all elements in parallel each round." },
-      { at: 0.72, text: "Pass 3 — scatter. Each particle claims a slot: start of its cell's run, plus an atomic ticket. One copy, and the array is sorted." },
+      { at: 0.34, text: "Pass 2, the scan. Where does each cell's run start? At the total of all the counts before it. Hillis–Steele gets there in rounds: every box adds the value 1 to its left, then 2 to its left, then 4. Three rounds for six cells, and every box updates at once in each round." },
+      { at: 0.64, text: "The scan gives totals that include each cell's own count. Shift them one place right, put a zero in front, and you have where each cell's run starts." },
+      { at: 0.74, text: "Pass 3, the scatter. Each particle takes the start of its cell's run plus an atomic ticket, and copies itself there. One pass and the array is sorted." },
       { at: 0.92, text: "Neighbours in space are now neighbours in memory. The 3×3 query reads each cell as one clean contiguous run." },
     ],
     draw(ctx, w, h, t) {
       const mx = Math.max(56, w * 0.08);
       const stripW = w - 2 * mx;
       const stripY = h * 0.05;
-      const stripH = h * 0.24;
+      const stripH = h * 0.2;
       const cw = stripW / CELLS;
 
       const pStrip = phase(t, 0, 0.1);
       const pHist = phase(t, 0.14, 0.32);
       const pScanIn = phase(t, 0.34, 0.4);
-      const pScatter = phase(t, 0.72, 0.92);
+      const pStarts = phase(t, 0.64, 0.7);
+      const pScatter = phase(t, 0.74, 0.92);
 
       // --- strip with cells ---
       ctx.save();
@@ -88,7 +90,7 @@ export function mountSortPipeline(el: HTMLElement): void {
       ctx.restore();
 
       // --- histogram row ---
-      const histY = stripY + stripH + h * 0.07;
+      const histY = stripY + stripH + h * 0.06;
       const boxH = h * 0.075;
       if (pHist > 0 || t >= 0.32) {
         for (let c = 0; c < CELLS; c++) {
@@ -114,12 +116,12 @@ export function mountSortPipeline(el: HTMLElement): void {
       }
 
       // --- scan rounds ---
-      const scanY0 = histY + boxH + h * 0.04;
-      const rowGap = boxH + h * 0.025;
+      const scanY0 = histY + boxH + h * 0.035;
+      const rowGap = boxH + h * 0.02;
       const nRounds = rounds.length - 1; // 3 add rounds
       for (let r = 1; r <= nRounds; r++) {
-        const t0 = 0.4 + ((r - 1) / nRounds) * 0.3;
-        const t1 = 0.4 + (r / nRounds) * 0.3;
+        const t0 = 0.4 + ((r - 1) / nRounds) * 0.24;
+        const t1 = 0.4 + (r / nRounds) * 0.24;
         const pr = phase(t, t0, t1);
         if (pr <= 0) continue;
         const y = scanY0 + (r - 1) * rowGap;
@@ -163,10 +165,42 @@ export function mountSortPipeline(el: HTMLElement): void {
         });
       }
 
+      // --- starts row: the inclusive scan shifted right by one ---
+      const startsY = scanY0 + nRounds * rowGap;
+      if (pStarts > 0) {
+        const lastY = scanY0 + (nRounds - 1) * rowGap + boxH;
+        for (let c = 0; c < CELLS; c++) {
+          ctx.globalAlpha = pStarts;
+          ctx.strokeStyle = CELL_COLORS[c];
+          ctx.strokeRect(mx + c * cw + 4, startsY, cw - 8, boxH);
+          label(ctx, String(starts[c]), mx + c * cw + cw / 2, startsY + boxH / 2, {
+            color: CELL_COLORS[c],
+            size: 13,
+            align: "center",
+            mono: true,
+            alpha: pStarts,
+          });
+          // each inclusive total slides one box right to become the next start
+          if (c < CELLS - 1 && pStarts < 1) {
+            const fromX = mx + c * cw + cw / 2;
+            const toX = mx + (c + 1) * cw + cw / 2;
+            ctx.globalAlpha = Math.sin(pStarts * Math.PI);
+            arrow(ctx, fromX, lastY, lerp(fromX, toX, pStarts), startsY, PAL.accent, 1.2, 5);
+          }
+        }
+        label(ctx, "starts", mx - 8, startsY + boxH / 2, {
+          color: PAL.muted,
+          size: 10,
+          align: "right",
+          alpha: pStarts,
+        });
+        ctx.globalAlpha = 1;
+      }
+
       // --- output row ---
-      const outY = scanY0 + nRounds * rowGap + h * 0.02;
+      const outY = startsY + rowGap + h * 0.01;
       const slotW = stripW / N;
-      const pOut = phase(t, 0.68, 0.74);
+      const pOut = phase(t, 0.7, 0.76);
       if (pOut > 0) {
         ctx.globalAlpha = pOut;
         ctx.strokeStyle = PAL.grid;

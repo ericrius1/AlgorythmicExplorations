@@ -3,7 +3,7 @@
 // FINEST/DIM/FP_SCALE baked as pipeline-override constants.
 
 import shader from "../shaders/pyramid.wgsl?raw";
-import { TOTAL_MASS, G, type Bodies } from "./seed";
+import { TOTAL_MASS, G, type Bodies, type Halo } from "./seed";
 
 const WG = 256;
 const SCALE_BUDGET = 3.6e9;
@@ -26,6 +26,7 @@ export class PyramidSolver {
   dt = 0.016;
   softening = 0.05;
   theta = 0.75;
+  halo: Halo | null = null;
 
   private dev: GPUDevice;
   private simParams: GPUBuffer;
@@ -64,7 +65,7 @@ export class PyramidSolver {
     this.mass = dev.createBuffer({ size: init.count * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     dev.queue.writeBuffer(this.mass, 0, init.mass as BufferSource);
 
-    this.simParams = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.simParams = dev.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.grid = dev.createBuffer({ size: cells * 16, usage: GPUBufferUsage.STORAGE });
     this.nodes = dev.createBuffer({ size: levelOffset(this.finestLevel + 1) * 16, usage: GPUBufferUsage.STORAGE });
     this.bounds = dev.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE });
@@ -98,7 +99,7 @@ export class PyramidSolver {
   }
 
   writeParams(): void {
-    const buf = new ArrayBuffer(32);
+    const buf = new ArrayBuffer(48);
     const dv = new DataView(buf);
     dv.setUint32(0, this.count, true);
     dv.setFloat32(4, this.dt, true);
@@ -107,6 +108,8 @@ export class PyramidSolver {
     dv.setFloat32(16, this.theta, true);
     dv.setFloat32(20, 1.0, true);   // damping (off)
     dv.setFloat32(24, 10.0, true);  // maxSpeed (effectively off)
+    dv.setFloat32(28, this.halo?.v2 ?? 0, true);
+    dv.setFloat32(32, this.halo?.core ?? 1, true);
     this.dev.queue.writeBuffer(this.simParams, 0, buf);
   }
 

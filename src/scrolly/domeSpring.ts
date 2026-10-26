@@ -17,24 +17,33 @@ interface Sample {
 const R = 1; // shell radius
 const K = 26; // shell spring stiffness
 const STEPS = 1400;
+const KICK_OUT = Math.floor(STEPS * 0.12); // radial kick: off the shell
+const KICK_ALONG = Math.floor(STEPS * 0.5); // tangential kick: over the rim
+
+// Scroll progress at which the scrub reaches sample i.
+const progressAt = (i: number): number => 0.02 + (0.96 * i) / (STEPS - 1);
 
 function simulate(): Sample[] {
   const out: Sample[] = [];
-  // Cross-section: x horizontal, y up. Start on the dome, sliding right.
+  // Cross-section: x horizontal, y up. Start on the dome, sliding slowly
+  // clockwise. Slow enough that the spring only has to stretch ~0.3% to
+  // supply the centripetal force, so it reads as silent.
   let x = -Math.SQRT1_2 * R;
   let y = Math.SQRT1_2 * R;
-  let vx = 0.6;
-  let vy = 0.6;
+  let vx = 0.3 * Math.SQRT1_2;
+  let vy = 0.3 * Math.SQRT1_2;
   const dt = 1 / 240;
   for (let i = 0; i < STEPS; i++) {
     // Scripted nudges so both springs get exercised on schedule.
-    if (i === Math.floor(STEPS * 0.12)) {
+    if (i === KICK_OUT) {
       const r = Math.hypot(x, y);
-      vx += (x / r) * 1.5;
-      vy += (y / r) * 1.5;
+      vx += (x / r) * 1.2;
+      vy += (y / r) * 1.2;
     }
-    if (i === Math.floor(STEPS * 0.52)) {
-      vy -= 2.6;
+    if (i === KICK_ALONG) {
+      const r = Math.hypot(x, y);
+      vx += (y / r) * 2.4;
+      vy -= (x / r) * 2.4;
     }
     const r = Math.hypot(x, y) || 1e-6;
     const fx = -(x / r) * (r - R) * K;
@@ -58,16 +67,27 @@ function simulate(): Sample[] {
 export function mountDomeSpring(el: HTMLElement): void {
   const path = simulate();
 
+  // Time the captions off the trajectory itself rather than guessing.
+  const after = (from: number, test: (s: Sample) => boolean): number => {
+    for (let i = from; i < path.length; i++) if (test(path[i])) return i;
+    return path.length - 1;
+  };
+  const inside = after(KICK_OUT, (s) => Math.hypot(s.x, s.y) < R - 0.05);
+  const below = after(KICK_ALONG, (s) => s.y < 0);
+  const above = after(below, (s) => s.y >= 0);
+  const lead = (i: number): number => Math.max(0, progressAt(i) - 0.01);
+
   mountScrolly(el, {
     screens: 4,
     aspect: 0.56,
     steps: [
-      { at: 0, text: "Cross-section of the dome. The dashed arc is the target shell, radius R. The body starts on it, moving along it — the spring is silent while r = R." },
-      { at: 0.1, text: "A kick sends it outside the shell. Now r > R, and the spring fires: a force pointing radially inward, proportional to how far the rule is broken." },
-      { at: 0.35, text: "Overshoot, correct, overshoot — the body oscillates around the shell while the spring negotiates it back. Light damping settles the argument." },
-      { at: 0.52, text: "A second kick slings it around the rim. The spring keeps tugging it back toward the shell the whole way — the force is always proportional to the current violation, nothing more." },
-      { at: 0.76, text: "It dips below the equator, and the floor spring (4× stiffer) shoves it straight back up. The equator is a hard edge; the shell is a soft preference." },
-      { at: 0.9, text: "That's the whole constraint: two if-statements producing forces. The integrator and the gravity solver never learn the world became a dome." },
+      { at: 0, text: "A slice through the dome. The dashed arc is the shell, radius R. The body starts on it, sliding slowly along, and the spring has almost nothing to do." },
+      { at: lead(KICK_OUT), text: "A kick knocks it outward. Now r > R and the spring pulls it back in, straight toward the centre, harder the farther out it is." },
+      { at: lead(inside), text: "It overshoots to the inside, gets pushed back out, overshoots again. A little damping lets it settle." },
+      { at: lead(KICK_ALONG), text: "A second kick sends it fast along the shell. Going fast, it rides a bit outside the arc: the stretch is what supplies the force that curves its path." },
+      { at: lead(below), text: "It skids off the rim and below the equator. The floor spring is 4× stiffer and shoves it straight back up. The floor is a hard edge, the shell a soft preference." },
+      { at: lead(above), text: "Back over the rim, it swings across the top with the shell spring reeling it in the whole way." },
+      { at: 0.92, text: "That's the whole constraint: two if-statements that produce forces. The integrator and the gravity solver never find out the world became a dome." },
     ],
     draw(ctx, w, h, t) {
       const cx = w / 2;
@@ -100,8 +120,9 @@ export function mountDomeSpring(el: HTMLElement): void {
       label(ctx, "shell  r = R", cx + S * 0.74, cy - S * 0.78, { color: PAL.accent, size: 11, alpha: 0.8 * appear });
       label(ctx, "equator (floor)", cx - S * 1.42, cy + 14, { color: PAL.muted, size: 11, alpha: 0.8 * appear });
 
-      // Scrub position along the precomputed path.
-      const scrub = phase(t, 0.02, 0.98);
+      // Scrub position along the precomputed path. Linear, so the caption
+      // timings computed from progressAt() line up with what's on screen.
+      const scrub = Math.min(1, Math.max(0, (t - 0.02) / 0.96));
       const idx = Math.min(path.length - 1, Math.floor(scrub * (path.length - 1)));
       const s = path[idx];
       const PX = (p: Sample | { x: number; y: number }): [number, number] => [cx + p.x * S, cy - p.y * S];
@@ -146,9 +167,13 @@ export function mountDomeSpring(el: HTMLElement): void {
       const fmag = Math.hypot(s.fx, s.fy);
       if (fmag * FS > 6) {
         arrow(ctx, bx, by, bx + s.fx * FS, by - s.fy * FS, PAL.warm, 2.5, 8);
-        label(ctx, "shell spring  −k·(r−R)·r̂", bx + s.fx * FS + 8, by - s.fy * FS, {
+        // flip the label to the left of the arrowhead near the right edge
+        const lx = bx + s.fx * FS;
+        const flip = lx + 170 > w;
+        label(ctx, "shell spring  −k·(r−R)·r̂", flip ? lx - 8 : lx + 8, by - s.fy * FS, {
           color: PAL.warm,
           size: 11,
+          align: flip ? "right" : "left",
         });
       }
       const gmag = Math.hypot(s.gx, s.gy);

@@ -10,19 +10,20 @@
     <title>Sorting Water — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part three: from gravity to fluids. GPU neighbor search via counting sort and parallel prefix sums — from an 1890 census machine to interactive SPH water in a browser tab."
+      content="From gravity to contact forces: finding neighbours on the GPU with a counting sort and a parallel prefix sum, ending with sand and SPH water you can stir in the browser."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <header class="hero">
+  <body class="series-pw">
+    <header class="hero hero-title-below">
       <div data-demo="hero-fluid"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Particle Worlds · Part 3</p>
         <h1>Sorting Water</h1>
         <p class="subtitle">
-          Part three: the particles stop attracting and start colliding. Counting sort,
-          parallel prefix sums, and a glass of water in
-          your browser tab. Stir it with your cursor.
+          The particles stop attracting and start colliding, and finding neighbours fast
+          turns into a sorting problem. The water above is 45,000 particles on your GPU.
+          Stir it with your cursor.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -33,96 +34,100 @@
 
     <main>
       <p>
-        <a href="/pages/particle-worlds/part1.html">Part one</a> built a galaxy: hundreds of thousands of
-        bodies, every one attracting every other, made tractable by a tree that
-        summarized faraway crowds into single points.
-        <a href="/pages/particle-worlds/part2.html">Part two</a> lifted it into 3D and bent it over a dome.
-        Both addressed the same constraint: gravity reaches across the entire universe, so in
-        principle everything matters to everything.
+        <a href="/pages/particle-worlds/part1.html">Part one</a> and
+        <a href="/pages/particle-worlds/part2.html">part two</a> were about gravity, where
+        every body pulls on every other body no matter how far apart they are. Most of the
+        work went into summarizing the bodies that are far away.
       </p>
       <p>
-        The liquid sloshing above is a different world. Water doesn't pull on water
-        across the tank. A drop only cares about the drops it is actually touching —
-        push on your neighbours, be pushed back, and the sum of tens of thousands of
-        tiny shoves becomes pressure, splashes, and waves. Collisions, flocking birds,
-        and molecular dynamics all work this way. Forces with a <em>cutoff radius</em>
-        are everywhere in simulation, and they sound easier: surely "check a few
-        neighbours" is easier than "sum the whole universe"?
-      </p>
-      <p>
-        It is — once you know who your neighbours are. Answering that question at GPU
-        speed takes one of the oldest algorithms in computing plus a fundamental
-        parallel primitive. Together they make the fluid demo possible.
+        The water at the top of this page works the other way around. A bit of water only
+        interacts with the bits right next to it: it pushes on its neighbours, gets pushed
+        back, and tens of thousands of those small pushes add up to pressure and waves.
+        Collisions and molecular dynamics work the same way, with forces that drop to zero
+        past some cutoff distance. That sounds easier than gravity, and it is once you know
+        which particles are your neighbours. Finding that out fast on a GPU took a counting
+        sort and a parallel prefix sum, and the rest of this page is how they fit together.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The opposite problem</span>Wasted pair checks</h2>
+      <h2 id="pairs"><span class="kicker">Step 1 · Contacts</span>Mostly checking for nothing</h2>
       <p>
-        Start with a box of discs under gravity. Two
-        discs push apart when they overlap — a stiff spring plus a little damping, the
-        standard contact model — and feel nothing otherwise. The obvious
-        implementation is the same two nested loops as the galaxy:
+        Start with a box of discs under gravity. Two discs push apart when they overlap,
+        using a stiff spring with a little damping, and don't feel each other at all
+        otherwise. The obvious way to write it is the same pair of nested loops as the
+        galaxy:
       </p>
       <pre><code>for (let i = 0; i &lt; count; i++) {
   for (let j = i + 1; j &lt; count; j++) {
-    if (distance(i, j) &lt; 2 * radius) {   // almost always false
+    if (distance(i, j) &lt; 2 * radius) {   <span class="cm">// almost always false</span>
       applyContactForce(i, j);
     }
   }
 }</code></pre>
       <p>
-        Run it and watch the middle number in the counter below. At 2,000 particles
-        the loop performs about two million distance checks per step, and on a typical
-        frame fewer than <em>three thousand</em> find discs actually touching. With
-        gravity, every term of the O(n²) sum contributed something. Here, more than
-        99.8% of the work computes a force of exactly zero.
+        The counter under the demo shows what that costs. At the default 2,000 discs it's
+        about two million distance checks per step, a few milliseconds of JavaScript. Only
+        around 8,000 of those pairs are touching while the pile is still settling, and
+        closer to 13,000 once it has packed down. Either way it's well under 1%. With
+        gravity, every term in the O(n²) sum added something. Here more than 99% of the
+        checks compute a force of zero.
       </p>
 
-      <div data-demo="naive-contacts"></div>
+      <div
+        data-demo="naive-contacts"
+        data-title="Checking every pair"
+        data-hint="Poke the pile"
+      ></div>
 
       <p>
-        Poke the pile — the cursor shoves nearby discs, and the shove costs the same
-        wall of distance checks. The fix can't be the part-one fix: a Barnes–Hut tree
-        answers "what does everything far away add up to?", and here the far field
-        adds up to nothing by definition. We need the mirror-image structure — one
-        that answers "who is <em>near me</em>?" and skips the rest entirely.
+        Your cursor shoves the discs near it, and that costs the same two million checks.
+        Part one's fix doesn't help here. A Barnes–Hut tree answers "what does everything
+        far away add up to?", and for contact forces the answer is always zero. This needs
+        the opposite kind of structure, one that answers "who is near me?" and skips
+        everything else.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Buckets</span>The spatial hash grid</h2>
+      <h2 id="grid"><span class="kicker">Step 2 · Buckets</span>A uniform grid</h2>
       <p>
-        The classic answer is direct. Lay a uniform grid over
-        the world, with cells exactly one interaction-radius wide, and drop each
-        particle into its cell. Any particle close enough to touch me must sit in my
-        cell or one of the eight surrounding it — by construction, since a cell is as
-        wide as my reach. The neighbour query becomes: look up nine buckets, test
-        their occupants, done. For roughly uniform particles that is O(n) total.
+        The standard answer is a grid. Lay a uniform grid over the world, with cells at
+        least as wide as the interaction distance, and put each particle in its cell.
+        Anything close enough to touch a particle has to be in the same cell or one of the
+        eight around it. So the neighbour query becomes: look in nine cells and test what's
+        in them. If the particles are spread fairly evenly, that's O(n) work in total.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The same idea across fields</span>
+        <span class="note-label">Aside · An old idea with several names</span>
         <p>
-          Molecular-dynamics people have leaned on this since the field began —
-          <em>cell lists</em> and Loup Verlet's <em>neighbour lists</em> date to the
-          1960s, when simulating a few hundred argon atoms was worth a paper in
-          <em>Physical Review</em>. Game engines call it spatial hashing, graphics
-          calls it a uniform grid, databases call it binning. Every field that needed
-          nearness rediscovered it.
+          Molecular dynamics has used this since the field's early days. Loup Verlet's 1967
+          paper in <em>Physical Review</em> simulated 864 argon atoms and kept a list of
+          each atom's nearby neighbours, so it didn't have to check every pair on every
+          step. Cell lists, the same grid as here, followed in the 1970s. Game and graphics
+          code usually calls it a uniform grid, or spatial hashing when the cells are
+          hashed into a table (more on that below).
         </p>
       </aside>
       <p>
-        The demo below runs the same pile of discs, now grid-accelerated. Your cursor
-        performs the query live: the yellow 3×3 window is every cell it searches, the
-        yellow discs the only candidates it tests. Move toward a dense clump and the
-        candidate count rises to a few dozen; the other 3,500 discs might as well not
-        exist.
+        The demo below is the same kind of pile, now 3,500 discs on a 24×24 grid. Your
+        cursor runs the query live. The yellow 3×3 window is every cell it would search,
+        and the yellow discs are the only candidates it would test. When the cursor isn't
+        over the box, the query parks itself inside the pile. Near the top of the pile the
+        window holds about a hundred discs, and a few hundred down near the floor, where
+        the pile is packed tightest. The rest are never looked at. Over a whole step, the
+        counter shows a bit over 400,000 candidate pairs, against 6.1 million for checking
+        every pair.
       </p>
 
-      <div data-demo="grid-cursor"></div>
+      <div
+        data-demo="grid-cursor"
+        data-title="The 3×3 query"
+        data-hint="Hover over the pile"
+      ></div>
 
       <p>
-        A CPU implementation is almost suspiciously small. Convert each position to
-        one integer cell key, append particle indices to that bucket, then visit the
-        3×3 block around the particle:
+        The simplest CPU version is short. Turn each position into one integer cell key,
+        append the particle's index to that cell's bucket, and then visit the 3×3 block
+        around each particle:
       </p>
       <pre><code>const buckets = Array.from({ length: grid * grid }, () =&gt; []);
 
@@ -135,179 +140,200 @@ function testNeighbours(i) {
   for (let offsetY = -1; offsetY &lt;= 1; offsetY++) {
     for (let offsetX = -1; offsetX &lt;= 1; offsetX++) {
       const cell = cellAt(cellX + offsetX, cellY + offsetY);
-      if (cell === undefined) continue;           // outside the box
+      if (cell === undefined) continue;           <span class="cm">// outside the box</span>
       for (const j of buckets[cell]) {
-        if (j &gt; i) testPair(i, j);                // each pair once
+        if (j &gt; i) testPair(i, j);                <span class="cm">// each pair once</span>
       }
     }
   }
 }</code></pre>
       <p>
-        The query is solved; the innocent-looking <code>push</code> is the GPU
-        obstacle. Appending to a list means pointers, allocation, and a write position
-        that depends on who appended before you — the same serial dependency that
-        complicated the Barnes–Hut tree build. Ten thousand threads cannot politely
-        take turns appending. Whatever structure we build must be built the GPU way:
-        every thread at once, no one waiting.
+        (The demo above already uses the sorted layout from the next section, but this is
+        the version you'd write first.)
       </p>
       <p>
-        Part one escaped this trap by making the tree implicit — pure arithmetic,
-        nothing to link. For the grid, sorting provides the equivalent layout.
+        The query part is fine. The problem for the GPU is the innocent-looking
+        <code>push</code>. Appending to a list means allocation, pointers, and a write
+        position that depends on who appended before you. That's the same serial
+        dependency that made the Barnes–Hut tree hard to build in parallel, and thousands of
+        threads taking turns to append would spend most of their time waiting. Whatever
+        structure I use has to be built the GPU way, with every thread working at once.
+      </p>
+      <p>
+        Part one got around this by making the tree implicit, so there was nothing to link.
+        For the grid, a sort does the same job.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Ordering the grid</span>Counting sort and the parallel for-loop</h2>
+      <h2 id="counting-sort"><span class="kicker">Step 3 · Sorting</span>Counting sort and the prefix sum</h2>
       <p>
-        Notice what we actually need. Not lists — just each cell's particles sitting
-        <em>together</em>, plus, for every cell, the index where its group starts.
-        That is precisely what a sort delivers: order the particles by cell number,
-        and each cell becomes a contiguous run in one flat array. The pointer
-        structure we couldn't build turns out to be an <em>ordering</em>, and
-        orderings are something GPUs can produce.
+        What the query needs is each cell's particles stored next to each other, plus the
+        index where each cell's group starts. Sorting the particles by cell number gives
+        you that: each cell becomes a contiguous run in one flat array. So the pointer
+        structure I couldn't build in parallel can be replaced by an ordering, and GPUs can
+        sort.
       </p>
       <p>
-        Better still, sorting by bucket number needs no comparisons. The recipe is
-        <em>counting sort</em>: count how many particles land in each cell; compute,
-        for every cell, the total count of all cells before it — that running total is
-        exactly where the cell's group starts; then move every particle directly to
-        its slot.
+        Sorting by cell number doesn't even need comparisons. The method is
+        <em>counting sort</em>. Count how many particles land in each cell. Then, for every
+        cell, add up the counts of all the cells before it; that running total is where the
+        cell's group starts. Finally, move every particle straight to its slot.
       </p>
-      <pre><code>counts[cell]++                       // 1. histogram      (one pass)
-starts[c] = counts[0..c-1] summed    // 2. prefix sum     (the interesting bit)
-slot = starts[cell] + claimed++      // 3. scatter        (one pass)</code></pre>
+      <pre><code>counts[cell]++                       <span class="cm">// 1. histogram    (one pass)</span>
+starts[c] = counts[0..c-1] summed    <span class="cm">// 2. prefix sum   (the hard part)</span>
+slot = starts[cell] + claimed++      <span class="cm">// 3. scatter      (one pass)</span></code></pre>
       <p>
-        In serial JavaScript, the whole sort is the following. The GPU version keeps
-        the same arrays and the same three phases; only the loops become compute
-        dispatches and the two increments become atomics:
+        In serial JavaScript the whole sort looks like this. The GPU version keeps the same
+        arrays and the same three phases. The loops become compute dispatches and the two
+        increments become atomics.
       </p>
       <pre><code>const counts = new Uint32Array(cellCount);
-for (const p of particles) counts[cellOf(p)]++;          // histogram
+for (const p of particles) counts[cellOf(p)]++;          <span class="cm">// histogram</span>
 
 const starts = new Uint32Array(cellCount);
 for (let c = 1; c &lt; cellCount; c++) {
-  starts[c] = starts[c - 1] + counts[c - 1];             // exclusive scan
+  starts[c] = starts[c - 1] + counts[c - 1];             <span class="cm">// exclusive scan</span>
 }
 
 const cursor = starts.slice();
 const sorted = new Array(particles.length);
 for (const p of particles) {
   const cell = cellOf(p);
-  sorted[cursor[cell]++] = p;                             // scatter
+  sorted[cursor[cell]++] = p;                             <span class="cm">// scatter</span>
 }</code></pre>
       <p>
-        Step 2 — turning per-cell counts into running totals — looks like the one
-        inherently serial part. A running total seems to demand a single accumulator
-        marching left to right: you can't know the total through cell 100 until
-        you've finished cell 99. How could a thousand threads possibly help?
+        The second phase, turning per-cell counts into running totals, looks like the one
+        part that has to run in order. A running total seems to need a single accumulator
+        moving left to right, since you can't know the total through cell 100 until you've
+        finished cell 99.
       </p>
       <p>
-        The answer, from Hillis and Steele in 1986, works by doubling. The scan runs
-        in rounds, and in each round <em>every</em> cell updates at once. Round one:
-        each cell adds in the value of its immediate left neighbour, so each cell now
-        holds the sum of two cells — itself and the one before. Round two: each cell
-        reaches <em>two</em> positions left and adds that value in. But that value
-        already covers two cells from round one, so every cell now holds the sum of
-        four. Round three reaches back four positions, and each cell covers eight.
-        The reach doubles each round, and so does the stretch of array each cell has
-        absorbed — after log₂ n rounds (ten rounds for a thousand cells), every
-        position holds the sum of everything up to it. Within a round no thread
-        waits on any other; the serial loop becomes a handful of perfectly parallel
-        sweeps.
+        The parallel version I used is the one Daniel Hillis and Guy Steele described in
+        1986, and it works by doubling. The scan runs in rounds, and in each round every
+        cell updates at the same time. In round one, each cell adds in the value one place
+        to its left, so it now holds the sum of two cells. In round two, each cell adds the
+        value two places to its left. That value already covers two cells, so each cell now
+        holds the sum of four. Round three reaches back four places and covers eight. After
+        log₂ n rounds (ten for a thousand cells), every position holds the sum of
+        everything up to and including itself. Within a round, no thread waits on any
+        other.
       </p>
       <p>
-        Here is the full process — histogram, scan, scatter — under your scroll
-        wheel. Take it slowly; the scan rounds are the part worth rewinding:
+        That gives totals that include each cell's own count. Shift them one place to the
+        right and put a zero in front, and each cell holds the index where its run starts.
+      </p>
+      <p>
+        Here's the whole process on 18 particles and 6 cells, scrubbed by your scroll
+        position: the histogram, the scan rounds, the shifted "starts" row, and the
+        scatter. Go slowly through the scan rounds. They're the part worth rewinding.
       </p>
 
       <div data-scrolly="sort-pipeline"></div>
 
       <p>
-        And here it is at a more realistic size, running continuously: 56 particles,
-        16 cells, scanned in four passes and scattered to their slots:
+        And here it is a bit bigger, running on its own: 56 particles in 16 cells, four
+        scan passes, then the shift, then the scatter. The buttons step through it one
+        phase at a time, toggle auto-play, and shuffle in a new set of particles.
       </p>
 
-      <div data-demo="scan"></div>
+      <div
+        data-demo="scan"
+        data-title="Counting sort, step by step"
+        data-hint="Step, or let it play"
+      ></div>
 
       <aside class="note">
-        <span class="note-label">Aside · Census machines and a refrigerator-sized computer</span>
+        <span class="note-label">Aside · Census machines and the Connection Machine</span>
         <p>
-          Counting sort predates electronic computers by half a century. The 1880 US
-          census took eight years to tabulate by hand; facing worse in 1890, the
-          Census Bureau bought Herman Hollerith's punched-card tabulating machines,
-          which grouped and counted cards by category, bucket by bucket. Clerks
-          sorting cards digit-by-digit into bins were executing radix sort decades
-          before anyone named it — and Hollerith's company, after some mergers, became
-          IBM. Harold Seward's 1954 MIT thesis finally wrote down the algorithm the
-          punched-card world had been running for sixty years.
+          Sorting into buckets instead of comparing is older than electronic computers. The
+          1880 US census took most of a decade to tabulate by hand, and for 1890 the Census
+          Bureau used Herman Hollerith's electric tabulating machines, which read punched
+          cards and counted them by category. Later mechanical card sorters dropped each
+          card into one of a row of pockets based on the hole in a single column, and
+          operators ran the deck through once per column, least significant digit first.
+          That's radix sort, done by machine. Hollerith's company, after a merger and a
+          rename, became IBM. Harold Seward's 1954 MIT master's thesis described counting
+          sort and radix sort for electronic computers.
         </p>
         <p>
-          The parallel scan has its own pedigree: Hillis and Steele were programming
-          the Connection Machine, a computer built from 65,536 one-bit processors —
-          and our grid happens to be 256×256 = 65,536 cells, one per processor.
+          The scan has its own history. Hillis and Steele were programming the Connection
+          Machine, which was built from 65,536 one-bit processors. The grid in the GPU demos
+          below happens to be 256×256, which is also 65,536 cells. The doubling pattern
+          itself is older: Peter Kogge and Harold Stone used it in 1973 to solve
+          recurrences, and it's the basis of the Kogge–Stone adder.
         </p>
       </aside>
       <p>
-        This operation — <em>scan</em>, or prefix sum — turned out to be far bigger
-        than sorting. Guy Blelloch's work at Carnegie Mellon recast scan as a
-        universal primitive: radix sort is scans, stream compaction is a scan, memory
-        allocation across threads is a scan. The slogan that stuck:
-        <strong>scan is the parallel for-loop</strong> — whenever a loop carries a
-        running quantity forward, a scan may be able to run it in logarithmic depth instead.
+        This operation, called a <em>scan</em> or prefix sum, turned out to be useful far
+        beyond sorting. Guy Blelloch argued that scans should count as basic parallel
+        operations and showed how much can be built from them: radix sort, stream
+        compaction, and handing out memory to many threads at once all come down to scans.
+        I think of it as the parallel version of any loop that carries a running total
+        forward. If the operation in that loop is associative, a scan can run it in
+        logarithmic depth.
       </p>
       <details class="fold">
-        <summary>Deep dive: the scan as three GPU dispatches</summary>
+        <summary>The scan as three GPU dispatches</summary>
         <div class="fold-body">
           <p>
-            On a modern GPU, scanning 65,536 cells takes three dispatches: each
-            256-thread workgroup scans its own 256 cells in shared memory; one
-            workgroup scans the 256 block totals; a final sweep adds each block's
-            total back onto its cells. About a tenth of a millisecond, all told.
+            On the GPU, scanning 65,536 cells takes three dispatches. First, each
+            256-thread workgroup scans its own 256 cells in shared memory. Then a single
+            workgroup scans the 256 block totals. Last, every cell adds its block's offset
+            back on.
           </p>
-          <pre><code>pass.setPipeline(scanBlocks);  pass.dispatchWorkgroups(256);
-pass.setPipeline(scanSums);    pass.dispatchWorkgroups(1);
-pass.setPipeline(scanAdd);     pass.dispatchWorkgroups(256);</code></pre>
+          <pre><code>pass.setPipeline(this.pipes.scan_blocks);  pass.dispatchWorkgroups(BLOCKS);  <span class="cm">// BLOCKS = 256</span>
+pass.setPipeline(this.pipes.scan_sums);    pass.dispatchWorkgroups(1);
+pass.setPipeline(this.pipes.scan_add);     pass.dispatchWorkgroups(BLOCKS);</code></pre>
           <p>
-            Inside the first two dispatches, each 256-thread group performs a
-            Hillis–Steele scan in fast workgroup memory. The offset doubles after
-            every barrier, so all threads read the previous round before any thread
-            starts the next:
+            Inside the first two dispatches, each group runs a Hillis–Steele scan in
+            workgroup memory. It ping-pongs between two arrays so that each round only reads
+            values the previous round finished writing, with a barrier between rounds:
           </p>
-          <pre><code>var&lt;workgroup&gt; values: array&lt;u32, 256&gt;;
-var&lt;workgroup&gt; scratch: array&lt;u32, 256&gt;;
+          <pre><code>var&lt;workgroup&gt; sa: array&lt;u32, 256&gt;;
+var&lt;workgroup&gt; sb: array&lt;u32, 256&gt;;
 
-fn scan(lid: u32) {
-  var offset = 1u;
+<span class="cm">// inclusive scan of the 256 values staged in sa</span>
+fn scanShared(lid: u32) -&gt; u32 {
+  var fromA = true;
+  var d = 1u;
   loop {
-    if (offset &gt;= 256u) { break; }
-
-    var next = values[lid];
-    if (lid &gt;= offset) { next += values[lid - offset]; }
-    scratch[lid] = next;
+    if (d &gt;= 256u) { break; }
+    if (fromA) {
+      var v = sa[lid];
+      if (lid &gt;= d) { v += sa[lid - d]; }
+      sb[lid] = v;
+    } else {
+      var v = sb[lid];
+      if (lid &gt;= d) { v += sb[lid - d]; }
+      sa[lid] = v;
+    }
     workgroupBarrier();
-
-    values[lid] = scratch[lid];
-    workgroupBarrier();
-    offset = offset &lt;&lt; 1u;
+    fromA = !fromA;
+    d = d &lt;&lt; 1u;
   }
+  return sa[lid];  <span class="cm">// 8 rounds, so the result lands back in sa</span>
 }</code></pre>
+          <p>
+            The scan produces inclusive totals. Each thread then subtracts its own cell's
+            count, which gives the same result as the shift in the diagram: the number of
+            particles in all the cells before it. The last dispatch also copies the starts
+            into a second buffer that the scatter uses as per-cell ticket counters.
+          </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The GPU implementation</h2>
-      <p>
-        The complete GPU pipeline runs every simulation step from scratch because the
-        particles never stop moving:
-      </p>
+      <h2 id="gpu-sort"><span class="kicker">Step 4 · Assembly</span>The whole sort on the GPU</h2>
+      <p>The particles never stop moving, so the full pipeline runs from scratch every step:</p>
       <pre><code>clear    → zero the cell counters
-count    → every particle atomically bumps its cell    (histogram)
-scan     → starts[] from counts[]                      (3 dispatches)
-scatter  → every particle copies itself to its slot    (one atomicAdd each)
-forces   → every particle reads its 9 cells, pushes, integrates</code></pre>
+count    → every particle atomically bumps its cell    <span class="cm">(histogram)</span>
+scan     → starts[] from counts[]                      <span class="cm">(3 dispatches)</span>
+scatter  → every particle copies itself to its slot    <span class="cm">(one atomicAdd each)</span>
+forces   → every particle reads its 9 cells, pushes, integrates  <span class="cm">(two passes for water)</span></code></pre>
       <p>
-        The histogram and scatter kernels are each only a few lines of WGSL. Atomics
-        do not impose an order; they only guarantee that no two particles receive the
-        same ticket:
+        The histogram and scatter kernels are a few lines of WGSL each. The atomics don't
+        put the particles in any particular order within a cell. They only make sure no two
+        particles get the same slot.
       </p>
       <pre><code>@compute @workgroup_size(256)
 fn count(@builtin(global_invocation_id) gid: vec3u) {
@@ -323,200 +349,190 @@ fn scatter(@builtin(global_invocation_id) gid: vec3u) {
   sorted[slot] = p;
 }</code></pre>
       <p>
-        Two details matter here. The scatter copies each particle's
-        <em>entire state</em> into the sorted array, not just an index — so after the
-        sort, particles that are neighbours in space are neighbours in memory, and the
-        force pass reads clean contiguous runs instead of pointer-chasing. (Part one's
-        epilogue promised memory coherence as a future optimization; here the
-        sort provides it directly.) The only
-        coordination is atomic increments, which the hardware resolves without anyone
-        stopping.
+        The scatter copies each particle's whole state into the sorted array, not just its
+        index. After the sort, particles that are near each other in space are near each
+        other in memory, so the force pass reads short contiguous runs instead of jumping
+        around. In part one I listed Morton ordering as something to try for the same
+        reason; here that kind of locality comes with the sort. The sort writes into a
+        second buffer, the forces run on that one in place, and the next step sorts it back
+        into the first. The only coordination anywhere is atomic increments, which the
+        hardware resolves without locks.
       </p>
       <details class="fold">
-        <summary>Deep dive: losing the box — spatial hashing</summary>
+        <summary>Losing the box: spatial hashing</summary>
         <div class="fold-body">
           <p>
-            One assumption matters here: our grid is <em>dense</em> — 65,536
-            cells covering a fixed box, most of them empty, each with its own counter.
-            For a tank with walls that's the right call. But nothing about the method
-            needs walls. Replace "cell index" with a <em>hash</em> of the cell
-            coordinates — multiply ix and iy by two large primes, XOR, mask to the
-            table size — and the same count-scan-scatter pipeline runs over an
-            unbounded world: only cells that actually contain something cost anything.
+            My grid is <em>dense</em>: 65,536 cells covering a fixed box, most of them
+            empty, each with its own counter. For a tank with walls that's the right
+            choice, but the method doesn't need walls. Replace the cell index with a
+            <em>hash</em> of the cell coordinates (multiply ix and iy by two large primes,
+            XOR them, and mask to the table size) and the same count, scan and scatter
+            pipeline works over an unbounded world, with a table whose size stays fixed no
+            matter how far the particles spread.
           </p>
           <p>
-            Distant cells occasionally hash to the same slot, and the algorithm
-            doesn't care: colliding cells share a bucket, and the distance test in the
-            force pass — always the final arbiter of who counts as a neighbour —
-            silently discards the impostors. This formulation (Teschner et al., 2003)
-            is what you reach for the moment your particles outgrow their box, and
-            part four will need it immediately.
+            Cells that are far apart will sometimes hash to the same bucket, and that's
+            fine. They share the bucket, and the distance test in the force pass, which
+            always has the final say on who counts as a neighbour, throws out the extra
+            candidates. This version comes from Teschner and colleagues in 2003, and part
+            four uses it once the particles leave the box.
           </p>
         </div>
       </details>
       <p>
-        Here it is as dry sand — twenty thousand grains, re-sorted every substep, five
-        substeps per frame. Drag your cursor through the pile:
+        Here it is running as dry sand: 12,000 grains by default (the slider goes from
+        2,000 to 30,000), re-sorted every substep, five substeps per frame. Each grain is a
+        disc one grid cell across, so any grain it can touch is in the 3×3 block around it.
+        Drag your cursor through the pile.
       </p>
 
-      <div data-demo="grains"></div>
+      <div
+        data-demo="grains"
+        data-title="Dry sand"
+        data-hint="Drag through the pile"
+      ></div>
 
       <p>
-        Note what the slider now costs. Doubling the grains doubles the histogram,
-        the scatter, and the force pass — everything is linear. The quadratic wall
-        from Step 1 isn't pushed back; it's gone.
+        Look at what the slider costs now. The grain size is fixed, so more grains means a
+        deeper pile, and the count, scatter and force passes each do work in proportion to
+        the number of grains. The scan doesn't grow at all, since it's always 65,536 cells.
+        There's no n² term left anywhere in the pipeline.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · From sand to water</span>Smoothed particles</h2>
+      <h2 id="sph"><span class="kicker">Step 5 · Water</span>Smoothed particles</h2>
       <p>
-        Sand grains only interact when they collide. Water needs more: it resists
-        compression everywhere, all the time, even in the calm middle of the tank.
-        The technique is <em>smoothed particle hydrodynamics</em>: represent the fluid
-        as particles, but treat each one as a small blurry blob of matter rather than
-        a point. The density anywhere is the sum of the blobs overlapping that spot.
-        Density above the resting value means squeezed, and squeezed fluid pushes its
-        neighbours apart; below means stretched, and it pulls back. Pressure becomes
-        one more short-range force, so the neighbor-search pipeline handles
-        it unchanged.
+        Sand grains only interact when they collide. Water needs more than that. It resists
+        being compressed everywhere, including in the still middle of the tank. The method
+        I used is <em>smoothed particle hydrodynamics</em> (SPH). The fluid is still a set of
+        particles, but each one is treated as a small blurry blob of matter instead of a
+        point, and the density anywhere is the sum of the blobs overlapping that spot.
+        Above the rest density the fluid is squeezed and pushes its neighbours apart. Below
+        it, the fluid pulls them back in. Pressure ends up as one more short-range force,
+        so the neighbour search handles it without changes.
       </p>
-      <pre><code>// pass 1 — density: how crowded is each particle?
+      <pre><code><span class="cm">// pass 1, density: how crowded is each particle?</span>
 ρ_i = Σ over neighbours j:  (1 − r/h)²
 
-// pass 2 — pressure force: push from crowded toward roomy
+<span class="cm">// pass 2, pressure force: push from crowded toward roomy</span>
 P_i  = k · (ρ_i − ρ_rest)
 acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
       <p>
-        The sort turns “over neighbours” into two ordinary integer ranges. This is
-        the inner loop of the density pass: visit nine cells, read each contiguous
-        run, then reject candidates outside the smoothing radius.
+        The smoothing radius h is one grid cell, so the 3×3 block always covers it, and the
+        sort turns "over neighbours" into nine ordinary integer ranges. This is the inner
+        loop of the density pass. It visits nine cells, reads each one's contiguous run, and
+        skips anything outside h:
       </p>
-      <pre><code>for (var offsetY = -1; offsetY &lt;= 1; offsetY++) {
-  for (var offsetX = -1; offsetX &lt;= 1; offsetX++) {
-    let cell = cellCoord(pos) + vec2i(offsetX, offsetY);
-    if (cell.x &lt; 0 || cell.y &lt; 0 ||
-        cell.x &gt;= i32(SP.grid) || cell.y &gt;= i32(SP.grid)) { continue; }
-
-    let key = u32(cell.y) * SP.grid + u32(cell.x);
-    let first = cellStart[key];
-    let end = first + cellCount[key];
-
-    for (var j = first; j &lt; end; j++) {
-      let delta = parts[j].xy - pos;
-      let distSq = dot(delta, delta);
-      if (distSq &lt; h2) {
-        let weight = 1.0 - sqrt(distSq) / h;
-        rho += weight * weight;
+      <pre><code>for (var oy = -1; oy &lt;= 1; oy++) {
+  for (var ox = -1; ox &lt;= 1; ox++) {
+    let c = cc + vec2i(ox, oy);
+    if (c.x &lt; 0 || c.y &lt; 0 || c.x &gt;= i32(SP.grid) || c.y &gt;= i32(SP.grid)) { continue; }
+    let ci = u32(c.y) * SP.grid + u32(c.x);
+    let s = cellStart[ci];               <span class="cm">// where this cell's run begins</span>
+    let n = cellCount[ci];               <span class="cm">// and how long it is</span>
+    for (var k = s; k &lt; s + n; k++) {
+      let d = parts[k].xy - pi;
+      let r2 = dot(d, d);
+      if (r2 &lt; h2) {
+        let q = sqrt(r2) / h;
+        let w = 1.0 - q;
+        rho += w * w;
+        rhoNear += w * w * w;            <span class="cm">// for near pressure, see below</span>
       }
     }
   }
 }</code></pre>
       <aside class="note">
-        <span class="note-label">Aside · Invented for stars, ended up in Moana</span>
+        <span class="note-label">Aside · Invented for stars</span>
         <p>
-          SPH was invented by astrophysicists. In 1977, Leon Lucy — and independently
-          Gingold and Monaghan — needed to simulate gas collapsing into stars, flows
-          so distorted that any fixed mesh would tangle. After twenty years in
-          astrophysics the method crossed into engineering (coastal flooding, fuel
-          sloshing) and then into every film and game studio that needed splashes.
-          Interactive SPH on consumer hardware traces to Matthias Müller's 2003 paper,
-          a direct ancestor of what's running below. Big-budget film water has since
-          moved to hybrid grid-particle methods like FLIP — which need the same
-          ingredient this article built: particles, binned to a grid, every frame,
-          fast.
+          SPH came out of astrophysics. In 1977 Leon Lucy, and separately Robert Gingold
+          and Joseph Monaghan, needed a way to simulate gas in stars without a fixed mesh.
+          In 1994 Monaghan applied it to water with a free surface, and from there it spread
+          into engineering, for things like coastal flooding, and into games and visual
+          effects. Interactive SPH on ordinary hardware traces back to a 2003 paper by
+          Matthias Müller, David Charypar and Markus Gross. Film water has since mostly moved
+          to hybrid grid-and-particle methods like FLIP, and those still need particles
+          binned into a grid every frame.
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: the stabilizers that keep game SPH from clumping</summary>
+        <summary>What keeps the water from clumping</summary>
         <div class="fold-body">
           <p>
-            Two passes instead of one — density first, then forces — plus two
-            stabilizers from the games literature. A short-range "near pressure" that
-            is always repulsive (Clavet, Beaudoin and Poulin's 2005
-            viscoelastic-fluids paper) keeps particles from clumping into strands. A
-            touch of velocity smoothing between neighbours reads as viscosity.
+            On top of the two passes there are two stabilizers. The first is a short-range
+            "near pressure" that only ever pushes, from Clavet, Beaudoin and Poulin's 2005
+            paper on viscoelastic fluids. Without it, particles tend to bunch up into clumps
+            and strands. The second is a small amount of XSPH velocity smoothing between
+            neighbours, another of Monaghan's ideas, which reads as viscosity.
           </p>
           <p>
-            Schemes where everything reduces to forces along the line between particle
-            pairs form their own branch of the SPH literature — <em>pairwise-force
-            SPH</em> — prized because pair forces conserve momentum exactly, by
-            Newton's third law, no matter how crude the rest of the model is. The
-            walls of the tank are three penalty springs: part two's dome trick,
-            constraints expressed as forces.
+            Every pressure push acts along the line between two particles and is equal and
+            opposite for the pair, so by Newton's third law the pressure forces can't add
+            momentum to the fluid as a whole. The tank's sides, floor and lid are penalty
+            springs, the same idea as part two's dome.
           </p>
         </div>
       </details>
 
-      <div data-demo="sph"></div>
+      <div
+        data-demo="sph"
+        data-title="SPH water"
+        data-hint="Stir it with your cursor"
+      ></div>
 
       <p>
-        That is a dam break — a classic test problem of computational fluid dynamics —
-        at tens of thousands of particles, each one sorted, densified, pressurized and
-        integrated five times per frame. Stir it. Make waves. Crank the particle count
-        and watch the water get <em>finer</em> rather than slower, for a while —
-        resolution, as in part one, is just a slider.
+        It starts as a wide block of water on the left side of the tank, a loose version
+        of the classic dam-break test. There are 50,000 particles by default (the slider
+        goes from 10,000 to 80,000), sorted into the 256×256 grid and run through the
+        density and force passes five times per frame. The particle size is fixed, so the
+        slider changes how much water there is, not how finely it's resolved.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>Results and tradeoffs</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <p>A few things from this part that apply well beyond water:</p>
+      <ul>
+        <li>
+          <strong>On a GPU, a data structure can often be an ordering.</strong> Per-cell
+          lists couldn't be built in parallel, but sorting the particles by cell holds the
+          same information in plain layout. Part one's pyramid replaced pointers with
+          arithmetic, and counting sort replaces them with a permutation.
+        </li>
+        <li>
+          <strong>Scan is worth knowing well.</strong> It's what made the sort parallel, and
+          it handles compaction, allocation and a lot of other steps that look serial at
+          first.
+        </li>
+        <li>
+          <strong>Most of the pipeline is moving data.</strong> In the water demo, five
+          dispatches organize data (count, three scan passes, scatter) and two compute
+          forces. The physics is a few lines. Most of the work went into arranging memory so
+          those lines read contiguous runs.
+        </li>
+        <li>
+          <strong>Near and far forces want different structures.</strong> Gravity needed a
+          hierarchy, because distant things still matter in total. Contacts needed flat
+          buckets, because distant things don't matter at all.
+        </li>
+      </ul>
       <p>
-        <strong>1. On a GPU, data structures become orderings.</strong> The CPU's
-        per-cell linked lists were unbuildable in parallel; sorting the particles by
-        cell produced the same information as pure layout. Part one's pyramid replaced
-        pointers with arithmetic; counting sort replaces them with a permutation. When
-        a structure won't parallelize, ask what <em>ordering</em> would make it
-        unnecessary.
+        Things I'd try next: a third dimension, which is the same sort with a third
+        coordinate folded into the cell index; radix sort, which is counting sort applied a
+        digit at a time, for keys too large for one histogram; and both structures in one
+        simulation, with part one's mass pyramid for gravity and this grid for collisions.
+        That last one is the start of a planet-formation simulator, and it's what part four
+        builds.
       </p>
-      <p>
-        <strong>2. Scan is the parallel for-loop.</strong> One log-depth primitive
-        unlocked sorting here, and it unlocks compaction, allocation, and a hundred
-        other "but that part is sequential" complaints elsewhere. It is the single
-        highest-leverage algorithm in GPU computing.
-      </p>
-      <p>
-        <strong>3. Physics is mostly data movement.</strong> Count the dispatches in
-        the final pipeline: five move and organize data, two compute forces. The
-        actual physics — a spring, a pressure gradient — is a few lines; the
-        achievement is arranging memory so those lines read at full bandwidth. This
-        ratio is normal, and learning to see it is most of GPU programming.
-      </p>
-      <p>
-        <strong>4. The far field and the near field want opposite structures.</strong>
-        Gravity needed a hierarchy, because distant things still mattered in
-        aggregate. Contact forces needed flat buckets, because distant things didn't
-        matter at all. Production codes often need both at once — and now you've built
-        each from scratch.
-      </p>
-      <p>
-        The same approach extends in several directions. Three dimensions is the same sort
-        with a third coordinate folded into the cell index. Radix sort — counting sort
-        applied digit by digit — handles keys when cells alone aren't enough. And
-        nothing stops both structures from living in the same simulation: part one's
-        mass pyramid for the far field, this article's hash grid for the near field,
-        gravity from one and contacts from the other. That pairing is the beginning of
-        a planet-formation simulator — dust attracting, colliding, and sticking.
-      </p>
-      <p>
-        <strong>Continued in <a href="/pages/particle-worlds/part4.html">Part four: Worlds from Dust</a></strong> —
-        the pairing happens: part one's pyramid and this article's hash grid run over
-        one buffer, dust attracts, collides, sticks, and a ring around a star grows
-        moons.
-      </p>
-      <p>
-        ← <a href="/pages/particle-worlds/part2.html">Part two: Gravity on a Dome</a> ·
-        <a href="/pages/particle-worlds/part1.html">Part one: Two Falling Dots</a>
+      <p class="continue">
+        <strong>Next: <a href="/pages/particle-worlds/part4.html">Part four, Worlds from Dust</a>.</strong>
+        Part one's gravity pyramid and this part's grid run over the same particles, and a
+        ring of dust around a star clumps into moonlets.
       </p>
     </main>
 
     <footer>
       <p>
-        Part three of the WebGPU particle series ·
-        <a href="/pages/particle-worlds/part1.html">Part one</a> ·
-        <a href="/pages/particle-worlds/part2.html">Part two</a> ·
-        <a href="/pages/particle-worlds/part4.html">Part four →</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
+        References:
         <a href="https://dl.acm.org/doi/10.1145/7902.7903">Hillis &amp; Steele (1986)</a> ·
         <a href="https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf">Blelloch, "Prefix Sums and Their Applications"</a> ·
         <a href="https://ui.adsabs.harvard.edu/abs/1977MNRAS.181..375G/abstract">Gingold &amp; Monaghan (1977)</a> ·

@@ -17,6 +17,7 @@ import {
 const GRID = 24; // cells per side; cell width = 2/24 ≈ 0.083 > 2·R
 const VIEW = 0.92;
 const N = 3500;
+const PROBE_AT_REST: [number, number] = [0.12, -0.62];
 
 export function mountGridNeighbors(container: HTMLElement): Demo {
   const shell = new Shell(container);
@@ -108,8 +109,11 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
         ctx.stroke();
       }
 
-      const m = mouse.get();
-      if (m && Math.abs(m[0]) < 1 && Math.abs(m[1]) < 1) {
+      // With no pointer over the canvas (or on a touch screen), park the
+      // query inside the pile so the figure still shows what it's about.
+      const hover = mouse.get();
+      const m = hover && Math.abs(hover[0]) < 1 && Math.abs(hover[1]) < 1 ? hover : PROBE_AT_REST;
+      {
         const cx = Math.min(GRID - 1, Math.max(0, Math.floor(((m[0] + 1) / 2) * GRID)));
         const cy = Math.min(GRID - 1, Math.max(0, Math.floor(((m[1] + 1) / 2) * GRID)));
         ctx.strokeStyle = "rgba(255, 205, 80, 0.55)";

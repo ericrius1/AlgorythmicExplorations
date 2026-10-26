@@ -68,7 +68,10 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
   const disk = opts.mode === "disk";
 
   const aspect = shell.canvas.width / shell.canvas.height;
-  const renderScale = disk ? 1.05 : 1.45;
+  // The hero's title sits over the bottom of the frame: shrink the ring and
+  // lift it into the clear space above.
+  const renderScale = disk ? (opts.hero ? 0.8 : 1.05) : 1.45;
+  const offsetY = opts.hero ? 0.14 : 0;
 
   // Total dust gravity is fixed; the slider only changes how finely it is
   // sampled — the same resolution-knob contract as part one's galaxy.
@@ -105,7 +108,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
   // The star is drawn, not simulated: one quad, fake velocity for warm color.
   const starBuf = dev.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   dev.queue.writeBuffer(starBuf, 0, new Float32Array([0, 0, 6, 0]));
-  const starRenderer = disk ? new ParticleRenderer(dev, ctx) : null;
+  const starRenderer = disk ? new ParticleRenderer(dev, ctx, { post: renderer.post }) : null;
   starRenderer?.bind(starBuf);
 
   // Cursor stirring, same scheme as part three's fluid.
@@ -117,7 +120,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
     const cx = ((e.clientX - r.left) / r.width) * 2 - 1;
     const cy = -(((e.clientY - r.top) / r.height) * 2 - 1);
     const wx = (cx * aspect) / renderScale;
-    const wy = cy / renderScale;
+    const wy = (cy - offsetY) / renderScale;
     const now = performance.now();
     const dtm = Math.min((now - lastMove) / 1000, 0.1) || 0.016;
     lastMove = now;
@@ -137,7 +140,7 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
 
   if (!opts.hero) {
     if (opts.mode === "collapse") {
-      const modeButton = (label: string, g: boolean, c: boolean): void =>
+      const modeButton = (label: string, g: boolean, c: boolean): HTMLButtonElement =>
         shell.button(label, () => {
           gravity = g;
           contacts = c;
@@ -213,10 +216,13 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
       renderer.bind(bufs[cur]);
       renderer.encode(enc, count, {
         scale: renderScale,
+        offsetY,
         size: disk ? 0.0028 : 0.0042,
         colorScale: disk ? 1.4 : 2.5,
+        intensity: disk ? 1.7 : 1.3,
+        present: !starRenderer, // the star draws on top, then presents
       });
-      starRenderer?.encode(enc, 1, { scale: renderScale, size: 0.035, colorScale: 0.2, load: true });
+      starRenderer?.encode(enc, 1, { scale: renderScale, offsetY, size: 0.035, colorScale: 0.2, intensity: 3, load: true });
       profiler.resolve(enc);
       dev.queue.submit([enc.finish()]);
       profiler.afterSubmit();

@@ -10,18 +10,19 @@
     <title>Gravity on a Dome — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part two: promoting the GPU Barnes-Hut pyramid from a quadtree to an octree, then constraining a galaxy to a hemispheric dome."
+      content="Taking part one's GPU gravity simulator into 3D: the quadtree pyramid becomes an octree, particles draw without a depth sort, and a spring force holds 20,000 bodies on a dome."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="series-pw">
     <header class="hero">
       <div data-demo="hero-dome"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Particle Worlds · Part 2</p>
         <h1>Gravity on a Dome</h1>
         <p class="subtitle">
-          Part two: the simulation leaves the plane. Quadtrees become octrees, the galaxy
-          gains depth, and a spring constraint confines it to a dome. Drag above to orbit it.
+          Part one's gravity simulator, moved into 3D and then held onto a dome with a
+          spring. The 20,000 bodies above are running live on your GPU. Drag to orbit them.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -32,235 +33,254 @@
 
     <main>
       <p>
-        <a href="/pages/particle-worlds/part1.html">Part one</a> ended with hundreds of thousands of bodies
-        in a flat universe: a Barnes–Hut tree with no pointers, rebuilt from scratch on
-        the GPU every step. If you haven't read it, start there — everything below
-        builds on it.
+        <a href="/pages/particle-worlds/part1.html">Part one</a> ended with 300,000 bodies
+        on a flat plane, using a Barnes–Hut tree with no pointers that the GPU rebuilds from
+        scratch every step. This part takes the same solver into 3D, and then restricts the
+        3D world to the surface of a dome.
       </p>
       <p>
-        This part answers the two questions everyone asks next. <em>Does it work in
-        3D?</em> Yes — and the port is surprisingly small. And <em>can the world be a
-        shape other than "everywhere"?</em> Above this
-        paragraph, twenty thousand bodies are gravitating while confined to a thin
-        hemispheric shell, like weather on a snow globe. The dome costs exactly four
-        lines of shader code, and the principle behind those four lines is useful for
-        far more than domes.
+        The dome at the top of the page is 20,000 bodies on a thin hemispheric shell,
+        stepped twice per frame. They pull on each other through 3D space while a spring
+        keeps them on the surface. I halved gravity for that one so it keeps flowing instead
+        of settling into clumps. Drag to orbit it, and pinch or hold ⌘/Ctrl while scrolling
+        to zoom (plain scrolling scrolls the page).
+      </p>
+      <p>
+        The 3D port turned out to be small. Memory is the part that changes most, and the
+        dome is one extra force term.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Moving to 3D</span>Costs introduced by 3D</h2>
+      <h2 id="octree"><span class="kicker">Step 1 · Into 3D</span>Quadtree to octree</h2>
       <p>
-        Adding a dimension sounds expensive. Whole textbooks treat the 2D
-        and 3D versions of an algorithm as separate chapters. Here is the entire
-        conceptual difference between a quadtree and an octree:
+        Going from a quadtree to an octree changes very little. The only structural
+        difference is how a cell finds its children:
       </p>
-      <pre><code>// 2D: children of (level, ix, iy)        — four of them
+      <pre><code><span class="cm">// 2D: children of (level, ix, iy), four of them</span>
 (level+1, 2ix+dx, 2iy+dy)                  dx, dy ∈ {0, 1}
 
-// 3D: children of (level, ix, iy, iz)    — eight of them
+<span class="cm">// 3D: children of (level, ix, iy, iz), eight of them</span>
 (level+1, 2ix+dx, 2iy+dy, 2iz+dz)          dx, dy, dz ∈ {0, 1}</code></pre>
       <p>
-        The implicit pyramid does not depend on dimension. Children
-        are still arithmetic; levels are still flat slabs in one buffer. Even the
-        Barnes–Hut acceptance test — <code>cellWidth² &lt; θ² × distance²</code> —
-        survives without changing a character, because widths and distances were
-        always just lengths.
+        Children are still computed rather than stored, and each level is still a flat
+        block in one buffer. The Barnes–Hut test, <code>cellWidth² &lt; θ² × distance²</code>,
+        doesn't change at all, since widths and distances are lengths in any number of
+        dimensions.
       </p>
       <p>
-        The limiting factor is <strong>memory</strong>. Each pyramid level now cubes
-        instead of squares. Part one's finest grid was 1024² ≈ a million cells — 16 MB
-        of accumulators, trivial. The same depth in 3D would be 1024³ ≈ a
-        <em>billion</em> cells: 16 GB, which most machines reading this don't have. So
-        the 3D pyramid stops three levels shorter, at 128³ ≈ two million cells, and
-        the solver picks its depth from the body count — <code>log₂(n)/3</code>,
-        clamped — so small demos don't pay for resolution they can't use.
+        What does change is memory. Each level now grows as a cube instead of a square.
+        Part one's finest grid went up to 1024², about a million cells and 16 MB of
+        accumulators. The same depth in 3D would be 1024³, a billion cells and around 16 GB,
+        which isn't going to happen in a browser tab. So I capped the octree at seven
+        levels: 128³, about two million cells and 34 MB. Below that cap the solver picks
+        its depth from the body count, <code>ceil(log₂(n) / 3)</code> clamped to between 4
+        and 7, which gives roughly as many finest cells as bodies.
       </p>
       <p>
-        What does a coarser floor cost physically? Resolution at close range. Two
-        bodies sharing a finest cell can't be told apart by the tree; their
-        interaction falls to the softening term. Softening already approximates
-        short-range physics; the coarser 3D floor extends that approximation over a
-        slightly larger neighbourhood. For a galaxy — where no individual encounter
-        matters — the trade is invisible. For planetary close passes, it would be the
-        first thing to fix.
+        The demos on this page never reach the cap. At the default 20,000 bodies the finest
+        grid is 32³, and at the slider's maximum of 200,000 it's 64³. It would take more
+        than 2¹⁸ = 262,144 bodies to get a 128³ grid.
       </p>
-      <blockquote>
-        <p>
-          The algorithm changes little in 3D, but grid memory grows from a square to
-          a cube.
-        </p>
-      </blockquote>
+      <p>
+        A coarser floor costs resolution up close. The finest level is where the walk
+        stops, so the other bodies in each nearby finest cell get lumped into one point at
+        that cell's centre of mass. At 20,000 bodies the finest cells start out about 0.06
+        wide, close to the softening length of 0.05, so the grid blurs about as much as
+        softening already does. For a galaxy, where no single close encounter matters, you
+        can't see the difference. For planets making close passes it would be the first
+        thing I'd fix.
+      </p>
       <details class="fold">
-        <summary>Deep dive: the bookkeeping that changes from 2D to 3D</summary>
+        <summary>The bookkeeping that changes from 2D to 3D</summary>
         <div class="fold-body">
           <p>
             <strong>Level offsets.</strong> The levels above level <em>l</em> hold
-            1 + 8 + 64 + … + 8<sup><em>l</em>−1</sup> nodes — a geometric series
-            summing to (8<sup>l</sup>−1)/7, where 2D had (4<sup>l</sup>−1)/3. Both
-            denominators are 2<sup>d</sup>−1. A bonus falls out: the entire hierarchy
-            above the finest level adds only ~one-seventh extra memory. Build the
-            bottom and the rest of the tree is nearly free.
+            1 + 8 + 64 + … + 8<sup><em>l</em>−1</sup> nodes, which sums to
+            (8<sup>l</sup>−1)/7. In 2D it was (4<sup>l</sup>−1)/3. Both denominators are
+            2<sup>d</sup>−1. It also means all the levels above the finest one together add
+            only about a seventh more memory in 3D (a third in 2D), so once the bottom level
+            is built the rest of the tree is cheap.
           </p>
           <p>
-            <strong>The spare word fills up.</strong> Part one's scatter used a stride
-            of four atomic words per cell (power-of-two strides keep indexing cheap)
-            but only used three: mass, Σm·dx, Σm·dy. In 3D the fourth word becomes
-            Σm·dz, and the layout is exactly full:
+            <strong>The spare word gets used.</strong> Part one's scatter used a stride of
+            four atomic words per cell, because power-of-two strides keep the indexing
+            cheap, but only filled three: mass, Σm·dx and Σm·dy. In 3D the fourth word
+            holds Σm·dz, and the layout is full:
           </p>
-          <pre><code>atomicAdd(&amp;grid[c],     u32(round(m * FP_SCALE)));        // Σ mass
-atomicAdd(&amp;grid[c + 1], …(m * frac.x * FP_SCALE));        // Σ m·dx
-atomicAdd(&amp;grid[c + 2], …(m * frac.y * FP_SCALE));        // Σ m·dy
-atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));        // Σ m·dz  ← the spare word</code></pre>
+          <pre><code>atomicAdd(&amp;grid[c],     u32(round(m * FP_SCALE)));  <span class="cm">// Σ mass</span>
+atomicAdd(&amp;grid[c + 1], …(m * frac.x * FP_SCALE));  <span class="cm">// Σ m·dx</span>
+atomicAdd(&amp;grid[c + 2], …(m * frac.y * FP_SCALE));  <span class="cm">// Σ m·dy</span>
+atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));  <span class="cm">// Σ m·dz, the word 2D left empty</span></code></pre>
           <p>
-            <strong>Bounds and stack.</strong> The bounds reduction now fills six
-            slots (min/max of x, y, z) instead of four. The traversal stack packs four
-            indices into 32 bits — <code>level(4) | iz(9) | iy(9) | ix(9)</code> —
-            and must be deeper: popping a node pushes eight children instead of four,
-            so the worst case is 7·depth+8 entries instead of 3·depth+4. At depth
-            seven that's 57 words — still small enough to live entirely in registers,
-            which is why the stack walk stays fast.
+            <strong>Bounds and stack.</strong> The bounds pass fills six slots (min and
+            max of x, y and z) instead of four. Stack entries pack into 32 bits as
+            <code>level(4) | iz(9) | iy(9) | ix(9)</code>. Opening a cell now pushes eight
+            children instead of four, so the stack has to be deeper. The shader uses a
+            fixed 64-entry array, enough for the seven-level cap. At the default 32³ grid
+            the walk never needs more than about 36 entries.
           </p>
           <p>
-            <strong>Mass rides in position.w.</strong> A 3D position needs three
-            floats, GPU buffers want 16-byte alignment, so a fourth float was going to
-            exist anyway — and the separate mass buffer disappears. A body is one
-            <code>vec4</code> of position and one of velocity: 32 bytes, one fetch
-            each. Two hundred thousand bodies fit in ~6 MB.
+            <strong>Mass goes in position.w.</strong> A 3D position needs three floats and
+            GPU buffers want 16-byte alignment, so there was going to be a fourth float
+            anyway. Putting the mass there removes the separate mass buffer. A body is one
+            <code>vec4</code> of position and one of velocity, 32 bytes and one fetch each,
+            so 200,000 bodies fit in about 6 MB.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Seeing in depth</span>Order-independent particle rendering</h2>
+      <h2 id="rendering"><span class="kicker">Step 2 · Rendering</span>Drawing without sorting</h2>
       <p>
-        Before using the octree, we need to <em>see</em> 3D — and 3D
-        rendering of transparent things usually comes with a dreaded word: sorting.
-        Blending is order-dependent: paint a near glow before a far one and the
-        picture misleads. Sorting hundreds of thousands of particles every frame is
-        exactly the kind of cost part one was designed to avoid.
+        Before the octree is any use I need to be able to see in 3D, and drawing
+        transparent things in 3D usually means sorting them. Normal blending depends on
+        order: draw a near glow before a far one and the picture comes out wrong. Sorting a
+        few hundred thousand particles by depth every frame would be a whole extra pipeline.
       </p>
       <p>
-        We skip it with arithmetic. Our particles <em>add</em> light rather than
-        occluding it, and addition is commutative: <code>a + b = b + a</code>, so draw
-        order cannot matter, by algebra rather than by effort. A million overlapping
-        glows compose to the same picture in any order — no sort, no depth buffer,
-        nothing to maintain. And this isn't a hack that happens to look acceptable:
-        stars genuinely work this way. They emit rather than block, their angular
-        sizes at galactic scales make occlusion a rounding error, and a long-exposure
-        photograph of a star field <em>is</em> a sum of light.
+        I skip the sort by having the particles add light instead of blocking it. Addition
+        doesn't care about order (a + b = b + a), so any number of overlapping glows add
+        up to the same picture whichever order they're drawn in. There's no sort and no
+        depth buffer. Stars mostly work this way anyway. They give off light, and at
+        galactic distances they almost never cover each other.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Fifty years of fighting draw order</span>
+        <span class="note-label">Aside · Fifty years of draw order</span>
         <p>
-          The problem is as old as computer graphics. The painter's algorithm of the
-          early 1970s was literally "draw back-to-front, like a painter." Ed Catmull's
-          z-buffer (1974) killed the sort for <em>opaque</em> scenes by testing depth
-          per pixel and is baked into every GPU since — but a depth test can only
-          discard, not blend, so transparency clawed the sort right back.
-          "Order-independent transparency" is a research topic to this day. Space is
-          a rare scene whose physics makes additive rendering a reasonable model.
+          Draw order has been a problem for about as long as there's been computer
+          graphics. The painter's algorithm from the early 1970s does what the name says:
+          draw the far things first and paint the near ones over them. The z-buffer,
+          described by Ed Catmull and independently by Wolfgang Straßer in 1974, removed the
+          sort for opaque scenes by storing a depth for every pixel, and every GPU now has
+          one in hardware. A depth test can only keep or discard a pixel, though, so it
+          doesn't help with blending, and transparency brought the sort back.
+          Order-independent transparency is still an active research topic. A field of
+          stars is one of the few scenes where plain additive blending is a fair model.
         </p>
       </aside>
       <p>
-        The geometry is equally frugal. Each body becomes a <em>billboard</em>: a
-        small quad that always faces the camera, built in the vertex shader from the
-        camera's own right and up vectors. There is no vertex buffer — the six corners
-        are hard-coded in the shader, and per-body data is fetched by instance index
-        straight from the <em>same storage buffers the simulation integrates in
-        place</em>. Nothing is copied between physics and pixels. The fragment shader
-        fades each quad from centre to edge; velocity picks the color — slow bodies
-        blue-white, fast ones orange, which is why collapsing clusters glow like
-        embers.
+        The geometry is cheap too. Each body is drawn as a small square facing the screen,
+        and there's no vertex buffer. The six corners are hard-coded in the vertex shader,
+        which looks up each body's position and velocity by instance index, straight from
+        the buffers the simulation writes. Nothing is copied between the physics and the
+        pixels. The fragment shader fades each square out from the centre, and speed picks
+        the colour: blue for slow bodies, orange for fast ones. Bodies in a collapsing clump
+        move fast, so clumps glow orange. The light adds up in a 16-bit float buffer, so
+        dense regions keep getting brighter instead of clipping, and a final pass tone-maps
+        that onto the screen.
       </p>
       <p>
-        Drag the demo below to orbit the part-one brute-force kernel — the same tiled
-        O(n²) loop with one more vector component, now with parallax:
+        Below is part one's tiled O(n²) kernel with a z component added. Drag to orbit it.
+        The disk has some thickness now, so you get parallax.
       </p>
 
-      <div data-demo="naive-3d"></div>
+      <div
+        data-demo="naive-3d"
+        data-title="Every pair, in 3D"
+        data-hint="Drag to orbit"
+      ></div>
 
       <p>
-        Notice the slider stops at 60,000 — brute force pays its quadratic bill in any
-        dimension. Time for the octree.
+        It starts at 25,000 bodies and the slider tops out at 60,000. Brute force costs n²
+        in any number of dimensions, which is what the octree is for.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · The octree pyramid</span>Building the octree pyramid</h2>
+      <h2 id="pipeline"><span class="kicker">Step 3 · The octree</span>Rebuilding the octree every step</h2>
       <p>
-        The full 3D pipeline is part one's pipeline with the constants swapped. Every
-        frame, a dozen dispatches rebuild the spatial index from nothing:
+        The 3D pipeline is part one's pipeline with the constants changed. Every body moves
+        every step, so every step rebuilds the octree from nothing. At the default size
+        that's ten dispatches:
       </p>
-      <pre><code>clear     → zero ~8M atomic words, reset the bounds slots
-bounds    → min/max reduce over every body          (the root cell)
-scatter   → each body bumps its cell's 4 words      (fixed-point atomics)
-resolve   → fixed point → (center of mass, mass)    (finest level)
-reduce ×7 → each level from its 8 children          (the pyramid)
-force     → stack walk, θ test, integrate           (in place)</code></pre>
+      <pre><code>clear     → zero the grid's atomic words, reset the bounds
+bounds    → min/max over every body                 <span class="cm">(the root cell)</span>
+scatter   → each body adds into its cell's 4 words  <span class="cm">(fixed-point atomics)</span>
+resolve   → fixed point → centre of mass and mass   <span class="cm">(finest level)</span>
+reduce ×5 → each level from its 8 children          <span class="cm">(×6 at 64³)</span>
+force     → stack walk, θ test, integrate           <span class="cm">(in place)</span></code></pre>
       <p>
-        Nothing here waits on anything. The tree is rebuilt from scratch each step
-        because rebuilding is cheaper than updating — part one's lesson, intact in 3D.
-        The force kernel still reads only its own body's position and velocity, so it
-        integrates in place, and one particle-state buffer remains shared by
-        physics and rendering.
+        At 20,000 bodies the grid is 32³, so the clear pass zeroes about 131,000 words and
+        there are five reduce passes. At 200,000 bodies it's 64³, about a million words and
+        six passes. As in 2D, the force kernel reads only its own body from the body
+        buffers (everything it knows about the others comes from the octree), so it
+        integrates in place, and the renderer draws from that same buffer.
       </p>
       <details class="fold">
-        <summary>Deep dive: how a body avoids gravitating toward itself</summary>
+        <summary>How a body avoids pulling on itself</summary>
         <div class="fold-body">
           <p>
-            When the stack walk reaches a finest-level cell, that cell's centre of
-            mass <em>includes the body doing the asking</em> — every body scattered
-            itself into the grid. The fix is two lines of algebra, no flags or
-            exclusion lists: subtract my mass from the cell's total, un-blend my
-            position from its centre of mass, and attract toward what remains. If I
-            was the only occupant, nothing remains and the cell is skipped.
+            Every body scatters its own mass into the grid, so every cell on the path from
+            the root down to the body's finest cell includes the body itself. If the walk
+            accepted one of those cells as a single point, the body would be pulled toward
+            a centre of mass that is partly itself. That can happen: a big cell can pass
+            the θ test when most of its mass sits at the far end of the cell from the body.
           </p>
+          <p>
+            So the walk has two rules. At the coarse levels it never accepts the cell the
+            body sits in. It always opens that one, all the way down. At the finest level,
+            when it reaches the body's own cell, it subtracts the body's mass from the
+            cell's total and takes the body's position back out of the centre of mass,
+            then attracts toward whatever is left. If the body was alone in the cell,
+            nothing is left and the cell is skipped.
+          </p>
+          <pre><code><span class="cm">// coarse levels: never summarize the cell this body sits in</span>
+let shift = FINEST - lvl;
+let mine = ix == (myIx &gt;&gt; shift) &amp;&amp; iy == (myIy &gt;&gt; shift) &amp;&amp; iz == (myIz &gt;&gt; shift);
+if (!mine &amp;&amp; w * w &lt; theta2 * r2) { <span class="cm">/* accept as one point */</span> } else { <span class="cm">/* push 8 children */</span> }
+
+<span class="cm">// finest level, own cell: take this body back out</span>
+m = n.w - myMass;
+if (m &lt;= 1e-9) { continue; }             <span class="cm">// alone in the cell</span>
+com = (n.xyz * n.w - p * myMass) / m;</code></pre>
         </div>
       </details>
 
-      <div data-demo="pyramid-3d"></div>
+      <div
+        data-demo="pyramid-3d"
+        data-title="The octree pyramid"
+        data-hint="Drag to orbit, add bodies"
+      ></div>
 
       <p>
-        Twenty thousand bodies by default — drag the slider to two hundred thousand —
-        on the same θ knob you've been turning since part one. The initial condition
-        is part one's recipe with thickness: a spinning disk, each body given the
-        circular velocity its enclosed mass demands, plus vertical scatter. Watch long
-        enough and the disk thickens, clumps, throws off spiral arms, sometimes tears
-        into orbiting sub-clusters that merge again. None of that is scripted. It's
-        the one formula from part one, evaluated quickly enough to matter.
+        It starts at 20,000 bodies, and the slider goes from 10,000 to 200,000. θ runs from
+        0.4 to 1.4 and starts at 0.8, the same default as part one. The starting galaxy is
+        part one's recipe with some thickness: a spinning disk where each body gets the
+        circular velocity for the mass inside its radius, plus a little vertical scatter.
+        Leave it running and it does what the flat disk did in part one. It breaks into
+        clumps, and the clumps settle into a ring. That's the same cold-disk instability
+        from part one's aside, and none of it is scripted.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Curved projection</span>The dome</h2>
+      <h2 id="dome"><span class="kicker">Step 4 · Constraints</span>The dome</h2>
       <p>
-        Everything so far simulates gravity in free space —
-        bodies go wherever forces send them. Suppose we want the simulation to live on
-        a <em>surface</em>: a hemispheric dome, with bodies flowing across it like
-        weather over a planet's cap. Several approaches come to mind: spherical
-        coordinates? Geodesic equations? A different integrator for a curved manifold?
+        Everything so far is gravity in open space, where bodies go wherever the forces
+        send them. For the dome I wanted the bodies to live on a surface instead, a
+        hemisphere they flow across like weather over the top of a planet. You could do
+        that with spherical coordinates, or with an integrator written for curved
+        surfaces. I went with a spring, which is a few lines in the force kernel:
       </p>
-      <p>
-        We need a spring. Here is the entire dome, verbatim from the force kernel:
-      </p>
-      <pre><code>if (P.shellK > 0.0) {
+      <pre><code>if (P.shellK &gt; 0.0) {
   let r = length(p);
   let rhat = p / max(r, 1e-6);
-  acc -= rhat * (r - P.shellR) * P.shellK;   // radial spring: stick to the shell
+  acc = acc - rhat * (r - P.shellR) * P.shellK;  <span class="cm">// radial spring: stay on the shell</span>
   if (p.z &lt; 0.0) {
-    acc.z -= p.z * P.shellK * 4.0;           // floor spring: stay in the upper half
+    acc.z = acc.z - p.z * P.shellK * 4.0;        <span class="cm">// floor spring: stay above the equator</span>
   }
 }</code></pre>
       <p>
-        A body inside the shell radius gets pushed out; outside, pulled in; below the
-        equator, shoved back up (the floor spring is four times stiffer, because the
-        equator is a hard edge and the shell is a soft preference). Each violation
-        produces a restoring force proportional to how far the rule was broken. This
-        is a <em>penalty force</em>. The constraint never edits positions, never
-        special-cases the integrator, never touches the octree — it is one more
-        <code>acc +=</code> among the gravitational ones.
+        A body inside the shell radius gets pushed out, one outside gets pulled in, and one
+        that drops below the equator gets pushed back up. I made the floor spring four
+        times stiffer than the shell spring, because I wanted the equator to act like a
+        hard edge and the shell like a soft preference. Each push is proportional to how
+        far the body is from where it should be. This is called a <em>penalty force</em>.
+        The constraint never edits positions and never touches the integrator or the
+        octree. It's one more term in the acceleration, next to gravity.
       </p>
       <p>
-        Here is the spring at work on a single body, scrubbed by your scroll wheel —
-        a real simulated trajectory you can play forward and backward:
+        Below is one body on the spring, in a 2D slice through the dome. It's a real
+        simulated trajectory, computed once when the page loads, and your scroll position
+        scrubs back and forth through it.
       </p>
 
       <div data-scrolly="dome-spring"></div>
@@ -268,126 +288,127 @@ force     → stack walk, θ test, integrate           (in place)</code></pre>
       <aside class="note">
         <span class="note-label">Aside · Penalty methods, 1943</span>
         <p>
-          Richard Courant described penalty methods in 1943: replace "you must satisfy
-          this constraint" with "you pay a price that grows with violation." The idea
-          has been rediscovered by structural engineering, optimization, robotics, and
-          every physics engine since.
+          Richard Courant described the penalty method in 1943. Instead of requiring that a
+          constraint hold, you charge a cost that grows the more it's violated. It's been a
+          standard tool in structural engineering and optimization ever since, and game
+          physics engines often use it for contacts.
         </p>
       </aside>
       <p>
-        The slider below demonstrates the constraint. At zero, free 3D gravity. Drag
-        it up and the shell condenses out of the chaos — bodies snap onto the dome and
-        keep flowing, swirling, clustering, but now along a curved two-dimensional
-        world. Gravity still acts through 3D
-        space. Two clusters on opposite sides of the dome attract along the straight
-        chord <em>through</em> the dome — watch them pair up and slide toward each
-        other like beads pulled by a thread under the shell. The dynamics live on the
-        surface; the forces never did.
+        The demo below starts with the dome on: 20,000 bodies spread over the hemisphere,
+        dome strength 6, and a little velocity damping (0.999 per step) so the shell
+        settles instead of ringing. Drag the strength down to zero and the springs let go.
+        Within a few seconds free 3D gravity pulls the whole shell together into one tight
+        clump. Then raise the strength again. The springs drag the clump back out to the
+        shell, but it stays one lump and slides around on the surface; it doesn't spread
+        back out into a dome. Press re-seed to get the shell back.
       </p>
 
-      <div data-demo="dome-morph"></div>
+      <div
+        data-demo="dome-morph"
+        data-title="Gravity on a dome"
+        data-hint="Drag dome strength to zero"
+      ></div>
 
+      <p>
+        While the bodies are held on the surface, gravity still acts through 3D space. Two
+        clumps on opposite sides of the dome pull on each other along the straight line
+        through the inside of the dome, not along the surface. The spring cancels the part
+        of that pull that points into the dome, and what's left slides each clump along
+        the shell toward the other.
+      </p>
       <aside class="note">
         <span class="note-label">Aside · Archimedes seeds the dome</span>
         <p>
-          Sampling points uniformly over a hemisphere needs care — naive
-          latitude-longitude sampling bunches points at the pole — but the care was
-          taken twenty-two centuries ago. Archimedes proved that a sphere and its
-          circumscribing cylinder have equal areas between any two horizontal slices,
-          so a <em>uniform</em> random height z, paired with a random angle, lands
-          uniformly on the sphere. Two random numbers, no rejection: the hat-box
-          theorem, used here to seed the WebGPU demo.
+          Spreading points evenly over a hemisphere takes a little care, because picking a
+          random latitude and longitude bunches the points up at the pole. The fix comes
+          from Archimedes, about 2,200 years ago. He showed that a sphere and the cylinder
+          that fits around it have the same surface area between any two horizontal
+          planes. So a uniformly random height, paired with a uniformly random angle, lands
+          uniformly on the sphere, with two random numbers and nothing rejected. It's
+          called the hat-box theorem, and both dome demos use it for their starting
+          positions.
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: why a spring and not a hard projection?</summary>
+        <summary>Why a spring and not a hard projection</summary>
         <div class="fold-body">
           <p>
-            Projection is the tempting fix — <code>p = normalize(p) * shellR</code>,
-            done — and it is everything a constraint shouldn't be. It silently deletes
-            radial velocity (energy vanishes without anything deciding it should), and
-            it happens outside the integrator's view, so damping, gravity, and
-            later constraints cannot account for it. A penalty force remains
-            inside the integrator: energy-aware, tunable, and composable. Note the
-            gentle velocity damping that switches on with the dome so the shell can
-            settle instead of ringing forever.
+            The obvious alternative is projection: after each step, set
+            <code>p = normalize(p) * shellR</code>. Projection moves the body without a
+            force, so the integrator never sees it. You either throw away the radial
+            velocity by hand as well, or leave it in and have the body fight the projection
+            every step. Either way energy changes without anything in the simulation
+            accounting for it. A penalty force stays inside the integrator, where damping
+            and gravity act on it like any other force and I can tune it. The small
+            velocity damping that switches on with the dome is there so the shell can
+            settle instead of oscillating forever.
           </p>
           <p>
-            The cost of the spring is stiffness: an explicit integrator can only
-            tolerate springs so stiff before the spring's own oscillation outruns the
-            timestep and explodes. That's why the dome uses a modest k plus damping
-            rather than an iron wall. When penalty stiffness becomes the bottleneck,
-            other methods are available — Lagrange multipliers, or the
-            position-based dynamics modern game engines run. For this flowing
-            system, the spring is enough.
+            The downside of a spring is stiffness. An explicit integrator can only handle a
+            spring so stiff before the spring's own oscillation is faster than the time
+            step can follow, and the simulation blows up. That's why the dome uses a modest
+            strength plus damping rather than a rigid wall. If penalty stiffness ever became
+            the limit, the next things to try would be Lagrange multipliers or the
+            position-based dynamics that a lot of game physics uses. For this, a spring is
+            enough.
           </p>
           <p>
-            And nothing in the spring cares that the shape is a sphere.
-            <code>length(p) − shellR</code> is a signed distance to the shell, and the
-            spring pushes down its gradient. Swap in any signed distance function — a
-            torus, a saddle, a terrain heightfield, extruded text — and gravity will
-            flow over that instead, with the same four lines doing the holding.
+            Nothing in the spring cares that the shape is a sphere, either.
+            <code>length(p) − shellR</code> is the signed distance to the shell, and the
+            spring pushes along its gradient. Swap in a different signed distance function,
+            like a torus or a terrain heightfield, and gravity would flow over that shape
+            instead, held there by the same few lines.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What changes in 3D</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What changes in 3D</h2>
+      <p>A few things from this part that I'll keep using:</p>
+      <ul>
+        <li>
+          <strong>An extra dimension mostly costs memory.</strong> Going from 2D to 3D
+          changed constants, 4 to 8 and squares to cubes, but none of the algorithms. The
+          one real decision was how deep a grid I could afford, and the answer was a
+          coarser floor that softening mostly covers.
+        </li>
+        <li>
+          <strong>Operations that ignore order save work.</strong> Additive blending gives
+          the same result in any draw order, so there's no depth sort to write.
+        </li>
+        <li>
+          <strong>Constraints can be forces.</strong> The dome is a few lines in the force
+          kernel, and nothing else in the solver knows it's there. Part three uses the same
+          idea for the walls of a water tank.
+        </li>
+        <li>
+          <strong>Physics and rendering can share a buffer.</strong> The renderer reads the
+          simulation's buffers directly, by instance index, in the same frame they were
+          written.
+        </li>
+      </ul>
       <p>
-        <strong>1. Dimensions cost memory, not ideas.</strong> The 2D→3D port changed
-        constants — 4 to 8, squared to cubed — and not one algorithm. The only forced
-        design decision was the memory bill for the finest grid, and the response was
-        a trade (a coarser floor, absorbed by softening), not a redesign.
+        Things I'd try next: sort the bodies in Morton order so neighbouring GPU threads
+        walk the same branches of the octree; replace the uniform pyramid with an adaptive
+        tree (an LBVH) so very clumpy scenes don't run out of resolution at the finest
+        level; and add collisions, which would turn the dome into a container for particles
+        that bounce off each other instead of passing through.
       </p>
-      <p>
-        <strong>2. Commutativity can remove work.</strong> Additive blending made
-        depth sorting simply not exist, because <code>a + b = b + a</code> is true in
-        every draw order. Choosing an operation with useful symmetries can remove
-        entire implementation steps.
-      </p>
-      <p>
-        <strong>3. Constraints are forces.</strong> The dome is four lines in the
-        force kernel, and the kernel doesn't know they're special. Before reaching for
-        special-case geometry code, ask what spring would express the rule and let the
-        integrator enforce it. Part three leans on this immediately: the walls of a
-        water tank use the same method: three more springs.
-      </p>
-      <p>
-        <strong>4. Physics and pixels can share one memory.</strong> The renderer
-        never receives data; it reads the integration buffers directly, by instance
-        index, the same frame they were written. On a GPU, the cheapest copy is the
-        one that isn't.
-      </p>
-      <p>
-        From here, the solver could Morton-order the bodies so
-        neighbouring threads walk the same octree branches; swap the uniform pyramid
-        for an adaptive tree (LBVH) when clustering outruns 128³; add collision
-        impulses and the dome becomes a container for colliding particles. The core
-        solver would not need to change.
-      </p>
-      <p>
-        <strong>Continued in <a href="/pages/particle-worlds/part3.html">Part three: Sorting Water</a></strong> —
-        the particles stop attracting and start colliding: neighbour search, counting
-        sort, parallel prefix sums, and a stirrable SPH fluid.
-      </p>
-      <p>
-        ← <a href="/pages/particle-worlds/part1.html">Part one: Two Falling Dots</a>
+      <p class="continue">
+        <strong>Next: <a href="/pages/particle-worlds/part3.html">Part three, Sorting Water</a>.</strong>
+        The particles stop attracting and start colliding, and finding each one's neighbours
+        fast turns into a sorting problem.
       </p>
     </main>
 
     <footer>
       <p>
-        Part two of the WebGPU n-body series ·
-        <a href="/pages/particle-worlds/part1.html">Part one</a> ·
-        <a href="/pages/particle-worlds/part3.html">Part three</a> ·
-        <a href="/pages/particle-worlds/part4.html">Part four</a> ·
+        References:
         <a href="https://www.nature.com/articles/324446a0">Barnes &amp; Hut (1986)</a> ·
-        <a href="https://github.com/PWhiddy/Nbody-Gravity">PWhiddy/Nbody-Gravity</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
         <a href="https://www.ams.org/journals/bull/1943-49-01/S0002-9904-1943-07818-4/">Courant (1943), penalty methods</a> ·
-        <a href="https://matthias-research.github.io/pages/publications/posBasedDyn.pdf">Müller et al., "Position Based Dynamics"</a>
+        <a href="https://matthias-research.github.io/pages/publications/posBasedDyn.pdf">Müller et al., "Position Based Dynamics"</a> ·
+        <a href="https://github.com/PWhiddy/Nbody-Gravity">PWhiddy/Nbody-Gravity</a>
       </p>
     </footer>
 

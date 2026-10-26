@@ -62,10 +62,11 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
   const layout = dev.createBindGroupLayout({
     entries: [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
       { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
       { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
       { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
     ],
   });
   const pipeLayout = dev.createPipelineLayout({ bindGroupLayouts: [layout] });
@@ -79,9 +80,8 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
   let steps = opts.steps ?? 5;
   let bufs: [GPUBuffer, GPUBuffer] = [null!, null!];
   let density: GPUBuffer = null!;
-  let sortGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
-  let simGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
-  let cur = 0;
+  let sortGroup: GPUBindGroup = null!;
+  let simGroup: GPUBindGroup = null!;
 
   const rebuild = (): void => {
     for (const b of bufs) b?.destroy();
@@ -90,20 +90,20 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
     bufs = [dev.createBuffer({ size: count * 16, usage }), dev.createBuffer({ size: count * 16, usage })];
     density = dev.createBuffer({ size: count * 8, usage: GPUBufferUsage.STORAGE });
     dev.queue.writeBuffer(bufs[0], 0, (sph ? seedDam : seedRain)(count, floorY) as BufferSource);
-    sortGroups = [sort.bindGroup(bufs[0], bufs[1]), sort.bindGroup(bufs[1], bufs[0])];
-    const mkSim = (sorted: GPUBuffer): GPUBindGroup =>
-      dev.createBindGroup({
-        layout,
-        entries: [
-          { binding: 0, resource: { buffer: params } },
-          { binding: 1, resource: { buffer: sorted } },
-          { binding: 2, resource: { buffer: sort.starts } },
-          { binding: 3, resource: { buffer: sort.counts } },
-          { binding: 4, resource: { buffer: density } },
-        ],
-      });
-    simGroups = [mkSim(bufs[1]), mkSim(bufs[0])]; // sim runs on the sort's output
-    cur = 0;
+    // Every substep: sort bufs[0] into bufs[1], then simulate from the
+    // sorted copy back into bufs[0], which the sort no longer needs.
+    sortGroup = sort.bindGroup(bufs[0], bufs[1]);
+    simGroup = dev.createBindGroup({
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: params } },
+        { binding: 1, resource: { buffer: bufs[1] } },
+        { binding: 2, resource: { buffer: sort.starts } },
+        { binding: 3, resource: { buffer: sort.counts } },
+        { binding: 4, resource: { buffer: density } },
+        { binding: 5, resource: { buffer: bufs[0] } },
+      ],
+    });
   };
   rebuild();
 
@@ -202,9 +202,9 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
       const wgs = Math.ceil(count / WG);
       const enc = dev.createCommandEncoder();
       for (let s = 0; s < steps; s++) {
-        sort.encode(enc, sortGroups[cur], count);
+        sort.encode(enc, sortGroup, count);
         const pass = enc.beginComputePass();
-        pass.setBindGroup(0, simGroups[cur]);
+        pass.setBindGroup(0, simGroup);
         if (densityPipe) {
           pass.setPipeline(densityPipe);
           pass.dispatchWorkgroups(wgs);
@@ -212,13 +212,16 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
         pass.setPipeline(forcePipe);
         pass.dispatchWorkgroups(wgs);
         pass.end();
-        cur = 1 - cur; // sim output becomes next sort's input
       }
-      renderer.bind(bufs[cur]);
+      renderer.bind(bufs[0]);
+      // Overlapping sprites so the water reads as a body of liquid, coloured
+      // by speed: still water deep blue, moving water cyan, spray white.
       renderer.encode(enc, count, {
         scale: renderScale,
-        size: sph ? 0.0035 : 0.005,
-        colorScale: 0.9,
+        size: sph ? 0.0045 : 0.0058,
+        colorScale: sph ? 1.5 : 0.9,
+        intensity: sph ? 0.75 : 0.7,
+        palette: sph ? "water" : "speed",
       });
       dev.queue.submit([enc.finish()]);
     },

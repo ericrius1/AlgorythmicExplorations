@@ -66,7 +66,11 @@ export async function mountNaiveGpu(container: HTMLElement): Promise<Demo> {
     },
   });
   shell.button("re-seed", rebuild);
-  shell.setInfo(() => `${(count * count / 1e6).toFixed(0)}M pair forces per step, every step`);
+  shell.setInfo(() => {
+    const pairs = count * count;
+    const n = pairs >= 1e9 ? `${(pairs / 1e9).toFixed(1)} billion` : `${Math.round(pairs / 1e6)} million`;
+    return `${n} pair forces per step, every step`;
+  });
 
   return {
     frame() {
@@ -86,7 +90,7 @@ export async function mountNaiveGpu(container: HTMLElement): Promise<Demo> {
       pass.end();
       cur = 1 - cur;
       renderer.bind(bodies[cur]);
-      renderer.encode(enc, count, { scale: 1.0 });
+      renderer.encode(enc, count, { scale: 0.95, intensity: 2.2 * Math.sqrt(20000 / count) });
       dev.queue.submit([enc.finish()]);
     },
   };

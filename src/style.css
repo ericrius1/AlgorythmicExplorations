@@ -1872,3 +1872,444 @@ body {
     height: 5.7rem;
   }
 }
+
+/* ---- slider + readout text parts (all series) ---- */
+
+.demo-slider-name::after {
+  content: ": ";
+}
+
+.demo-info:not(:empty)::before {
+  content: " · ";
+}
+
+/* =====================================================================
+   Particle Worlds series styling. Pages opt in with <body class="series-pw">;
+   everything below is scoped so the other series are unaffected.
+   ===================================================================== */
+
+.series-pw h2 {
+  scroll-margin-top: 4.5rem;
+}
+
+/* ---- hero: the title sits over the bottom of the live simulation ---- */
+
+/* the title is always on the first screen here, so no scroll prompt */
+.series-pw .hero-scroll-hint {
+  display: none;
+}
+
+.series-pw .hero-kicker {
+  margin: 0 0 0.55rem;
+  font: 600 0.72rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+@media (min-width: 46rem) {
+  .series-pw header.hero {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .series-pw header.hero:not(.hero-title-below) .hero-title {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: none;
+    padding: 7rem 1.2rem 2.4rem;
+    background: linear-gradient(to top, var(--bg) 0%, rgba(10, 11, 16, 0.82) 42%, rgba(10, 11, 16, 0) 100%);
+    pointer-events: none;
+  }
+
+  .series-pw header.hero .hero-title > * {
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .series-pw header.hero h1 {
+    text-shadow: 0 2px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .series-pw header.hero .subtitle {
+    margin-bottom: 0;
+    color: #a9b0c4;
+  }
+
+  .series-pw header.hero .demo-readout {
+    position: absolute;
+    top: 3.3rem;
+    left: 1.1rem;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+  }
+
+  .series-pw header.hero .demo-controls {
+    position: absolute;
+    top: 3.1rem;
+    right: 1.1rem;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* ---- figures ---- */
+
+.series-pw main .demo,
+.series-pw main .demo-slot,
+.series-pw .scrolly-stage {
+  background: linear-gradient(180deg, rgba(21, 24, 36, 0.92), rgba(13, 15, 23, 0.92));
+  border: 1px solid rgba(122, 162, 255, 0.13);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px -32px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.series-pw main .demo,
+.series-pw main .demo-slot {
+  padding: 0.7rem 0.75rem 0.75rem;
+}
+
+.series-pw main .demo-slot:not(.demo) {
+  min-height: min(calc(46vw + 6rem), 38rem);
+}
+
+.series-pw .demo-canvas,
+.series-pw .scrolly-canvas {
+  border-radius: 10px;
+  outline: 1px solid rgba(255, 255, 255, 0.04);
+  outline-offset: -1px;
+}
+
+.demo-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.65rem;
+  padding: 0.1rem 0.3rem 0.65rem;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.demo-fig {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.demo-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #eef1f8;
+}
+
+.demo-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.demo-hint::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-warm);
+  box-shadow: 0 0 10px var(--accent-warm);
+  animation: pw-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pw-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---- controls ---- */
+
+.series-pw .demo-controls {
+  gap: 0.8rem 1.4rem;
+  padding: 0.9rem 0.3rem 0.15rem;
+}
+
+.series-pw .demo-slider {
+  flex: 1 1 10rem;
+  min-width: 10rem;
+  max-width: 15rem;
+  gap: 0.3rem;
+}
+
+.series-pw .demo-slider-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.74rem;
+}
+
+.series-pw .demo-slider-name::after {
+  content: none;
+}
+
+.series-pw .demo-slider-value {
+  color: #e6e9f2;
+  font: 500 0.72rem ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.series-pw .demo-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.series-pw .demo-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent) var(--fill, 50%), #272c3f var(--fill, 50%));
+}
+
+.series-pw .demo-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #f4f6fc;
+  box-shadow:
+    0 0 0 3px rgba(122, 162, 255, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.15s ease;
+}
+
+.series-pw .demo-slider input[type="range"]:hover::-webkit-slider-thumb,
+.series-pw .demo-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 5px rgba(122, 162, 255, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.series-pw .demo-slider input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 4px;
+  background: #272c3f;
+}
+
+.series-pw .demo-slider input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.series-pw .demo-slider input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: #f4f6fc;
+  box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.3);
+}
+
+.series-pw .demo-button {
+  border-radius: 999px;
+  padding: 0.38rem 0.95rem;
+  font-weight: 600;
+  color: #dfe5f7;
+  background: rgba(122, 162, 255, 0.08);
+  border: 1px solid rgba(122, 162, 255, 0.24);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.series-pw .demo-button:hover {
+  background: rgba(122, 162, 255, 0.16);
+  border-color: var(--accent);
+}
+
+.series-pw .demo-button:active {
+  transform: translateY(1px);
+}
+
+.series-pw .demo-readout {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  padding: 0.65rem 0.3rem 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.series-pw .demo-readout > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.6rem;
+}
+
+.series-pw .demo-fps {
+  flex: none;
+  padding: 0.02rem 0.45rem;
+  border-radius: 999px;
+  color: #8fe0b0;
+  background: rgba(125, 214, 160, 0.08);
+  border: 1px solid rgba(125, 214, 160, 0.2);
+}
+
+.series-pw .demo-info::before {
+  content: none;
+}
+
+.series-pw .demo-info {
+  color: #f0c08a;
+}
+
+/* ---- scroll diagrams ---- */
+
+.series-pw .scrolly-stage {
+  top: var(--stage-top, 3.2rem);
+  padding: 0.75rem;
+}
+
+.series-pw .scrolly-progress-fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+}
+
+.series-pw .scrolly-caption {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  min-height: 3em;
+}
+
+/* ---- text ---- */
+
+.series-pw main ul {
+  padding-left: 1.25rem;
+  margin: 0 0 1.4rem;
+}
+
+.series-pw main li {
+  margin: 0 0 0.6rem;
+}
+
+.series-pw main li::marker {
+  color: var(--accent);
+}
+
+.series-pw .continue {
+  margin-top: 2.4rem;
+  padding: 1.05rem 1.25rem;
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(122, 162, 255, 0.08), rgba(255, 184, 107, 0.04));
+}
+
+/* ---- reading progress + step rail (seriesChrome.ts) ---- */
+
+.pw-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  pointer-events: none;
+}
+
+.pw-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.pw-rail {
+  position: fixed;
+  left: 1.4rem;
+  top: 50%;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-width: 12rem;
+  transform: translateY(-50%);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+@media (min-width: 86rem) {
+  .pw-rail {
+    display: flex;
+  }
+}
+
+.pw-rail.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pw-rail-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.38rem 0.75rem;
+  border-left: 2px solid var(--border);
+  text-decoration: none;
+  transition: border-color 0.2s ease;
+}
+
+.pw-rail-kicker {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #565d76;
+}
+
+.pw-rail-label {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.pw-rail-link:hover .pw-rail-label {
+  color: var(--text);
+}
+
+.pw-rail-link.is-current {
+  border-left-color: var(--accent);
+}
+
+.pw-rail-link.is-current .pw-rail-kicker {
+  color: var(--accent);
+}
+
+.pw-rail-link.is-current .pw-rail-label {
+  color: #eef1f8;
+}
+
+@media (max-width: 40rem) {
+  .series-pw .demo-slider {
+    max-width: none;
+    flex-basis: 100%;
+  }
+}

@@ -59,6 +59,13 @@ export function mountScrolly(container: HTMLElement, spec: ScrollySpec): void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     w = cw;
     h = ch;
+    // Where the pinned stage should sit so it's centred under the nav. Only
+    // pages whose CSS reads --stage-top use it.
+    requestAnimationFrame(() => {
+      const nav = 48;
+      const top = Math.max(nav + 8, (window.innerHeight - stage.offsetHeight) / 2 + nav / 2);
+      stage.style.setProperty("--stage-top", `${Math.round(top)}px`);
+    });
   };
 
   const rawProgress = (): number => {

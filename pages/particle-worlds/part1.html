@@ -10,19 +10,19 @@
     <title>Two Falling Dots — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="An interactive guide to building a GPU-resident Barnes-Hut simulation, from two falling dots to hundreds of thousands of gravitating bodies."
+      content="Building a gravity simulator in the browser, from two falling dots to 300,000 bodies on the GPU: direct summation, tiled compute shaders, Barnes–Hut, and a quadtree with nothing to build."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="series-pw">
     <header class="hero">
       <div data-demo="hero"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Particle Worlds · Part 1</p>
         <h1>Two Falling Dots</h1>
         <p class="subtitle">
-          Building a gravity simulator from two falling dots to three hundred thousand
-          bodies — one optimization at a time. Everything above is running live, right
-          now, on your GPU.
+          A gravity simulator built up from two falling dots to 300,000 bodies, one fix at a
+          time. The galaxy above is running live on your GPU.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -33,119 +33,114 @@
 
     <main>
       <p>
-        The galaxy at the top of this page is not a video. It is twenty thousand
-        bodies, each pulling on all the others, simulated and drawn by your graphics
-        card about a hundred times per second. The same method scales to three
-        hundred thousand bodies in the final demo on this page.
+        The galaxy at the top of this page is a live simulation: 40,000 bodies, every one
+        pulling on every other, stepped about 120 times a second on your graphics card. The
+        last demo on this page runs the same code with up to 300,000.
       </p>
       <p>
-        Naïvely, three hundred thousand mutually attracting bodies means three hundred
-        thousand <em>squared</em> force calculations per step — ninety billion. We will
-        do it in a browser tab on a typical WebGPU-capable machine.
-      </p>
-      <p>
-        There is no single optimization that gets us there. Each section fixes a specific limitation in the
-        previous approach, with a live demo you can poke, drag, and break. By the end,
-        every part of the galaxy up top will have a clear job.
+        Done the obvious way, 300,000 bodies means 300,000² pair forces per step. That's
+        90 billion, and in a browser tab it would take more than a minute to draw a single
+        frame. This article is how I got it running in real time. Each step fixes whatever
+        was limiting the step before it, and each one has a demo you can play with.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · One force</span>Direct gravity integration</h2>
+      <h2 id="formula"><span class="kicker">Step 1 · One force</span>The formula</h2>
       <p>
-        Every optimization in this article exists to evaluate one formula faster.
-        Here it is — the only physics we will ever need:
+        All of the physics in this article is one line. Everything after this section is
+        about evaluating it faster.
       </p>
-      <pre><code>// acceleration of body i, caused by body j
+      <pre><code><span class="cm">// acceleration of body i, caused by body j</span>
 d   = position[j] - position[i]
 a_i += G * mass[j] * d / (|d|² + ε²)^(3/2)</code></pre>
       <p>
-        That is Newton's law of gravitation with one engineering patch: the
-        <strong>ε²</strong> term, called <em>softening</em>. Real gravity goes to
-        infinity as two points touch. Simulated gravity, evaluated in discrete time
-        steps, does something worse: a body skims past a neighbour, the force spikes
-        for one step, and the body gets flung across the universe at an unphysical
-        speed. Softening puts a floor under the denominator — below distance ε, the
-        force stops growing. It effectively blurs each point mass into a small fuzzy
-        ball of radius ε, which is why ε enters the formula squared, as a length.
+        That's Newton's law of gravity with one fudge added, the <strong>ε²</strong> term,
+        called <em>softening</em>. Real gravity goes to infinity as two points touch. In a
+        simulation that moves in fixed time steps it's worse than that: a body passes close
+        to another, the force spikes for a single step, and the body gets thrown out of the
+        system faster than anything real could move. Softening caps the force. Inside a
+        distance of about ε it stops growing, as if each point mass had been smeared into a
+        small ball of radius ε.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Where softening comes from</span>
         <p>
-          Astronomers have used this exact formula for over a century. It comes from a
-          density profile Henry Plummer fit to globular star clusters in 1911 — decades
-          before anyone could simulate one. A "softened point mass" is mathematically a
-          tiny Plummer sphere.
+          Astronomers had this formula long before anyone simulated anything. In 1911 Henry
+          Plummer fit a density profile to globular star clusters, and the pull of a Plummer
+          sphere works out to exactly this softened formula. A softened point mass is a tiny
+          Plummer sphere.
         </p>
       </aside>
       <p>
-        Try it. Drag anywhere on the black to launch a body around the star. Then drag
-        the softening slider to its minimum and launch a body straight at the centre —
-        it gets slingshotted unrealistically hard. That spike is the bug ε exists to fix.
+        Try it below. Press on the black, drag in the direction you want the body to go,
+        and let go. Then pull the softening slider all the way down and launch a body
+        straight at the star. It comes back out far faster than it went in. That spike is
+        what ε is there to prevent.
       </p>
 
-      <div data-demo="slingshot"></div>
+      <div
+        data-demo="slingshot"
+        data-title="One star, your planets"
+        data-hint="Press, drag, release"
+      ></div>
 
       <p>
-        One integration detail matters here: update velocity from acceleration first,
-        <em>then</em> update position from the new velocity. This ordering — called
-        <em>semi-implicit Euler</em> — costs nothing extra and keeps orbits stable for
-        thousands of revolutions, where the "obvious" order makes them slowly spiral
-        outward.
+        One more detail matters here, and it costs nothing. Update the velocity from the
+        acceleration first, then move the body using the <em>new</em> velocity. This is
+        called <em>semi-implicit Euler</em>. Do it the other way around, moving the body
+        with its old velocity first, and orbits slowly gain energy and spiral outward. The
+        demo has a button for this. Watch the inner planet: switch to "position first" and
+        it starts to unwind within a few laps.
       </p>
       <details class="fold">
-        <summary>Why the update order matters: symplectic integrators</summary>
+        <summary>Why the order matters</summary>
         <div class="fold-body">
           <p>
-            Updating velocity first makes the integrator <em>symplectic</em>: it exactly
-            preserves a geometric invariant of Hamiltonian mechanics (phase-space area)
-            even while getting individual positions slightly wrong. The practical
-            consequence is that its errors push orbits <em>sideways</em> rather than
-            inward or outward, so energy errors oscillate instead of accumulating —
-            orbits stay orbits.
+            With velocity first, the integrator is <em>symplectic</em>. It preserves
+            phase-space area, a geometric property of Hamiltonian mechanics, even though
+            every individual position it computes is slightly off. In practice the errors
+            push orbits sideways instead of steadily outward, so the energy wobbles around
+            the right value rather than drifting away from it.
           </p>
           <p>
-            Its close cousin, leapfrog integration, has carried this property through
-            nearly every serious gravity and molecular-dynamics code since the 1960s.
-            A one-line ordering decision is the difference between a solar system that
-            lasts and one that evaporates.
+            Its close relative, leapfrog integration, is what most gravity and molecular
+            dynamics codes have used since the 1960s, for the same reason. Swapping two
+            lines is the difference between a solar system that lasts and one that slowly
+            comes apart.
           </p>
         </div>
       </details>
       <p>
-        One star and a handful of planets is cheap: each body only feels the star.
-        The trouble starts when everything feels <em>everything</em>.
+        One star and a few planets is cheap, because each planet only feels the star. It
+        gets expensive when every body feels every other body.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Everyone pulls on everyone</span>Pairwise complexity</h2>
+      <h2 id="pairs"><span class="kicker">Step 2 · All pairs</span>Everyone pulls on everyone</h2>
       <p>
-        A real star cluster has no fixed central star. Every body pulls on every other
-        body — the disk holds itself together with its own gravity. And for three or
-        more bodies, no general closed-form solution exists. If you want to know what a
-        thousand gravitating bodies will do, there is exactly one method: step the
-        system forward and watch.
+        A galaxy has no central star holding it together. The disk holds itself together
+        with its own gravity, so every body pulls on every other one. With three or more
+        bodies there's no formula for what happens next. The only way to find out what a
+        thousand gravitating bodies will do is to step them forward and watch.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Chaos, and a simulation made of light bulbs</span>
         <p>
-          Henri Poincaré proved in the 1890s that three-body dynamics can be chaotic —
-          sensitive to initial conditions in a way no formula can summarize. That
-          proof, written for a prize offered by the King of Sweden, is often counted as
-          the birth of chaos theory.
+          Henri Poincaré showed in the 1890s that three bodies are already enough for chaos:
+          motion so sensitive to where things start that no formula can follow it for long.
+          He was writing for a prize offered by King Oscar II of Sweden, and that work is
+          often counted as the start of chaos theory.
         </p>
         <p>
-          The first n-body simulation predates the computer. In 1941, Erik Holmberg
-          arranged 74 light bulbs on a table — two "galaxies" of 37 bulbs — exploiting
-          the fact that light intensity falls off as 1/r², exactly like gravity. He
-          measured the light falling on each bulb with a photocell, used it as the
-          gravitational force, moved each bulb by hand, and repeated. His analog
-          computer correctly predicted that close-passing galaxies fling out tidal
-          tails, decades before electronic machines confirmed it.
+          The first n-body simulation didn't use a computer. In 1941 Erik Holmberg laid out
+          74 light bulbs on a table as two "galaxies" of 37 bulbs each. Light falls off as
+          1/r², the same as gravity, so he measured the light reaching each bulb with a
+          photocell, treated it as the gravitational pull, moved the bulbs by hand, and
+          repeated. His two galaxies swung past each other and threw out tidal tails,
+          something electronic simulations didn't confirm until decades later.
         </p>
       </aside>
-      <p>
-        With an actual computer, the direct implementation is two nested loops:
-      </p>
+      <p>With a computer it's two nested loops:</p>
       <pre><code>for (let i = 0; i &lt; count; i++) {
   let ax = 0, ay = 0;
   for (let j = 0; j &lt; count; j++) {
@@ -157,376 +152,407 @@ a_i += G * mass[j] * d / (|d|² + ε²)^(3/2)</code></pre>
   vx[i] += ax * dt;  vy[i] += ay * dt;
 }</code></pre>
       <p>
-        This is correct, and it is the ground truth every later optimization will be
-        checked against. It also scales badly. Drag the slider right and watch the
-        milliseconds-per-step number: the work grows with the <em>square</em> of the
-        count. Doubling the bodies quadruples the work — 4,000 bodies is 16 million
-        force calculations, 8,000 is 64 million, every step, sixty steps a second.
+        This is correct, and it's the reference everything later gets checked against.
+        It's also slow. Drag the slider right and watch the milliseconds per step: the work
+        grows with the square of the body count. Twice the bodies is four times the work.
+        4,000 bodies is 16 million force calculations per step, at sixty steps a second.
       </p>
 
-      <div data-demo="naive-cpu"></div>
+      <div
+        data-demo="naive-cpu"
+        data-title="Every pair, on the CPU"
+        data-hint="Drag the slider until it hurts"
+      ></div>
 
       <p>
-        Somewhere on that slider, your machine hit a wall. Note what kind of wall: the
-        results are still correct, and the inner loop is about as tight as this code
-        gets. It doesn't matter. An O(n²) algorithm outgrows any constant-factor
-        improvement. Getting further takes either much more arithmetic or a
-        fundamentally better idea. We'll need both — and the arithmetic is already
-        sitting in your machine.
+        Somewhere along that slider your machine ran out of room. The results are still
+        right, and the inner loop is about as tight as JavaScript gets. An O(n²) loop
+        outgrows any constant speedup eventually. To go further you need a lot more
+        arithmetic or a better algorithm, and I ended up needing both. The extra arithmetic
+        is already sitting in your machine.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Parallel work</span>Move it to the GPU</h2>
+      <h2 id="gpu"><span class="kicker">Step 3 · Parallel</span>Move it to the GPU</h2>
       <p>
-        Look at the nested loop again. Body 0's force sum doesn't depend on body 1's —
-        every iteration of the <em>outer</em> loop is independent. That is exactly the
-        shape of problem a GPU is built for: thousands of identical computations that
-        never need to talk to each other.
+        Look at the nested loop again. Body 0's force doesn't depend on body 1's, so every
+        pass of the outer loop is independent. That's the kind of problem a GPU is built
+        for: thousands of identical calculations that never need to talk to each other.
       </p>
       <p>
-        A GPU is thousands of small processors all executing the same program on
-        different data. So: one thread per body, each thread runs the inner loop. The
-        outer loop stops existing as a loop — it becomes hardware.
+        So the GPU version runs one thread per body, and each thread does the inner loop.
+        The outer loop goes away. The hardware runs all of its iterations at once.
       </p>
       <p>
-        One refinement teaches the most important fact about GPUs: <strong>they are
-        usually limited by memory, not math</strong>. If 100,000 threads each
-        independently read all 100,000 positions from main GPU memory, the memory
-        system chokes. Instead, threads cooperate in groups of 256: the group loads a
-        <em>tile</em> of 256 positions into fast on-chip shared memory, everyone sums
-        forces against the tile, then the group loads the next one.
+        The most important thing about GPUs shows up right away: <strong>they usually run
+        out of memory bandwidth before they run out of math</strong>. If 100,000 threads
+        each read all 100,000 positions from GPU memory, the memory system can't keep up.
+        So the threads work in groups of 256. A group loads a <em>tile</em> of 256
+        positions into fast on-chip shared memory, every thread sums forces against that
+        tile, and then the group loads the next one.
       </p>
-      <pre><code>var&lt;workgroup&gt; tile: array&lt;vec3f, 256&gt;;  // fast on-chip memory
+      <pre><code>var&lt;workgroup&gt; tile: array&lt;vec3f, 256&gt;;  <span class="cm">// fast on-chip memory</span>
 
 for (var t = 0u; t &lt; numTiles; t++) {
-  tile[local_id] = load(bodies[t * 256u + local_id]); // each thread fetches one
-  workgroupBarrier();                                  // wait for the whole tile
+  tile[local_id] = load(bodies[t * 256u + local_id]); <span class="cm">// each thread fetches one</span>
+  workgroupBarrier();                                  <span class="cm">// wait for the whole tile</span>
   for (var k = 0u; k &lt; 256u; k++) {
-    acc += force(tile[k], myPosition);                 // everyone uses all 256
+    acc += force(tile[k], myPosition);                 <span class="cm">// everyone uses all 256</span>
   }
   workgroupBarrier();
 }</code></pre>
       <p>
-        Each position is now read from slow memory once per <em>group</em> instead of
-        once per <em>thread</em> — a 256× cut in memory traffic. This is the tiled
-        n-body kernel from GPU Gems 3, the "hello world" of GPU computing.
+        Each position now comes out of main memory once per group instead of once per
+        thread, which cuts memory traffic by 256×. This is the tiled n-body kernel from
+        <em>GPU Gems 3</em>, and it's more or less the hello world of GPU computing.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · When gravity needed custom silicon</span>
+        <span class="note-label">Aside · When gravity got its own chips</span>
         <p>
-          In the 1990s, astronomers at the University of Tokyo were so starved for this
-          computation that they built chips for it: the GRAPE machines ("GRAvity
-          PipE"), with Newton's force law hardwired into the circuits. GRAPE-4 was, for
-          a time, the fastest computer on Earth at any task — as long as that task was
-          gravity. The shader above does the same job on hardware you already own,
-          because the games industry spent thirty years accidentally building gravity
-          machines for everyone.
+          In the 1990s, astronomers at the University of Tokyo wanted this calculation badly
+          enough to build hardware for it. The GRAPE machines (GRAvity PipE) had Newton's
+          force law wired into the silicon, and in 1995 GRAPE-4 became the first computer to
+          reach a teraflop. Gravity was the only thing it could compute. The shader above
+          does the same job on chips that video games have spent thirty years making cheap.
         </p>
       </aside>
 
-      <div data-demo="naive-gpu"></div>
+      <div
+        data-demo="naive-gpu"
+        data-title="Every pair, on the GPU"
+        data-hint="Same slider, much further"
+      ></div>
 
       <p>
-        Same slider as before. The wall that was at ~4,000 bodies is now tens of times
-        further out. But the underlying problem hasn't changed — watch the pair
-        counter: at 120,000 bodies you're computing over 14 <em>billion</em> pair
-        forces per step, and that number still grows with the square of the count.
-        The GPU pushed the wall out; it didn't remove it. Tiling and parallelism buy
-        constant factors. To get past n² for good, we have to compute
-        <em>fewer forces</em>, not compute them faster.
+        Same slider as before, and the wall that was around 4,000 bodies is now dozens of
+        times further out. The problem underneath hasn't changed, though. Watch the
+        readout: at 120,000 bodies you're computing 14.4 billion pair forces per step, and
+        that still grows with the square of the count. The GPU moved the wall. Getting past
+        it means computing <em>fewer forces</em>, not the same forces faster.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Approximation</span>Grouping distant particles</h2>
+      <h2 id="barnes-hut"><span class="kicker">Step 4 · Approximation</span>Group the far-away bodies</h2>
       <p>
-        Stand outside on a clear night. Roughly a hundred billion stars in the
-        Andromeda galaxy are pulling on you — and your body feels them as <em>one</em>
-        pull, toward one smudge in the sky. From far enough away, a cluster of bodies
-        is indistinguishable from a single point holding the cluster's total mass at
-        its centre of mass.
+        Every star in the Andromeda galaxy is pulling on you right now, and you feel all of
+        them as one pull toward one smudge in the sky. From far enough away, a cluster of
+        bodies acts like a single point with the cluster's total mass, sitting at its
+        centre of mass.
       </p>
       <p>
-        Barnes and Hut turned that observation into an algorithm in 1986. Build a
-        <em>quadtree</em>: recursively divide space into quadrants until each cell
-        holds about one body. For every cell, precompute total mass and centre of
-        mass. Then, to sum forces on a body, walk the tree from the root and apply one
-        test at every cell:
+        Josh Barnes and Piet Hut turned that into an algorithm in 1986. Build a
+        <em>quadtree</em>: split space into four squares, split any square holding more
+        than one body into four again, and keep going. Each cell stores its total mass and
+        centre of mass. To get the force on a body, start at the root and ask one question
+        at every cell:
       </p>
-      <pre><code>// the multipole acceptance criterion ("does this cluster blur?")
+      <pre><code><span class="cm">// is this cell small enough, seen from here, to count as one point?</span>
 if (cellWidth² &lt; θ² × distance²) {
-  acc += forceFrom(cell.totalMass, cell.centerOfMass);  // one term, whole subtree
+  acc += forceFrom(cell.totalMass, cell.centerOfMass);  <span class="cm">// one term for the whole cell</span>
 } else {
-  descend into the four children;                       // too close — look closer
+  descend into the four children;                       <span class="cm">// too close, look closer</span>
 }</code></pre>
       <p>
-        θ (theta) is the knob that trades accuracy for speed: how small does a cell
-        have to <em>look</em> — width over distance — before it counts as one point?
-        Nearby regions get opened all the way down to individual bodies; the far side
-        of the disk collapses into a handful of lumps. The sum that took <em>n</em>
-        terms now takes about log <em>n</em>.
+        θ (theta) trades accuracy for speed. It sets how small a cell has to <em>look</em>,
+        its width divided by its distance, before it counts as a single point. Cells near
+        the body get opened all the way down to individual bodies, and the far side of the
+        galaxy collapses into a few lumps. A sum that took <em>n</em> terms now takes about
+        log <em>n</em>.
       </p>
       <p>
-        Here is the whole walk, one piece at a time. Scroll through it slowly — and
-        scroll back up whenever you want to re-watch a stage:
+        Here's one walk, a piece at a time. Scroll slowly, and scroll back up whenever you
+        want to see a stage again.
       </p>
 
       <div data-scrolly="bh-walk"></div>
 
       <p>
-        And here it is live. Your cursor is the test body: every yellow box is a
-        cluster the walk accepted as a single point mass for your position. Move
-        toward the disk's core and the boxes shrink near you while the far field stays
-        coarse. Then drag θ down to 0.1 (strict — many small boxes, accurate) and up
-        to 2.0 (coarse — only a few boxes for a galaxy).
+        And here it is live. Your cursor is the test body, and each yellow box is a cluster
+        the walk treated as one point mass for that spot. Move toward the middle of the disk
+        and the boxes near you shrink while the far ones stay big. Then drag θ down to 0.1
+        (lots of small boxes) and up to 2.0 (a handful of boxes for the whole galaxy).
       </p>
 
-      <div data-demo="barnes-hut"></div>
+      <div
+        data-demo="barnes-hut"
+        data-title="The Barnes–Hut walk"
+        data-hint="Move your cursor over the disk"
+      ></div>
 
       <p>
-        Watch the counter while you move: a few dozen cluster terms instead of 3,000
-        body terms, for a force within a fraction of a percent of exact. Barnes–Hut
-        trades a controlled amount of accuracy for a large reduction in work.
+        The readout checks the walk against the exact sum. At the default θ = 0.8 it uses
+        about 60 terms instead of 3,000 and usually lands within a few percent of the exact
+        force. At θ = 0.3 the error drops below 1%, for a few hundred terms. That's still a
+        tenth of the work.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · A three-page paper and its family tree</span>
+        <span class="note-label">Aside · A three-page paper and its relatives</span>
         <p>
-          The Barnes–Hut paper in <em>Nature</em> combined two existing ideas: the
-          quadtree, invented by Finkel and Bentley in 1974 for database queries, and
-          a standard approximation from celestial mechanics — treating a distant cluster as a
+          The Barnes–Hut paper in <em>Nature</em> is three pages long. It combines two older
+          ideas: the quadtree, which Raphael Finkel and Jon Bentley came up with in 1974 for
+          database lookups, and the astronomer's habit of treating a distant cluster as a
           point at its centre of mass.
         </p>
         <p>
-          A year later, Greengard and Rokhlin pushed it further with the Fast Multipole
-          Method, which reaches O(n) with guaranteed error bounds, and was later named
-          one of the top ten algorithms of the twentieth century — alongside quicksort
-          and the FFT. The shared pattern: impose a hierarchy, do exact work locally
-          and summarized work at a distance. Multigrid solvers, wavelets, and JPEG all
-          play the same game.
+          A year later Leslie Greengard and Vladimir Rokhlin published the Fast Multipole
+          Method, which gets all the way to O(n) with guaranteed error bounds. It later made
+          a list of the ten most important algorithms of the twentieth century, alongside
+          quicksort and the FFT. All of these do exact work up close and summarized work
+          far away. Multigrid solvers and wavelets are built the same way.
         </p>
       </aside>
       <p>
-        It's tempting to declare victory: port the tree walk to the GPU and scale up
-        another order of magnitude. But one real obstacle remains, and it's the tree
-        itself.
+        The obvious next move is to port the tree walk to the GPU and add a zero to the body
+        count. One thing gets in the way, and it's the tree.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · CPU bottleneck</span>Building the tree on the CPU</h2>
+      <h2 id="pyramid"><span class="kicker">Step 5 · The bottleneck</span>A tree with nothing to build</h2>
       <p>
-        The textbook Barnes–Hut tree is built by inserting bodies <em>one at a
-        time</em>: find the body's leaf; if it's occupied, split it and push the old
-        occupant down. Every insertion depends on the tree state left by the previous
-        one. It is a deeply <em>sequential</em> algorithm — and since the bodies move
-        every step, the whole tree must be rebuilt every step, forever.
+        The textbook Barnes–Hut tree is built one body at a time. Find the leaf the body
+        belongs in, and if something's already there, split the leaf and push the old
+        occupant down a level. Each insert depends on the tree the last one left behind, so
+        the build is <em>sequential</em>. And because every body moves every step, the
+        tree has to be rebuilt from scratch every step.
       </p>
       <p>
-        On a CPU that's fine at small n. But our simulation state lives on the GPU
-        now, so each frame would have to copy every position back to the CPU, build
-        the tree in single-threaded JavaScript, and upload the nodes again. Past
-        ~100k bodies, the round-trip over the bus costs more than the physics. The
-        algorithm isn't the bottleneck — the data structure is living on the wrong
-        side of it.
+        On a CPU that's fine at small counts. But the simulation lives on the GPU now, so
+        every frame would mean copying all the positions back to the CPU, building the tree
+        in single-threaded JavaScript, and uploading it again. Past about 100,000 bodies,
+        that round trip costs more than the physics. There's nothing wrong with the
+        algorithm. The tree is being built on the wrong side of the bus.
       </p>
       <p>
-        You could port the sequential build to the GPU with atomics and locks (people
-        have; it is complicated and lock-heavy). Or change the structure:
+        You can port the sequential build to the GPU with atomics and locks. People have,
+        and it gets complicated. I went the other way and changed the tree so there's
+        nothing left to build.
       </p>
-      <blockquote>
-        <p>What if the tree had no pointers to build at all?</p>
-      </blockquote>
       <p>
-        Force the quadtree to be <em>complete</em> — every cell split to the same
-        depth, occupied or not — and the entire structure becomes arithmetic. The
-        children of cell <code>(level, ix, iy)</code> are, by construction, cells
-        <code>(level+1, 2ix+dx, 2iy+dy)</code>. Nothing to allocate, nothing to link;
-        each level is a flat slab in one buffer. If you've used texture mipmaps, you
-        already know this object: it's a <strong>mipmap of mass</strong>.
+        Make the quadtree <em>complete</em>: split every cell to the same depth, whether
+        anything is in it or not. Then the whole structure is arithmetic. The children of
+        cell <code>(level, ix, iy)</code> are always
+        <code>(level+1, 2ix+dx, 2iy+dy)</code>, so there are no pointers to allocate or
+        follow, and each level is a flat block in one buffer. If you've worked with texture
+        mipmaps, you already know this structure. It's a <strong>mipmap of mass</strong>.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Mipmaps, 1983</span>
         <p>
           Lance Williams introduced mipmaps in 1983 to stop distant textures from
-          shimmering (the name is Latin, <em>multum in parvo</em> — "much in little"),
-          and they proved so useful that GPUs grew dedicated hardware for them. Reusing
-          a texture-filtering structure as a gravity solver is not a coincidence: both
-          problems summarize fine detail you are too far away to see.
+          shimmering. The name comes from the Latin <em>multum in parvo</em>, "much in
+          little," and they turned out to be useful enough that GPUs grew dedicated hardware
+          for them. A texture-filtering structure works as a gravity solver because the two
+          problems are the same: summarize detail you're too far away to see.
         </p>
       </aside>
       <p>
-        Slide through the pyramid below. Level 7 is a fine 128×128 grid over the live
-        disk; each level above merges 2×2 cells into one, up to a single cell holding
-        the whole galaxy. Every cell stores exactly what a Barnes–Hut node stores —
-        total mass and centre of mass (the pink dots) — and the walk from the last
-        demo runs on this structure <em>unchanged</em>.
+        Slide through the levels below. Level 7 is a 128×128 grid over the live disk, and
+        each level above it merges 2×2 cells into one, up to a single cell holding the whole
+        galaxy. Each cell stores what a Barnes–Hut node stores, total mass and centre of
+        mass (the pink dots), so the walk from the last demo runs on it unchanged.
       </p>
 
-      <div data-demo="pyramid-levels"></div>
+      <div
+        data-demo="pyramid-levels"
+        data-title="The mass pyramid"
+        data-hint="Slide through the levels"
+      ></div>
 
+      <p>Unlike the pointer tree, this one builds in parallel. It takes two passes.</p>
       <p>
-        The build, unlike the pointer tree, parallelizes completely. Two passes:
+        <strong>Scatter.</strong> Every body adds its mass into its cell at the finest level,
+        all at the same time. Thousands of threads hit the same cells, so the adds have to be
+        atomic:
       </p>
+      <pre><code><span class="cm">// one thread per body, in any order, nobody waits</span>
+atomicAdd(&amp;grid[cell],     u32(round(m * FP_SCALE)));                     <span class="cm">// Σ mass</span>
+atomicAdd(&amp;grid[cell + 1], bitcast&lt;u32&gt;(i32(round(m * dx * FP_SCALE)))); <span class="cm">// Σ m·dx</span>
+atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))); <span class="cm">// Σ m·dy</span></code></pre>
       <p>
-        <strong>Scatter.</strong> Every body, in parallel, adds its mass into its cell
-        at the finest level. Thousands of threads hit the same cell at once, so the
-        adds must be atomic:
-      </p>
-      <pre><code>// one thread per body — wait-free, order-independent
-atomicAdd(&amp;grid[cell],     u32(round(m * FP_SCALE)));          // Σ mass
-atomicAdd(&amp;grid[cell + 1], bitcast&lt;u32&gt;(i32(round(m * dx * FP_SCALE)))); // Σ m·dx
-atomicAdd(&amp;grid[cell + 2], bitcast&lt;u32&gt;(i32(round(m * dy * FP_SCALE)))); // Σ m·dy</code></pre>
-      <p>
-        <strong>Reduce.</strong> Build each coarser level from the one below: every
-        parent sums its four children. One thread per parent, no contention, log₂
-        passes. A 1024×1024 pyramid is built from scratch in ten dispatches taking
-        about a millisecond. The "deeply sequential" tree build became a scatter and a
-        mipmap chain.
+        <strong>Reduce.</strong> Build each coarser level from the one below it: every
+        parent adds up its four children. One thread per parent, no conflicts, one pass per
+        level. A 1024×1024 pyramid takes ten of these passes and about a millisecond in
+        total. The sequential tree build has turned into one scatter and a mipmap chain.
       </p>
       <details class="fold">
-        <summary>Deep dive: fixed-point atomics — three techniques in three lines</summary>
+        <summary>Fixed-point atomics: three tricks in three lines</summary>
         <div class="fold-body">
           <p>
-            WGSL has no atomic <em>float</em> add, so the scatter uses fixed-point
-            arithmetic: scale to integers on the way in, divide back out on the way
-            out, with the scale chosen so that even "all mass in one cell" can't
-            overflow 32 bits.
+            WGSL has no atomic add for floats, so the scatter works in fixed point. Multiply
+            by a scale factor and round to an integer on the way in, divide back out on the
+            way out. The scale is chosen so that even the worst case, all of the mass in
+            one cell, can't overflow 32 bits.
           </p>
           <p>
-            Second, the offsets are stored relative to each cell's centre. They
-            are bounded by half a cell width, so every fixed-point bit goes to
-            precision instead of range.
+            The offsets are stored relative to each cell's centre. They can never be more
+            than half a cell wide, so every bit of the fixed-point number goes to precision
+            instead of range.
           </p>
           <p>
-            Third, negative values pass through unsigned atomics via two's-complement
-            bit patterns — u32 wrap-around addition <em>is</em> signed addition. After
-            the reduce, each cell's centre of mass is recovered as
-            COM = Σm·dx / Σm.
+            Negative offsets go through unsigned atomics as two's-complement bit patterns.
+            Wrap-around u32 addition produces the same bits as signed addition, so this
+            works with no special handling. After the reduce, each cell's centre of mass
+            comes back out as Σm·dx / Σm.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · GPU-resident</span>The complete GPU pipeline</h2>
+      <h2 id="pipeline"><span class="kicker">Step 6 · GPU-resident</span>The whole pipeline on the GPU</h2>
       <p>
-        Assemble everything. Each simulation step is a fixed pipeline of ~15 GPU
-        dispatches, and <em>nothing</em> touches the CPU:
+        Put it together and each simulation step is a fixed list of GPU dispatches, fifteen
+        at full size, and none of them touch the CPU:
       </p>
-      <pre><code>bounds   → where is everything? (parallel min/max reduction)
-clear    → zero the grid's atomic accumulators
-scatter  → every body adds mass into its finest cell   (the atomics above)
-reduce   → build the pyramid, level by level            (log₂ passes)
-force    → every body walks the implicit tree           (Barnes-Hut, no pointers)
-           …and integrates its own position, in place</code></pre>
+      <pre><code>clear    → zero the grid's atomic accumulators
+bounds   → where is everything? (parallel min/max)
+scatter  → every body adds its mass to its finest cell   <span class="cm">(the atomics above)</span>
+resolve  → fixed point back to mass + centre of mass
+reduce   → build the pyramid, one level per pass         <span class="cm">(10 passes at 1024²)</span>
+force    → every body walks the implicit tree            <span class="cm">(Barnes–Hut, no pointers)</span>
+           …and moves itself, in place</code></pre>
       <p>
-        Two details matter. The <em>bounds</em> pass re-fits the grid to the
-        bodies every step, so the pyramid always wraps the world even when the galaxy
-        drifts or explodes. And the <em>force</em> pass writes each body back
-        <strong>in place</strong> — safe, because no kernel ever reads another body's
-        position directly; all cross-body information flows through the pyramid. One
-        buffer, with no duplicate particle-state buffer.
+        Two details are worth pointing out. The <em>bounds</em> pass refits the grid to the
+        bodies every step, so the pyramid always covers everything, even when the galaxy
+        drifts or flings bodies out. And the <em>force</em> pass writes each body back
+        <strong>in place</strong>. That's safe because no kernel ever reads another body's
+        position directly; everything a body knows about the others comes through the
+        pyramid. So there's one body buffer and no second copy to swap with.
       </p>
       <details class="fold">
-        <summary>Deep dive: atomically min/maxing floats</summary>
+        <summary>Atomic min and max on floats</summary>
         <div class="fold-body">
           <p>
-            The bounds pass needs an atomic min/max over floats, which WGSL also
-            doesn't have. The solution is to map each float to an unsigned integer whose
-            ordering matches the float's. For positive floats the IEEE-754 bit pattern
-            already sorts correctly; for negative floats you flip all the bits. After
-            the reduction, the same mapping run backwards recovers the float bounds.
-            Integer atomic min/max then does the rest.
+            The bounds pass needs atomic min and max on floats, which WGSL doesn't have
+            either. The fix is to map each float to an unsigned integer that sorts in the
+            same order. For a positive float, set the top bit. For a negative one, flip all
+            the bits. Integer atomic min and max then do the work, and running the mapping
+            backwards recovers the float bounds.
           </p>
         </div>
       </details>
       <p>
-        Here is the result. The same θ slider you used in the 3,000-body demo now
-        governs hundreds of thousands of bodies. Steps-per-frame multiplies simulation
-        speed independent of your display's refresh rate.
+        Here's the result. It starts at 100,000 bodies, and the θ slider is the same one
+        from the 3,000-body demo. Steps per frame runs more simulation between frames, which
+        speeds up time without asking more of your display.
       </p>
 
-      <div data-demo="pyramid-gpu"></div>
+      <div
+        data-demo="pyramid-gpu"
+        data-title="The whole thing, on the GPU"
+        data-hint="Push it to 300,000, try the halo"
+      ></div>
 
       <p>
-        On a recent laptop GPU this sustains three hundred thousand bodies at
-        interactive rates — tens of millions of body-steps per second — where the
-        nested loop from Step 2 would need <em>minutes per frame</em>. Same physics,
-        same softening, same θ you can verify against the smaller demos. The speedup
-        comes from several independent changes:
+        On my machine this runs 300,000 bodies at 60 frames a second with two steps per
+        frame, about 36 million body-steps a second. The nested loop from Step 2 would need
+        over a minute for <em>one</em> step at that size. The physics hasn't changed: same
+        formula, same softening, and a θ you can check against the smaller demos. Here's
+        where the speedup came from:
       </p>
-      <pre><code>two loops in JS          ~4,000 bodies        (Step 2)
-+ GPU, one thread/body   ~25× more            (Step 3)
-+ tiles in shared memory   …included above    (Step 3)
-+ Barnes-Hut θ-test      O(n²) → O(n log n)   (Step 4)
-+ pointer-free pyramid   tree build: ~1 ms    (Step 5)
-+ everything GPU-resident  zero round-trips   (Step 6)</code></pre>
+      <pre><code>two loops in JS             ~4,000 bodies          (Step 2)
++ GPU, one thread per body   dozens of times more   (Step 3)
++ tiles in shared memory     (part of that)         (Step 3)
++ Barnes–Hut θ test          O(n²) → O(n log n)     (Step 4)
++ pointer-free pyramid       tree build ~1 ms       (Step 5)
++ nothing leaves the GPU     no round trips         (Step 6)</code></pre>
+      <p>
+        This demo and the galaxy at the top have one thing the earlier ones don't: a
+        <em>dark matter halo</em>. It's a single fixed pull toward the centre, added to each
+        body's acceleration after the tree walk. Turn it off with the <em>dark halo</em>
+        button and the disk can't hold itself together. It breaks into clumps, the clumps
+        settle into a ring, and bodies get thrown clear. Turn it back on and the disk stays
+        put and grows spiral arms instead. Colour is still speed: the slow-turning core
+        shows up gold and the faster disk blue-white.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why galaxies need a halo</span>
+        <p>
+          A cold, flat disk held together only by its own gravity is unstable. Jeremiah
+          Ostriker and Jim Peebles showed this in 1973 with simulations of a few hundred
+          bodies: their disks kept turning into bars. Real spiral galaxies stay flat for
+          billions of years, so Ostriker and Peebles argued they must sit inside a much
+          heavier halo of matter nobody could see. It was one of the early arguments for
+          dark matter. The halo here is about the simplest version there is, a pull of
+          v²·r / (r² + core²), which gives the flat rotation curve astronomers measure in
+          real spirals.
+        </p>
+      </aside>
+      <details class="fold">
+        <summary>Starting a disk that doesn't fly apart</summary>
+        <div class="fold-body">
+          <p>
+            Every body starts on a circular orbit, so it needs the right speed for its
+            radius. The textbook shortcut is v² = G·M(&lt;r)/r, using only the mass inside
+            the orbit. That's correct for a sphere and wrong for a thin disk, where the
+            mass outside a body's radius pulls it outward too. Near the centre the shortcut
+            came out more than twice too fast, and the first version of this demo blew a
+            hole in its own core within a second.
+          </p>
+          <p>
+            So the seeding code measures the pull instead. It sums the softened force from a
+            sample of the bodies at 48 radii, adds the halo, and gives each body the speed
+            that balances the pull at its radius. A little random motion on top keeps it
+            from being perfectly smooth.
+          </p>
+        </div>
+      </details>
       <aside class="note">
         <span class="note-label">Aside · How the real universe gets simulated</span>
         <p>
-          The Millennium Run in 2005 followed ten billion particles of dark matter
-          from shortly after the Big Bang to today, using a tree code descended from
-          Barnes and Hut's, hybridized with a grid method much like our pyramid. Its
-          successors underpin most of what cosmologists believe about galaxy
-          formation. The codes are bigger and the supercomputers run for months, but
-          the moves are the ones on this page: soften the force, build a hierarchy,
-          summarize the far field, keep the data where the compute is.
+          The Millennium Run in 2005 followed ten billion particles of dark matter from
+          shortly after the Big Bang to today. Its code, GADGET-2, used a Barnes–Hut tree
+          for nearby forces and a grid method for distant ones (part five builds that grid).
+          The machines are bigger and the runs take months, but the ideas are the ones on
+          this page: soften the force, build a hierarchy, summarize what's far away, and
+          keep the data where the compute is.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What carries over</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <p>The gravity is specific to this page, but a few lessons run through the whole series:</p>
+      <ul>
+        <li>
+          <strong>Figure out which wall you're hitting.</strong> The GPU moved the O(n²)
+          wall. Only Barnes–Hut got rid of it.
+        </li>
+        <li>
+          <strong>Accuracy is a dial.</strong> θ gives up a few percent of accuracy for a
+          huge cut in work, and you get to choose where it sits.
+        </li>
+        <li>
+          <strong>Data layout decides what can run in parallel.</strong> The pointer
+          quadtree and the pyramid hold the same information. One can't be built in
+          parallel and the other is a scatter and a mipmap.
+        </li>
+        <li>
+          <strong>Watch the round trips.</strong> The CPU tree build didn't lose because
+          CPUs are slow. It lost because of the trip across the bus.
+        </li>
+      </ul>
       <p>
-        Strip away the gravity and four useful lessons remain:
+        Things I'd try next: sort the bodies along a space-filling curve (Morton order) so
+        neighbouring GPU threads walk the same parts of the tree; replace the uniform
+        pyramid with an adaptive tree built in parallel (an LBVH) for very clumpy scenes;
+        and add a third dimension. Part two does that last one.
       </p>
       <p>
-        <strong>1. Walls are algorithmic before they are mechanical.</strong> The GPU
-        moved the O(n²) wall; only Barnes–Hut removed it. Measure which kind of wall
-        you're hitting before you buy hardware at it.
+        The galaxy at the top of the page is still running. Scroll back up and you can name
+        everything it's doing.
       </p>
-      <p>
-        <strong>2. Approximation is a resource.</strong> θ trades a controlled amount
-        of accuracy for a substantial speed increase. Many systems have a similar
-        tolerance; the useful question is how much precision the result actually needs.
-      </p>
-      <p>
-        <strong>3. Data structures choose your hardware.</strong> The pointer quadtree
-        and the pyramid hold identical information. One is unbuildable in parallel;
-        the other is a scatter and a mipmap. When an algorithm maps poorly to
-        a GPU, changing the data layout can expose the necessary parallelism.
-      </p>
-      <p>
-        <strong>4. Residence beats speed.</strong> The CPU tree build wasn't slow
-        because CPUs are slow; it lost to a round-trip. Keeping a loop on one side of
-        the bus is often worth more than optimizing either side.
-      </p>
-      <p>
-        Possible next steps: sort bodies along a space-filling curve so
-        neighbouring GPU threads walk the same part of the tree (Morton order — worth
-        another 2–5× from memory coherence alone). Replace the uniform pyramid with a
-        parallel-built adaptive tree (LBVH) when clustering gets extreme. Add a third
-        dimension — quadtree to octree, four children to eight.
-      </p>
-      <p>
-        The galaxy at the top of the page is still spinning. Scroll back up and you
-        can name everything it's doing: the scatter, the pyramid reduction, the
-        pointer-free tree walk, the in-place integration — a hundred times a second,
-        on whatever GPU you happen to own.
-      </p>
-      <p>
-        <strong>Continued in <a href="/pages/particle-worlds/part2.html">Part two: Gravity on a Dome</a></strong> —
-        the simulation leaves the plane: quadtrees become octrees, the galaxy gains
-        depth, and the world itself gets bent into a hemispheric dome.
+      <p class="continue">
+        <strong>Next: <a href="/pages/particle-worlds/part2.html">Part two, Gravity on a Dome</a>.</strong>
+        The simulation goes 3D. Quadtrees become octrees, and the galaxy gets bent over a
+        hemispheric dome.
       </p>
     </main>
 
     <footer>
       <p>
-        <a href="/pages/particle-worlds/part2.html">Part two: Gravity on a Dome →</a> ·
-        <a href="/pages/particle-worlds/part3.html">Part three: Sorting Water →</a> ·
-        <a href="/pages/particle-worlds/part4.html">Part four: Worlds from Dust →</a>
-      </p>
-      <p>
-        Companion article to a WebGPU n-body lab. Standing on the shoulders of:
+        References:
         <a href="https://www.nature.com/articles/324446a0">Barnes &amp; Hut (1986)</a> ·
         <a href="https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-31-fast-n-body-simulation-cuda">GPU Gems 3, ch. 31</a> ·
+        <a href="https://ui.adsabs.harvard.edu/abs/1973ApJ...186..467O/abstract">Ostriker &amp; Peebles (1973)</a> ·
         <a href="https://github.com/PWhiddy/Nbody-Gravity">PWhiddy/Nbody-Gravity</a>
       </p>
     </footer>
