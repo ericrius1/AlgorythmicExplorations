@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/algorythmicexplorations", "destination": "/algorythmicexplorations/index.html" }
+  ],
+  "redirects": [
+    { "source": "/", "destination": "https://www.ericlevin.dev/algorythmicexplorations/", "permanent": false },
+    { "source": "/index.html", "destination": "https://www.ericlevin.dev/algorythmicexplorations/", "permanent": false },
+    { "source": "/pages/:path*", "destination": "https://www.ericlevin.dev/algorythmicexplorations/pages/:path*", "permanent": false }
+  ]
+}

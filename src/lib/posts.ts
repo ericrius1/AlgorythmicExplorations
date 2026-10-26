@@ -2,6 +2,14 @@
 // read-next cards are all generated from this one list.
 
 export const SITE_NAME = "Algorythmic Explorations";
+
+// The site is served from a subpath (www.ericlevin.dev/algorythmicexplorations/),
+// so post hrefs stay site-relative ("/pages/…") and links are built with siteUrl().
+export const BASE = import.meta.env.BASE_URL; // always ends in "/"
+
+export function siteUrl(path: string): string {
+  return BASE + path.replace(/^\//, "");
+}
 export const SITE_REPO = "https://github.com/ericrius1/AlgorythmicExplorations";
 
 export interface Post {
@@ -374,7 +382,9 @@ export const POSTS: Post[] = [
 ];
 
 export function currentPost(): { post: Post | null; index: number } {
-  const path = location.pathname.replace(/\/$/, "") || "/index.html";
+  let path = location.pathname;
+  if (path.startsWith(BASE)) path = "/" + path.slice(BASE.length);
+  path = path.replace(/\/$/, "") || "/index.html";
   const file = path.split("/").pop() || "index.html";
   const index = POSTS.findIndex((p) => p.href === path || p.href.endsWith(`/${file}`));
   return { post: index >= 0 ? POSTS[index] : null, index };

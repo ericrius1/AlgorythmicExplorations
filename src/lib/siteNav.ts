@@ -4,7 +4,8 @@
 //   · "read next" cards above the footer
 // All generated from posts.ts, so adding a post is a one-line change.
 
-import { POSTS, SITE_NAME, SITE_REPO, currentPost, type Post } from "./posts";
+import { POSTS, SITE_NAME, SITE_REPO, currentPost, siteUrl, type Post } from "./posts";
+import { initSeriesChrome } from "./seriesChrome";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -24,7 +25,7 @@ function buildMenu(current: Post | null): HTMLElement {
     menu.appendChild(el("div", "site-nav-series", name));
     for (const post of POSTS.filter((p) => p.series === name)) {
       const a = el("a", "site-nav-item" + (post === current ? " is-current" : ""));
-      a.href = post.href;
+      a.href = siteUrl(post.href);
       const head = el("span", "site-nav-item-title");
       head.appendChild(el("span", "site-nav-item-num", String(post.part)));
       head.appendChild(document.createTextNode(post.title));
@@ -40,9 +41,13 @@ function wireScrollHint(): void {
   const hero = document.querySelector("header.hero");
   const hint = document.querySelector<HTMLElement>(".hero-scroll-hint");
   if (!hero || !hint) return;
+  const title = hero.querySelector(".hero-title");
   const syncHint = () => {
     const pastHero = hero.getBoundingClientRect().bottom < 80;
-    hint.classList.toggle("is-hidden", window.scrollY > 120 || pastHero);
+    // Only needed while the title is still below the fold; once it's on
+    // screen the hint would just sit on top of it.
+    const titleShowing = title ? title.getBoundingClientRect().top < window.innerHeight - 110 : false;
+    hint.classList.toggle("is-hidden", window.scrollY > 120 || pastHero || titleShowing);
   };
   window.addEventListener("scroll", syncHint, { passive: true });
   window.addEventListener("resize", syncHint, { passive: true });
@@ -55,7 +60,7 @@ export function initNav(): void {
   // ---- top bar ---------------------------------------------------------------
   const nav = el("nav", "site-nav");
   const home = el("a", "site-nav-home", SITE_NAME);
-  home.href = "/index.html";
+  home.href = siteUrl("index.html");
   nav.appendChild(home);
 
   const right = el("div", "site-nav-right");
@@ -65,7 +70,7 @@ export function initNav(): void {
     const arrow = (p: Post | null, glyph: string, label: string): void => {
       const a = el("a", "site-nav-arrow" + (p ? "" : " is-off"), glyph);
       if (p) {
-        a.href = p.href;
+        a.href = siteUrl(p.href);
         a.title = `${label}: ${p.title}`;
       }
       right.appendChild(a);
@@ -76,7 +81,7 @@ export function initNav(): void {
   }
 
   const contact = el("a", "site-nav-github", "Contact");
-  contact.href = "/pages/core/contact.html";
+  contact.href = siteUrl("pages/core/contact.html");
   contact.title = "Get in touch";
   right.appendChild(contact);
 
@@ -109,6 +114,9 @@ export function initNav(): void {
   // ---- hero scroll hint (markup lives in each page's <header.hero>) ----------
   wireScrollHint();
 
+  // ---- figure heads, progress line, step rail (opt-in per series) ----------
+  initSeriesChrome();
+
   // ---- read-next cards -------------------------------------------------------
   const footer = document.querySelector("footer");
   if (!footer || !post) return;
@@ -125,7 +133,7 @@ export function initNav(): void {
 
   for (const { label, post: p } of picks.slice(0, 3)) {
     const a = el("a", "read-next-card");
-    a.href = p.href;
+    a.href = siteUrl(p.href);
     a.appendChild(el("span", "read-next-label", label));
     a.appendChild(el("strong", "", `${p.part}. ${p.title}`));
     a.appendChild(el("span", "read-next-sub", p.subtitle));

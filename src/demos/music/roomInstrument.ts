@@ -1,4 +1,5 @@
 import { Shell, type Demo } from "../../lib/demoShell";
+import { siteUrl } from "../../lib/posts";
 import {
   Tone,
   StepClock,
@@ -342,7 +343,7 @@ function unpackState(raw: string | null): RoomState {
 }
 
 function shareUrl(state: RoomState): string {
-  const url = new URL("/pages/acoustic-spaces/room-instrument.html", location.href);
+  const url = new URL(siteUrl("pages/acoustic-spaces/room-instrument.html"), location.href);
   url.searchParams.set("room", compactState(state));
   return url.href;
 }

@@ -5,7 +5,7 @@
 import { initNav } from "../../lib/siteNav";
 import { mountLazy } from "../../lib/demoShell";
 import { mountPyramidGpu } from "../../demos/particle/pyramidGpu";
-import { POSTS, SERIES_TAGLINES, type Post } from "../../lib/posts";
+import { POSTS, SERIES_TAGLINES, siteUrl, type Post } from "../../lib/posts";
 
 initNav();
 
@@ -36,7 +36,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 function card(post: Post): HTMLAnchorElement {
   const a = el("a", "home-card");
-  a.href = post.href;
+  a.href = siteUrl(post.href);
   a.appendChild(el("span", "home-card-num", String(post.part)));
   const body = el("span", "home-card-body");
   body.appendChild(el("strong", "", post.title));

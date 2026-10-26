@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,10 +26,41 @@ const htmlInputs: Record<string, string> = {
   ...collectHtml(join(root, "pages"), "pages"),
 };
 
-export default defineConfig({
-  server: process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : {},
-  build: {
-    target: "esnext",
-    rollupOptions: { input: htmlInputs },
-  },
+// Production lives at www.ericlevin.dev/algorythmicexplorations/ (the portfolio
+// proxies that path to this project). Dev stays at the root. SITE_BASE=/
+// builds a root-hosted copy instead.
+const SUBPATH = "/algorythmicexplorations/";
+
+// The pages link to each other as /pages/…, /index.html, /favicon.png. Vite
+// rewrites the assets it bundles but not plain links, so prefix those here.
+function prefixRootLinks(base: string): Plugin {
+  return {
+    name: "prefix-root-links",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler(html) {
+        if (base === "/") return html;
+        return html.replace(/(href|src)="\/(?!\/)([^"]*)"/g, (m, attr: string, rest: string) =>
+          rest.startsWith(base.slice(1)) ? m : `${attr}="${base}${rest}"`,
+        );
+      },
+    },
+  };
+}
+
+export default defineConfig(({ command }) => {
+  const base = command === "build" ? (process.env.SITE_BASE ?? SUBPATH) : "/";
+  return {
+    base,
+    plugins: [prefixRootLinks(base)],
+    server: process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : {},
+    build: {
+      target: "esnext",
+      // dist/ mirrors the URL space, so the files sit under dist/algorythmicexplorations/
+      outDir: join("dist", base),
+      emptyOutDir: true,
+      rollupOptions: { input: htmlInputs },
+    },
+  };
 });
