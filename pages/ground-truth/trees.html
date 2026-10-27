@@ -135,23 +135,19 @@ radius(branch)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 is Leona
       <!-- ================================================================ -->
       <h2><span class="kicker">Step 3 · The perch list</span>Publishing perches</h2>
       <p>
-        Those cyan markers are the reason trees joined this series early.
-        Next door in <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a>, an eagle
-        is being built from lofted rings, bones, and feathers, and will eventually fly over
-        this terrain and <em>land in these trees</em>. The landing controller
-        needs to know which branches are graspable (radius within the
-        toes' range), level enough (a bird lands on a rail, not a
-        flagpole), and open from above (her approach path needs headroom).
+        Those cyan markers are perches: branches a bird could land on. A
+        landing controller would need to know which branches are graspable
+        (radius within a bird's grip), level enough (a bird lands on a rail,
+        not a flagpole), and open from above (the approach needs headroom).
         So every tree publishes a list of qualifying perches, computed
         from the skeleton, not the mesh:
       </p>
       <pre><code>perch = { position, tangent, radius, headroom }   <span class="cm">// what a landing controller asks for</span></code></pre>
       <p>
         The skeleton retains information absent from the triangles: parent
-        relationships, thickness, and clearance above each branch. As with
-        the bear's qi gong and the eagle's bones, keeping the structured representation after the
-        mesh is built, because every later system would rather query
-        structure than geometry.
+        relationships, thickness, and clearance above each branch. I keep the
+        structured representation after the mesh is built, because every
+        later system would rather query structure than geometry.
       </p>
       <details class="fold">
         <summary>Deep dive: the cost of growing a forest</summary>
@@ -198,8 +194,6 @@ radius(branch)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 is Leona
     <footer>
       <p>
         Ground Truth, part four ·
-        written in parallel with <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a>
-        (the perches are for her) ·
         rooted in <a href="/pages/ground-truth/erosion.html">part two's</a> valleys
       </p>
       <p>

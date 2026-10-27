@@ -1,15 +1,16 @@
 import { wirePage } from "../../core/wirePage";
-import { mountNeuronHero } from "../../demos/neuron/neuronHero";
-import { mountMembranePotential, mountSpike } from "../../demos/neuron/membranePotential";
-import { mountActionPotential } from "../../demos/neuron/actionPotential";
-import { mountSynapse } from "../../demos/neuron/synapseDemo";
-import { mountNeuronNetwork } from "../../demos/neuron/neuronNetwork";
+import { mountLivingNeuron } from "../../demos/neuron/livingNeuron";
+import { mountIonPatch } from "../../demos/neuron/ionPatch";
+import { mountAxonRace } from "../../demos/neuron/axonRace";
+import { mountSynapse3D } from "../../demos/neuron/synapse3d";
+import { mountNetwork } from "../../demos/neuron/network";
 
 wirePage({
-  hero: mountNeuronHero,
-  membrane: mountMembranePotential,
-  spike: mountSpike,
-  "action-potential": mountActionPotential,
-  synapse: mountSynapse,
-  network: mountNeuronNetwork,
+  hero: (el) => mountLivingNeuron(el, { hero: true }),
+  anatomy: (el) => mountLivingNeuron(el, { labels: true }),
+  "ions-rest": (el) => mountIonPatch(el, { mode: "rest" }),
+  "ions-spike": (el) => mountIonPatch(el, { mode: "spike" }),
+  "axon-race": mountAxonRace,
+  synapse3d: mountSynapse3D,
+  cortex: mountNetwork,
 });
