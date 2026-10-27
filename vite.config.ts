@@ -41,9 +41,10 @@ function prefixRootLinks(base: string): Plugin {
       order: "post",
       handler(html) {
         if (base === "/") return html;
-        return html.replace(/(href|src)="\/(?!\/)([^"]*)"/g, (m, attr: string, rest: string) =>
-          rest.startsWith(base.slice(1)) ? m : `${attr}="${base}${rest}"`,
-        );
+        const prefix = (rest: string): string => (rest.startsWith(base.slice(1)) ? rest : base.slice(1) + rest);
+        return html
+          .replace(/(href|src)="\/(?!\/)([^"]*)"/g, (_m, attr: string, rest: string) => `${attr}="/${prefix(rest)}"`)
+          .replace(/(content="\d+;\s*url=)\/(?!\/)([^"]*)"/gi, (_m, head: string, rest: string) => `${head}/${prefix(rest)}"`);
       },
     },
   };

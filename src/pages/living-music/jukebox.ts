@@ -1,12 +1,14 @@
+import "../../styles/music-harmony.css";
 import { initNav } from "../../lib/siteNav";
-import { mountLazy } from "../../lib/demoShell";
+import { mountLazy, type Demo } from "../../lib/demoShell";
+import { mountJukeboxGen } from "../../demos/music/jukeboxGen";
 import { mountEuclid } from "../../demos/music/euclid";
 import { mountMelodyWalk } from "../../demos/music/melodyWalk";
-import { mountJukeboxGen } from "../../demos/music/jukeboxGen";
 
 initNav();
 
-const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
+const mounts: Record<string, (el: HTMLElement) => Demo | Promise<Demo>> = {
+  hero: (el) => mountJukeboxGen(el, { mode: "hero" }),
   euclid: (el) => mountEuclid(el),
   walk: (el) => mountMelodyWalk(el),
   jukebox: (el) => mountJukeboxGen(el),

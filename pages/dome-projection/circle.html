@@ -10,137 +10,207 @@
     <title>The Circle Under the Dome — Dome Projection</title>
     <meta
       name="description"
-      content="Part one of a dome projection series: polar coordinates, radians, seams, and texture lookup math before any projector enters the room."
+      content="Part one of a series on dome projection: polar coordinates, atan2, the seam where a circle meets a texture, and why a renderer works backwards from each output pixel."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="essay dome-projection">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Dome Projection · Part 1</p>
+        <h1>The Circle Under the Dome</h1>
+        <p class="subtitle">
+          Seen from below, a dome is a circle, and every point in it has an angle and a
+          distance from the centre. Polar coordinates, seams, and working backwards.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
     <main>
-      <h1>The Circle Under the Dome</h1>
       <p>
-        This series is a path from a circle on paper to a full dome show:
-        seamless visuals, calibrated projectors, warp meshes, and edge blends.
-        The first step is deliberately small. Before a dome is a room, a lens, or
-        a projector-layout problem, it is a circular coordinate problem.
+        This series goes from a circle on paper to a working dome show: the image formats
+        domes use, how several projectors share one dome without visible seams, and how to
+        render a live scene for one. The first step is small. Before a dome is a room or a
+        projector layout, it's a coordinate problem.
       </p>
       <p>
-        A rectangular screen asks for <code>x</code> and <code>y</code>. A dome asks
-        for a <em>direction</em>. The easiest way to build intuition for that is
-        the unit circle: every point can be named either by Cartesian coordinates
-        or by a radius and an angle. Projection math is mostly the art of moving
-        between those names without losing track of the seam.
+        The planetarium at the top of the page is ray traced on your GPU, one pixel at a
+        time. The sky turns slowly, and the grid on it is polar: rings every 15 degrees out
+        from the top of the dome, spokes every 30 degrees around it. The orange spoke sweeps
+        round once every 30 seconds, the green arc is the angle it has covered so far, and
+        the blue point slides in and out along it.
+      </p>
+      <p>
+        A flat screen asks for an <em>x</em> and a <em>y</em>. A dome asks for a direction.
+        Seen from straight below, a dome is a circle, and every point in a circle has two
+        names: <em>x</em> and <em>y</em>, or a distance from the centre and an angle around
+        it. Most of the maths in this series is moving between those names without losing
+        track of where the circle gets cut.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Two names for one point</span>Cartesian and polar coordinates</h2>
+      <h2 id="polar"><span class="kicker">Step 1 · Two names</span>Cartesian and polar</h2>
       <p>
-        The left diagram shows a point in the <code>x/y</code> plane, with its
-        polar name drawn on top: radius <code>r</code> and angle
-        <code>&theta;</code>. The right diagram unwraps that same
-        <code>r</code> and <code>&theta;</code> into a texture lookup. Drag either
-        blue point directly: both diagrams are the same state in two coordinate
+        The left half of the figure is the unit circle with one point in it, labelled with
+        its polar name: its radius <em>r</em> and its angle <em>θ</em>. The right half is a
+        tiny texture, twelve texels around by five out. Its horizontal axis is the angle and
+        its vertical axis is the radius, so it's the circle cut along one spoke and unrolled
+        into a rectangle. Drag either point. They're the same state in two coordinate
         systems.
-        A fisheye dome image uses this same idea: angle around the circle becomes
-        horizontal texture position, and distance from center becomes distance
-        from the zenith.
       </p>
 
-      <div data-demo="polar-circle"></div>
+      <div
+        data-demo="polar-circle"
+        data-title="One point, two names"
+        data-hint="Drag either point"
+      ></div>
 
-      <pre><code>// polar -> cartesian
-x = r * cos(theta)
-y = r * sin(theta)
-
-// cartesian -> polar
-r     = sqrt(x*x + y*y)
-theta = atan2(y, x)</code></pre>
       <p>
-        Use <code>atan2(y, x)</code> when recovering an angle from a vector. A
-        plain arctangent can tell you a slope, but it cannot tell which quadrant
-        the point lives in. Dome mapping needs the full direction around the
-        circle, including the sign of both coordinates.
+        The circle is filled from the texture. For each pixel inside it, the figure works
+        out that pixel's <em>r</em> and <em>θ</em>, turns them into a texture coordinate, and
+        reads the colour there. A fulldome image works the same way, one dimension up.
       </p>
+      <pre><code><span class="cm">// polar → cartesian</span>
+x = r * cos(θ)
+y = r * sin(θ)
 
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The seam is real</span>Radians, wraparound, and normalized UVs</h2>
+<span class="cm">// cartesian → polar</span>
+r = sqrt(x*x + y*y)
+θ = atan2(y, x)</code></pre>
       <p>
-        Angles repeat. <code>0</code>, <code>2&pi;</code>, and
-        <code>4&pi;</code> all point to the same direction. A texture, however,
-        has a left edge and a right edge, so the circle must be cut somewhere.
-        That cut is the seam. Good dome content does not pretend the seam
-        vanished; it places it where the audience will not notice, uses wrapping
-        texture sampling, and avoids bright hard features crossing it.
-      </p>
-      <pre><code>u = fract(theta / (2*pi))   // horizontal position around the circle
-v = clamp(r, 0, 1)          // radial distance from center to edge</code></pre>
-      <p>
-        The word <code>fract</code> means "keep only the fractional part." It is
-        what turns an angle that can grow forever into a repeating
-        <code>0..1</code> texture coordinate. If the seam glitches, the first
-        question is usually: did one side sample <code>u = 0.001</code> while the
-        other side sampled <code>u = 0.999</code> as if they were far apart?
+        Use <code>atan2(y, x)</code>, not <code>atan(y / x)</code>, to get the angle back.
+        A plain arctangent only sees the slope, so it can't tell (1, 1) from (−1, −1), and
+        it divides by zero anywhere on the vertical axis. <code>atan2</code> looks at both
+        signs and returns the full angle, from −π to π. Add 2π to the negative ones if you
+        want 0 to 2π, which is what the figure does.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Why radians matter</span>
+        <span class="note-label">Aside · Where radians come from</span>
         <p>
-          Radians are not a different unit for the same old angle. They measure
-          angle as arc length divided by radius. That makes derivatives, rotations,
-          waves, and trig functions line up without conversion constants. Dome work
-          is full of arcs, so radians keep the code honest.
+          A radian is the angle whose arc is as long as the radius, so a full turn is 2π.
+          Measured that way, an arc's length is just <em>r</em>·<em>θ</em>, and the
+          derivative of sin is cos with no 180/π factor hanging off it. Roger Cotes was
+          working with the idea by 1714, but the name came much later: "radian" first
+          appeared in print in 1873, in exam questions James Thomson set at Queen's College,
+          Belfast.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Sampling is the job</span>From math to pixels</h2>
+      <h2 id="seam"><span class="kicker">Step 2 · The seam</span>Angles wrap, textures don't</h2>
       <p>
-        A projection mapper does not usually push content forward and hope it
-        lands on the dome. It works backward. For each output pixel, it asks:
-        "What direction on the dome does this pixel hit?" Then it converts that
-        direction to a coordinate in the master image and samples there.
+        Angles repeat: 0, 2π and 4π all point the same way. A texture doesn't repeat. It has
+        a left edge and a right edge, so the circle has to be cut somewhere, and the cut is
+        the seam. In the figure it's the orange spoke at <em>θ</em> = 0, which is both edges
+        of the texture at once. Press <em>go to the seam</em> and nudge the angle back and
+        forth across it: the point in the circle barely moves, and the point in the texture
+        jumps from one side to the other.
+      </p>
+      <pre><code>u = fract(θ / 2π)    <span class="cm">// around the circle, 0..1</span>
+v = clamp(r, 0, 1)   <span class="cm">// centre to edge, 0..1</span></code></pre>
+      <p>
+        <code>fract</code> keeps only the fractional part, which turns an angle that can grow
+        without limit into a coordinate that repeats from 0 to 1.
+      </p>
+      <p>
+        A seam in the coordinates doesn't have to be a seam in the picture. The texture in
+        the figure goes once round a colour wheel, so its last column blends back into its
+        first, and the figure's sampler wraps when it filters, so the circle has no visible
+        join. Two things commonly break that. One is a sampler set to clamp instead of
+        repeat, which stops the filter from blending across the edge. The other is subtler,
+        and it's the classic polar shader bug. A GPU chooses which mipmap level to read from
+        how fast the texture coordinate changes between neighbouring pixels. Right at the
+        seam, one pixel computes <em>u</em> = 0.999 and the pixel next to it
+        <em>u</em> = 0.001, so the GPU decides the whole texture fits between two pixels,
+        reads the smallest mip level, and draws a one-pixel line of averaged colour along
+        the seam. The fix is to hand the sampler gradients that wrap too
+        (<code>textureSampleGrad</code> in WGSL, with derivatives taken from an angle that
+        doesn't jump), or to choose the level yourself.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Put the seam where nobody looks</span>
+        <p>
+          A dome's coordinates always have a seam somewhere. When content is built from a
+          panorama, which wraps around the same way as this texture, it makes sense to turn
+          the seam toward the back of the room, behind most of the audience, and to keep
+          bright hard edges away from it. If anything does show there, few people are
+          facing it.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="backwards"><span class="kicker">Step 3 · Backwards</span>Sampling is the job</h2>
+      <p>
+        A projection mapper doesn't push content forward and hope it lands in the right
+        place. It works backwards. For each output pixel it asks which direction that pixel
+        shows, turns the direction into a position in the source image, and reads the colour
+        there:
       </p>
       <pre><code>for each output pixel:
-  direction = pixel_to_dome_direction(pixel)
-  uv        = direction_to_master_uv(direction)
-  color     = sample(master, uv)</code></pre>
+  direction = pixel_to_direction(pixel)
+  uv        = direction_to_source_uv(direction)
+  color     = sample(source, uv)</code></pre>
       <p>
-        That inverse-mapping habit prevents cracks. Every output pixel receives
-        exactly one answer. No holes appear because a source pixel failed to land
-        somewhere, and no overlaps fight unless you intentionally create them for
-        edge blending.
+        That's how the circle in the figure is filled, and how every image in this series is
+        made, the hero included. Going backwards means every output pixel gets exactly one
+        answer. Push source pixels forward instead and some output pixels get none, which
+        shows up as holes, and others get several, which shows up as sparkle where they
+        fight.
       </p>
       <details class="fold">
-        <summary>Deep dive: the center is singular</summary>
+        <summary>The centre is a singular point</summary>
         <div class="fold-body">
           <p>
-            At <code>r = 0</code>, every angle names the same center point. That is
-            not a bug; it is the geometry. In a shader, the center of a polar map is
-            a singularity, so do not let code depend on a meaningful
-            <code>theta</code> there. Choose any angle, or branch around the center
-            if the effect has a visible spoke.
+            At <em>r</em> = 0 every angle names the same point. That isn't a bug, it's the
+            geometry, but code that depends on <em>θ</em> there misbehaves. Nothing crashes
+            (in JavaScript, <code>Math.atan2(0, 0)</code> quietly returns 0). What goes
+            wrong is anything that varies with the angle, like a pattern of spokes, which
+            pinches into a visible point at the centre. Fade those effects out near
+            <em>r</em> = 0, or pick a fixed angle there. On a dome the same point is the
+            zenith, straight overhead, which is where the audience looks most.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What you need before the dome</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <ul>
+        <li>
+          <strong>A point has two names.</strong> <code>atan2</code> gets you from one to
+          the other with the quadrant intact.
+        </li>
+        <li>
+          <strong>Angles wrap and textures don't.</strong> Decide where the seam goes, and
+          make sure both the filter and the mip selection wrap across it.
+        </li>
+        <li>
+          <strong>Work backwards from the output.</strong> One lookup per output pixel, and
+          no holes.
+        </li>
+      </ul>
       <p>
-        Master this page and you have the vocabulary for the rest of the series:
-        vectors, angles, radii, normalized texture coordinates, wraparound, and
-        seams. Part two lifts the circle into a hemisphere and turns each dome
-        direction into a fisheye pixel.
+        Things I'd try next: put the mipmap seam in the figure itself, rendered on the GPU
+        with a switch for the gradient fix, so the one-pixel line is there to see instead
+        of described.
       </p>
-      <p>
-        <strong>Continued in <a href="/pages/dome-projection/fisheye.html">Part two: The Fisheye Map</a></strong> —
-        dome directions, fisheye projection families, and the inverse map every
-        projector needs.
+      <p class="continue">
+        <strong>Next: <a href="/pages/dome-projection/fisheye.html">Part 2, The Fisheye Map</a>.</strong>
+        One dimension up: each point of a dome master is a direction, and lenses disagree
+        about how far from the centre to put it.
       </p>
     </main>
 
     <footer>
       <p>
-        Part one of the Dome Projection series ·
-        <a href="/pages/dome-projection/fisheye.html">Part two</a> ·
-        <a href="/pages/dome-projection/show.html">Part three</a>
+        References:
+        <a href="https://paulbourke.net/dome/">Paul Bourke's dome projection notes</a> ·
+        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/atan2">Math.atan2 (MDN)</a> ·
+        <a href="https://www.w3.org/TR/WGSL/#texturesamplegrad">WGSL textureSampleGrad</a>
       </p>
     </footer>
 

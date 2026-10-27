@@ -5,7 +5,8 @@
 // tile it — so it lives here, alone, with no idea what a vertex is.
 
 import * as THREE from "three/webgpu";
-import { fbm2, hash2 } from "./noise";
+import { fbm2 } from "./noise";
+import { bakeLight, type HeightSampler } from "./light";
 
 export interface TerrainParams {
   seed: number;
@@ -44,7 +45,7 @@ export function terrainHeight(x: number, z: number, p: TerrainParams): number {
 
 // ---- the palette: altitude and slope vote on every vertex --------------------------
 
-const C_GRASS = new THREE.Color().setHex(0x55703b, THREE.SRGBColorSpace);
+const C_GRASS = new THREE.Color().setHex(0x4f6a32, THREE.SRGBColorSpace);
 const C_SCREE = new THREE.Color().setHex(0x7d7166, THREE.SRGBColorSpace);
 const C_ROCK = new THREE.Color().setHex(0x665f58, THREE.SRGBColorSpace);
 const C_SNOW = new THREE.Color().setHex(0xe9eef4, THREE.SRGBColorSpace);
@@ -56,9 +57,9 @@ const smooth = (a: number, b: number, t: number): number => {
 
 // h01 = height as a fraction of amplitude, slope = 1 − normal.y.
 export function heightColor(h01: number, slope: number, out: THREE.Color): THREE.Color {
-  out.copy(C_GRASS).lerp(C_SCREE, smooth(0.3, 0.62, h01));
-  out.lerp(C_ROCK, smooth(0.22, 0.5, slope)); // steep ground sheds its soil
-  const snow = smooth(0.55, 0.7, h01) * (1 - smooth(0.3, 0.55, slope)); // snow refuses steeps
+  out.copy(C_GRASS).lerp(C_SCREE, smooth(0.4, 0.7, h01));
+  out.lerp(C_ROCK, smooth(0.25, 0.5, slope)); // steep ground sheds its soil
+  const snow = smooth(0.6, 0.72, h01) * (1 - smooth(0.3, 0.55, slope)); // snow refuses steeps
   return out.lerp(C_SNOW, snow);
 }
 
@@ -69,12 +70,24 @@ export interface TerrainBuild {
   vertexCount: number;
   triangleCount: number;
   buildMs: number;
+  // the (n+1)² heights, row-major from (centerX − size/2, centerZ − size/2)
+  heights: Float32Array;
 }
 
-export function buildTerrainGeometry(
-  p: TerrainParams,
-  opts: { size?: number; segments?: number; centerX?: number; centerZ?: number; skirt?: number } = {},
-): TerrainBuild {
+export interface TerrainBuildOptions {
+  size?: number;
+  segments?: number;
+  centerX?: number;
+  centerZ?: number;
+  skirt?: number; // depth of the crack-hiding curtain around the border
+  skirtTint?: [number, number, number, number]; // paint the skirt (a block-diagram side)
+  hole?: number; // leave out quads inside this half-width (a far ring around a near patch)
+  light?: { sun: { x: number; y: number; z: number }; reach?: number; outside?: HeightSampler };
+  // paint per vertex: (x, z, height, slope as rise/run) → linear rgb + weight
+  tint?: (x: number, z: number, h: number, slope: number) => [number, number, number, number];
+}
+
+export function buildTerrainGeometry(p: TerrainParams, opts: TerrainBuildOptions = {}): TerrainBuild {
   const t0 = performance.now();
   const size = opts.size ?? 14;
   const n = opts.segments ?? 192;
@@ -88,30 +101,30 @@ export function buildTerrainGeometry(
   // keeps border normals two-sided (chunked worlds shade seamlessly)
   const W = n + 1;
   const MW = W + 2;
-  const heights = new Float32Array(MW * MW);
+  const margin = new Float32Array(MW * MW);
   let s = 0;
   for (let j = -1; j <= n + 1; j++) {
     const z = cz - half + j * step;
     for (let i = -1; i <= n + 1; i++) {
-      heights[s++] = terrainHeight(cx - half + i * step, z, p);
+      margin[s++] = terrainHeight(cx - half + i * step, z, p);
     }
   }
-  const H = (i: number, j: number): number => heights[i + 1 + MW * (j + 1)];
+  const H = (i: number, j: number): number => margin[i + 1 + MW * (j + 1)];
+
+  const heights = new Float32Array(W * W);
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) heights[i + W * j] = H(i, j);
 
   const positions = new Float32Array(W * W * 3);
   const normals = new Float32Array(W * W * 3);
-  const colors = new Float32Array(W * W * 3);
-  const c = new THREE.Color();
+  const lightAttr = new Float32Array(W * W * 2).fill(1);
+  const tint = new Float32Array(W * W * 4);
 
   for (let j = 0; j < W; j++) {
     for (let i = 0; i < W; i++) {
       const v = i + W * j;
-      const x = cx - half + i * step;
-      const z = cz - half + j * step;
-      const h = H(i, j);
-      positions[v * 3] = x;
-      positions[v * 3 + 1] = h;
-      positions[v * 3 + 2] = z;
+      positions[v * 3] = cx - half + i * step;
+      positions[v * 3 + 1] = H(i, j);
+      positions[v * 3 + 2] = cz - half + j * step;
 
       // central differences on the height grid: the normal is (−dh/dx, 1, −dh/dz)
       const dhdx = (H(i + 1, j) - H(i - 1, j)) / (2 * step);
@@ -120,59 +133,93 @@ export function buildTerrainGeometry(
       normals[v * 3] = -dhdx * inv;
       normals[v * 3 + 1] = inv;
       normals[v * 3 + 2] = -dhdz * inv;
-
-      const mottle = 0.92 + 0.16 * hash2(i * 7 + 13, j * 7 + 5, p.seed);
-      heightColor(h / p.amplitude, 1 - inv, c).multiplyScalar(mottle);
-      colors[v * 3] = c.r;
-      colors[v * 3 + 1] = c.g;
-      colors[v * 3 + 2] = c.b;
+      if (opts.tint) tint.set(opts.tint(positions[v * 3], positions[v * 3 + 2], H(i, j), Math.hypot(dhdx, dhdz)), v * 4);
     }
   }
 
-  const indices = new Uint32Array(n * n * 6 + (opts.skirt ? 4 * n * 12 : 0));
-  let q = 0;
+  if (opts.light) {
+    const baked = bakeLight(heights, W, W, cx - half, cz - half, step, opts.light.sun, {
+      reach: opts.light.reach,
+      outside: opts.light.outside,
+    });
+    lightAttr.set(baked);
+  }
+
+  const hole = opts.hole ?? 0;
+  const inHole = (x: number, z: number): boolean => Math.abs(x - cx) < hole - 1e-4 && Math.abs(z - cz) < hole - 1e-4;
+  const quads: number[] = [];
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const a = i + W * j;
-      const b = a + 1;
-      const d = a + W;
-      const e = d + 1;
-      indices[q++] = a; indices[q++] = d; indices[q++] = b;
-      indices[q++] = b; indices[q++] = d; indices[q++] = e;
+      if (hole > 0) {
+        const xm = cx - half + (i + 0.5) * step, zm = cz - half + (j + 0.5) * step;
+        if (inHole(xm, zm)) continue;
+      }
+      quads.push(i + W * j);
     }
   }
 
   // the skirt: each border vertex gets a twin pushed straight down, and the
   // wall between them hides the cracks where a coarser neighbor chunk meets
-  // this one (both windings, so the wall shows from every side)
-  let posOut = positions, normOut = normals, colOut = colors;
-  let vertCount = W * W;
+  // this one (both windings, so the wall shows from every side). A ring with
+  // a hole gets one around the hole's rim as well.
+  const lines: number[][] = [];
   if (opts.skirt) {
-    const edge: number[] = [];
-    for (let i = 0; i < W; i++) edge.push(i); // top
-    for (let i = 0; i < W; i++) edge.push(i + W * n); // bottom
-    for (let j = 0; j < W; j++) edge.push(W * j); // left
-    for (let j = 0; j < W; j++) edge.push(n + W * j); // right
+    const side = (f: (k: number) => number, from: number, to: number): number[] => {
+      const out: number[] = [];
+      for (let k = from; k <= to; k++) out.push(f(k));
+      return out;
+    };
+    lines.push(side((i) => i, 0, n), side((i) => i + W * n, 0, n), side((j) => W * j, 0, n), side((j) => n + W * j, 0, n));
+    if (hole > 0) {
+      const h0 = Math.round((half - hole) / step), h1 = Math.round((half + hole) / step);
+      lines.push(
+        side((i) => i + W * h0, h0, h1),
+        side((i) => i + W * h1, h0, h1),
+        side((j) => h0 + W * j, h0, h1),
+        side((j) => h1 + W * j, h0, h1),
+      );
+    }
+  }
+  const SW = lines.reduce((m, l) => m + l.length, 0);
+  const wallQuads = lines.reduce((m, l) => m + l.length - 1, 0);
 
-    const SW = edge.length;
+  const indices = new Uint32Array(quads.length * 6 + wallQuads * 12);
+  let q = 0;
+  for (const a of quads) {
+    const b = a + 1;
+    const d = a + W;
+    const e = d + 1;
+    indices[q++] = a; indices[q++] = d; indices[q++] = b;
+    indices[q++] = b; indices[q++] = d; indices[q++] = e;
+  }
+
+  let posOut = positions, normOut = normals, lightOut = lightAttr, tintOut = tint;
+  let vertCount = W * W;
+  if (opts.skirt && SW > 0) {
     posOut = new Float32Array((W * W + SW) * 3);
     normOut = new Float32Array((W * W + SW) * 3);
-    colOut = new Float32Array((W * W + SW) * 3);
-    posOut.set(positions); normOut.set(normals); colOut.set(colors);
-    for (let k = 0; k < SW; k++) {
-      const src = edge[k] * 3, dst = (W * W + k) * 3;
-      posOut[dst] = positions[src];
-      posOut[dst + 1] = positions[src + 1] - opts.skirt;
-      posOut[dst + 2] = positions[src + 2];
-      normOut[dst] = normals[src]; normOut[dst + 1] = normals[src + 1]; normOut[dst + 2] = normals[src + 2];
-      colOut[dst] = colors[src] * 0.85; colOut[dst + 1] = colors[src + 1] * 0.85; colOut[dst + 2] = colors[src + 2] * 0.85;
-    }
-    for (let e2 = 0; e2 < 4; e2++) {
-      for (let i = 0; i < n; i++) {
-        const a = edge[e2 * W + i];
-        const b = edge[e2 * W + i + 1];
-        const sa = W * W + e2 * W + i;
-        const sb = sa + 1;
+    lightOut = new Float32Array((W * W + SW) * 2);
+    tintOut = new Float32Array((W * W + SW) * 4);
+    posOut.set(positions); normOut.set(normals); lightOut.set(lightAttr); tintOut.set(tint);
+    let dst = W * W;
+    for (const line of lines) {
+      const first = dst;
+      for (const src of line) {
+        posOut[dst * 3] = positions[src * 3];
+        posOut[dst * 3 + 1] = positions[src * 3 + 1] - opts.skirt;
+        posOut[dst * 3 + 2] = positions[src * 3 + 2];
+        for (let c = 0; c < 3; c++) normOut[dst * 3 + c] = normals[src * 3 + c];
+        lightOut[dst * 2] = lightAttr[src * 2] * 0.8;
+        lightOut[dst * 2 + 1] = lightAttr[src * 2 + 1] * 0.8;
+        if (opts.skirtTint) {
+          tintOut.set(opts.skirtTint, dst * 4);
+          tintOut.set(opts.skirtTint, src * 4); // the rim of the top, too, so the edge reads as a cut
+        }
+        dst++;
+      }
+      for (let k = 0; k < line.length - 1; k++) {
+        const a = line[k], b = line[k + 1];
+        const sa = first + k, sb = sa + 1;
         indices[q++] = a; indices[q++] = b; indices[q++] = sa;
         indices[q++] = b; indices[q++] = sb; indices[q++] = sa;
         indices[q++] = a; indices[q++] = sa; indices[q++] = b;
@@ -185,13 +232,16 @@ export function buildTerrainGeometry(
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(posOut, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(normOut, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colOut, 3));
+  geometry.setAttribute("aLight", new THREE.BufferAttribute(lightOut, 2));
+  geometry.setAttribute("aTint", new THREE.BufferAttribute(tintOut, 4));
+  geometry.setAttribute("aWater", new THREE.BufferAttribute(new Float32Array(vertCount), 1)); // dry; the erosion meshes fill theirs
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
   return {
     geometry,
     vertexCount: vertCount,
-    triangleCount: indices.length / 3,
+    triangleCount: q / 3,
     buildMs: performance.now() - t0,
+    heights,
   };
 }

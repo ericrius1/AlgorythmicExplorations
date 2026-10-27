@@ -62,6 +62,11 @@ export class ShaderView {
   readonly uniforms = new Float32Array(32);
   readonly data: Float32Array;
   readonly pointer = { x: 0.5, y: 0.5, down: false, inside: false };
+  // Opt-in for big data arrays that change a little at a time (e.g. a
+  // spectrogram ring buffer): when true, draw() uploads only the ranges
+  // passed to markData() since the previous draw, instead of all of `data`.
+  manualUpload = false;
+  private dirty: [number, number][] = [];
 
   private dev: GPUDevice;
   private ctx: GPUCanvasContext;
@@ -142,13 +147,33 @@ export class ShaderView {
     this.uniforms[1] = canvas.width / canvas.height;
   }
 
+  // Queue data[start, end) for upload on the next draw() (manualUpload mode).
+  markData(start: number, end: number): void {
+    const a = Math.max(0, Math.floor(start));
+    const b = Math.min(this.data.length, Math.ceil(end));
+    if (b > a) this.dirty.push([a, b]);
+  }
+
+  // True once a WGSL compile or pipeline validation error has been seen
+  // (draw() is then a no-op), so a caller can fall back to another renderer.
+  get failed(): boolean {
+    return this.broken;
+  }
+
   draw(): void {
     if (this.broken) return;
     this.uniforms[0] = (performance.now() - this.t0) / 1000;
     this.uniforms[2] = this.pointer.x;
     this.uniforms[3] = this.pointer.y;
     this.dev.queue.writeBuffer(this.ubuf, 0, this.uniforms as BufferSource);
-    this.dev.queue.writeBuffer(this.dbuf, 0, this.data as BufferSource);
+    if (!this.manualUpload) {
+      this.dev.queue.writeBuffer(this.dbuf, 0, this.data as BufferSource);
+    } else {
+      for (const [a, b] of this.dirty) {
+        this.dev.queue.writeBuffer(this.dbuf, a * 4, this.data as BufferSource, a, b - a);
+      }
+      this.dirty.length = 0;
+    }
 
     const enc = this.dev.createCommandEncoder();
     const pass = enc.beginRenderPass({

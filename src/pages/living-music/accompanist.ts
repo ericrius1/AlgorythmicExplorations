@@ -1,15 +1,17 @@
-import { initNav } from "../../lib/siteNav";
-import { mountLazy } from "../../lib/demoShell";
+import "../../styles/music-play.css";
+import { wirePage } from "../../core/wirePage";
 import { mountAccompanist } from "../../demos/music/accompanist";
+import { mountAccompHero } from "../../demos/music/accomp/hero";
+import { mountProbeTest } from "../../demos/music/accomp/probe";
+import { mountKeyFinder } from "../../demos/music/accomp/keyfind";
+import { mountChordFinder } from "../../demos/music/accomp/chordfind";
+import { mountAnswerFig } from "../../demos/music/accomp/answer";
 
-initNav();
-
-const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
+wirePage({
+  hero: mountAccompHero,
+  probe: mountProbeTest,
+  keyfinder: mountKeyFinder,
+  chords: mountChordFinder,
+  answer: mountAnswerFig,
   accompanist: mountAccompanist,
-};
-
-for (const el of document.querySelectorAll<HTMLElement>("[data-demo]")) {
-  const kind = el.dataset.demo!;
-  const make = mounts[kind];
-  if (make) mountLazy(el, () => make(el));
-}
+});

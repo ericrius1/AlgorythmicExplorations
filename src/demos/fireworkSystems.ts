@@ -1,18 +1,37 @@
+// Figures for "Fireworks at GPU Scale": the hero, four diagrams that explain
+// the frame, and a live figure that runs the real thing with its counters.
+
 import { Shell, type Demo } from "../lib/demoShell";
-import { mountFireworkHeroGpu } from "./fireworkHeroGpu";
+import { getDevice } from "../lib/gpu";
+import {
+  autoShow,
+  EMIT_COMMAND_BYTES,
+  FireworksView,
+  FireworksWorld,
+  PARTICLE_STRIDE,
+  type FireworkSystemId,
+} from "./fireworkHeroGpu";
 
 type Ctx = CanvasRenderingContext2D;
 
 const TAU = Math.PI * 2;
+const SANS = "ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif";
+const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
-// Figures draw straight into device pixels, so a literal 13px label is only
-// ~6px on a 2x display — unreadable next to 18px body copy. Scale type and
-// strokes with the canvas width, clamped so phones keep their size and very
-// wide screens do not turn chunky. setFigureScale runs once per frame in clear.
-let FS = 1;
-function setFigureScale(w: number): void {
-  FS = Math.min(2.6, Math.max(1, w / 680));
-}
+const C = {
+  bg0: "#080a12",
+  bg1: "#0d1019",
+  panel: "rgba(255, 255, 255, 0.035)",
+  line: "rgba(122, 162, 255, 0.18)",
+  text: "#e3e7f2",
+  muted: "#8a91a5",
+  dim: "#5d6479",
+  blue: "#7aa2ff",
+  amber: "#ffb86b",
+  green: "#7dd6a0",
+  red: "#ff8585",
+  violet: "#c59bff",
+};
 
 function hash01(n: number): number {
   const value = Math.sin(n * 12.9898 + 78.233) * 43758.5453123;
@@ -23,470 +42,927 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+function ease(t: number): number {
+  const x = clamp(t, 0, 1);
+  return x * x * (3 - 2 * x);
 }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes.toFixed(0)} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB`;
 }
 
-function clear(ctx: Ctx, w: number, h: number, top = "#06070b", bottom = "#11131c"): void {
-  setFigureScale(w);
+// Draw in CSS pixels whatever the canvas resolution is.
+function begin(canvas: HTMLCanvasElement): { ctx: Ctx; w: number; h: number } {
+  const ctx = canvas.getContext("2d")!;
+  const w = canvas.clientWidth || canvas.width;
+  const h = canvas.clientHeight || canvas.height;
+  const dpr = canvas.width / Math.max(w, 1);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, top);
-  g.addColorStop(1, bottom);
+  g.addColorStop(0, C.bg0);
+  g.addColorStop(1, C.bg1);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+function text(
+  ctx: Ctx,
+  value: string,
+  x: number,
+  y: number,
+  opts: { size?: number; color?: string; align?: CanvasTextAlign; mono?: boolean; weight?: number } = {},
+): void {
+  ctx.fillStyle = opts.color ?? C.text;
+  ctx.font = `${opts.weight ?? (opts.mono ? 400 : 500)} ${opts.size ?? 13}px ${opts.mono ? MONO : SANS}`;
+  ctx.textAlign = opts.align ?? "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(value, x, y);
 }
 
 function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number): void {
-  const rr = Math.min(r, w * 0.5, h * 0.5);
   ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
+  ctx.roundRect(x, y, Math.max(0, w), Math.max(0, h), Math.min(r, w / 2, h / 2));
 }
 
-function text(ctx: Ctx, value: string, x: number, y: number, size = 13, color = "#d7dbe6", align: CanvasTextAlign = "left"): void {
-  ctx.fillStyle = color;
-  ctx.font = `${size * FS}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`;
-  ctx.textAlign = align;
-  ctx.textBaseline = "middle";
-  ctx.fillText(value, x, y);
-}
-
-function textWidth(ctx: Ctx, value: string, size = 13): number {
-  ctx.font = `${size * FS}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`;
-  return ctx.measureText(value).width;
-}
-
-function mono(ctx: Ctx, value: string, x: number, y: number, size = 12, color = "#c4cdf0", align: CanvasTextAlign = "left"): void {
-  ctx.fillStyle = color;
-  ctx.font = `${size * FS}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-  ctx.textAlign = align;
-  ctx.textBaseline = "middle";
-  ctx.fillText(value, x, y);
-}
-
-function panel(ctx: Ctx, x: number, y: number, w: number, h: number, title: string): void {
-  ctx.save();
-  roundRect(ctx, x, y, w, h, 12);
-  ctx.fillStyle = "rgba(17, 19, 28, 0.82)";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(122, 162, 255, 0.22)";
-  ctx.stroke();
-  text(ctx, title, x + 16, y + 23, 13, "#7aa2ff");
-  ctx.restore();
-}
-
-function arrow(ctx: Ctx, x1: number, y1: number, x2: number, y2: number, color = "#5f677e"): void {
-  const a = Math.atan2(y2 - y1, x2 - x1);
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2 * FS;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  const head = 10 * FS;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - Math.cos(a - 0.48) * head, y2 - Math.sin(a - 0.48) * head);
-  ctx.lineTo(x2 - Math.cos(a + 0.48) * head, y2 - Math.sin(a + 0.48) * head);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function sparkle(ctx: Ctx, x: number, y: number, r: number, color: string, alpha: number): void {
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, color);
-  g.addColorStop(0.26, color.replace("1)", `${alpha})`));
-  g.addColorStop(1, color.replace("1)", "0)"));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
+// ---------------------------------------------------------------------------
+// Hero
 
 export async function mountHeroFireworks(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.46);
   shell.controls.style.display = "none";
   shell.readout.parentElement?.remove();
 
-  const gpu = await mountFireworkHeroGpu(shell.canvas);
-  if (gpu) return gpu;
+  const world = await FireworksWorld.get();
+  if (!world) return mountHeroFallback(shell);
 
-  return mountHeroFireworksCanvas(shell);
-}
-
-function mountHeroFireworksCanvas(shell: Shell): Demo {
-  const ctx = shell.canvas.getContext("2d")!;
+  const view = new FireworksView(world, shell.canvas);
+  view.resize();
+  const tick = autoShow(
+    world,
+    () => view.aspect(),
+    () => ({ sparks: 920, rockets: [1, 3], interval: [1.0, 1.8], collapseEvery: 4 }),
+  );
+  // start mid-show rather than on an empty sky
+  if (!world.prewarmed) world.prewarm(2.6, tick);
+  let last = performance.now();
 
   return {
     frame() {
-      const w = shell.canvas.width;
-      const h = shell.canvas.height;
-      const t = performance.now() * 0.001;
-      clear(ctx, w, h, "#05060b", "#17101f");
-
-      const sky = ctx.createRadialGradient(w * 0.5, h * 0.08, 0, w * 0.5, h * 0.08, h * 0.9);
-      sky.addColorStop(0, "rgba(70, 84, 140, 0.34)");
-      sky.addColorStop(0.5, "rgba(34, 19, 42, 0.3)");
-      sky.addColorStop(1, "rgba(255, 139, 55, 0.12)");
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, w, h);
-
-      for (let ridge = 0; ridge < 2; ridge++) {
-        ctx.beginPath();
-        ctx.moveTo(0, h);
-        for (let i = 0; i <= 28; i++) {
-          const x = (i / 28) * w;
-          const y = h * (0.68 + ridge * 0.11) + Math.sin(i * 0.7 + ridge) * h * 0.035 + hash01(i + ridge * 50) * h * 0.07;
-          ctx.lineTo(x, y);
-        }
-        ctx.lineTo(w, h);
-        ctx.closePath();
-        ctx.fillStyle = ridge === 0 ? "rgba(8, 11, 21, 0.72)" : "rgba(4, 7, 12, 0.95)";
-        ctx.fill();
-      }
-
-      for (let b = 0; b < 5; b++) {
-        const phase = (t * 0.23 + b * 0.21) % 1;
-        const cx = w * (0.18 + hash01(b * 12.7) * 0.68);
-        const cy = h * (0.16 + hash01(b * 31.1) * 0.36);
-        const hue = b % 3 === 0 ? "255, 187, 84" : b % 3 === 1 ? "94, 192, 255" : "248, 106, 255";
-        if (phase < 0.32) {
-          const launch = phase / 0.32;
-          const x = lerp(cx + Math.sin(b * 2.1) * w * 0.04, cx, launch);
-          const y = lerp(h * 0.9, cy, 1 - Math.pow(1 - launch, 2));
-          sparkle(ctx, x, y, h * 0.035, `rgba(${hue}, 1)`, 0.6);
-        } else {
-          const age = (phase - 0.32) / 0.68;
-          for (let i = 0; i < 110; i++) {
-            const seed = b * 1000 + i * 3.17;
-            const a = hash01(seed) * TAU;
-            const speed = h * (0.08 + hash01(seed + 2) * 0.34);
-            const rr = speed * Math.sin(age * Math.PI * 0.84);
-            const fall = h * 0.17 * age * age;
-            const x = cx + Math.cos(a) * rr * (1 + hash01(seed + 5) * 0.35);
-            const y = cy + Math.sin(a) * rr * 0.72 + fall;
-            const alpha = Math.pow(1 - age, 1.4) * (0.4 + hash01(seed + 8) * 0.6);
-            if (alpha <= 0) continue;
-            sparkle(ctx, x, y, h * (0.008 + hash01(seed + 9) * 0.012), `rgba(${hue}, 1)`, alpha);
-          }
-        }
-      }
-
-      const cpuLabel = "CPU: launch intent";
-      const gpuLabel = "GPU: millions of independent fragments of light";
-      const captionSize = 13;
-      const marginX = 24;
-      const gap = 12 * FS;
-      const arrowSpan = 32 * FS;
-      const captionY = h - 50;
-      const cpuW = textWidth(ctx, cpuLabel, captionSize);
-      const gpuW = textWidth(ctx, gpuLabel, captionSize);
-      const rowW = cpuW + gap + arrowSpan + gap + gpuW;
-
-      if (rowW <= w - marginX * 2) {
-        text(ctx, cpuLabel, marginX, captionY, captionSize, "#8a91a5");
-        const ax1 = marginX + cpuW + gap;
-        arrow(ctx, ax1, captionY, ax1 + arrowSpan, captionY, "#5f677e");
-        text(ctx, gpuLabel, ax1 + arrowSpan + gap, captionY, captionSize, "#d7dbe6");
-      } else {
-        const lineStep = 20 * FS;
-        const topY = captionY - lineStep * 0.5;
-        const bottomY = captionY + lineStep * 0.5;
-        text(ctx, cpuLabel, marginX, topY, captionSize, "#8a91a5");
-        arrow(ctx, marginX + cpuW + gap, topY, marginX + cpuW + gap + arrowSpan, topY, "#5f677e");
-        text(ctx, gpuLabel, marginX, bottomY, captionSize, "#d7dbe6");
-      }
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      tick(world.clock);
+      world.step(now);
+      world.render(view, dt);
+    },
+    dispose() {
+      view.dispose();
     },
   };
 }
 
+// Without WebGPU: a few soft 2D bursts over the same kind of ridge line.
+function mountHeroFallback(shell: Shell): Demo {
+  return {
+    frame() {
+      const { ctx, w, h } = begin(shell.canvas);
+      const t = performance.now() * 0.001;
+      const sky = ctx.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, "#04050d");
+      sky.addColorStop(0.7, "#1a1636");
+      sky.addColorStop(1, "#45293a");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      for (let b = 0; b < 4; b++) {
+        const phase = (t * 0.18 + b * 0.27) % 1;
+        const cx = w * (0.15 + hash01(b * 12.7 + Math.floor(t * 0.18 + b * 0.27)) * 0.7);
+        const cy = h * (0.18 + hash01(b * 31.1) * 0.3);
+        const hue = ["255, 187, 84", "94, 192, 255", "248, 106, 255", "140, 255, 120"][b];
+        if (phase < 0.25) continue;
+        const age = (phase - 0.25) / 0.75;
+        for (let i = 0; i < 90; i++) {
+          const s = b * 1000 + i * 3.17;
+          const a = hash01(s) * TAU;
+          const r = h * (0.06 + hash01(s + 2) * 0.22) * Math.sin(age * Math.PI * 0.5);
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r + h * 0.12 * age * age;
+          const alpha = Math.pow(1 - age, 1.4) * 0.8;
+          ctx.fillStyle = `rgba(${hue}, ${alpha})`;
+          ctx.fillRect(x - 1, y - 1, 2, 2);
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#05060c";
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let i = 0; i <= 40; i++) ctx.lineTo((i / 40) * w, h * (0.8 + Math.sin(i * 0.7) * 0.03 + hash01(i) * 0.04));
+      ctx.lineTo(w, h);
+      ctx.fill();
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fig. 1: bytes the CPU uploads for one frame of launches
+
 export function mountCommandBudget(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.52);
-  const ctx = shell.canvas.getContext("2d")!;
+  const narrow = (container.clientWidth || 700) < 560;
+  const shell = new Shell(container, narrow ? 0.95 : 0.5);
   const state = { bursts: 12, sparks: 50000 };
+  // A shell is more than its sparks: the explosion command also expands into
+  // the centre flash, crackle, embers and smoke (see spawnClassic).
+  const extras = 1 + Math.round(11 * 11 * 0.34) + 64 + 30;
 
   shell.slider({
-    label: "bursts in one frame",
+    label: "shells in one frame",
     min: 1,
     max: 80,
     step: 1,
     value: state.bursts,
     format: (v) => v.toFixed(0),
-    onInput: (v) => {
-      state.bursts = Math.round(v);
-    },
+    onInput: (v) => (state.bursts = Math.round(v)),
   });
   shell.slider({
-    label: "sparks per burst",
+    label: "sparks per shell",
     min: 500,
     max: 120000,
     step: 500,
     value: state.sparks,
     format: (v) => v.toLocaleString(),
-    onInput: (v) => {
-      state.sparks = Math.round(v);
-    },
+    onInput: (v) => (state.sparks = Math.round(v)),
   });
-
+  const bytes = (): { commands: number; particles: number; count: number } => {
+    const count = state.bursts * (state.sparks + extras);
+    return { commands: state.bursts * EMIT_COMMAND_BYTES, particles: count * PARTICLE_STRIDE, count };
+  };
   shell.setInfo(() => {
-    const commandBytes = state.bursts * 96;
-    const naiveBytes = state.bursts * state.sparks * 80;
-    return `${formatBytes(commandBytes)} commands vs ${formatBytes(naiveBytes)} particles`;
+    const b = bytes();
+    return `${b.count.toLocaleString()} particles · ${formatBytes(b.commands)} of commands vs ${formatBytes(b.particles)} of particles`;
   });
 
   return {
     frame() {
-      const w = shell.canvas.width;
-      const h = shell.canvas.height;
-      clear(ctx, w, h);
-      const commandBytes = state.bursts * 96;
-      const naiveBytes = state.bursts * state.sparks * 80;
-      const maxLog = Math.log10(Math.max(naiveBytes, commandBytes, 10));
-      const bar = (label: string, bytes: number, y: number, color: string): void => {
-        const x = w * 0.12;
-        const bw = w * 0.72;
-        const filled = (Math.log10(Math.max(bytes, 10)) / maxLog) * bw;
-        text(ctx, label, x, y - 22, 14, "#d7dbe6");
-        mono(ctx, formatBytes(bytes), x + bw, y - 22, 13, "#ffb86b", "right");
-        roundRect(ctx, x, y, bw, h * 0.09, 12);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
-        ctx.fill();
-        roundRect(ctx, x, y, Math.max(2, filled), h * 0.09, 12);
-        ctx.fillStyle = color;
-        ctx.fill();
-      };
+      const { ctx, w, h } = begin(shell.canvas);
+      const small = w < 520;
+      const b = bytes();
+      const padL = small ? 16 : w * 0.08;
+      const padR = small ? 16 : w * 0.08;
+      const x0 = padL;
+      const x1 = w - padR;
+      // fixed log axis from 10 B to 4 GiB, so the bars move as you drag
+      const lo = 1;
+      const hi = Math.log10(4 * 1024 ** 3);
+      const xOf = (v: number): number => x0 + ((Math.log10(Math.max(v, 10)) - lo) / (hi - lo)) * (x1 - x0);
 
-      text(ctx, "Same visual request, radically different upload", w * 0.5, h * 0.12, 18, "#eef1f8", "center");
-      text(ctx, `${state.bursts.toLocaleString()} bursts x ${state.sparks.toLocaleString()} sparks`, w * 0.5, h * 0.19, 13, "#8a91a5", "center");
-      bar("CPU uploads one command per burst", commandBytes, h * 0.33, "rgba(122, 162, 255, 0.78)");
-      bar("CPU uploads every particle", naiveBytes, h * 0.58, "rgba(255, 184, 107, 0.78)");
-      const ratio = naiveBytes / Math.max(commandBytes, 1);
-      text(ctx, `${ratio.toLocaleString(undefined, { maximumFractionDigits: 0 })}x less CPU-to-GPU traffic`, w * 0.5, h * 0.84, 17, "#7dd6a0", "center");
-      text(ctx, "The GPU still creates every spark. The CPU just stops spelling them out.", w * 0.5, h * 0.91, 12, "#8a91a5", "center");
+      const head = `${state.bursts} shell${state.bursts === 1 ? "" : "s"} × ${state.sparks.toLocaleString()} sparks`;
+      if (small) {
+        text(ctx, head, w / 2, h * 0.07, { size: 13, align: "center", weight: 600 });
+        text(ctx, "launched in the same frame", w / 2, h * 0.07 + 17, { size: 11, align: "center", color: C.muted });
+      } else {
+        text(ctx, `${head}, launched in the same frame`, w / 2, h * 0.1, { size: 15, align: "center", weight: 600 });
+      }
+
+      const row = (label: string, value: number, y: number, color: string, glow: string): void => {
+        const bh = small ? 18 : Math.max(16, h * 0.085);
+        text(ctx, label, x0, y - bh * 0.5 - 10, { size: small ? 11 : 13, color: C.muted });
+        roundRect(ctx, x0, y - bh / 2, x1 - x0, bh, bh / 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
+        ctx.fill();
+        const xe = xOf(value);
+        const g = ctx.createLinearGradient(x0, 0, xe, 0);
+        g.addColorStop(0, glow);
+        g.addColorStop(1, color);
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 14;
+        roundRect(ctx, x0, y - bh / 2, Math.max(bh, xe - x0), bh, bh / 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.restore();
+        const label2 = formatBytes(value);
+        const inside = xe - x0 > 110;
+        text(ctx, label2, inside ? xe - 10 : xe + 8, y, {
+          size: small ? 11 : 13,
+          mono: true,
+          color: inside ? "#0b0d14" : color,
+          align: inside ? "right" : "left",
+          weight: 600,
+        });
+      };
+      row(small ? "one 96-byte command per shell" : "upload one emit command per shell (96 bytes each)", b.commands, h * (small ? 0.3 : 0.33), C.blue, "rgba(122,162,255,0.35)");
+      row(small ? "every particle, 80 bytes each" : "upload every particle (80 bytes each)", b.particles, h * (small ? 0.47 : 0.55), C.amber, "rgba(255,184,107,0.35)");
+
+      // axis
+      const ay = h * (small ? 0.6 : 0.7);
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x0, ay);
+      ctx.lineTo(x1, ay);
+      ctx.stroke();
+      for (let d = 1; d <= 9; d++) {
+        const x = xOf(10 ** d);
+        ctx.beginPath();
+        ctx.moveTo(x, ay - 3);
+        ctx.lineTo(x, ay + 3);
+        ctx.stroke();
+      }
+      const ticks: Array<[number, string]> = [
+        ...(small ? [] : ([[100, "100 B"]] as Array<[number, string]>)),
+        [1024, "1 KiB"],
+        [1024 ** 2, "1 MiB"],
+        [1024 ** 3, "1 GiB"],
+      ];
+      for (const [v, l] of ticks) {
+        const x = xOf(v);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.beginPath();
+        ctx.moveTo(x, ay - 6);
+        ctx.lineTo(x, ay + 6);
+        ctx.stroke();
+        text(ctx, l, x, ay + 16, { size: small ? 10 : 11, mono: true, color: C.dim, align: "center" });
+      }
+      text(ctx, "bytes, log scale", x0, ay - 12, { size: small ? 9 : 11, color: C.dim });
+
+      const ratio = b.particles / b.commands;
+      text(ctx, `${Math.round(ratio).toLocaleString()}× less to send`, w / 2, h * (small ? 0.76 : 0.86), {
+        size: small ? 16 : 19,
+        color: C.green,
+        align: "center",
+        weight: 600,
+      });
+      if (small) {
+        text(ctx, "Either way the GPU still writes", w / 2, h * 0.86, { size: 11, color: C.muted, align: "center" });
+        text(ctx, "every particle. Only the upload changes.", w / 2, h * 0.86 + 15, { size: 11, color: C.muted, align: "center" });
+      } else {
+        text(ctx, "Either way the GPU still writes every particle. Only the upload changes.", w / 2, h * 0.94, {
+          size: 12,
+          color: C.muted,
+          align: "center",
+        });
+      }
       shell.tick();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Fig. 2: two buffers, compacted every frame
+
+interface Slot {
+  id: number;
+  hue: number; // 0..1, which burst it came from
+  life: number; // frames left
 }
 
 export function mountLiveCompaction(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.58);
-  const ctx = shell.canvas.getContext("2d")!;
-  const particles = Array.from({ length: 96 }, (_, i) => ({
-    age: hash01(i * 17.1),
-    life: 0.32 + hash01(i * 41.3) * 0.68,
-    hue: hash01(i * 9.7),
-  }));
+  const shell = new Shell(container, 0.6);
+  const CAP = 40;
+  const FRAME_S = 2.2;
+  let nextId = 0;
+  const newBurst = (n: number): Slot[] => {
+    const hue = Math.random();
+    return Array.from({ length: n }, () => ({ id: nextId++, hue, life: 1 + Math.floor(Math.random() * 4) }));
+  };
+  let read: Slot[] = [...newBurst(9), ...newBurst(7), ...newBurst(8)];
+  let survivors: Array<{ s: Slot; from: number; to: number }> = [];
+  let born: Slot[] = [];
+  let dead: number[] = [];
+  let readIsA = true;
+  let phase = 0;
   let paused = false;
-  shell.button("reseed", () => {
-    for (let i = 0; i < particles.length; i++) {
-      particles[i].age = hash01(i * 23.7 + performance.now() * 0.001) * 0.4;
-      particles[i].life = 0.32 + hash01(i * 19.4 + performance.now() * 0.002) * 0.68;
+  let overflow = 0;
+
+  // One simulated frame: age everything, hand survivors slots in the order
+  // their (pretend) threads finish, then append the new burst.
+  const plan = (): void => {
+    survivors = [];
+    dead = [];
+    const alive: number[] = [];
+    read.forEach((s, i) => (s.life > 1 ? alive.push(i) : dead.push(i)));
+    // atomicAdd hands out slots in arrival order, which isn't index order:
+    // shuffle within groups of 8, like workgroups racing each other
+    for (let g = 0; g < alive.length; g += 8) {
+      const chunk = alive.slice(g, g + 8);
+      for (let i = chunk.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+      }
+      alive.splice(g, chunk.length, ...chunk);
     }
-  });
+    alive.forEach((from, to) => survivors.push({ s: read[from], from, to }));
+    const room = CAP - survivors.length;
+    const want = read.length < 22 ? 9 + Math.floor(Math.random() * 6) : 4 + Math.floor(Math.random() * 6);
+    born = newBurst(Math.min(want, room));
+    overflow = Math.max(0, want - room);
+  };
+  const commit = (): void => {
+    read = [...survivors.map((v) => ({ ...v.s, life: v.s.life - 1 })), ...born];
+    readIsA = !readIsA;
+  };
+  plan();
+
   shell.button("pause", () => {
     paused = !paused;
+    pauseButton.textContent = paused ? "play" : "pause";
   });
-  shell.setInfo(() => {
-    const live = particles.filter((p) => p.age < p.life).length;
-    return `${live} live slots -> draw ${live} instances`;
+  const pauseButton = shell.controls.lastElementChild as HTMLButtonElement;
+  shell.button("next frame", () => {
+    paused = true;
+    pauseButton.textContent = "play";
+    phase = 0;
+    commit();
+    plan();
   });
+  shell.setInfo(
+    () =>
+      `${read.length} live → ${survivors.length} survive, ${born.length} emitted · instanceCount = ${survivors.length + born.length}`,
+  );
 
+  let last = performance.now();
   return {
     frame() {
-      const w = shell.canvas.width;
-      const h = shell.canvas.height;
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
       if (!paused) {
-        for (let i = 0; i < particles.length; i++) {
-          particles[i].age += 0.0035 + hash01(i) * 0.0015;
-          if (particles[i].age > 1.18) {
-            particles[i].age = 0;
-            particles[i].life = 0.32 + hash01(i * 31.7 + performance.now() * 0.001) * 0.68;
-            particles[i].hue = hash01(i * 13.1 + performance.now() * 0.0007);
-          }
+        phase += dt / FRAME_S;
+        if (phase >= 1) {
+          phase = 0;
+          commit();
+          plan();
         }
       }
+      const { ctx, w, h } = begin(shell.canvas);
+      const small = w < 520;
+      const cols = 20;
+      const rows = CAP / cols;
+      const padX = small ? 12 : w * 0.07;
+      const gap = small ? 2 : 4;
+      const cw = (w - padX * 2 - gap * (cols - 1)) / cols;
+      const ch = Math.min(cw, h * 0.075);
+      const blockH = rows * ch + (rows - 1) * gap;
+      const topY = h * 0.15;
+      const botY = h * 0.62 - blockH * 0.5;
+      const yA = topY;
+      const yB = botY;
+      const readY = readIsA ? yA : yB;
+      const writeY = readIsA ? yB : yA;
+      const slotXY = (i: number, by: number): [number, number] => [
+        padX + (i % cols) * (cw + gap),
+        by + Math.floor(i / cols) * (ch + gap),
+      ];
+      const colorOf = (s: Slot, a: number): string => {
+        const r = Math.round(122 + (255 - 122) * s.hue);
+        const g = Math.round(162 + (184 - 162) * s.hue);
+        const b = Math.round(255 + (107 - 255) * s.hue);
+        return `rgba(${r}, ${g}, ${b}, ${a})`;
+      };
 
-      clear(ctx, w, h);
-      panel(ctx, w * 0.05, h * 0.1, w * 0.9, h * 0.32, "read buffer: old state with gaps");
-      panel(ctx, w * 0.05, h * 0.54, w * 0.9, h * 0.28, "write buffer: compacted live list");
-      const live = particles.filter((p) => p.age < p.life);
-      drawCells(ctx, particles, w * 0.09, h * 0.18, w * 0.82, h * 0.16, false);
-      drawCells(ctx, live, w * 0.09, h * 0.62, w * 0.82, h * 0.12, true);
-      arrow(ctx, w * 0.5, h * 0.44, w * 0.5, h * 0.52, "#7aa2ff");
-      text(ctx, "simulate, discard expired particles, atomicAdd live survivors", w * 0.5, h * 0.49, 13, "#d7dbe6", "center");
-      mono(ctx, `counter.write = ${live.length}`, w * 0.09, h * 0.88, 13, "#7dd6a0");
-      mono(ctx, `drawIndirect.instanceCount = ${live.length}`, w * 0.48, h * 0.88, 13, "#ffb86b");
+      // buffer frames
+      const frame = (by: number, name: string, role: string, active: boolean, below: boolean): void => {
+        const ly = below ? by + blockH + (small ? 13 : 18) : by - (small ? 12 : 16);
+        text(ctx, name, padX, ly, { size: small ? 11 : 13, weight: 600 });
+        text(ctx, role, padX + (small ? 66 : 92), ly, {
+          size: small ? 10 : 12,
+          mono: true,
+          color: active ? C.amber : C.blue,
+        });
+        for (let i = 0; i < CAP; i++) {
+          const [x, y] = slotXY(i, by);
+          roundRect(ctx, x, y, cw, ch, 3);
+          ctx.fillStyle = "rgba(255,255,255,0.04)";
+          ctx.fill();
+        }
+      };
+      frame(yA, "buffer A", readIsA ? "read · last frame" : "write · this frame", !readIsA, false);
+      frame(yB, "buffer B", readIsA ? "write · this frame" : "read · last frame", readIsA, true);
+
+      const pDie = ease(phase / 0.3);
+      const pMove = ease((phase - 0.3) / 0.4);
+      const pBorn = ease((phase - 0.68) / 0.18);
+
+      // read buffer contents: the dying fade, survivors lift off
+      read.forEach((s, i) => {
+        const [x, y] = slotXY(i, readY);
+        const dying = s.life <= 1;
+        const a = dying ? 0.85 * (1 - pDie) + 0.08 : 0.85 * (1 - pMove * 0.75);
+        roundRect(ctx, x, y, cw, ch, 3);
+        ctx.fillStyle = colorOf(s, a);
+        ctx.fill();
+        if (dying && pDie > 0.4) {
+          ctx.strokeStyle = `rgba(255,133,133,${0.7 * (1 - pMove)})`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x + 3, y + 3);
+          ctx.lineTo(x + cw - 3, y + ch - 3);
+          ctx.stroke();
+        }
+      });
+
+      // survivors travel to the slot their atomicAdd returned
+      for (const v of survivors) {
+        const [fx, fy] = slotXY(v.from, readY);
+        const [tx, ty] = slotXY(v.to, writeY);
+        if (pMove > 0 && pMove < 1) {
+          ctx.strokeStyle = colorOf(v.s, 0.18);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(fx + cw / 2, fy + ch / 2);
+          ctx.bezierCurveTo(fx + cw / 2, (fy + ty) / 2, tx + cw / 2, (fy + ty) / 2, tx + cw / 2, ty + ch / 2);
+          ctx.stroke();
+        }
+        if (pMove <= 0) continue;
+        const t = pMove;
+        const mx = (1 - t) ** 3 * fx + 3 * (1 - t) ** 2 * t * fx + 3 * (1 - t) * t * t * tx + t ** 3 * tx;
+        const midY = (fy + ty) / 2;
+        const my = (1 - t) ** 3 * fy + 3 * (1 - t) ** 2 * t * midY + 3 * (1 - t) * t * t * midY + t ** 3 * ty;
+        ctx.save();
+        ctx.shadowColor = colorOf(v.s, 0.8);
+        ctx.shadowBlur = 8;
+        roundRect(ctx, mx, my, cw, ch, 3);
+        ctx.fillStyle = colorOf(v.s, 0.9);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // newly emitted particles append after the survivors
+      born.forEach((s, k) => {
+        const [x, y] = slotXY(survivors.length + k, writeY);
+        if (pBorn <= 0) return;
+        roundRect(ctx, x, y, cw, ch, 3);
+        ctx.fillStyle = colorOf(s, 0.9 * pBorn);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(125, 214, 160, ${pBorn})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+
+      // the pass between them
+      const midY = (yA + blockH + yB) / 2;
+      const down = readIsA;
+      const ax = w - padX - (small ? 6 : 12);
+      ctx.strokeStyle = C.blue;
+      ctx.fillStyle = C.blue;
+      ctx.lineWidth = 2;
+      const y0 = down ? yA + blockH + 8 : yB - 8;
+      const y1 = down ? yB - (small ? 26 : 30) : yA + blockH + (small ? 26 : 30);
+      ctx.beginPath();
+      ctx.moveTo(ax, y0);
+      ctx.lineTo(ax, y1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ax, y1 + (down ? 6 : -6));
+      ctx.lineTo(ax - 5, y1);
+      ctx.lineTo(ax + 5, y1);
+      ctx.fill();
+      text(ctx, small ? "simulate → append" : "simulate, drop the expired, atomicAdd the rest", ax - 14, midY, {
+        size: small ? 10 : 12,
+        color: C.muted,
+        align: "right",
+      });
+
+      const n = survivors.length + born.length;
+      const y = h * 0.87;
+      text(ctx, `counters.write = ${survivors.length} + ${born.length} = ${n}`, padX, y, { size: small ? 10 : 13, mono: true, color: C.green });
+      text(ctx, `instanceCount = ${n}`, w - padX, y, { size: small ? 10 : 13, mono: true, color: C.amber, align: "right" });
+      if (overflow > 0) {
+        text(ctx, `${overflow} didn't fit → overflow`, w / 2, h * 0.97, { size: small ? 10 : 11, mono: true, color: C.red, align: "center" });
+      }
       shell.tick();
     },
   };
 }
 
-function drawCells(
-  ctx: Ctx,
-  particles: Array<{ age: number; life: number; hue: number }>,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  compact: boolean,
-): void {
-  const cols = 24;
-  const rows = compact ? 3 : 4;
-  const gap = 3;
-  const cw = (w - gap * (cols - 1)) / cols;
-  const ch = (h - gap * (rows - 1)) / rows;
-  const slots = cols * rows;
-  for (let i = 0; i < slots; i++) {
-    const p = particles[i];
-    const cx = x + (i % cols) * (cw + gap);
-    const cy = y + Math.floor(i / cols) * (ch + gap);
-    roundRect(ctx, cx, cy, cw, ch, 3);
-    if (!p) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.035)";
-    } else if (p.age >= p.life && !compact) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
-    } else {
-      const hot = p.hue < 0.5 ? "122, 162, 255" : "255, 184, 107";
-      const a = compact ? 0.78 : clamp(1 - p.age / p.life, 0.16, 0.92);
-      ctx.fillStyle = `rgba(${hot}, ${a})`;
-    }
-    ctx.fill();
-  }
-}
+// ---------------------------------------------------------------------------
+// Fig. 3: one frame as a table of passes and the buffers they touch
 
 export function mountPipelineGraph(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.54);
-  const ctx = shell.canvas.getContext("2d")!;
-  const state = { pass: 0 };
-  const names = ["begin", "simulate", "emit", "finish", "draw"];
-  shell.slider({
+  const narrow = (container.clientWidth || 700) < 560;
+  const shell = new Shell(container, narrow ? 0.98 : 0.62);
+  const passes = [
+    { name: "CPU", full: "queue.writeBuffer", what: "The CPU uploads this frame's emit commands, the emit totals in the counters, and the uniforms." },
+    { name: "begin", full: "beginFrame", what: "One thread zeroes the write counter and the draw instance count." },
+    {
+      name: "simulate",
+      full: "simulateCompact",
+      what: "One thread per live particle, sized by last frame's dispatch args. Survivors are appended to the other buffer.",
+    },
+    { name: "emit", full: "emitParticles", what: "One thread per new particle. Each finds its command, hashes seed + index, and appends." },
+    { name: "finish", full: "finishFrame", what: "One thread copies the write counter into live, the draw args, and next frame's dispatch args." },
+    { name: "draw", full: "drawIndirect", what: "Six vertices per particle, instance count read from the buffer finishFrame just wrote." },
+  ];
+  // r = read, w = write, rw = both (atomics), per resource per pass
+  const resources: Array<{ name: string; ops: string[] }> = [
+    { name: "emit commands", ops: ["w", "", "", "r", "", ""] },
+    { name: "counters", ops: ["w", "w", "rw", "rw", "rw", ""] },
+    { name: "particles (old)", ops: ["", "", "r", "", "", ""] },
+    { name: "particles (new)", ops: ["", "", "w", "w", "", "r"] },
+    { name: "draw args", ops: ["", "w", "", "", "w", "r"] },
+    { name: "dispatch args", ops: ["", "", "r", "", "w", ""] },
+  ];
+  let pass = 0;
+  let auto = true;
+  let clock = 0;
+  const slider = shell.slider({
     label: "pass",
     min: 0,
-    max: 4,
+    max: passes.length - 1,
     step: 1,
-    value: state.pass,
-    format: (v) => names[Math.round(v)],
+    value: 0,
+    format: (v) => passes[Math.round(v)].full,
     onInput: (v) => {
-      state.pass = Math.round(v);
+      pass = Math.round(v);
+      auto = false;
     },
   });
-  shell.setInfo(() => names[state.pass]);
+  shell.button("play", () => {
+    auto = true;
+    clock = 0;
+  });
+  shell.setInfo(() => (auto ? "playing · drag the slider to stop on a pass" : `${passes[pass].full}`));
+  let last = performance.now();
 
   return {
     frame() {
-      const w = shell.canvas.width;
-      const h = shell.canvas.height;
-      clear(ctx, w, h);
-      text(ctx, "One frame as a command buffer", w * 0.5, h * 0.1, 18, "#eef1f8", "center");
-
-      const blocks = [
-        { label: "beginFrame", sub: "reset write + overflow", x: 0.08, y: 0.27 },
-        { label: "simulateCompact", sub: "read A, append live to B", x: 0.29, y: 0.27 },
-        { label: "emitParticles", sub: "commands → particles", x: 0.5, y: 0.27 },
-        { label: "finishFrame", sub: "write counters + draw args", x: 0.71, y: 0.27 },
-        { label: "drawIndirect", sub: "render exactly live count", x: 0.39, y: 0.66 },
-      ];
-      const bw = w * 0.19;
-      for (let i = 0; i < 3; i++) {
-        arrow(ctx, w * blocks[i].x + bw, h * blocks[i].y, w * blocks[i + 1].x - 8, h * blocks[i + 1].y, "#5f677e");
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (auto) {
+        clock += dt;
+        if (clock > 1.9) {
+          clock = 0;
+          pass = (pass + 1) % passes.length;
+          slider.value = String(pass);
+          slider.dispatchEvent(new Event("input"));
+          auto = true;
+        }
       }
-      arrow(ctx, w * 0.79, h * 0.4, w * 0.58, h * 0.61, "#5f677e");
+      const { ctx, w, h } = begin(shell.canvas);
+      const small = w < 520;
+      const labelW = small ? 84 : 150;
+      const x0 = small ? 10 : w * 0.05;
+      const x1 = w - (small ? 10 : w * 0.05);
+      const colW = (x1 - x0 - labelW) / passes.length;
+      const y0 = h * (small ? 0.09 : 0.13);
+      const rowH = (h * (small ? 0.6 : 0.62)) / resources.length;
 
-      for (let i = 0; i < blocks.length; i++) {
-        const b = blocks[i];
-        const bh = h * 0.18;
-        const x = w * b.x;
-        const y = h * b.y - bh * 0.5;
-        roundRect(ctx, x, y, bw, bh, 12);
-        ctx.fillStyle = i === state.pass ? "rgba(122, 162, 255, 0.2)" : "rgba(255, 255, 255, 0.05)";
+      // column headers and the highlighted pass
+      const hx = x0 + labelW + pass * colW;
+      roundRect(ctx, hx + 2, y0 - (small ? 16 : 20), colW - 4, rowH * resources.length + (small ? 22 : 28), 8);
+      ctx.fillStyle = "rgba(122, 162, 255, 0.1)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(122, 162, 255, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      const short = ["CPU", "begin", "sim", "emit", "finish", "draw"];
+      passes.forEach((p, i) => {
+        text(ctx, small ? short[i] : p.name, x0 + labelW + (i + 0.5) * colW, y0 - 6, {
+          size: small ? 10 : 12,
+          align: "center",
+          weight: 600,
+          color: i === pass ? C.text : C.muted,
+        });
+      });
+      // order arrows
+      for (let i = 0; i < (small ? 0 : passes.length - 1); i++) {
+        const xa = x0 + labelW + (i + 1) * colW;
+        ctx.fillStyle = C.dim;
+        ctx.beginPath();
+        ctx.moveTo(xa - 3, y0 - 9);
+        ctx.lineTo(xa + 3, y0 - 6);
+        ctx.lineTo(xa - 3, y0 - 3);
         ctx.fill();
-        ctx.strokeStyle = i === state.pass ? "rgba(122, 162, 255, 0.95)" : "rgba(122, 162, 255, 0.18)";
-        ctx.stroke();
-        text(ctx, b.label, x + bw * 0.5, y + bh * 0.38, 13, "#eef1f8", "center");
-        text(ctx, b.sub, x + bw * 0.5, y + bh * 0.66, 10.5, "#8a91a5", "center");
       }
 
-      drawBuffer(ctx, w * 0.12, h * 0.79, w * 0.24, h * 0.1, "particle buffer A", state.pass === 1 ? "#ffb86b" : "#5f677e");
-      drawBuffer(ctx, w * 0.4, h * 0.79, w * 0.24, h * 0.1, "particle buffer B", state.pass === 1 || state.pass === 2 ? "#7dd6a0" : "#5f677e");
-      drawBuffer(ctx, w * 0.68, h * 0.79, w * 0.2, h * 0.1, "indirect args", state.pass >= 3 ? "#7aa2ff" : "#5f677e");
-      mono(ctx, state.pass < 3 ? "CPU knows commands, not live count" : "GPU writes the live count the renderer consumes", w * 0.5, h * 0.94, 13, "#c4cdf0", "center");
+      resources.forEach((r, j) => {
+        const y = y0 + 8 + j * rowH;
+        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        ctx.beginPath();
+        ctx.moveTo(x0, y + rowH);
+        ctx.lineTo(x1, y + rowH);
+        ctx.stroke();
+        const touched = r.ops[pass] !== "";
+        text(ctx, r.name, x0, y + rowH / 2, { size: small ? 10 : 13, color: touched ? C.text : C.muted, weight: touched ? 600 : 500 });
+        r.ops.forEach((op, i) => {
+          if (!op) return;
+          const cx = x0 + labelW + (i + 0.5) * colW;
+          const cy = y + rowH / 2;
+          const on = i === pass;
+          const rad = small ? 6 : 8;
+          const draw = (dx: number, color: string, letter: string): void => {
+            ctx.save();
+            if (on) {
+              ctx.shadowColor = color;
+              ctx.shadowBlur = 12;
+            }
+            ctx.beginPath();
+            ctx.arc(cx + dx, cy, rad, 0, TAU);
+            ctx.fillStyle = on ? color : "rgba(255,255,255,0.08)";
+            ctx.fill();
+            ctx.restore();
+            text(ctx, letter, cx + dx, cy + 0.5, { size: small ? 8 : 10, align: "center", weight: 700, color: on ? "#0b0d14" : color });
+          };
+          if (op === "rw") {
+            draw(-rad * 0.95, C.blue, "R");
+            draw(rad * 0.95, C.amber, "W");
+          } else if (op === "r") draw(0, C.blue, "R");
+          else draw(0, C.amber, "W");
+        });
+      });
+
+      // what the highlighted pass does, wrapped to the canvas
+      const desc = `${passes[pass].full}: ${passes[pass].what}`;
+      ctx.font = `${small ? 11 : 13}px ${SANS}`;
+      const words = desc.split(" ");
+      const lines: string[] = [];
+      let cur = "";
+      for (const word of words) {
+        const next = cur ? `${cur} ${word}` : word;
+        if (ctx.measureText(next).width > x1 - x0 && cur) {
+          lines.push(cur);
+          cur = word;
+        } else cur = next;
+      }
+      lines.push(cur);
+      lines.slice(0, 4).forEach((l, i) => {
+        text(ctx, l, x0, h * (small ? 0.78 : 0.84) + i * (small ? 15 : 18), { size: small ? 11 : 13, color: i === 0 ? C.text : C.muted });
+      });
       shell.tick();
     },
   };
 }
 
-function drawBuffer(ctx: Ctx, x: number, y: number, w: number, h: number, label: string, color: string): void {
-  roundRect(ctx, x, y, w, h, 10);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.stroke();
-  mono(ctx, label, x + w * 0.5, y + h * 0.5, 11, "#d7dbe6", "center");
-}
+// ---------------------------------------------------------------------------
+// Fig. 4: capacity from the device's storage binding limit
 
 export function mountCapacityMap(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.5);
-  const ctx = shell.canvas.getContext("2d")!;
-  const state = { limitMiB: 128 };
-  shell.slider({
-    label: "max storage binding",
-    min: 64,
-    max: 512,
+  const narrow = (container.clientWidth || 700) < 560;
+  const shell = new Shell(container, narrow ? 0.9 : 0.5);
+  const MiB = 1024 * 1024;
+  const state = { limitMiB: 128, deviceMiB: 0, adapterMiB: 0 };
+  const slider = shell.slider({
+    label: "storage binding limit",
+    min: 20.48, // a log range of exactly 2.00, so the slider's 0.01 steps reach both ends
+    max: 2048,
     step: 32,
     value: state.limitMiB,
-    format: (v) => `${v.toFixed(0)} MiB`,
-    onInput: (v) => {
-      state.limitMiB = Math.round(v);
-    },
+    log: true,
+    format: (v) => (v >= 1024 ? `${(v / 1024).toFixed(2)} GiB` : `${v.toFixed(0)} MiB`),
+    onInput: (v) => (state.limitMiB = v),
   });
+  // read the real numbers off this machine
+  void getDevice().then((device) => {
+    if (!device) return;
+    state.deviceMiB = device.limits.maxStorageBufferBindingSize / MiB;
+    state.limitMiB = state.deviceMiB;
+    slider.value = String(Math.log10(state.limitMiB));
+    slider.dispatchEvent(new Event("input"));
+  });
+  void navigator.gpu
+    ?.requestAdapter()
+    .then((adapter) => {
+      if (adapter) state.adapterMiB = adapter.limits.maxStorageBufferBindingSize / MiB;
+    })
+    .catch(() => {});
   shell.setInfo(() => {
-    const cap = Math.floor((state.limitMiB * 1024 * 1024) / 80);
-    return `${cap.toLocaleString()} particles`;
+    const cap = Math.floor((state.limitMiB * MiB) / PARTICLE_STRIDE);
+    return `${cap.toLocaleString()} particles per buffer`;
   });
 
   return {
     frame() {
-      const w = shell.canvas.width;
-      const h = shell.canvas.height;
-      clear(ctx, w, h);
-      const bindingBytes = state.limitMiB * 1024 * 1024;
-      const capacity = Math.floor(bindingBytes / 80);
-      const particleMiB = (capacity * 80) / 1024 / 1024;
-      const totalMiB = particleMiB * 2 + (65536 * 96) / 1024 / 1024 + 0.001;
-      text(ctx, "Capacity is a device fact", w * 0.5, h * 0.12, 18, "#eef1f8", "center");
-      mono(ctx, `floor(${state.limitMiB} MiB / 80 bytes) = ${capacity.toLocaleString()} particles`, w * 0.5, h * 0.22, 14, "#c4cdf0", "center");
+      const { ctx, w, h } = begin(shell.canvas);
+      const small = w < 520;
+      const bytes = state.limitMiB * MiB;
+      const capacity = Math.floor(bytes / PARTICLE_STRIDE);
+      const bufMiB = (capacity * PARTICLE_STRIDE) / MiB;
+      const cmdMiB = (65536 * EMIT_COMMAND_BYTES) / MiB;
+      const totalMiB = bufMiB * 2 + cmdMiB;
 
-      const x = w * 0.14;
-      const bw = w * 0.72;
-      memoryBar(ctx, x, h * 0.36, bw, h * 0.1, "read particle buffer", particleMiB, state.limitMiB, "#ffb86b");
-      memoryBar(ctx, x, h * 0.53, bw, h * 0.1, "write particle buffer", particleMiB, state.limitMiB, "#7dd6a0");
-      memoryBar(ctx, x, h * 0.7, bw, h * 0.1, "commands + counters", totalMiB - particleMiB * 2, state.limitMiB, "#7aa2ff");
-      text(ctx, `total fireworks GPU allocation: ${totalMiB.toFixed(1)} MiB`, w * 0.5, h * 0.9, 15, "#d7dbe6", "center");
+      if (small) {
+        text(ctx, `floor(${formatBytes(bytes)} ÷ 80 B)`, w / 2, h * 0.07, { size: 13, mono: true, align: "center", weight: 600 });
+        text(ctx, `= ${capacity.toLocaleString()} particles`, w / 2, h * 0.07 + 18, { size: 13, mono: true, align: "center", weight: 600 });
+        text(ctx, "per buffer, and there are two of them", w / 2, h * 0.07 + 38, { size: 11, color: C.muted, align: "center" });
+      } else {
+        text(ctx, `floor(${formatBytes(bytes)} ÷ 80 B) = ${capacity.toLocaleString()} particles`, w / 2, h * 0.11, {
+          size: 16,
+          mono: true,
+          align: "center",
+          weight: 600,
+        });
+        text(ctx, "per buffer, and there are two of them", w / 2, h * 0.19, { size: 12, color: C.muted, align: "center" });
+      }
+
+      // memory map: both particle buffers plus the command buffer, to scale
+      const x0 = small ? 12 : w * 0.07;
+      const x1 = w - x0;
+      const y = h * (small ? 0.33 : 0.36);
+      const bh = small ? 46 : h * 0.16;
+      const scale = (x1 - x0) / totalMiB;
+      const seg = (from: number, size: number, color: string, label: string, sub: string): void => {
+        const x = x0 + from * scale;
+        const sw = size * scale;
+        const g = ctx.createLinearGradient(0, y, 0, y + bh);
+        g.addColorStop(0, color);
+        g.addColorStop(1, color + "99");
+        roundRect(ctx, x + 1, y, sw - 2, bh, 6);
+        ctx.fillStyle = g;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        if (sw > 70) {
+          text(ctx, label, x + 10, y + bh * 0.36, { size: small ? 10 : 13, color: "#0b0d14", weight: 700 });
+          text(ctx, sub, x + 10, y + bh * 0.7, { size: small ? 9 : 11, color: "#0b0d14", mono: true });
+        }
+      };
+      seg(0, bufMiB, C.amber, "particles A", formatBytes(bufMiB * MiB));
+      seg(bufMiB, bufMiB, C.green, "particles B", formatBytes(bufMiB * MiB));
+      seg(bufMiB * 2, cmdMiB, C.blue, "", "");
+      text(ctx, small ? `+ ${cmdMiB.toFixed(0)} MiB of emit commands, + counters` : `+ ${cmdMiB.toFixed(0)} MiB of emit commands, and a few bytes of counters and indirect args`, x1, y + bh + 16, {
+        size: small ? 9 : 11,
+        color: C.muted,
+        align: "right",
+      });
+      text(ctx, `total ${formatBytes(totalMiB * MiB)}`, x1, y - 14, { size: small ? 11 : 13, mono: true, align: "right", color: C.text });
+
+      // facts from this machine
+      const fy = h * (small ? 0.66 : 0.74);
+      const line = (label: string, value: string, yy: number, color: string): void => {
+        text(ctx, label, x0, yy, { size: small ? 10 : 13, color: C.muted });
+        text(ctx, value, x1, yy, { size: small ? 10 : 13, mono: true, color, align: "right" });
+      };
+      line(
+        small ? "this page's device (defaults)" : "this page's device (default WebGPU limits)",
+        state.deviceMiB ? formatBytes(state.deviceMiB * MiB) : "no WebGPU",
+        fy,
+        C.text,
+      );
+      line(
+        small ? "your GPU would grant up to" : "most your GPU adapter would grant if asked",
+        state.adapterMiB ? formatBytes(state.adapterMiB * MiB) : "…",
+        fy + (small ? 18 : 24),
+        C.green,
+      );
+      const shells = Math.floor(capacity / (50000 + 1 + 41 + 64 + 30));
+      line(small ? "50,000-spark shells per buffer" : "50,000-spark shells that fit in one buffer", shells.toLocaleString(), fy + (small ? 36 : 48), C.amber);
       shell.tick();
     },
   };
 }
 
-function memoryBar(ctx: Ctx, x: number, y: number, w: number, h: number, label: string, usedMiB: number, limitMiB: number, color: string): void {
-  text(ctx, label, x, y - 16, 12, "#8a91a5");
-  mono(ctx, `${usedMiB.toFixed(1)} MiB`, x + w, y - 16, 12, "#ffb86b", "right");
-  roundRect(ctx, x, y, w, h, 9);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-  ctx.fill();
-  roundRect(ctx, x, y, w * clamp(usedMiB / limitMiB, 0, 1), h, 9);
-  ctx.fillStyle = color;
-  ctx.fill();
+// ---------------------------------------------------------------------------
+// Fig. 5: the real thing, with its counters
+
+export async function mountFireworksLive(container: HTMLElement): Promise<Demo> {
+  const shell = new Shell(container, 0.56);
+  const world = await FireworksWorld.get();
+  if (!world) {
+    const note = document.createElement("p");
+    note.className = "demo-fallback";
+    note.textContent = "This figure needs WebGPU (Chrome or Edge 113+, or a recent Safari).";
+    container.appendChild(note);
+    return { frame() {} };
+  }
+  const view = new FireworksView(world, shell.canvas);
+  view.resize();
+  const state = { sparks: 3000, rockets: 3, system: "classic" as FireworkSystemId, auto: true };
+  shell.canvas.style.touchAction = "none";
+  shell.canvas.style.cursor = "crosshair";
+
+  shell.slider({
+    label: "sparks per shell",
+    min: 100,
+    max: 100000,
+    step: 100,
+    value: state.sparks,
+    log: true,
+    format: (v) => Math.round(v).toLocaleString(),
+    onInput: (v) => (state.sparks = Math.round(v)),
+  });
+  shell.slider({
+    label: "rockets per launch",
+    min: 1,
+    max: 12,
+    step: 1,
+    value: state.rockets,
+    format: (v) => v.toFixed(0),
+    onInput: (v) => (state.rockets = Math.round(v)),
+  });
+  const systemButton = shell.button("shell: classic", () => {
+    state.system = state.system === "classic" ? "collapse" : "classic";
+    systemButton.textContent = `shell: ${state.system}`;
+  });
+  shell.button("salvo of 24", () => {
+    const a = view.aspect();
+    for (let i = 0; i < 24; i++) {
+      world.launch([-0.85 + (1.7 * (i + 0.5)) / 24, 0.2 + Math.random() * 0.55], { system: state.system, sparks: state.sparks }, a);
+    }
+  });
+  const autoButton = shell.button("auto: on", () => {
+    state.auto = !state.auto;
+    autoButton.textContent = `auto: ${state.auto ? "on" : "off"}`;
+  });
+
+  // live counters, below the canvas
+  const panel = document.createElement("div");
+  panel.className = "fw-stats";
+  const cells: Record<string, HTMLSpanElement> = {};
+  const rows: Array<[string, string]> = [
+    ["live", "live particles"],
+    ["overflow", "overflowed, total"],
+    ["capacity", "capacity per buffer"],
+    ["emitted", "emitted, last second"],
+    ["commands", "emit commands, last second"],
+    ["memory", "GPU memory"],
+  ];
+  for (const [key, label] of rows) {
+    const cell = document.createElement("div");
+    cell.className = "fw-stat";
+    const v = document.createElement("span");
+    v.className = "fw-stat-value";
+    v.textContent = "–";
+    const l = document.createElement("span");
+    l.className = "fw-stat-label";
+    l.textContent = label;
+    cell.append(v, l);
+    panel.appendChild(cell);
+    cells[key] = v;
+  }
+  shell.canvas.after(panel);
+
+  // press and hold to keep launching where the pointer is
+  let held: [number, number] | null = null;
+  let nextHold = 0;
+  const toPoint = (e: PointerEvent): [number, number] => {
+    const r = shell.canvas.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * 2 - 1, 1 - ((e.clientY - r.top) / r.height) * 2];
+  };
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    held = toPoint(e);
+    nextHold = 0;
+    shell.canvas.setPointerCapture(e.pointerId);
+  });
+  shell.canvas.addEventListener("pointermove", (e) => {
+    if (held) held = toPoint(e);
+  });
+  const release = (): void => {
+    held = null;
+  };
+  shell.canvas.addEventListener("pointerup", release);
+  shell.canvas.addEventListener("pointercancel", release);
+
+  const tick = autoShow(
+    world,
+    () => view.aspect(),
+    () => ({ sparks: state.sparks, rockets: [1, 3], interval: [0.8, 1.5], collapseEvery: state.system === "collapse" ? 1 : 0 }),
+  );
+
+  // emitted totals over the last second (these numbers start on the CPU anyway)
+  const history: Array<{ t: number; emitted: number; commands: number }> = [];
+  let lastStats = 0;
+  let last = performance.now();
+  shell.setInfo(() => "press and hold on the sky to launch");
+
+  return {
+    frame() {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (state.auto && !held) tick(world.clock);
+      if (held && world.clock >= nextHold) {
+        // eight launches every half second while the pointer is down
+        nextHold = world.clock + 0.5 / 8;
+        const a = view.aspect();
+        for (let r = 0; r < state.rockets; r++) {
+          world.launch(world.spread(held, r, state.rockets, a), { system: state.system, sparks: state.sparks }, a);
+        }
+      }
+      world.step(now);
+      world.render(view, dt);
+      shell.tick();
+
+      const s = world.stats();
+      if (s && now - lastStats > 250) {
+        lastStats = now;
+        history.push({ t: now, emitted: world.emittedSinceLastRead(), commands: world.commandsSinceLastRead() });
+        while (history.length && now - history[0].t > 1000) history.shift();
+        cells.live.textContent = s.live.toLocaleString();
+        cells.overflow.textContent = s.overflow.toLocaleString();
+        cells.overflow.classList.toggle("is-bad", s.overflow > 0);
+        cells.capacity.textContent = s.capacity.toLocaleString();
+        cells.emitted.textContent = history.reduce((sum, x) => sum + x.emitted, 0).toLocaleString();
+        cells.commands.textContent = history.reduce((sum, x) => sum + x.commands, 0).toLocaleString();
+        cells.memory.textContent = formatBytes(s.gpuBytes);
+      }
+    },
+    dispose() {
+      view.dispose();
+    },
+  };
 }

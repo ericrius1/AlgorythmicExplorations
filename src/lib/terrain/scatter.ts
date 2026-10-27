@@ -25,7 +25,7 @@ export const SCATTER_DEFAULTS: ScatterParams = {
   moistureFreq: 0.035,
   moistureOffset: 0,
   treeLine: 0.45,
-  treeCell: 3.4,
+  treeCell: 2.6,
   rockCell: 5.0,
 };
 
@@ -81,7 +81,28 @@ export function groundAt(
   return { h, h01, slope, m, biome: classify(h01, slope, m, sp) };
 }
 
+// ---- the ground's paint ------------------------------------------------------------------
+
+// A per-vertex tint toward each biome's colour (linear rgb + weight), for
+// buildTerrainGeometry's `tint` option. Forest gets the strongest pull, so
+// woods too far away to have trees drawn still read as dark canopy.
+const TINT: Record<Biome, [number, number, number, number]> = (() => {
+  const w: Record<Biome, number> = { forest: 0.8, meadow: 0.3, scrub: 0.5, scree: 0.35, alpine: 0.55, cliff: 0.25 };
+  const out = {} as Record<Biome, [number, number, number, number]>;
+  for (const k of Object.keys(BIOME_COLORS) as Biome[]) {
+    const c = new THREE.Color().setHex(k === "forest" ? 0x2c4424 : BIOME_COLORS[k], THREE.SRGBColorSpace);
+    out[k] = [c.r, c.g, c.b, w[k]];
+  }
+  return out;
+})();
+
+export function biomeTint(tp: TerrainParams, sp: ScatterParams): (x: number, z: number, h: number, slope: number) => [number, number, number, number] {
+  return (x, z, h, slope) => TINT[classify(h / tp.amplitude, slope, moisture(x, z, sp), sp)];
+}
+
 // ---- placement: the jittered grid --------------------------------------------------------
+
+export const TREE_VARIANTS = 6;
 
 // One candidate per grid cell, jittered by the cell's hash. The cells are
 // indexed in *world* coordinates (floor(x / cell)), so any region query over
@@ -135,7 +156,7 @@ export function scatterItems(
     const nearLine = smooth01((g.h01 - (sp.treeLine - 0.2)) / 0.2);
     out.push({
       kind: "tree",
-      variant: (hash2(ci, cj, sp.seed + 31) * 4) | 0,
+      variant: (hash2(ci, cj, sp.seed + 31) * TREE_VARIANTS) | 0,
       x,
       y: g.h - 0.05,
       z,
@@ -176,9 +197,9 @@ const smooth01 = (t: number): number => {
 
 // Function-of-position grass (part 3 planted from the erosion ledger; this
 // plants from the climate, so chunks can do it). Density follows biome.
-const C_GREEN = new THREE.Color().setHex(0x5d8038, THREE.SRGBColorSpace);
-const C_LIGHT = new THREE.Color().setHex(0x93b052, THREE.SRGBColorSpace);
-const C_DRY = new THREE.Color().setHex(0xa39a58, THREE.SRGBColorSpace);
+const C_GREEN = new THREE.Color().setHex(0x3d6828, THREE.SRGBColorSpace);
+const C_LIGHT = new THREE.Color().setHex(0x789c3c, THREE.SRGBColorSpace);
+const C_DRY = new THREE.Color().setHex(0xa8985a, THREE.SRGBColorSpace);
 
 export function grassBlades(
   tp: TerrainParams,
@@ -186,7 +207,9 @@ export function grassBlades(
   region: { minX: number; minZ: number; maxX: number; maxZ: number },
   candidates: number,
   seed: number,
+  opts: { scale?: number; sun?: (x: number, z: number) => number } = {},
 ): GrassBlade[] {
+  const scale = opts.scale ?? 1;
   const blades: GrassBlade[] = [];
   const c = new THREE.Color();
   const w = region.maxX - region.minX, d = region.maxZ - region.minZ;
@@ -211,11 +234,12 @@ export function grassBlades(
       y: g.h - 0.01,
       z,
       yaw: hash2(k, 97, seed) * Math.PI * 2,
-      height: 0.1 + 0.16 * tall,
-      width: 0.012 + 0.012 * hash2(k, 157, seed),
+      height: (0.1 + 0.16 * tall) * scale,
+      width: (0.012 + 0.012 * hash2(k, 157, seed)) * scale,
       lean: 0.05 + 0.22 * hash2(k, 307, seed),
       phase: hash2(k, 769, seed) * Math.PI * 2,
       flex: 0.45 + 0.8 * tall,
+      sun: opts.sun ? opts.sun(x, z) : 1,
       r: c.r,
       g: c.g,
       b: c.b,

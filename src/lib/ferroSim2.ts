@@ -5,7 +5,7 @@
 
 import ferroShader from "../shaders/ferro2.wgsl?raw";
 import { GridSort2, GRID } from "./gridSort2";
-import { seedTray, TRAY, H } from "./ferroSim";
+import { seedTray, TRAY, H, type Tray } from "./ferroSim";
 
 const WG = 256;
 export { TRAY, H };
@@ -22,6 +22,8 @@ export interface Ferro2Knobs {
   magMoment: number; // cursor dipole moment
   forceScale: number;
   kelvin: boolean; // true = Kelvin force model, false = current loop
+  mMax: number;
+  accClamp: number;
 }
 
 export const FERRO2_KNOBS: Ferro2Knobs = {
@@ -29,21 +31,22 @@ export const FERRO2_KNOBS: Ferro2Knobs = {
   stiffness: 80.0,
   restDensity: 2.6,
   nearStiffness: 260.0,
-  xsph: 0.16,
-  tension: 3.2,
-  chi: 8.0,
+  xsph: 0.3,
+  tension: 5.0,
+  chi: 2.0,
   hExt: 5.0,
   magMoment: 0.0,
   forceScale: 0.45,
   kelvin: false,
+  mMax: 30.0,
+  accClamp: 70.0,
 };
 
 export const CURSOR_H = 0.1; // cursor magnet smoothing radius, world units
-const M_MAX = 30.0;
-const ACC_CLAMP = 70.0;
 
 export class Ferro2Sim {
   count: number;
+  readonly tray: Tray;
   readonly params: GPUBuffer;
   private dev: GPUDevice;
   private sort: GridSort2;
@@ -58,9 +61,10 @@ export class Ferro2Sim {
   private simGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
   private cur = 0;
 
-  constructor(dev: GPUDevice, count: number) {
+  constructor(dev: GPUDevice, count: number, tray: Tray = TRAY) {
     this.dev = dev;
     this.count = count;
+    this.tray = tray;
     this.sort = new GridSort2(dev);
     this.params = dev.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const buf = (type: GPUBufferBindingType): GPUBindGroupLayoutEntry["buffer"] => ({ type });
@@ -94,7 +98,7 @@ export class Ferro2Sim {
       this.dev.createBuffer({ size: count * 32, usage }),
     ];
     this.density = this.dev.createBuffer({ size: count * 16, usage: GPUBufferUsage.STORAGE });
-    this.dev.queue.writeBuffer(this.bufs[0], 0, seedTray(count) as BufferSource);
+    this.dev.queue.writeBuffer(this.bufs[0], 0, seedTray(count, this.tray) as BufferSource);
     this.sortGroups = [this.sort.bindGroup(this.bufs[0], this.bufs[1]), this.sort.bindGroup(this.bufs[1], this.bufs[0])];
     const mkSim = (sorted: GPUBuffer): GPUBindGroup =>
       this.dev.createBindGroup({
@@ -131,11 +135,11 @@ export class Ferro2Sim {
     dv.setFloat32(60, mag[1], true);
     dv.setFloat32(64, knobs.forceScale, true);
     dv.setFloat32(68, knobs.kelvin ? 1.0 : 0.0, true);
-    dv.setFloat32(72, M_MAX, true);
-    dv.setFloat32(76, ACC_CLAMP, true);
-    dv.setFloat32(80, TRAY.floorY, true);
-    dv.setFloat32(84, TRAY.wallX, true);
-    dv.setFloat32(88, TRAY.topY, true);
+    dv.setFloat32(72, knobs.mMax, true);
+    dv.setFloat32(76, knobs.accClamp, true);
+    dv.setFloat32(80, this.tray.floorY, true);
+    dv.setFloat32(84, this.tray.wallX, true);
+    dv.setFloat32(88, this.tray.topY, true);
     dv.setFloat32(92, CURSOR_H, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }

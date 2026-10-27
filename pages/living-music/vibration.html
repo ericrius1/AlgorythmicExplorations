@@ -14,9 +14,16 @@
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Living Music · Part 1</p>
+        <h1>The Anatomy of a Note</h1>
+        <p class="subtitle">What a note is made of. The harp above has eight strings tuned to the harmonics of one low A.</p>
+      </div>
+    </header>
     <main>
-      <h1>The Anatomy of a Note</h1>
       <p>
         This series approaches music theory through acoustics rather than
         starting with staff lines and Italian vocabulary. Music theory is
@@ -58,7 +65,7 @@
         hollow, reedy. Step 3 explains those timbral differences.
       </p>
 
-      <div data-demo="oscillo"></div>
+      <div data-demo="oscillo" data-title="Scope" data-hint="Play"></div>
 
       <aside class="note">
         <span class="note-label">Aside · Pitch before frequency</span>
@@ -104,7 +111,7 @@ for (let i = 1; i &lt; N - 1; i++) {
         frequency. The fixed ends select stable repeating modes from the wave equation.
       </p>
 
-      <div data-demo="string"></div>
+      <div data-demo="string" data-title="String" data-hint="Pluck"></div>
 
       <p>
         Now watch the coloured bars under the string, and try the two pluck buttons.
@@ -168,7 +175,11 @@ for (let i = 1; i &lt; N - 1; i++) {
         is their sum, and the sound.
       </p>
 
-      <div data-demo="harmonics"></div>
+      <div data-demo="ladder" data-title="The ladder" data-hint="Tap a rung"></div>
+      <div data-demo="harmonics" data-title="Additive" data-hint="Draw on the bars"></div>
+      <div data-demo="vowels" data-title="Vowels" data-hint="Drag the dot"></div>
+      <div data-demo="missing" data-title="Missing" data-hint="Raise the slider"></div>
+      <div data-demo="shepard" data-title="Shepard" data-hint="Play"></div>
 
       <p>
         To isolate each harmonic, pull everything down except <code>h1</code>: a pure

@@ -1,139 +1,184 @@
-// The plucked string: a 1D wave equation you can grab. The sim runs in slow
-// motion so you can watch the wave bounce; the sound is synthesized from the
-// string's *modal recipe* — project the release shape onto the first ten
-// standing waves and hand each one a sine oscillator with its own decay.
-// Pluck near the end and the recipe goes bright; pluck the middle and the
-// even harmonics vanish. Same string, same physics, two timbres.
+// Fig. 2 of "The Anatomy of a Note": one string, plucked or bowed. The
+// picture and the sound come from the same modal model. A string fixed at
+// both ends can only hold the standing waves sin(nπx), each ringing at n·f;
+// any motion is a sum of them. A pluck is a triangle, which projects onto
+// mode n as sin(nπp)/n² (p = where you plucked); the bridge feels the
+// string's slope, which adds a factor of n, so the heard recipe is
+// sin(nπp)/n. Bowing sets up Helmholtz motion: a sharp corner racing around
+// the string inside a parabola, every harmonic at 1/n.
 
-import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
-import { getDevice } from "../../lib/gpu";
-import { ShaderView } from "../../lib/shaderCanvas";
-import { Tone, masterBus, unlockAudio, frameGuard, soundHint, freqLabel } from "../../lib/audio";
+import type { Demo } from "../../lib/demoShell";
+import { strike, damp, Partials, unlockAudio, audioOn, noteLabel, type Mode, guardSound } from "./sound/core";
+import { Stage, PlayPill, choice, glowStroke, glowDot, harmonicRgb, rgba, mix, text, hline, vline, WHITE, GOLD, ORANGE, roundRect } from "./sound/draw";
 
-const N = 160; // string points
-const MODES = 10;
-const SLOWMO = 80; // visual sim runs this many times slower than the audio
+const MODES = 24; // modes drawn
+const BARS = 16; // harmonics shown in the recipe
+const VIS_HZ = 1.25; // the drawn fundamental, whatever the pitch
 
-const SCENE = /* wgsl */ `
-fn sample(x: f32) -> f32 {
-  let f = clamp(x, 0.0, 1.0) * f32(${N - 1});
-  let i = u32(floor(f));
-  return mix(D[i], D[min(i + 1u, ${N - 1}u)], fract(f));
-}
-
-fn scene(uv: vec2f) -> vec3f {
-  let t = uf(0u);
-  let grab = uf(4u);
-  var col = vec3f(0.0);
-
-  // anchor posts
-  col += vec3f(0.18, 0.14, 0.10) * (glow(abs(uv.x - 0.04), 0.004) + glow(abs(uv.x - 0.96), 0.004))
-       * smoothstep(0.18, 0.3, uv.y) * smoothstep(0.82, 0.7, uv.y);
-
-  // first three mode shapes, ghosted, scaled by their live amplitudes
-  let xs = clamp((uv.x - 0.04) / 0.92, 0.0, 1.0);
-  for (var n = 1; n <= 3; n++) {
-    let amp = D[${N}u + u32(n - 1)];
-    let ym = 0.56 + sin(f32(n) * 3.14159265 * xs) * amp * 0.22 * sin(t * (1.0 + f32(n) * 0.3));
-    col += hsv(0.6 + f32(n) * 0.07, 0.7, 0.8) * glow(abs(uv.y - ym), 0.002) * 0.25 * step(0.001, amp);
-  }
-
-  // the string itself
-  if (uv.x > 0.03 && uv.x < 0.97) {
-    let y = 0.56 + sample(xs) * 0.22;
-    let d = abs(uv.y - y);
-    let c = mix(hsv(0.09, 0.55, 1.0), hsv(0.13, 0.85, 1.0), grab);
-    col += c * (glow(d, 0.0035) * 1.25 + halo(d, 0.005) * 0.4);
-  }
-
-  // modal recipe bars along the bottom
-  for (var n = 0u; n < ${MODES}u; n++) {
-    let amp = D[${N}u + n];
-    let cx = 0.08 + (f32(n) + 0.5) * 0.05;
-    let h = 0.02 + amp * 0.13;
-    if (abs(uv.x - cx) < 0.016 && uv.y > 0.045 && uv.y < 0.045 + h) {
-      col += hsv(0.6 + f32(n) * 0.055, 0.75, 0.9) * 0.8;
-    }
-    // harmonic number tick
-    col += vec3f(0.1) * glow(length(uv - vec2f(cx, 0.035)), 0.0025);
-  }
-
-  return col * vignette(uv);
-}
-`;
+type Mode2 = "pluck" | "bow";
 
 export async function mountPluckString(container: HTMLElement): Promise<Demo> {
-  const dev = await getDevice();
-  const shell = new Shell(container, 0.52);
-  if (!dev) return gpuMissing(container);
-  const view = new ShaderView(dev, shell.canvas, SCENE, N + MODES);
-  soundHint(container, "drag the string, let go");
+  const stage = new Stage(container, { aspect: 0.6, narrowAspect: 1.05, touch: "none" });
+  const { shell, canvas } = stage;
 
   let f0 = 110;
+  let mode: Mode2 = "pluck";
+  const decay = (f: number): number => Math.min(3.2, Math.max(0.12, 2.6 * Math.pow(110 / f, 0.6)));
 
-  // ---- audio: ten sines, one per mode, with per-mode decay ----------------
-  const oscs: Tone.Oscillator[] = [];
-  const gains: Tone.Gain[] = [];
-  const releaseAt = { t: -1 };
-  const recipe = new Float32Array(MODES); // amplitudes at release, for the bars
-  for (let n = 1; n <= MODES; n++) {
-    const g = new Tone.Gain(0).connect(masterBus());
-    const o = new Tone.Oscillator(f0 * n, "sine").connect(g);
-    oscs.push(o);
-    gains.push(g);
-  }
-  const decay = (n: number): number => 3.2 / (1 + 0.45 * (n - 1)); // high modes die first
+  // complex mode amplitudes in units of the panel half-height
+  const cr = new Float64Array(MODES + 1);
+  const ci = new Float64Array(MODES + 1);
+  // the sound's recipe right now (for the bars), and how it decays
+  const recipe = new Float64Array(BARS + 1);
+  let lastP = -1;
+  let bowP = 0.12;
+  let bowing = false;
+  let bowAmp = 0; // Helmholtz amplitude, eases in while bowing
+  let grab: { p: number; y: number } | null = null;
+  const t = (): number => performance.now() / 1000;
+  const w = (n: number): number => 2 * Math.PI * n * VIS_HZ;
 
-  const silence = (): void => {
-    for (const g of gains) g.gain.cancelScheduledValues(Tone.now());
-    for (const g of gains) g.gain.rampTo(0, 0.1);
-  };
-  const guard = frameGuard(silence);
-
-  // ---- the string ----------------------------------------------------------
-  const y = new Float32Array(N);
-  const v = new Float32Array(N);
-  let grabbed = -1;
-
-  const pluckAudio = (): void => {
-    // project the string shape onto sin(nπx): the recipe the ear will get
-    let peak = 1e-6;
-    for (let n = 1; n <= MODES; n++) {
-      let b = 0;
-      for (let i = 0; i < N; i++) b += y[i] * Math.sin((n * Math.PI * i) / (N - 1));
-      b = Math.abs((2 * b) / N);
-      recipe[n - 1] = b;
-      peak = Math.max(peak, b);
+  // ---- sound ------------------------------------------------------------------
+  const bow = new Partials(20, { level: 0.08 });
+  const bowRecipe = (): void => {
+    const fr: number[] = [];
+    const am: number[] = [];
+    for (let n = 1; n <= 20; n++) {
+      fr.push(n * f0);
+      am.push(n * f0 < 9000 ? 1 / n : 0);
     }
-    const now = Tone.now();
-    releaseAt.t = performance.now();
+    bow.set(fr, am, 0.02);
+  };
+  bowRecipe();
+
+  const heard = (p: number, n: number): number => Math.sin(n * Math.PI * p) / n;
+
+  let touched = false; // until someone plays, the string plucks itself (silently)
+  const pluck = (p: number, h: number, audible = true): void => {
+    p = Math.min(0.97, Math.max(0.03, p));
+    const t0 = t();
+    // a hand on the string stops what it was doing
     for (let n = 1; n <= MODES; n++) {
-      const g = gains[n - 1].gain;
-      const a = (recipe[n - 1] / peak) * 0.34 / Math.sqrt(n);
-      if (oscs[n - 1].state !== "started") oscs[n - 1].start();
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(Math.max(a, 1e-4), now);
-      g.exponentialRampToValueAtTime(1e-4, now + decay(n));
-      g.linearRampToValueAtTime(0, now + decay(n) + 0.05);
+      cr[n] *= 0.1;
+      ci[n] *= 0.1;
     }
-    for (let n = 0; n < MODES; n++) recipe[n] /= peak;
+    for (let n = 1; n <= MODES; n++) {
+      const b = (2 * h * Math.sin(n * Math.PI * p)) / (n * n * Math.PI * Math.PI * p * (1 - p));
+      cr[n] += b * Math.cos(-w(n) * t0);
+      ci[n] += b * Math.sin(-w(n) * t0);
+    }
+    lastP = p;
+    let peak = 1e-9;
+    for (let n = 1; n <= BARS; n++) peak = Math.max(peak, Math.abs(heard(p, n)));
+    for (let n = 1; n <= BARS; n++) recipe[n] = Math.abs(heard(p, n)) / peak;
+
+    if (!audible || !audioOn()) return;
+    damp(0.03);
+    const modes: Mode[] = [];
+    let sum = 0;
+    for (let n = 1; n <= 30 && n * f0 < 9000; n++) {
+      const a = heard(p, n);
+      modes.push({ f: n * f0, a, tau: decay(n * f0) });
+      sum += Math.abs(a);
+    }
+    const level = (0.26 * Math.min(1, Math.abs(h) / 0.5 + 0.3)) / Math.max(sum, 0.8);
+    for (const m of modes) m.a *= level;
+    strike(modes, { attack: 0.002 });
   };
 
-  const xToIndex = (ux: number): number => Math.round(((ux - 0.04) / 0.92) * (N - 1));
+  const startBow = (p: number): void => {
+    bowP = Math.min(0.4, Math.max(0.04, p));
+    bowing = true;
+    for (let n = 1; n <= BARS; n++) recipe[n] = 1 / n;
+    lastP = -1;
+    if (audioOn()) {
+      damp(0.05);
+      bowRecipe();
+      bow.start(0.12);
+    }
+  };
+  const stopBow = (): void => {
+    if (!bowing) return;
+    bowing = false;
+    // the string keeps ringing after the bow leaves: hand the sustained
+    // motion to the free decay, and the sound to a ring-out
+    if (audioOn() && bow.playing) {
+      const modes: Mode[] = [];
+      for (let n = 1; n <= 20 && n * f0 < 9000; n++) modes.push({ f: n * f0, a: (0.08 * 0.62) / n, tau: decay(n * f0) * 0.8 });
+      strike(modes, { attack: 0.03 });
+      bow.stop(0.06);
+    }
+  };
 
-  shell.canvas.addEventListener("pointerdown", (e) => {
-    void unlockAudio();
+  // ---- input ------------------------------------------------------------------
+  const geom = { xa: 0, xb: 0, ys: 0, amp: 0 };
+  const pOf = (x: number): number => (x - geom.xa) / (geom.xb - geom.xa);
+  const pill = new PlayPill(stage, "Drag the string and let go", () => {
+    touched = true;
+    void unlockAudio().then(() => {
+      pill.show(false);
+      if (mode === "pluck") pluck(0.5, 0.7);
+    });
+  }, "top");
+
+  canvas.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    grabbed = Math.max(2, Math.min(N - 3, xToIndex(view.pointer.x)));
+    touched = true;
+    canvas.setPointerCapture(e.pointerId);
+    pill.show(false);
+    const [x, y] = stage.local(e);
+    void unlockAudio().then(() => {
+      if (mode === "bow") startBow(pOf(x));
+    });
+    if (mode === "pluck") grab = { p: Math.min(0.97, Math.max(0.03, pOf(x))), y: (geom.ys - y) / geom.amp };
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!grab) return;
+    const [, y] = stage.local(e);
+    grab.y = Math.max(-1, Math.min(1, (geom.ys - y) / geom.amp));
   });
   const release = (): void => {
-    if (grabbed < 0) return;
-    grabbed = -1;
-    pluckAudio();
+    if (grab) {
+      const h = Math.abs(grab.y) < 0.06 ? 0.7 : grab.y;
+      const p = grab.p;
+      grab = null;
+      void unlockAudio().then(() => pluck(p, h));
+    }
+    stopBow();
   };
-  shell.canvas.addEventListener("pointerup", release);
-  shell.canvas.addEventListener("pointerleave", release);
+  canvas.addEventListener("pointerup", release);
+  canvas.addEventListener("pointercancel", release);
 
+  let pluckBtns: HTMLButtonElement[] = [];
+  choice(
+    stage,
+    [
+      { id: "pluck", label: "pluck" },
+      { id: "bow", label: "bow (hold)" },
+    ],
+    mode,
+    (m) => {
+      mode = m;
+      stopBow();
+      for (const b of pluckBtns) b.disabled = m === "bow";
+      pill.setText(m === "bow" ? "Press and hold to bow" : "Drag the string and let go");
+    },
+  );
+  const at = (label: string, p: number): void => {
+    pluckBtns.push(
+      shell.button(label, () => {
+        touched = true;
+        void unlockAudio().then(() => {
+          pill.show(false);
+          pluck(p, 0.7);
+        });
+      }),
+    );
+  };
+  at("pluck at ½", 1 / 2);
+  at("at ⅕", 1 / 5);
+  at("near the end", 1 / 14);
+  pluckBtns = pluckBtns.filter(Boolean);
   shell.slider({
     label: "pitch",
     min: 65,
@@ -142,63 +187,231 @@ export async function mountPluckString(container: HTMLElement): Promise<Demo> {
     value: f0,
     log: true,
     format: (v) => `${Math.round(v)} Hz`,
-    onInput: (val) => {
-      f0 = val;
-      oscs.forEach((o, i) => o.frequency.rampTo(f0 * (i + 1), 0.05));
+    onInput: (v) => {
+      f0 = v;
+      bowRecipe();
     },
   });
-  shell.button("pluck the middle", () => {
-    void unlockAudio();
-    for (let i = 0; i < N; i++) y[i] = 0.9 * Math.min(i / (N / 2), (N - 1 - i) / (N / 2));
-    v.fill(0);
-    pluckAudio();
+
+  const guard = guardSound(container, () => {
+    damp(0.1);
+    bow.stop(0.1);
+    bowing = false;
+    grab = null;
   });
-  shell.button("pluck near the bridge", () => {
-    void unlockAudio();
-    const p = Math.floor(N * 0.92);
-    for (let i = 0; i < N; i++) y[i] = 0.9 * (i <= p ? i / p : (N - 1 - i) / (N - 1 - p));
-    v.fill(0);
-    pluckAudio();
-  });
-  shell.setInfo(
-    () => `${freqLabel(f0)} string · shown ${SLOWMO}× slower than it sounds · drag it`,
-  );
+
+  // harmonics a pluck at p (nearly) removes: those with a node there
+  const missing = (p: number): number[] => {
+    const out: number[] = [];
+    for (let n = 2; n <= BARS; n++) if (Math.abs(Math.sin(n * Math.PI * p)) < 0.07) out.push(n);
+    return out;
+  };
+  const fracName = (p: number): string => {
+    for (let q = 2; q <= 16; q++) {
+      const k = Math.round(p * q);
+      if (k > 0 && Math.abs(p - k / q) < 0.004) return k === 1 ? `1/${q}` : `${k}/${q}`;
+    }
+    return p.toFixed(2);
+  };
+
+  shell.setInfo(() => `${noteLabel(f0)} · ${Math.round(f0)} Hz · drawn ${Math.round(f0 / VIS_HZ)}× slower than it sounds`);
+
+  // ---- drawing ------------------------------------------------------------------
+  const PTS = 220;
+  let lastT = t();
+  const AUTO = [1 / 2, 1 / 5, 1 / 14, 1 / 3];
+  let autoAt = t() + 0.4;
+  let autoIdx = 0;
 
   return {
     frame() {
       shell.tick();
       guard.pulse();
-
-      // wave equation, slow-motion: fundamental ≈ (110/SLOWMO) Hz on screen
-      const c = (2 * f0) / SLOWMO; // wave speed for a unit-length string
-      const dx = 1 / (N - 1);
-      const dt = (0.8 * dx) / c;
-      const steps = Math.max(1, Math.min(40, Math.round(1 / 60 / dt)));
-      for (let s = 0; s < steps; s++) {
-        if (grabbed >= 0) {
-          y[grabbed] = Math.max(-1, Math.min(1, (view.pointer.y - 0.56) / 0.22));
-          v[grabbed] = 0;
-        }
-        const k = ((c * dt) / dx) ** 2;
-        for (let i = 1; i < N - 1; i++) {
-          v[i] += k * (y[i - 1] - 2 * y[i] + y[i + 1]);
-          v[i] *= 0.99995;
-        }
-        if (grabbed >= 0) v[grabbed] = 0;
-        for (let i = 1; i < N - 1; i++) y[i] += v[i];
+      const now = t();
+      const dt = Math.min(0.1, now - lastT);
+      lastT = now;
+      if (!touched && mode === "pluck" && now > autoAt) {
+        pluck(AUTO[autoIdx++ % AUTO.length], 0.55, false);
+        autoAt = now + 4.5;
       }
 
-      view.data.set(y.subarray(0, N), 0);
-      // bars decay in step with the audio envelopes
-      const dtRel = releaseAt.t < 0 ? -1 : (performance.now() - releaseAt.t) / 1000;
-      for (let n = 1; n <= MODES; n++) {
-        view.data[N + n - 1] = dtRel < 0 ? 0 : recipe[n - 1] * Math.exp((-3 * dtRel) / decay(n));
+      const g = stage.begin();
+      const W = stage.w;
+      const H = stage.h;
+      geom.xa = W * 0.05;
+      geom.xb = W * 0.95;
+      geom.ys = H * (stage.narrow ? 0.3 : 0.32);
+      geom.amp = H * (stage.narrow ? 0.17 : 0.2);
+      const { xa, xb, ys, amp } = geom;
+
+      // bowing: Helmholtz motion, Σ sin(nπx) sin(nθ)/n², eased in
+      if (bowing) bowAmp += (0.62 - bowAmp) * Math.min(1, dt * 6);
+      else bowAmp = 0;
+      if (bowing) {
+        const scale = (8 / (Math.PI * Math.PI)) * bowAmp;
+        for (let n = 1; n <= MODES; n++) {
+          // sin(nθ) = Re[e^{i(nθ − π/2)}]
+          cr[n] = 0;
+          ci[n] = -scale / (n * n);
+        }
+      } else {
+        for (let n = 1; n <= MODES; n++) {
+          const k = Math.exp(-dt / decay(n * f0));
+          cr[n] *= k;
+          ci[n] *= k;
+        }
+        for (let n = 1; n <= BARS; n++) recipe[n] *= Math.exp(-dt / decay(n * f0));
       }
-      view.uniforms[4] = grabbed >= 0 ? 1 : 0;
-      view.draw();
+
+      // the shape now
+      const ys2 = new Float32Array(PTS);
+      let energy = 0;
+      if (grab) {
+        for (let j = 0; j < PTS; j++) {
+          const x = j / (PTS - 1);
+          ys2[j] = grab.y * (x <= grab.p ? x / grab.p : (1 - x) / (1 - grab.p));
+        }
+        energy = Math.abs(grab.y);
+      } else {
+        for (let n = 1; n <= MODES; n++) energy += cr[n] * cr[n] + ci[n] * ci[n];
+        energy = Math.sqrt(energy);
+        const y = ys2;
+        // the string now: every mode swinging at its own rate, n × the fundamental
+        for (let n = 1; n <= MODES; n++) {
+          const swing = cr[n] * Math.cos(w(n) * now) - ci[n] * Math.sin(w(n) * now);
+          for (let j = 0; j < PTS; j++) y[j] += swing * Math.sin((n * Math.PI * j) / (PTS - 1));
+        }
+      }
+
+      // envelope of the bowed motion: the parabola the corner runs around
+      if (bowing) {
+        const env = new Path2D();
+        const env2 = new Path2D();
+        for (let j = 0; j < PTS; j++) {
+          const x = j / (PTS - 1);
+          const e = 4 * x * (1 - x) * bowAmp * 0.5 * 2;
+          const px = xa + x * (xb - xa);
+          if (j === 0) {
+            env.moveTo(px, ys - e * amp);
+            env2.moveTo(px, ys + e * amp);
+          } else {
+            env.lineTo(px, ys - e * amp);
+            env2.lineTo(px, ys + e * amp);
+          }
+        }
+        g.save();
+        g.setLineDash([3, 5]);
+        g.strokeStyle = rgba(ORANGE, 0.35);
+        g.lineWidth = 1;
+        g.stroke(env);
+        g.stroke(env2);
+        g.restore();
+      }
+
+      // ghost of the first missing harmonic: its node sits where you plucked
+      const miss = lastP > 0 && !bowing ? missing(lastP) : [];
+      if (miss.length && !grab) {
+        const n = miss[0];
+        const c = harmonicRgb(n);
+        const ghost = new Path2D();
+        for (let j = 0; j < PTS; j++) {
+          const px = xa + (j / (PTS - 1)) * (xb - xa);
+          const py = ys - Math.sin((n * Math.PI * j) / (PTS - 1)) * amp * 0.32;
+          if (j === 0) ghost.moveTo(px, py);
+          else ghost.lineTo(px, py);
+        }
+        g.save();
+        g.setLineDash([2, 4]);
+        g.strokeStyle = rgba(c, 0.4);
+        g.lineWidth = 1;
+        g.stroke(ghost);
+        g.restore();
+        for (let k = 1; k < n; k++) glowDot(g, xa + (k / n) * (xb - xa), ys, 1.6, c, 0.6);
+      }
+
+      // posts at both ends
+      for (const x of [xa, xb]) {
+        g.save();
+        g.fillStyle = "rgba(255, 214, 140, 0.22)";
+        roundRect(g, x - 3, ys - amp * 0.55, 6, amp * 1.1, 3);
+        g.fill();
+        g.restore();
+      }
+      hline(g, xa, xb, ys, "rgba(122,162,255,0.08)");
+
+      // the string
+      const path = new Path2D();
+      for (let j = 0; j < PTS; j++) {
+        const px = xa + (j / (PTS - 1)) * (xb - xa);
+        const py = ys - ys2[j] * amp;
+        if (j === 0) path.moveTo(px, py);
+        else path.lineTo(px, py);
+      }
+      const hot = Math.min(1, energy * 1.4);
+      glowStroke(g, path, mix(GOLD, [255, 236, 200], hot * 0.5), 1.6 + hot * 0.6, 0.65 + 0.35 * hot);
+
+      // where the finger / bow is
+      const markP = grab ? grab.p : bowing ? bowP : lastP;
+      if (markP > 0) {
+        const mx = xa + markP * (xb - xa);
+        vline(g, mx, ys - amp * 1.12, ys - amp * 1.02, rgba(ORANGE, 0.8), 1.4);
+        text(g, bowing ? "bow" : grab ? "finger" : `plucked at ${fracName(markP)}`, mx, ys - amp * 1.12 - 5, {
+          size: 10.5,
+          align: mx < W * 0.15 ? "left" : mx > W * 0.85 ? "right" : "center",
+          color: rgba(ORANGE, 0.9),
+          weight: 600,
+        });
+      }
+
+      // ---- the recipe: one bar per harmonic ----
+      const by1 = H - 30;
+      const by0 = H * (stage.narrow ? 0.62 : 0.64);
+      const bw = (xb - xa) / BARS;
+      text(g, bowing ? "what you hear: every harmonic, falling as 1/n" : "what you hear: harmonic n at sin(nπp)/n", xa, by0 - 10, {
+        size: 10.5,
+        color: "rgba(180,188,210,0.8)",
+      });
+      if (miss.length && !grab) {
+        const list = miss.slice(0, 4).join(", ") + (miss.length > 4 ? " …" : "");
+        text(g, `missing: ${list}`, xb, by0 - 10, { size: 10.5, align: "right", color: rgba(harmonicRgb(miss[0], 0.75), 0.95), weight: 600 });
+      }
+      hline(g, xa, xb, by1, "rgba(122,162,255,0.18)");
+      for (let n = 1; n <= BARS; n++) {
+        const cx = xa + (n - 0.5) * bw;
+        const v = Math.min(1, recipe[n]);
+        const c = harmonicRgb(n);
+        const bh = v * (by1 - by0 - 6);
+        if (bh > 0.5) {
+          g.save();
+          g.globalCompositeOperation = "lighter";
+          const grd = g.createLinearGradient(0, by1 - bh, 0, by1);
+          grd.addColorStop(0, rgba(mix(c, WHITE, 0.25), 0.95));
+          grd.addColorStop(1, rgba(c, 0.35));
+          g.fillStyle = grd;
+          roundRect(g, cx - bw * 0.3, by1 - bh, bw * 0.6, bh, 2);
+          g.fill();
+          g.restore();
+        }
+        const isMiss = miss.includes(n);
+        text(g, String(n), cx, by1 + 14, {
+          size: stage.narrow ? 9 : 10.5,
+          align: "center",
+          color: isMiss ? rgba(harmonicRgb(n, 0.75), 0.95) : "rgba(150,160,190,0.6)",
+          weight: isMiss ? 700 : 500,
+          mono: true,
+        });
+        if (isMiss) {
+          g.save();
+          g.strokeStyle = rgba(c, 0.5);
+          g.setLineDash([2, 3]);
+          g.strokeRect(cx - bw * 0.3, by0 + 4, bw * 0.6, by1 - by0 - 4);
+          g.restore();
+        }
+      }
     },
     dispose() {
-      silence();
+      damp(0.1);
+      bow.stop();
     },
   };
 }

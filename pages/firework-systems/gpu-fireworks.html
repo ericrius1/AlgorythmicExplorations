@@ -10,20 +10,19 @@
     <title>Fireworks at GPU Scale — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A one-part essay on high-count WebGPU fireworks: compact emit commands, GPU-owned particles, live-list compaction, indirect draw calls, memory limits, diagnostics, and the philosophy behind fast visual effects."
+      content="A WebGPU fireworks renderer where the CPU sends one 96-byte command per launch and the GPU creates, simulates, compacts and draws every particle: emit commands, ping-pong buffers, atomic append, indirect draws, and counters read back without stalling."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="essay">
     <header class="hero">
       <div data-demo="hero-fireworks"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Firework Systems · Part 1</p>
         <h1>Fireworks at GPU Scale</h1>
         <p class="subtitle">
-          A fireworks renderer is a lesson in where not to put the CPU. The useful
-          architecture is not a bigger queue or a clever emergency reserve; it is a
-          frame graph where the CPU describes intent and the GPU owns the millions of
-          small glowing facts.
+          A fireworks show where the CPU only describes each launch and the GPU creates,
+          moves and draws every spark. The sky above is running live.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -34,300 +33,305 @@
 
     <main>
       <p>
-        Fireworks are simple in the way that performance problems are simple: every
-        individual piece is cheap, and there are suddenly too many pieces. A rocket is
-        one particle. Its smoke trail is a few more. The burst is hundreds, then
-        thousands, then tens of thousands of sparks. Click once and nothing strains.
-        Hold the mouse down, raise the spark count, ask for many rockets in the same
-        half second, and the shape of the program matters more than the constants.
+        Fireworks make a good stress test because every piece is cheap and there are
+        suddenly a lot of pieces. A rocket is one particle, and its trail is a few hundred
+        more. The shell it bursts into is a few thousand. Hold the mouse down in the last
+        figure on this page with the spark count turned up, and that turns into millions of
+        particles a second.
       </p>
       <p>
-        The obvious first design fails in the ordinary way. Keep a large ring buffer of
-        particles. Launching a firework means the CPU writes particle records into that
-        ring; old particles expire by time; the renderer draws the portion of the ring
-        that has been touched. That sounds reasonable until the test case becomes
-        deliberately unreasonable: many fireworks close together, very high spark
-        counts, and no interest in protecting a small laptop from itself. Then older
-        sparks disappear because newer sparks lap the ring. Or the opposite happens:
-        nothing visible remains, but the debug overlay still reports hundreds of
-        thousands of active particles, because the CPU's bookkeeping and the GPU's
-        visual truth have drifted apart.
+        The obvious first design is a big ring buffer. Launching a firework means the CPU
+        writes particle records into the ring, old ones expire by timestamp, and the renderer
+        draws the part of the ring that has been used. That works until you push it. Then
+        newer sparks lap the ring and older ones vanish in mid-air. Or the sky goes dark
+        while the CPU's bookkeeping still says hundreds of thousands of particles are alive,
+        because its idea of what's alive and what the GPU is drawing have drifted apart.
       </p>
       <p>
-        The fix is not to add a hidden reserve, a second emergency buffer, or a more
-        elaborate policy about which old sparks deserve to live. The fix is to remove
-        that policy. A visual effect with this many independent particles should not
-        ask the CPU to manage individual particles in the first place.
+        A bigger ring, or a reserve buffer for emergencies, only moves the problem. What
+        fixed it was taking individual particles away from the CPU. The CPU says what to
+        launch. Creating the sparks, ageing them, deciding which are still alive and
+        counting them for the draw call all happen on the GPU.
       </p>
       <p>
-        This article is the architecture that follows from that constraint. It borrows
-        the frame-graph mindset from
-        <a href="/pages/particle-worlds/part4.html">Worlds from Dust</a>: fixed GPU
-        buffers, explicit passes, tiny CPU parameter writes, and a renderer that reads
-        the buffer the simulation just produced. The physics here is not planetary
-        science. It is art-directed sparks, smoke, gravity, drag, curl, and color. But
-        the performance philosophy is the same.
+        It's the same shape as the accretion demo in
+        <a href="/pages/particle-worlds/part4.html">Particle Worlds part four</a>:
+        long-lived GPU buffers, a fixed list of passes, small parameter writes from the CPU,
+        and a renderer that draws whatever the simulation just wrote. The physics here is
+        much simpler. The plumbing is the interesting part.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The wrong unit of work</span>Events, not particles</h2>
+      <h2 id="commands"><span class="kicker">Step 1 · Events</span>Send the recipe, not the sparks</h2>
       <p>
-        A user does not create 50,000 particles. A user launches a firework. The
-        firework happens to contain 50,000 sparks, but that count is an implementation
-        detail of the effect, not the semantic event. If the CPU uploads one record per
-        spark, the CPU is doing work at the wrong level of abstraction.
-      </p>
-      <p>
-        The better unit is an <em>emit command</em>. A command is a compact
-        description of a family of particles:
+        Nobody launches 50,000 particles. You launch a firework, and the firework happens to
+        contain 50,000 sparks. If the CPU uploads one record per spark, it's working at the
+        wrong level. So it uploads an <em>emit command</em> instead, one small struct per
+        event:
       </p>
       <pre><code>struct EmitCommand {
   header:       vec4u,  <span class="cm">// kind, count, start, aux</span>
   posScaleSeed: vec4f,  <span class="cm">// origin, size scale, random seed</span>
-  velLifeSize:  vec4f,  <span class="cm">// velocity or burst speed, lifetime, size</span>
+  velLifeSize:  vec4f,  <span class="cm">// velocity or burst speed, then per-kind counts and times</span>
   color:        vec4f,
   accent:       vec4f,
-  homeParams:   vec4f,  <span class="cm">// target/home, depth, extra counts</span>
+  homeParams:   vec4f,  <span class="cm">// burst centre, depth, one more per-kind number</span>
 }</code></pre>
       <p>
-        A rocket command creates one particle. A trail command creates a handful of
-        smoke and ember particles behind the rocket. An explosion command creates the
-        center flash, the main shell, crackle particles, falling embers, and smoke.
-        The command does not contain those particles; it contains the recipe. The GPU
-        runs one compute invocation per emitted particle, derives a local index inside
-        the command, hashes the command seed with that local index, and procedurally
-        fills out the particle record.
+        A rocket command makes one particle. A trail command makes six sparks and puffs of
+        smoke behind the rocket, and the rocket sends one every 18 milliseconds of its
+        flight. An explosion command makes the whole shell: a centre flash, the main sparks,
+        crackle, falling embers and smoke. The command holds the recipe, not the particles.
       </p>
       <p>
-        That changes the CPU's job from "write every spark" to "write one command per
-        meaningful event." The difference is not subtle:
+        On the GPU, one thread runs for every particle to be created this frame. Each
+        command records where its particles start in that frame's list, so a thread finds
+        its command with a binary search, works out its index inside it, hashes the
+        command's seed with that index, and fills in a particle record from the result.
       </p>
 
-      <div data-demo="command-budget"></div>
+      <div
+        data-demo="command-budget"
+        data-title="What the CPU uploads"
+        data-hint="Drag both sliders"
+      ></div>
 
       <p>
-        The numbers in the diagram are intentionally boring. A particle record in the
-        current renderer is 80 bytes: position, velocity, color, age/life/size/kind,
-        seed/level/depth, and a home anchor. An emit command is 96 bytes. For one
-        firework with 50,000 sparks, uploading particles is roughly 3.8 MiB of CPU to
-        GPU traffic. Uploading the command is 96 bytes. For a burst of many fireworks,
-        the ratio becomes absurd enough that it stops feeling like optimization and
-        starts feeling like type correctness.
+        A particle here is 80 bytes: position, velocity, colour, age, lifetime, size, kind,
+        seed, shell level, depth, and the centre of the burst it belongs to. A command is 96
+        bytes. One shell of 50,000 sparks is about 3.8 MiB of particle records, or a single
+        command. The figure counts the flash, crackle, embers and smoke as well, and even with
+        both sliders all the way down the commands are more than 500 times smaller.
       </p>
       <p>
-        The GPU still does the particle work. It still creates every spark. It still
-        writes every particle record. But that work happens in parallel, adjacent to
-        the buffer that will be simulated and rendered. The CPU stays at the scale of
-        interaction: pointer down, launch count, target position, colors, spark count.
+        The GPU still creates every particle and writes every record. That work just happens
+        in parallel, right next to the buffer it goes into, and the CPU stays at the level of
+        the interaction: a pointer down, a target, a colour, a spark count.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Randomness belongs to the command</span>
+        <span class="note-label">Aside · Particles were invented for fire</span>
         <p>
-          A command needs a seed, not a list of random numbers. The local particle
-          index provides the second coordinate. The shader can derive angle, speed,
-          lifetime, shell level, smoke drift, and color interpolation from
-          <code>hash(seed, local)</code>. This is why the CPU can describe an explosion
-          without enumerating the explosion.
+          The term comes from William Reeves at Lucasfilm, who built the wall of fire that
+          spreads across a planet in the Genesis sequence of <em>Star Trek II</em> (1982)
+          and described it in a 1983 paper. His particles had a position, velocity, size,
+          colour, transparency and lifetime, and each was created from a few random draws
+          around averages the animator chose. That's the record in this renderer, plus a
+          depth. Twenty years later Lutz Latta's "Building a Million Particle System" moved
+          the state into GPU memory and updated it there, which is the idea this page runs
+          on.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · The GPU owns the state</span>A ping-pong particle world</h2>
+      <h2 id="compaction"><span class="kicker">Step 2 · Compaction</span>A list that cleans itself up</h2>
       <p>
-        Once emission happens on the GPU, the rest of the architecture becomes easier
-        to see. There is no CPU particle array. There is no CPU list of expiration
-        times. There is no high-water mark that guesses how much of a ring buffer is
-        worth drawing. There are two GPU particle buffers:
-      </p>
-      <pre><code>particleBufferA: array&lt;Particle&gt;
-particleBufferB: array&lt;Particle&gt;</code></pre>
-      <p>
-        On frame N, one buffer is the read buffer and the other is the write buffer.
-        The simulation reads every live particle from the old buffer, advances it, and
-        appends survivors to the new buffer. New particles from emit commands append
-        to the same new buffer. At the end of the frame, the new buffer becomes the
-        current state. Next frame the roles swap.
+        With emission on the GPU there's no CPU particle array left: no expiry times, and no
+        high-water mark guessing how much of a ring is worth drawing. There are two particle
+        buffers on the GPU, and each frame one is read and the other is written.
+        <code>simulateCompact</code> runs one thread per particle in last frame's list. Each
+        thread moves its particle forward a step, and if it's still alive, appends it to the
+        other buffer. Then <code>emitParticles</code> appends this frame's new particles
+        after the survivors. Next frame the two buffers swap.
       </p>
       <p>
-        This is the same ping-pong pattern used by fluid solvers, cellular automata,
-        particle-mesh codes, and the accretion demos earlier in the particle series.
-        It has one beautiful property: the write buffer is always compact. If a spark
-        dies, it simply is not appended. No hole remains. No old slot needs to be
-        zeroed. No CPU cleanup pass waits around to discover that the scene is empty.
+        It's the ping-pong pattern from fluid solvers and cellular automata, and the written
+        list is always dense. A spark that dies just doesn't get appended, so there's no hole
+        to fill and nothing to clear.
       </p>
 
-      <div data-demo="live-compaction"></div>
+      <div
+        data-demo="live-compaction"
+        data-title="Two buffers, compacted every frame"
+        data-hint="Watch, or step a frame"
+      ></div>
 
-      <p>
-        The compaction pass is short enough to write as a sketch:
-      </p>
+      <p>The compaction pass, as it is in the shader:</p>
       <pre><code>@compute @workgroup_size(256)
 fn simulateCompact(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
-  if (i &gt;= counters.live) { return; }
+  let activeCount = atomicLoad(&amp;counters.live);
+  if (i &gt;= activeCount) { return; }
 
-  var p = simulate(particlesIn[i]);
-  if (p.age &gt;= p.life) { return; }
+  let p = simulate_particle(particlesIn[i]);
+  if (p.ageLife.x &gt;= p.ageLife.y || p.ageLife.y &lt;= 0.0) { return; }  <span class="cm">// expired</span>
+  append_particle(p);
+}
 
-  let out = atomicAdd(&amp;counters.write, 1u);
-  particlesOut[out] = p;
+fn append_particle(p: Particle) {
+  let outIndex = atomicAdd(&amp;counters.write, 1u);  <span class="cm">// claim the next free slot</span>
+  write_particle(outIndex, p);
 }</code></pre>
       <p>
-        The important line is the atomic add. It turns a sparse set of survivors into
-        a dense write list without asking any invocation where the others went. Every
-        live particle claims the next slot. Dead particles claim nothing. If a burst
-        creates 200,000 particles and 148,000 survive the frame, the write counter
-        says 148,000. That number is not inferred later; it is the result of building
-        the list.
+        The <code>atomicAdd</code> is what keeps the list dense. Every surviving thread
+        claims the next free slot, and no thread needs to know where the others went. Two
+        things follow from that. The order isn't kept: slots go out in whatever order the
+        threads reach the atomic, so a particle can land ahead of one that was before it,
+        as in the figure. That's fine here because every particle is drawn with additive
+        blending, and adding up light gives the same total in any order.
       </p>
       <p>
-        This also resolves stale active counts. The active count is no
-        longer a CPU-side estimate derived from timestamps. It is the GPU's own write
-        counter, copied to a tiny readback buffer for the debug overlay. When the last
-        spark dies, the next compaction pass appends zero particles and the active
-        count becomes zero. The renderer and the readout are looking at the same fact.
+        And the count is exact. When a 50,000-spark shell is down to its last 12,000, the
+        write counter says 12,000, because that's how many appends happened. When the last
+        spark dies, the next frame appends nothing and the count is zero. The renderer and
+        the debug readout are looking at the same number.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · No draw loop bookkeeping</span>Indirect rendering</h2>
+      <h2 id="indirect"><span class="kicker">Step 3 · Indirect</span>The GPU fills in the draw call</h2>
       <p>
-        If the CPU does not know how many particles survived, how does it draw them?
-        The GPU writes the draw call arguments too.
-      </p>
-      <p>
-        A particle is rendered as a six-vertex billboard: two triangles stretched in
-        the direction of velocity, shaded as a soft additive blob. WebGPU's indirect
-        draw buffer for this renderer is four integers:
+        If the CPU doesn't know how many particles survived, how does it draw them? It
+        doesn't have to know. The GPU writes the draw call's arguments as well. Each particle
+        is a billboard of six vertices, two triangles stretched along its velocity, and
+        WebGPU's <code>drawIndirect</code> reads its four arguments from a buffer:
       </p>
       <pre><code>drawArgs.vertexCount   = 6
-drawArgs.instanceCount = liveParticleCount
+drawArgs.instanceCount = live      <span class="cm">// written on the GPU</span>
 drawArgs.firstVertex   = 0
 drawArgs.firstInstance = 0</code></pre>
       <p>
-        The finish pass writes that structure after simulation and emission have
-        appended their particles. The render pass then calls
-        <code>drawIndirect(drawArgs)</code>. The CPU does not read back the count, wait
-        for it, and call <code>draw(6, count)</code>. It records the same command every
-        frame and lets the GPU fill in the count before the command executes.
+        A one-thread pass, <code>finishFrame</code>, writes those after simulation and
+        emission are done, and the render pass calls <code>drawIndirect(drawArgs)</code>.
+        The CPU never reads the count back or waits for it. It records the same command every
+        frame, and the GPU fills in the number before the draw runs.
+      </p>
+      <p>
+        <code>finishFrame</code> also writes next frame's dispatch size for the simulation,
+        <code>ceil(live / 256)</code> workgroups, into a second indirect buffer, so the
+        simulation only runs threads for particles that exist. The buffers have room for 1.7
+        million particles each, but an empty sky dispatches zero simulation workgroups, emits
+        nothing, and draws zero instances.
       </p>
 
-      <div data-demo="pipeline-graph"></div>
+      <div
+        data-demo="pipeline-graph"
+        data-title="One frame, pass by pass"
+        data-hint="Drag to stop on a pass"
+      ></div>
 
+      <p>The whole frame is one short command buffer:</p>
+      <pre><code>beginFrame       <span class="cm">// zero the write counter and the draw count</span>
+simulateCompact  <span class="cm">// indirect: one thread per particle alive last frame</span>
+emitParticles    <span class="cm">// one thread per new particle</span>
+finishFrame      <span class="cm">// live = write; draw args; next frame's dispatch size</span>
+drawScene        <span class="cm">// the backdrop</span>
+drawIndirect     <span class="cm">// the particle list, with finishFrame's instance count</span></code></pre>
       <p>
-        The whole frame is a small command buffer:
-      </p>
-      <pre><code>beginFrame       <span class="cm">// reset write counter, overflow counter, draw args</span>
-simulateCompact  <span class="cm">// read old buffer, append live survivors</span>
-emitParticles    <span class="cm">// expand compact commands into new particles</span>
-finishFrame      <span class="cm">// publish live count, draw args, next dispatch size</span>
-renderScene
-drawIndirect     <span class="cm">// render exactly the compacted live list</span></code></pre>
-      <p>
-        The pass order matters. New particles are appended after old survivors, so a
-        particle emitted this frame renders this frame. The next frame's indirect
-        dispatch size is also written on the GPU, so the simulation does not need to
-        dispatch across the full capacity every time. It dispatches over the live
-        count from the previous finish pass.
-      </p>
-      <p>
-        That last sentence is one of the quiet performance wins. The buffer may have
-        capacity for more than a million particles, but an idle frame does not scan a
-        million empty slots. It dispatches zero workgroups for simulation, maybe a few
-        for emission, writes a draw count of zero, and moves on.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Capacity is not a vibe</span>Memory as a first-class readout</h2>
-      <p>
-        Removing artificial limits does not mean pretending hardware has no limits.
-        It means distinguishing a policy limit from a device fact. "Never let more
-        than 150,000 particles exist because performance might be bad" is a policy.
-        "This adapter allows a 128 MiB storage buffer binding" is a fact. A debugging
-        tool should show facts.
-      </p>
-      <p>
-        The current particle stride is 80 bytes. The maximum particle capacity is
-        therefore:
-      </p>
-      <pre><code>capacity = floor(device.limits.maxStorageBufferBindingSize / 80)</code></pre>
-      <p>
-        On a typical desktop GPU, the storage buffer binding limit reported by the
-        browser is 128 MiB, which gives 1,677,721 particles per
-        particle buffer. The fireworks system keeps two such buffers, because
-        compaction ping-pongs from old state into new state. That is why the debug
-        overlay's "storage limit" and "fireworks GPU memory" do not match. The limit
-        is per binding. The total allocation includes both particle buffers, the emit
-        command buffer, counters, indirect argument buffers, and uniforms.
-      </p>
-
-      <div data-demo="capacity-map"></div>
-
-      <p>
-        This is the honest version of "no artificial limiting." The capacity is as
-        large as the current WebGPU device allows for one particle buffer. The overlay
-        reports the capacity, total fireworks GPU allocation, overflow count, live
-        particles, and active launches. If the user chooses settings that exceed the
-        buffer, the shader increments an overflow counter. It does not silently erase
-        old particles to make room for new ones. It does not maintain a secret
-        emergency reserve. It tells you what happened.
+        The order matters. New particles go in after the survivors, so a particle emitted
+        this frame is drawn this frame. The emit dispatch is the only one sized on the CPU,
+        which is fine, because the CPU wrote the commands and already knows how many
+        particles they make.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Total app memory is not exposed as a promise</span>
+        <span class="note-label">Aside · Where indirect draws came from</span>
         <p>
-          Browsers expose WebGPU device limits such as maximum storage buffer binding
-          size. They do not generally give a portable, reliable "total memory this app
-          may use" number. For this renderer, the useful diagnostic is therefore the
-          storage binding limit plus the actual GPU allocations made by the fireworks
-          system. The first tells you the largest legal particle buffer; the second
-          tells you what the effect currently reserves.
+          Draw calls whose arguments live in GPU memory arrived with Direct3D 11 in 2009 and
+          OpenGL 4.0 in 2010. Direct3D 11 also turned the atomic-append pattern above into a
+          buffer type, <code>AppendStructuredBuffer</code>. WebGPU has no append buffer, so
+          here it's an atomic counter and a plain array, which is what an append buffer is
+          underneath.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 5 · Simulation is cheap when it is local</span>The actual particle physics</h2>
+      <h2 id="capacity"><span class="kicker">Step 4 · Limits</span>Capacity comes from the device</h2>
       <p>
-        None of the above says the particles are visually simple. Each particle still
-        carries a kind: rocket, spark, ember, or smoke. Each kind gets different
-        acceleration, drag, size, color, parallax depth, and lifetime. Rockets ignore
-        most gravity so they can hit their target. Sparks fall and curl. Smoke rises
-        and fattens. Embers live longer and drift down through the scene.
+        Taking out the arbitrary limits doesn't mean pretending the hardware has none. It
+        means telling a policy apart from a fact. "Never let more than 150,000 particles
+        exist, in case it's slow" is a policy. "This device allows 128 MiB in one storage
+        buffer binding" is a fact, and the particle capacity falls straight out of it:
+      </p>
+      <pre><code>capacity = floor(device.limits.maxStorageBufferBindingSize / 80)</code></pre>
+      <p>
+        This page asks WebGPU for a device with the default limits, so the binding limit is
+        128 MiB and the capacity is 1,677,721 particles per buffer on every machine. Most
+        GPUs would grant a much bigger binding if the page asked for one with
+        <code>requiredLimits</code>, and the figure reads what yours would allow. There are
+        two particle buffers, because compaction reads one while it writes the other, so the
+        particles take 256 MiB. The emit command buffer adds 6 MiB, room for 65,536 commands
+        in a frame (it doubles if a frame needs more), and the counters and indirect
+        arguments add a few dozen bytes.
+      </p>
+
+      <div
+        data-demo="capacity-map"
+        data-title="What fits in a binding"
+        data-hint="Drag the binding limit"
+      ></div>
+
+      <p>
+        When more particles are asked for than fit, <code>write_particle</code> skips the
+        write and counts it instead. Nothing older is erased to make room and there's no
+        hidden reserve:
+      </p>
+      <pre><code>fn write_particle(index: u32, p: Particle) {
+  let capacity = arrayLength(&amp;particlesOut);
+  if (index &lt; capacity) {
+    particlesOut[index] = p;
+  } else {
+    atomicAdd(&amp;counters.overflow, 1u);  <span class="cm">// never reset, so no readback misses one</span>
+  }
+}</code></pre>
+      <p>
+        Survivors are appended before new particles, and there can never be more survivors
+        than the buffer holds, so when a frame overflows it's always the newest particles
+        that get dropped. Sparks already in the sky never disappear to make room.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · There's no memory budget to ask for</span>
+        <p>
+          Browsers don't expose a portable "total memory this page may use" number. WebGPU
+          gives you limits, like the largest storage buffer binding, and you know your own
+          allocations. So those are the two numbers worth showing: the biggest legal particle
+          buffer, and what the effect has actually reserved.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="physics"><span class="kicker">Step 5 · Physics</span>Cheap because it's local</h2>
+      <p>
+        None of this makes the particles look simple. Each one has a kind (rocket, spark,
+        ember or smoke) and each kind gets its own acceleration, drag, size, colour and
+        lifetime. Rockets feel 13% of normal gravity and reach their target in 0.7 to 0.9
+        seconds. Sparks fall and swirl. Embers start out slower, drop, and last 1.1 to 2.7
+        seconds. Smoke drifts upward.
       </p>
       <p>
-        The shader also adds an art-directed curl field. A small grid-like noise
-        function turns position and time into a direction; that direction becomes
-        wind, turbulence, and shell swirl. It is not a Navier-Stokes solve. It is the
-        cheaper lesson from the
-        <a href="/pages/particle-worlds/part6.html">fluid instrument</a>: if the eye
-        needs curling motion, a divergence-free-ish procedural field often gives more
-        visual value per millisecond than a full fluid solve.
+        The swirl comes from a cheap procedural field. The sky is cut into a grid 18 cells
+        across, each cell points in a random direction that changes about once a second, and
+        there's a spin around each cell's centre on top. It isn't a fluid solve, or even
+        proper curl noise like the
+        <a href="/pages/particle-worlds/part6.html">fluid instrument</a> uses, but what the
+        eye wants is sparks that curl, and this is a few lines of arithmetic per particle.
       </p>
       <p>
-        The renderer then makes physics legible. Each particle becomes a billboard
-        stretched along velocity. Fast sparks become streaks; slow smoke becomes soft
-        round puffs. Depth is sampled from the painted mountain scene so sparks can
-        pass behind terrain silhouettes. Additive blending does what fireworks want:
-        many dim particles accumulating into a bright burst.
+        Every fourth volley the hero fires a different kind of shell. Its grains fly out like
+        a normal burst, then about 0.9 seconds later a spring pulls them back toward the
+        centre. A hash of each grain's grid cell staggers when it starts to pull, so the
+        collapse ripples inward instead of snapping shut. It's a nod to the dust clumping in
+        part four of Particle Worlds; nothing actually collides.
       </p>
       <p>
-        The important performance property is locality. A particle update does not
-        need to find neighbors, sort a grid, solve a pressure field, or walk a tree.
-        It reads its own record, reads uniforms, writes one survivor or nothing. High
-        counts are possible because the expensive part is embarrassingly parallel.
+        Drawing is where the physics becomes readable. Each particle is stretched along its
+        velocity, so fast sparks become streaks and slow smoke stays round. The painted
+        backdrop comes with a depth map, and a particle fades out wherever a ridge is nearer
+        than it is, so falling sparks drop behind the mountains and rockets rise out from
+        behind them. Everything is added into a floating-point target, so overlapping sparks
+        keep adding up, and then gets bloom and filmic tone mapping, the same finish as the
+        Particle Worlds demos.
+      </p>
+      <p>
+        What makes the high counts possible is that the update is local. A particle never
+        looks for neighbours, sorts into a grid or walks a tree. It reads its own record and
+        a few uniforms, and writes one particle or none.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 6 · The boring parts are the sharp parts</span>WGSL layout discipline</h2>
+      <h2 id="layout"><span class="kicker">Step 6 · Layout</span>Name the bytes</h2>
       <p>
-        The most useful discipline here is not glamorous: make storage layouts
-        explicit. It is tempting to address counters and indirect arguments as bare
-        indexed storage arrays:
-      </p>
-      <pre><code>counters[0]  <span class="cm">// active count?</span>
-counters[1]  <span class="cm">// write count?</span>
-counters[4]  <span class="cm">// overflow?</span></code></pre>
-      <p>
-        That is compact, but it hides meaning at exactly the layer where meaning
-        matters. Named structs make the shader state the contract:
+        The least glamorous habit here turned out to be the most useful: give every storage
+        layout a name. It's tempting to treat the counters as a bare array of
+        <code>u32</code> and remember that <code>counters[0]</code> is the live count and
+        <code>counters[4]</code> the overflow. A struct puts that contract in the shader:
       </p>
       <pre><code>struct Counters {
   live:         atomic&lt;u32&gt;,
@@ -335,181 +339,111 @@ counters[4]  <span class="cm">// overflow?</span></code></pre>
   commandCount: atomic&lt;u32&gt;,
   totalEmit:    atomic&lt;u32&gt;,
   overflow:     atomic&lt;u32&gt;,
+  pad0: atomic&lt;u32&gt;, pad1: atomic&lt;u32&gt;, pad2: atomic&lt;u32&gt;,  <span class="cm">// 32 bytes</span>
 }</code></pre>
       <p>
-        The same is true for draw and dispatch indirect arguments. A buffer is still
-        only bytes, and the CPU still writes words at fixed offsets, but the shader
-        names the contract. That makes validation errors easier to reason about and
-        removes a class of "which counter was index 3?" mistakes.
+        The CPU still writes words at byte offsets (<code>commandCount</code> and
+        <code>totalEmit</code> go in at byte 8 every frame), but the shader says what each
+        word means, and "which counter was index 3?" stops being a question.
       </p>
       <p>
-        Explicit layouts also surface a very WebGPU kind of problem early: intuitive
-        field names like <code>active</code> and <code>target</code> are reserved WGSL
-        words in some browser validators. A shader that uses them does not fail at the
-        line where the render loop binds the pipeline; it fails earlier, during shader
-        module validation, after which every frame reports "invalid pipeline." The
-        practical rule is to ask for the root error before the frame loop floods the
-        console:
+        Names come with one surprise. WGSL reserves a long list of words from other
+        languages, and <code>active</code> and <code>target</code> are both on it. A shader
+        that uses one as a field name fails when the module compiles, and if nothing checks,
+        all you see afterwards is a stream of "invalid pipeline" errors, one per frame. So
+        every module and pipeline gets a label, every module's compilation messages get
+        logged, and every pipeline is created inside an error scope:
       </p>
-      <pre><code>device.pushErrorScope("validation");
-const module = device.createShaderModule({ code });
-const error = await device.popErrorScope();
-const info = await module.getCompilationInfo();</code></pre>
+      <pre><code>const module = device.createShaderModule({ label: "firework sim", code });
+module.getCompilationInfo().then(logMessages);  <span class="cm">// line, column, message</span>
+
+device.pushErrorScope("validation");
+const pipeline = device.createComputePipeline({ label, layout: "auto", compute: { module, entryPoint } });
+device.popErrorScope().then((error) =&gt; {
+  if (error) console.error(`${label} validation: ${error.message}`);
+});</code></pre>
       <p>
-        That is not a fireworks trick. It is a WebGPU habit. Build shader modules and
-        pipelines with labels. Use error scopes around suspicious creation calls. Read
-        compilation info. A fast simulation that cannot explain its own invalid state
-        is not a fast simulation; it is just opaque.
+        None of that is about fireworks. It's the WebGPU habit that pays for itself first:
+        the real error shows up once, with a name on it, instead of a flood of symptoms a few
+        frames later.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 7 · Diagnostics without synchronization</span>Read back less than you want</h2>
+      <h2 id="readback"><span class="kicker">Step 7 · Diagnostics</span>Read back less than you want</h2>
       <p>
-        The debug overlay is intentionally small. It shows FPS, frame time, active
-        particles, particle capacity, draw slots, active fireworks, queued bursts,
-        particles emitted this frame, overflow, fireworks GPU memory, and the storage
-        binding limit. That is enough to answer the questions that come up when
-        something looks wrong:
+        The counters make the cheapest possible debug overlay. Four times a second, the
+        frame that just ran copies the 32-byte counter buffer into a buffer the CPU can map,
+        and <code>mapAsync</code> hands the numbers over a frame or two later. The
+        simulation never waits for them. Copying the particle buffer back to count particles
+        would move 128 MiB to learn one number.
       </p>
       <p>
-        Are particles disappearing because capacity is exceeded? Check overflow.
-        Is the app slow because hundreds of thousands of invisible particles remain
-        active? Check active particles after the effect has faded. Is draw work still
-        happening when the scene is empty? Check slots drawn. Is the cap a magic
-        constant or a hardware limit? Compare capacity to storage limit.
+        Here's the real thing with those counters showing. It shares its buffers with the
+        hero at the top of the page, so the page only allocates them once. Press and hold on
+        the sky to launch; while you hold, it fires eight launches every half second. Then
+        turn sparks per shell up to 100,000, set twelve rockets per launch, and hold again.
+        Within a second or two the live count runs into the capacity, and the overflow total
+        starts climbing by tens of millions a second. Let go and the live count drains back
+        down as the sparks burn out (switch <em>auto</em> off to watch it reach zero).
       </p>
-      <p>
-        The overlay does not read back the particle buffer. It does not inspect
-        individual sparks. It does not synchronize every frame. Every few tenths of a
-        second, it copies the small counters buffer into a map-readable buffer and
-        updates the UI when the mapping completes. The simulation never waits for the
-        overlay. Diagnostics are observers, not part of the hot path.
-      </p>
-      <aside class="note">
-        <span class="note-label">Aside · Metrics change behavior if you let them</span>
-        <p>
-          A common trap in GPU demos is to add a helpful readback that accidentally
-          serializes the pipeline. Reading a million particles to count them is worse
-          than not knowing. Maintaining a counter on the GPU and occasionally reading
-          eight integers is the difference between instrumentation and interference.
-        </p>
-      </aside>
 
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Step 8 · Why the solar-system demo matters</span>One frame as a graph</h2>
+      <div
+        data-demo="fireworks-live"
+        data-title="The whole thing, with its counters"
+        data-hint="Press and hold on the sky"
+      ></div>
+
       <p>
-        The strongest influence from the particle series is not a specific force
-        law. It is the shape of the accretion demo in
-        <a href="/pages/particle-worlds/part4.html">part four</a>. That demo combines
-        gravity and collisions by building GPU data structures in phases: sort into a
-        spatial hash, reduce into a gravity pyramid, run a force pass, render the
-        resulting buffer. The CPU writes parameters and records passes; the GPU owns
-        the evolving particle state.
-      </p>
-      <p>
-        Fireworks are physically simpler, so they do not need a tree or a neighbor
-        grid. But they benefit from the same mental model:
-      </p>
-      <pre><code>resources are long-lived
-passes have explicit read/write ownership
-the CPU writes parameters and commands
-the GPU transforms one valid state into the next valid state
-the renderer consumes the state that the simulation just produced</code></pre>
-      <p>
-        This is why "just use a much bigger ring buffer" is only half right. A bigger
-        buffer postpones overwrite bugs. It does not answer who owns liveness, how
-        dead particles disappear, where the draw count comes from, or whether the CPU
-        should be writing individual sparks. The real simplification is replacing
-        the ring with a current-state buffer and a next-state buffer. Once the state is
-        a compact list, old particles cannot be overwritten by new ones. They either
-        survive into the next list or they do not.
+        The live count and the overflow total come off the GPU. The emitted counts are the
+        CPU's, since it wrote the commands that asked for those particles. Watch the frame
+        rate while the buffer is full. Whether the time goes to emission, compaction or
+        filling pixels with 1.7 million billboards is the next thing I'd measure.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 9 · Philosophy</span>Remove policy, keep physics</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <ul>
+        <li>
+          <strong>Send events, not data.</strong> One command per launch, expanded on the
+          GPU next to the buffer the particles live in.
+        </li>
+        <li>
+          <strong>Let the GPU count.</strong> The write counter is the live count, the draw
+          count and next frame's dispatch size, so nothing has to estimate it.
+        </li>
+        <li>
+          <strong>Keep limits and policy apart.</strong> Capacity comes from the device, and
+          when it runs out the overflow is counted where you can see it.
+        </li>
+        <li>
+          <strong>Read back counters, not particles.</strong> Thirty-two bytes four times a
+          second is enough to debug the whole system.
+        </li>
+      </ul>
       <p>
-        The guiding principle is not "optimize everything." It is more specific:
-        remove artificial policy from the hot path and make the remaining constraints
-        visible.
+        Things I'd try next: let compute passes write emit commands too, so the follow-up
+        pops around each shell, which the CPU still schedules, become GPU state as well. Time
+        each pass with timestamp queries, to see whether a slow frame at a million particles
+        is emission, compaction or fill rate. And draw the smoke with ordinary alpha
+        blending so it can darken the sky, which would mean sorting just the smoke. The
+        command idea also reaches well past fireworks: fountains, sparks off collisions, rain
+        splashes, dust kicked up off terrain. If an event fits in a few numbers and can be
+        expanded procedurally, the CPU should send the event.
       </p>
-      <p>
-        A maximum particle count chosen because it feels safe is policy. A hidden
-        reserve for emergencies is policy. Dropping old particles because new ones
-        arrived is policy. Drawing a stale high-water range because compaction is
-        inconvenient is policy. The GPU storage binding limit is not policy. Particle
-        stride is not policy. A user's spark slider is not policy. Those are facts or
-        explicit choices.
-      </p>
-      <p>
-        The final architecture tries to keep the facts close to the code:
-      </p>
-      <pre><code>capacity       = floor(storageLimit / particleStride)
-liveCount      = GPU write counter
-overflow       = GPU overflow counter
-drawnInstances = indirect draw instance count
-memory         = actual buffers allocated by this system</code></pre>
-      <p>
-        There is still a limit, because buffers are finite. But it is now the real
-        limit. There is still an overflow case, because a user can request more
-        particles than fit. But overflow is counted, not disguised as "older sparks
-        gracefully disappeared." There is still performance cost, because millions of
-        billboards are millions of billboards. But the cost is where it belongs: in
-        GPU work proportional to live visible particles, not in CPU bookkeeping
-        proportional to every particle ever requested.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Epilogue</span>What I would add next</h2>
-      <p>
-        This architecture is a good base, not an ending. Several extensions fall out
-        naturally.
-      </p>
-      <p>
-        <strong>GPU-side command generation.</strong> Some secondary effects are still
-        scheduled by the CPU at the firework level: satellite bursts, follow-up pops,
-        and timing choices. A more autonomous system could let compute passes append
-        future emit commands into a command buffer, turning the whole firework script
-        into GPU state. That would need a second command queue and careful lifetime
-        rules, but the pattern is the same as particle append.
-      </p>
-      <p>
-        <strong>Depth-aware sorting or layered blending.</strong> Additive sparks do
-        not require exact sorting, but smoke and darker particles benefit from better
-        order. A coarse depth binning pass could sort only the particles that need it,
-        while hot additive sparks remain unordered.
-      </p>
-      <p>
-        <strong>Timestamp profiling.</strong> The overlay currently reports frame
-        time, not pass time. WebGPU timestamp queries would separate simulation,
-        emission, scene rendering, and particle rendering. That matters when a high
-        spark count drops FPS: the next question is whether the limit is compute
-        emission, compaction, fragment fill, or blending.
-      </p>
-      <p>
-        <strong>More authored commands.</strong> The command idea scales beyond
-        fireworks: fountains, sparks from collisions, rain splashes, magic spells,
-        dust kicked off terrain, debris from explosions. If the event can be described
-        compactly and expanded procedurally, the CPU should probably send the event,
-        not the particles.
-      </p>
-      <p>
-        The main lesson is smaller than the code. High-performance browser graphics
-        usually comes from asking which facts need to cross the CPU/GPU boundary at
-        all. For fireworks, the answer is: far fewer than the obvious first design
-        assumes. A click, a target, a seed, a count, a color. The rest is light.
+      <p class="continue">
+        <strong>Related: <a href="/pages/particle-worlds/part4.html">Particle Worlds, Part 4: Worlds from Dust</a>.</strong>
+        The same frame-graph shape with real physics: a spatial hash and a mass pyramid
+        rebuilt over one particle buffer every frame.
       </p>
     </main>
 
     <footer>
       <p>
-        A one-part WebGPU effects essay ·
-        <a href="/pages/particle-worlds/part4.html">Related: Worlds from Dust</a> ·
-        <a href="/pages/particle-worlds/part6.html">Related: The Fluid Instrument</a>
-      </p>
-      <p>
-        Techniques used here: GPU emit commands, ping-pong storage buffers, atomic
-        append compaction, indirect draw and dispatch buffers, sparse readback
-        diagnostics, and explicit WGSL storage layouts.
+        References:
+        <a href="https://dl.acm.org/doi/10.1145/357318.357320">Reeves (1983)</a> ·
+        <a href="https://www.w3.org/TR/webgpu/#dom-gpurendercommandsmixin-drawindirect">WebGPU: drawIndirect</a> ·
+        <a href="https://www.w3.org/TR/WGSL/#reserved-words">WGSL reserved words</a> ·
+        <a href="https://www.w3.org/TR/WGSL/#atomic-builtin-functions">WGSL atomics</a>
       </p>
     </footer>
 

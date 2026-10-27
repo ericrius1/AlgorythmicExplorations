@@ -1,12 +1,11 @@
-// Ferrofluid SPH: the lava lamp's double-density relaxation core, with the
-// thermodynamics removed and two forces promoted to stars of the show —
-// surface tension (Akinci-style cohesion, the same kernel the lamp uses) and
-// a magnet. The magnet force is the gradient of a dipole field's energy
-// density, F ∝ ∇|B|²: it pulls fluid toward the magnet, hardest along the
-// dipole axis, and sideways *toward* the axis — which is what piles the
-// fluid into a spike instead of a blob. Surface tension and gravity push
-// back, and the three-way fight is the whole phenomenon.
-
+// Ferrofluid SPH (Strange Matter part one): the lava lamp's double-density
+// relaxation core with the heat taken out, plus surface tension (the
+// Akinci-style cohesion the lamp uses) and a magnet. The magnet pulls with
+// the gradient of its field's energy density, F ∝ ∇|B|². For a dipole that
+// gradient has two parts: one toward the magnet, strongest on its axis, and
+// one sideways toward the axis. The second one is what gathers the fluid
+// into a spike under the magnet instead of a wide hump. Gravity and surface
+// tension push back.
 struct Particle2 {
   pv: vec4f,  // pos.xy, vel.zw
   aux: vec4f, // unused here (kept for layout parity with the sorter)
@@ -27,10 +26,14 @@ struct FerroParams {
   magStrength: f32, // magnet pull; 0 = magnet off
   mag: vec2f,       // magnet position, world units
   magDir: vec2f,    // dipole axis, unit vector
-  magSoft: f32,     // softening radius so the pull stays finite up close
+  magSoft: f32,     // size of the magnet: softens the pull up close
   floorY: f32,
   wallX: f32,       // tray half-width
   topY: f32,
+  magBody: f32,     // 1 = the magnet's bar is solid
+  magCap: f32,      // most the magnet can pull, as a fraction of gravity
+  _pad0: f32,
+  _pad1: f32,
 }
 
 @group(0) @binding(0) var<uniform> FP: FerroParams;
@@ -129,22 +132,39 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // --- the magnet -------------------------------------------------------------
-  // F ∝ ∇|B|² for a point dipole. |B|² ∝ (3cos²θ + 1)/r⁶, so the gradient has
-  // a radial term (toward the magnet, strongest on-axis) and an angular term
-  // (toward the axis). The true 1/r⁷ falloff is too vicious for a toy, so the
-  // softened (r²+s²)² stands in — same shape near the magnet, kinder far away.
+  // |B|² of a dipole goes as (3cos²θ + 1)/r⁶. Softening r² to r² + s² stands
+  // in for a magnet of finite size s. The gradient of that has a radial part
+  // (toward the magnet, falling off as 1/r⁷) and an angular part (toward the
+  // axis). FP.mag is the pole face at the bottom of the bar; the dipole sits
+  // inside the bar, just above it.
   if (FP.magStrength > 0.0) {
-    let dm = p.pv.xy - FP.mag;
-    let r2 = dot(dm, dm) + FP.magSoft * FP.magSoft;
-    let rl = sqrt(r2);
+    let dm = p.pv.xy - (FP.mag + FP.magDir * FP.magSoft);
+    let r2 = dot(dm, dm);
+    let q = r2 + FP.magSoft * FP.magSoft;
+    let rl = sqrt(r2) + 1e-6;
     let rhat = dm / rl;
     let cth = dot(FP.magDir, rhat);
-    let falloff = 0.001 / (r2 * r2);
-    var macc = FP.magStrength * falloff *
-      (6.0 * cth * (FP.magDir - cth * rhat) - 6.0 * (3.0 * cth * cth + 1.0) * rhat);
+    let g = 1e-7 / (q * q * q);
+    let radial = -6.0 * rl / q * (3.0 * cth * cth + 1.0) * g * rhat;
+    let angular = 6.0 * cth * g / sqrt(q) * (FP.magDir - cth * rhat);
+    var macc = FP.magStrength * (radial + angular);
     let ml = length(macc);
-    if (ml > 90.0) { macc *= 90.0 / ml; }
+    // capped just under gravity: the fluid can climb toward the magnet but
+    // never quite lift off and jump onto it
+    let cap = FP.magCap * FP.gravity;
+    if (ml > cap) { macc *= cap / ml; }
     acc += macc;
+  }
+  // the bar is solid: fluid that touches it gets pushed back out sideways or down
+  if (FP.magBody > 0.5) {
+    let local = p.pv.xy - FP.mag;
+    let hw = 0.026;
+    if (abs(local.x) < hw && local.y > -0.004 && local.y < 0.12) {
+      let side = hw - abs(local.x);
+      let below = local.y + 0.004;
+      if (side < below) { acc.x += sign(local.x) * side * FP.wallK; }
+      else { acc.y -= below * FP.wallK; }
+    }
   }
 
   // tray: penalty springs, the series' usual walls

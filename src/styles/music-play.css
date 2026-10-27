@@ -1,0 +1,214 @@
+/* Styles for the music-play figures: The Accompanist (Living Music 8) and
+   Acoustic Spaces. Every rule is under an .mp- class. */
+
+.mp-stage {
+  position: relative;
+}
+
+/* ---- tap to play ---- */
+
+.mp-gate {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1.25rem 0.7rem 0.75rem;
+  border: 1px solid rgba(255, 184, 107, 0.55);
+  border-radius: 999px;
+  background: rgba(12, 13, 20, 0.84);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #f6efe4;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 6px rgba(255, 184, 107, 0.08),
+    0 14px 40px rgba(0, 0, 0, 0.55);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+  animation: mp-gate-breathe 2.8s ease-in-out infinite;
+}
+
+.mp-gate:hover {
+  border-color: rgba(255, 200, 140, 0.9);
+}
+
+.mp-gate.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.94);
+  animation: none;
+}
+
+.mp-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffcf94, #ff9f5a);
+  color: #1a1206;
+  font-size: 0.95rem;
+  padding-left: 0.15rem;
+}
+
+.mp-gate-words {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.mp-gate-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.mp-gate-sub {
+  font-size: 0.72rem;
+  color: #b9bfd3;
+}
+
+@keyframes mp-gate-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(255, 184, 107, 0.08),
+      0 14px 40px rgba(0, 0, 0, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgba(255, 184, 107, 0.14),
+      0 14px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* in the hero, keep the gate clear of the overlaid title */
+@media (min-width: 46rem) {
+  header.hero .mp-gate {
+    top: 40%;
+  }
+}
+
+/* ---- segmented buttons ---- */
+
+.mp-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.mp-seg-label {
+  margin-right: 0.25rem;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.mp-seg-btn {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(122, 162, 255, 0.05);
+  color: #c9d1ea;
+  font: 600 0.74rem ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.mp-seg-btn:hover {
+  border-color: var(--accent);
+}
+
+.mp-seg-btn.is-on {
+  background: rgba(122, 162, 255, 0.22);
+  border-color: var(--accent);
+  color: #f2f5ff;
+}
+
+/* ---- the on-screen piano: your notes vs the band's ---- */
+
+.mp-piano {
+  height: 74px;
+  margin: 0.75rem 0.1rem 0.1rem;
+}
+
+.mp-piano .piano-key.is-you {
+  background: #e6f1ff;
+  box-shadow: inset 0 -6px 0 #7aa2ff;
+}
+
+.mp-piano .piano-black.is-you {
+  background: #7aa2ff;
+}
+
+.mp-piano .piano-key.is-held {
+  background: #ffb86b;
+}
+
+.mp-piano .piano-key.is-root {
+  background: #a08cff;
+}
+
+@media (max-width: 40rem) {
+  .mp-piano {
+    height: 64px;
+  }
+  .mp-piano .piano-cap {
+    display: none;
+  }
+}
+
+/* ---- rating buttons (probe-tone experiment) ---- */
+
+.mp-rate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.mp-rate-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-right: 0.3rem;
+}
+
+.mp-rate button {
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 184, 107, 0.4);
+  background: rgba(255, 184, 107, 0.06);
+  color: #ffe3c4;
+  font: 700 0.9rem ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.mp-rate button:hover:not(:disabled) {
+  background: rgba(255, 184, 107, 0.22);
+}
+
+.mp-rate button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.mp-rate-ends {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* ---- a row break inside a demo's control strip ---- */
+
+.mp-break {
+  flex-basis: 100%;
+  height: 0;
+}

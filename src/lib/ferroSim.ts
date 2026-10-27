@@ -1,15 +1,24 @@
-// The ferrofluid SPH stack: 32-byte particles, grid sort, density+force
-// passes — the lava lamp's skeleton with temperature removed and a magnet
-// added. Demos differ only in how they draw the result.
+// The ferrofluid SPH stack (Strange Matter part one): 32-byte particles, the
+// grid sort, a density pass and a force pass. It's the lava lamp's skeleton
+// with the temperature taken out and a magnet put in. Demos differ only in
+// the tray they pour into and how they draw the result.
 
 import ferroShader from "../shaders/ferro.wgsl?raw";
 import { GridSort2, GRID } from "./gridSort2";
 
 const WG = 256;
 export const H = 2 / GRID;
+// particles start on a grid at half the kernel radius
+export const SPACING = H * 0.5;
 
-// Tray geometry, world units ([-1,1] sim box). Shared by sim and renderer.
-export const TRAY = {
+// Tray geometry in world units (the sim box is [-1, 1]²).
+export interface Tray {
+  floorY: number;
+  wallX: number;
+  topY: number;
+}
+
+export const TRAY: Tray = {
   floorY: -0.52,
   topY: 0.95,
   wallX: 0.8,
@@ -24,6 +33,7 @@ export interface FerroKnobs {
   tension: number;
   magStrength: number;
   magSoft: number;
+  magCap: number;
 }
 
 export const FERRO_KNOBS: FerroKnobs = {
@@ -33,19 +43,27 @@ export const FERRO_KNOBS: FerroKnobs = {
   nearStiffness: 260.0,
   xsph: 0.16,
   tension: 3.2,
-  magStrength: 30.0,
-  magSoft: 0.09,
+  magStrength: 40.0,
+  magSoft: 0.035,
+  magCap: 0.9,
 };
 
+// How deep a pool of `count` particles stands in a tray, at seed spacing.
+export function poolDepth(count: number, tray: Tray): number {
+  const s = SPACING;
+  const cols = Math.max(Math.floor((2 * (tray.wallX - s)) / s), 1);
+  return Math.ceil(count / cols) * s;
+}
+
 // Cold pool filling the bottom of the tray, h/2 spacing with jitter.
-export function seedTray(count: number): Float32Array {
-  const s = H * 0.5;
+export function seedTray(count: number, tray: Tray = TRAY): Float32Array {
+  const s = SPACING;
   const state = new Float32Array(count * 8);
+  const hw = tray.wallX - s;
+  const cols = Math.max(Math.floor((hw * 2) / s), 1);
   let i = 0;
   for (let row = 0; i < count && row < 4000; row++) {
-    const y = TRAY.floorY + s * (row + 0.7);
-    const hw = TRAY.wallX - s;
-    const cols = Math.max(Math.floor((hw * 2) / s), 1);
+    const y = tray.floorY + s * (row + 0.7);
     for (let col = 0; col < cols && i < count; col++, i++) {
       state[i * 8] = -hw + s * (col + 0.5) + (Math.random() - 0.5) * s * 0.4;
       state[i * 8 + 1] = y + (Math.random() - 0.5) * s * 0.4;
@@ -56,6 +74,7 @@ export function seedTray(count: number): Float32Array {
 
 export class FerroSim {
   count: number;
+  readonly tray: Tray;
   readonly params: GPUBuffer;
   private dev: GPUDevice;
   private sort: GridSort2;
@@ -68,11 +87,12 @@ export class FerroSim {
   private simGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
   private cur = 0;
 
-  constructor(dev: GPUDevice, count: number) {
+  constructor(dev: GPUDevice, count: number, tray: Tray = TRAY) {
     this.dev = dev;
     this.count = count;
+    this.tray = tray;
     this.sort = new GridSort2(dev);
-    this.params = dev.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.params = dev.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const buf = (type: GPUBufferBindingType): GPUBindGroupLayoutEntry["buffer"] => ({ type });
     this.layout = dev.createBindGroupLayout({
       entries: [
@@ -100,7 +120,7 @@ export class FerroSim {
       this.dev.createBuffer({ size: count * 32, usage }),
     ];
     this.density = this.dev.createBuffer({ size: count * 16, usage: GPUBufferUsage.STORAGE });
-    this.dev.queue.writeBuffer(this.bufs[0], 0, seedTray(count) as BufferSource);
+    this.dev.queue.writeBuffer(this.bufs[0], 0, seedTray(count, this.tray) as BufferSource);
     this.sortGroups = [this.sort.bindGroup(this.bufs[0], this.bufs[1]), this.sort.bindGroup(this.bufs[1], this.bufs[0])];
     const mkSim = (sorted: GPUBuffer): GPUBindGroup =>
       this.dev.createBindGroup({
@@ -117,8 +137,10 @@ export class FerroSim {
     this.cur = 0;
   }
 
-  writeParams(knobs: FerroKnobs, dt: number, mag: [number, number], magDir: [number, number], magOn: boolean): void {
-    const dv = new DataView(new ArrayBuffer(80));
+  // mag is the magnet's pole face (the bottom of the bar); the dipole sits a
+  // little above it, inside the bar, and the bar itself is solid.
+  writeParams(knobs: FerroKnobs, dt: number, mag: [number, number], magOn: boolean): void {
+    const dv = new DataView(new ArrayBuffer(96));
     dv.setUint32(0, this.count, true);
     dv.setUint32(4, GRID, true);
     dv.setFloat32(8, H, true);
@@ -133,12 +155,14 @@ export class FerroSim {
     dv.setFloat32(44, magOn ? knobs.magStrength : 0.0, true);
     dv.setFloat32(48, mag[0], true);
     dv.setFloat32(52, mag[1], true);
-    dv.setFloat32(56, magDir[0], true);
-    dv.setFloat32(60, magDir[1], true);
+    dv.setFloat32(56, 0, true); // dipole axis: straight up
+    dv.setFloat32(60, 1, true);
     dv.setFloat32(64, knobs.magSoft, true);
-    dv.setFloat32(68, TRAY.floorY, true);
-    dv.setFloat32(72, TRAY.wallX, true);
-    dv.setFloat32(76, TRAY.topY, true);
+    dv.setFloat32(68, this.tray.floorY, true);
+    dv.setFloat32(72, this.tray.wallX, true);
+    dv.setFloat32(76, this.tray.topY, true);
+    dv.setFloat32(80, magOn ? 1 : 0, true); // the bar is solid only while it's there
+    dv.setFloat32(84, knobs.magCap, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 
@@ -156,10 +180,6 @@ export class FerroSim {
       pass.end();
       this.cur = 1 - this.cur;
     }
-  }
-
-  get current(): GPUBuffer {
-    return this.bufs[this.cur];
   }
 
   get buffers(): [GPUBuffer, GPUBuffer] {

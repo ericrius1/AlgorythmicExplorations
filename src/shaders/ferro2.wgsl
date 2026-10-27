@@ -54,14 +54,21 @@ struct FerroParams2 {
 @group(0) @binding(3) var<storage, read> cellCount: array<u32>;
 @group(0) @binding(4) var<storage, read_write> density: array<vec4f>; // rho, rhoNear, _, _
 
-// particle volume × kernel normalization, dx = h/2 → (h/2)³/(πh³) = 1/(8π)
-const VSIG: f32 = 0.039788735;
-const MAG_REACH: i32 = 4; // pair interactions truncated at 4h (paper's lookup range)
+// The sim is a 2D cross-section: each particle stands for a long column of
+// fluid running into the screen, so the magnetostatics is the 2D kind
+// (fields of line dipoles, falling off as 1/r²). Huang et al.'s smoothed
+// dipole has a 2D twin with the same shape; only the ball average becomes a
+// disk average and the self-demagnetizing 1/3 becomes 1/2.
+
+// particle area × 2D kernel normalization: dx = h/2, σ₂ = 10/(7πh²)
+const VSIG: f32 = 0.11368210;
+const MAG_REACH: i32 = 6; // pair interactions truncated at 6h
 
 // ---- smoothed-dipole kernels (dimensionless, s = r/h) ----------------------------
-// w: 3D cubic spline (×πh³). wavr: its average over the ball of radius r —
-// the W̄ of Huang et al.'s smoothed dipole. Beyond the support, wavr decays
-// as 3/(4s³) and the smoothed dipole becomes the exact point dipole.
+// wk: cubic spline (without its normalization). wavr: its average over the
+// disk of radius r — the W̄ of the smoothed dipole. Beyond the support the
+// average decays as 0.7/s² and the smoothed dipole becomes the exact line
+// dipole.
 
 fn wk(s: f32) -> f32 {
   if (s < 1.0) { return 1.0 - 1.5 * s * s + 0.75 * s * s * s; }
@@ -76,38 +83,39 @@ fn wkp(s: f32) -> f32 { // dw/ds
 }
 
 fn wavr(s: f32) -> f32 {
-  if (s < 1.0) { return 1.0 - 0.9 * s * s + 0.375 * s * s * s; }
+  if (s < 1.0) { return 1.0 - 0.75 * s * s + 0.3 * s * s * s; }
   if (s < 2.0) {
-    let f = 2.6666667 * s * s * s - 3.0 * s * s * s * s + 1.2 * s * s * s * s * s
-          - 0.16666667 * s * s * s * s * s * s;
-    let iint = 0.6333333 + f - 0.7;
-    return 0.75 * iint / (s * s * s);
+    let v = 2.0 - s;
+    let v4 = v * v * v * v;
+    let inner = 0.3 - 0.5 * v4 + 0.2 * v4 * v;
+    return 2.0 * (0.275 + 0.25 * inner) / (s * s);
   }
-  return 0.75 / (s * s * s);
+  return 0.7 / (s * s);
 }
 
-// A(r) = (W̄ − W)/r² — finite at r → 0 because W̄(0) = W(0)
+// A(s) = (W̄ − W)/s², finite at s → 0 because W̄(0) = W(0)
 fn magA(s: f32) -> f32 {
-  if (s < 1.0) { return 0.6 - 0.375 * s; }
+  if (s < 1.0) { return 0.75 - 0.45 * s; }
   return (wavr(s) - wk(s)) / (s * s);
 }
 
-// A'(r) per eq. 33 — the 1/s singularities cancel analytically below s = 1
+// A'(s); below s = 1 the 1/s terms cancel and it's a constant
 fn magAp(s: f32) -> f32 {
-  if (s < 1.0) { return -0.375; }
-  return 5.0 * (wk(s) - wavr(s)) / (s * s * s) - wkp(s) / (s * s);
+  if (s < 1.0) { return -0.45; }
+  return 4.0 * (wk(s) - wavr(s)) / (s * s * s) - wkp(s) / (s * s);
 }
 
-// field of a smoothed dipole with moment m at offset u = r/h (eq. 18)
+// field of a smoothed line dipole with moment m at offset u = r/h
 fn hferro(u: vec2f, m: vec2f) -> vec2f {
   let s = length(u);
-  if (s < 1e-5) { return -m * 0.33333333; } // W̄(0)/3, the self-demagnetizing limit
+  if (s < 1e-5) { return -m * 0.5; } // W̄(0)/2: a round column's self-demagnetization
   let uh = u / s;
-  return uh * (dot(uh, m) * (wavr(s) - wk(s))) - m * (wavr(s) / 3.0);
+  return uh * (dot(uh, m) * (wavr(s) - wk(s))) - m * (wavr(s) * 0.5);
 }
 
-// Kelvin pair force ∇H(u, ms)·mt (eqs. 31–33), u = (target − source)/h.
-// Antisymmetric in u and symmetric under ms↔mt: momentum is conserved.
+// Kelvin pair force ∇(m_t · H(u, m_s)), u = (target − source)/h. It has the
+// same form in 2D as in 3D. Antisymmetric in u and symmetric under
+// ms ↔ mt, so momentum is conserved.
 fn fKelvin(u: vec2f, ms: vec2f, mt: vec2f) -> vec2f {
   let s = length(u);
   if (s < 1e-5) { return vec2f(0.0); }
@@ -159,7 +167,7 @@ fn magnetizePass(@builtin(global_invocation_id) gid: vec3u) {
   let h = FP.cell;
   let cc = cellCoord(pi);
 
-  var b = externalH(pi) + mi * (VSIG * 0.66666667); // self term, W̄(0) = W(0)
+  var b = externalH(pi) + mi * (VSIG * 0.5); // self term: H = −m/2, M = m
   for (var oy = -MAG_REACH; oy <= MAG_REACH; oy++) {
     for (var ox = -MAG_REACH; ox <= MAG_REACH; ox++) {
       let c = cc + vec2i(ox, oy);

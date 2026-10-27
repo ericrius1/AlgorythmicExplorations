@@ -14,9 +14,16 @@
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Living Music · Part 3</p>
+        <h1>Consonance and Roughness</h1>
+        <p class="subtitle">Why some pairs of notes sound smooth and others rough.</p>
+      </div>
+    </header>
     <main>
-      <h1>Consonance and Roughness</h1>
       <p>
         <a href="/pages/living-music/vibration.html">Part one</a> dissected a single note: a repetition
         rate (pitch), a swing size (loudness), and a recipe of harmonics riding the
@@ -54,7 +61,7 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
         two separate notes.
       </p>
 
-      <div data-demo="beats"></div>
+      <div data-demo="beats" data-title="Beats" data-hint="Play"></div>
 
       <p>
         That arc — <strong>smooth → throb → rough → two notes</strong> — explains
@@ -96,7 +103,7 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
         filling the whole square: a picture of "never repeats".
       </p>
 
-      <div data-demo="lissajous"></div>
+      <div data-demo="lissajous" data-title="Ratios" data-hint="Play"></div>
 
       <p>
         Play the interval at each snap button and listen while you look. The simple
@@ -147,7 +154,8 @@ beat rate = |f₂ − f₁|        // always. no exceptions.</code></pre>
         several strong alignments.
       </p>
 
-      <div data-demo="comb"></div>
+      <div data-demo="comb" data-title="Comb" data-hint="Drag"></div>
+      <div data-demo="timbre" data-title="Timbre" data-hint="Drag"></div>
 
       <p>
         The red mountain range underneath is the same idea made quantitative: total

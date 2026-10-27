@@ -1,28 +1,39 @@
-// Part three: participating media. The world here is mostly inherited — the
-// scene pass paints emission + occlusion exactly as the bonfire did. What's
-// new is the media pass: it renders the fog itself into a second texture,
-// a = extinction density, rgb = the fog's *glow* (density × last frame's
-// fluence × the fog's albedo). The cascade march in rc.wgsl then attenuates
-// every ray through the density and picks up the glow along the way.
+// Part three: participating media. The scene pass paints emission +
+// occlusion exactly as the bonfire's did. What's new is the media pass: it
+// renders the fog itself into a second texture, a = extinction density,
+// rgb = the light the fog is sitting in (last frame's fluence, softly
+// blurred). The cascade march in rc.wgsl attenuates every ray through the
+// density and picks up the fog's glow along the way.
 //
 // One shader, three worlds, switched by FP.mode:
-//   0 — the dawn forest: trees, ground, a low sun, ground mist
-//   1 — the lamp room: one warm lamp in a closed dark room of uniform fog
+//   0 — the dawn forest: pines, ground mist, a low sun
+//   1 — the lamp room: one warm lamp in a closed room of fog, and a pillar
 //   2 — the window room: sun outside, two slits in the wall, shafts inside
+//
+// The display pass draws what a viewer would see: a backdrop (the sky, or the
+// room's dim back wall) seen through the fog, plus the fog's own glow, which
+// is density × the light it sits in × how much it scatters. Fog in sunlight
+// shines; fog in shadow doesn't. Light shafts are that difference.
 
 struct FogParams {
   viewScale: vec2f, // world [-1,1] → clip
-  res: vec2f,       // scene texture px
+  res: vec2f,       // target px (scene texture, or the canvas for display)
   time: f32,
   mode: f32,
-  fog: f32,         // fog amount knob (density multiplier)
+  fog: f32,         // fog amount (density multiplier)
   glow: f32,        // lamp brightness
   lamp: vec2f,      // cursor lamp, world (mode 1)
   bounce: f32,
   puffCount: f32,
   probes0: vec2f,   // cascade-0 probe grid, for fluence sampling
-  mist: f32,        // mode 0: how high the ground mist sits
-  _p0: f32,
+  mist: f32,        // mode 0: how high the ground mist reaches
+  scatter: f32,     // single-scattering albedo, as on the slider
+  sunDir: vec2f,    // toward the sun, world (y up)
+  sigma: f32,       // extinction per world unit at density 1
+  airGlow: f32,     // display gain for the fog's glow
+  zenith: vec4f,    // display backdrop: sky colours (linear)
+  horizon: vec4f,
+  sunColor: vec4f,  // rgb, w = intensity of the sun's glow in the backdrop
 }
 
 struct Puff {
@@ -62,7 +73,7 @@ fn fbm(p: vec2f) -> f32 {
 // ---- world geometry ------------------------------------------------------------
 
 fn groundY(x: f32) -> f32 {
-  return -0.62 + 0.07 * sin(x * 1.9 + 1.2) + 0.035 * sin(x * 4.7 + 0.6);
+  return -0.66 + 0.05 * sin(x * 1.9 + 1.2) + 0.025 * sin(x * 4.7 + 0.6);
 }
 
 fn sdCapsule(p: vec2f, a: vec2f, b: vec2f, r: f32) -> f32 {
@@ -72,111 +83,79 @@ fn sdCapsule(p: vec2f, a: vec2f, b: vec2f, r: f32) -> f32 {
   return length(pa - ba * h) - r;
 }
 
-// pines: a trunk and a heavy crown. The crowns matter more than the trunks —
-// god rays need *wide* occluders with gaps between them, and a crown is the
-// widest thing a forest owns.
-fn treeDist(world: vec2f, baseX: f32, h: f32, seed: f32) -> f32 {
+// A pine, as in the bonfire: trunk plus stacked tiers. These are taller and
+// their crowns start higher, so the low sun can slip under and between them.
+fn pineDist(world: vec2f, baseX: f32, h: f32, seed: f32) -> f32 {
   let gy = groundY(baseX);
-  let sway = 0.02 * sin(seed * 9.0);
-  let top = vec2f(baseX + sway, gy + h);
-  var d = sdCapsule(world, vec2f(baseX, gy - 0.05), top, 0.022 + 0.014 * h);
-  // crown: a lumpy ellipse, big enough to cast a shadow the upper cascades
-  // can't interpolate away
-  let c = world - (top + vec2f(0.0, 0.08));
-  let lump = 1.0 + 0.5 * (vnoise(world * 9.0 + seed * 13.0) - 0.5);
-  d = min(d, length(c * vec2f(1.25, 1.7)) - 0.26 * h * lump);
-  let m1 = mix(gy, gy + h, 0.6);
-  d = min(d, sdCapsule(world, vec2f(baseX + sway * 0.5, m1), vec2f(baseX + 0.16 * h, m1 + 0.22 * h), 0.011));
-  return d;
+  let q = world - vec2f(baseX, gy);
+  let trunk = sdCapsule(q, vec2f(0.0, -0.05), vec2f(0.0, h * 0.92), 0.01 + 0.012 * h);
+  let c0 = 0.3 * h;
+  let t = clamp((q.y - c0) / (h - c0), 0.0, 1.0);
+  let tiers = 5.0 + floor(seed * 2.5);
+  let saw = fract(t * tiers + seed * 0.37);
+  var w = (1.0 - t) * 0.2 * h * mix(1.0, 0.45, saw);
+  w *= 1.0 + 0.16 * (vnoise(q * vec2f(60.0, 32.0) + seed * 9.0) - 0.5);
+  let crown = max(abs(q.x) - w, max(c0 - q.y, q.y - h)) * 0.75;
+  return min(trunk, crown);
 }
 
-// ---- scene (emission + occlusion), same contract as parts one and two ---------------
-
-struct SceneEval {
-  emission: vec3f,
+struct Solid {
+  d: f32,
   albedo: vec3f,
-  occ: f32,
 }
 
-fn evalScene(world: vec2f, aa: f32) -> SceneEval {
-  var emission = vec3f(0.0);
-  var albedo = vec3f(0.0);
-  var occ = 0.0;
+fn roomInner() -> vec2f {
+  return 1.0 / FP.viewScale - vec2f(0.1, 0.1);
+}
+
+// Mode 2's window wall: its inner face, and how thick it is.
+fn windowWallX() -> f32 { return -roomInner().x + 0.32; }
+const WALL_T: f32 = 0.12;
+
+fn solidAt(world: vec2f) -> Solid {
   let mode = u32(FP.mode);
-
+  var s = Solid(1e3, vec3f(0.0));
   if (mode == 0u) {
-    // ---- the dawn forest ------------------------------------------------------
-    let gy = groundY(world.x);
-    let gcov = smoothstep(aa, -aa, world.y - gy);
-    if (gcov > 0.0) {
-      occ = gcov;
-      let depth = gy - world.y;
-      albedo = mix(vec3f(0.13, 0.13, 0.10), vec3f(0.05, 0.05, 0.045), smoothstep(0.0, 0.25, depth)) * gcov;
-    }
-    let t1 = treeDist(world, -1.05, 0.9, 1.0);
-    let t2 = treeDist(world, -0.42, 1.1, 2.0);
-    let t3 = treeDist(world, 0.3, 0.85, 3.0);
-    let t4 = treeDist(world, 0.95, 1.15, 4.0);
-    let t5 = treeDist(world, 1.55, 0.9, 5.0);
-    let td = min(min(min(t1, t2), min(t3, t4)), t5);
-    let tcov = smoothstep(aa, -aa, td);
-    if (tcov > 0.0) {
-      occ = max(occ, tcov);
-      albedo = mix(albedo, vec3f(0.05, 0.075, 0.04), tcov);
-    }
+    s = Solid((world.y - groundY(world.x)) * 0.92, vec3f(0.12, 0.12, 0.09));
+    var td = 1e3;
+    td = min(td, pineDist(world, -1.95, 1.25, 0.2));
+    td = min(td, pineDist(world, -1.35, 1.5, 0.7));
+    td = min(td, pineDist(world, -0.78, 1.18, 0.4));
+    td = min(td, pineDist(world, -0.12, 1.42, 0.9));
+    td = min(td, pineDist(world, 0.5, 1.22, 0.1));
+    td = min(td, pineDist(world, 1.08, 1.55, 0.6));
+    td = min(td, pineDist(world, 1.7, 1.28, 0.3));
+    td = min(td, pineDist(world, 2.3, 1.45, 0.8));
+    if (td < s.d) { s = Solid(td, vec3f(0.05, 0.08, 0.045)); }
   } else if (mode == 1u) {
-    // ---- the lamp room ----------------------------------------------------------
-    let b = 0.92;
-    let wcov = smoothstep(-aa, aa, max(abs(world.x), abs(world.y)) - b);
-    if (wcov > 0.0) {
-      occ = max(occ, wcov);
-      albedo = mix(albedo, vec3f(0.30, 0.30, 0.33), wcov);
-    }
-    // a pillar, so the fog has a shadow to make visible
-    let pd = max(abs(world.x - 0.45) - 0.045, abs(world.y + 0.18) - 0.42);
-    let pcov = smoothstep(aa, -aa, pd);
-    if (pcov > 0.0) {
-      occ = max(occ, pcov);
-      albedo = mix(albedo, vec3f(0.22, 0.24, 0.3), pcov);
-    }
-    // the lamp follows the cursor. Kept deliberately fat: a near-point
-    // source beads the low cascades' sparse directions into visible dots,
-    // and a wide soft emitter is the honest fix.
-    let ld = length(world - FP.lamp);
-    let lampCov = smoothstep(aa, -aa, ld - 0.09);
-    if (lampCov > 0.0) {
-      occ = max(occ, lampCov);
-      albedo = mix(albedo, vec3f(0.0), lampCov);
-      emission = vec3f(1.0, 0.8, 0.55) * 4.5 * FP.glow * smoothstep(0.09, 0.025, ld);
-    }
+    // the lamp room: walls just inside the canvas, and a pillar
+    let q = abs(world) - roomInner();
+    let box = length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0);
+    s = Solid(-box, vec3f(0.42, 0.42, 0.45));
+    let pd = max(abs(world.x - 0.45) - 0.05, abs(world.y + 0.15) - 0.42);
+    if (pd < s.d) { s = Solid(pd, vec3f(0.35, 0.37, 0.42)); }
   } else {
-    // ---- the window room ----------------------------------------------------------
-    // floor, ceiling, right wall: plain plaster. The left wall is thicker
-    // and pierced by two slits — the slits carve all the way through, so
-    // the sky's sun can pour in.
-    let b = 0.92;
-    var wallCov = step(0.0, max(abs(world.x), abs(world.y)) - b);
-    if (world.x < -b + 0.10) {
-      let slit = abs(world.y - 0.44) < 0.115 || abs(world.y - 0.0) < 0.115;
-      wallCov = select(1.0, 0.0, slit);
-    }
-    if (wallCov > 0.0) {
-      occ = max(occ, wallCov);
-      albedo = mix(albedo, vec3f(0.30, 0.29, 0.27), wallCov);
-    }
-    // a table under the shafts — something for the light to land on
-    let td = max(abs(world.x - 0.18) - 0.34, abs(world.y + 0.62) - 0.05);
-    let tcov = smoothstep(aa, -aa, td);
-    if (tcov > 0.0) {
-      occ = max(occ, tcov);
-      albedo = mix(albedo, vec3f(0.32, 0.2, 0.1), tcov);
-    }
+    // the window room: floor, ceiling and right wall are plaster; the left
+    // wall is pierced by two slits, and beyond it is the open air
+    let inner = roomInner();
+    let wx = windowWallX();
+    var room = min(min(inner.y - world.y, world.y + inner.y), inner.x - world.x);
+    if (world.x < wx - WALL_T) { room = 1e3; } // outside: no floor or ceiling
+    s = Solid(room, vec3f(0.4, 0.38, 0.35));
+    let wallBox = max(abs(world.x - (wx - WALL_T * 0.5)) - WALL_T * 0.5, abs(world.y) - inner.y - 0.2);
+    let slits = min(abs(world.y - 0.42) - 0.11, abs(world.y + 0.02) - 0.11);
+    let wd = max(wallBox, -slits);
+    if (wd < s.d) { s = Solid(wd, vec3f(0.4, 0.38, 0.35)); }
+    // a table under the shafts, for the light to land on
+    let tdist = max(abs(world.x - 0.2) - 0.36, abs(world.y + inner.y - 0.2) - 0.035);
+    let legs = max(abs(abs(world.x - 0.2) - 0.3) - 0.02, abs(world.y + inner.y - 0.1) - 0.1);
+    let table = min(tdist, legs);
+    if (table < s.d) { s = Solid(table, vec3f(0.36, 0.22, 0.12)); }
   }
-
-  return SceneEval(emission, albedo, occ);
+  return s;
 }
 
-// ---- fluence (last frame's light), for bounce and for the fog's glow -----------------
+// ---- fluence (last frame's light), for bounce, the fog's glow and display ------------
 
 struct FullOut {
   @builtin(position) pos: vec4f,
@@ -192,6 +171,15 @@ fn vsFullF(@builtin(vertex_index) vi: u32) -> FullOut {
   return out;
 }
 
+fn uvToWorld(uv: vec2f) -> vec2f {
+  return vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0) / FP.viewScale;
+}
+
+fn worldToUv(w: vec2f) -> vec2f {
+  let c = w * FP.viewScale;
+  return vec2f(c.x * 0.5 + 0.5, 0.5 - c.y * 0.5);
+}
+
 fn fluenceAt(uv: vec2f) -> vec3f {
   let texFull = vec2f(textureDimensions(fluenceTex));
   let local = clamp(uv, vec2f(0.5) / FP.probes0, 1.0 - vec2f(0.5) / FP.probes0);
@@ -204,43 +192,90 @@ fn fluenceAt(uv: vec2f) -> vec3f {
   return sum * 0.25;
 }
 
+fn probeSpacing() -> f32 {
+  return 2.0 / (FP.viewScale.y * FP.probes0.y);
+}
+
+fn normalAt(world: vec2f) -> vec2f {
+  let e = probeSpacing() * 0.5;
+  return normalize(vec2f(
+    solidAt(world + vec2f(e, 0.0)).d - solidAt(world - vec2f(e, 0.0)).d,
+    solidAt(world + vec2f(0.0, e)).d - solidAt(world - vec2f(0.0, e)).d,
+  ) + vec2f(0.0, 1e-6));
+}
+
+// Light arriving at a solid point from outside it (see bonfire.wgsl).
+fn incidentAt(world: vec2f, d: f32) -> vec3f {
+  let out = world + normalAt(world) * (max(-d, 0.0) + probeSpacing() * 1.5);
+  return fluenceAt(worldToUv(out));
+}
+
+// Light in the air at a point, nudged clear of any solid it's touching.
+fn airLightAt(world: vec2f, uv: vec2f, d: f32) -> vec3f {
+  let reach = probeSpacing() * 1.5;
+  if (d > 0.0 && d < reach) {
+    return fluenceAt(worldToUv(world + normalAt(world) * (reach - d)));
+  }
+  return fluenceAt(uv);
+}
+
+fn lampAt(world: vec2f, aa: f32) -> vec4f {
+  if (u32(FP.mode) != 1u) { return vec4f(0.0); }
+  // kept fat on purpose: a near-point source beads the low cascades' sparse
+  // directions into dots
+  let ld = length(world - FP.lamp);
+  let cov = smoothstep(aa, -aa, ld - 0.085);
+  // flat out to the edge: rays only ever read a light at its surface
+  return vec4f(vec3f(1.0, 0.8, 0.55) * 6.0 * FP.glow, cov);
+}
+
 @fragment
 fn fsSceneF(in: FullOut) -> @location(0) vec4f {
-  let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
-  let world = clip / FP.viewScale;
+  let world = uvToWorld(in.uv);
   let aa = 2.0 / (FP.viewScale.y * FP.res.y);
-  let s = evalScene(world, aa);
-  var emission = s.emission + s.albedo * 0.012;
-  if (s.occ > 0.5 && FP.bounce > 0.0) {
-    emission += s.albedo * fluenceAt(in.uv) * FP.bounce;
+  let s = solidAt(world);
+  let cov = smoothstep(aa, -aa, s.d);
+  var emission = vec3f(0.0);
+  if (cov > 0.0) {
+    emission = s.albedo * 0.004;
+    if (FP.bounce > 0.0) {
+      emission += s.albedo * incidentAt(world, s.d) * exp(min(s.d, 0.0) / 0.06) * FP.bounce;
+    }
+    emission *= cov;
   }
-  return vec4f(emission, s.occ);
+  let lamp = lampAt(world, aa);
+  emission = mix(emission, lamp.rgb, lamp.a);
+  return vec4f(emission, max(cov, lamp.a));
 }
 
 // ---- media: the fog itself ------------------------------------------------------------
-// Density is procedural mist plus cursor-blown smoke puffs; the glow channel
-// multiplies that density by last frame's fluence. Fog that light reaches
-// shines; fog in shadow stays dark — god rays are exactly this difference.
+// Density is procedural mist plus cursor-blown smoke puffs.
 
-fn fogDensity(world: vec2f, uv: vec2f) -> f32 {
+fn fogDensity(world: vec2f) -> f32 {
   let mode = u32(FP.mode);
   var dens = 0.0;
 
   if (mode == 0u) {
-    // ground mist: dense at the floor, thinning with height, drifting east
+    // ground mist: dense at the floor, thinning with height (one exponential,
+    // like a real atmosphere), drifting east
     let gy = groundY(world.x);
     let h = world.y - gy;
     let band = exp(-max(h, 0.0) / max(FP.mist, 0.05));
     let drift = fbm(world * vec2f(1.4, 2.2) + vec2f(-FP.time * 0.05, FP.time * 0.012));
     dens = FP.fog * band * (0.35 + 0.85 * drift);
-    // thin haze everywhere, so even the canopy gaps participate a little
-    dens += FP.fog * 0.10 * fbm(world * 0.9 + vec2f(FP.time * 0.02, 0.0));
+    // haze everywhere, thicker under the canopy, so the gaps between the
+    // crowns have something for the sun to light
+    let canopy = smoothstep(1.1, 0.2, h);
+    dens += FP.fog * (0.12 + 0.3 * canopy) * fbm(world * vec2f(0.9, 1.6) + vec2f(FP.time * 0.02, 0.0));
     if (world.y < gy) { dens = 0.0; }
   } else {
     // rooms: near-uniform fog with a slow large-scale stir
     let wobble = 0.85 + 0.3 * (fbm(world * 1.3 + vec2f(FP.time * 0.04, -FP.time * 0.03)) - 0.5);
     dens = FP.fog * wobble;
-    if (max(abs(world.x), abs(world.y)) > 0.92) { dens = 0.0; }
+    let inner = roomInner();
+    if (abs(world.y) > inner.y || world.x > inner.x) { dens = 0.0; }
+    if (mode == 1u && world.x < -inner.x) { dens = 0.0; }
+    if (mode == 2u && world.x < windowWallX()) { dens = 0.0; }
   }
 
   // smoke puffs (cursor-blown)
@@ -254,20 +289,78 @@ fn fogDensity(world: vec2f, uv: vec2f) -> f32 {
 
 @fragment
 fn fsMedia(in: FullOut) -> @location(0) vec4f {
-  let clip = vec2f(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0);
-  let world = clip / FP.viewScale;
-  let dens = fogDensity(world, in.uv);
-  // the glow channel holds the local light field (last frame's fluence) with
-  // a slightly warm tint — droplets scatter sunrise light amber-ish. The
-  // march multiplies in the density's (1 − e^(−σρΔs)) itself, so density is
-  // NOT folded in here. The wide 5-tap blur matters: near a bright source
-  // the cascades' probe grid leaves faint rings, and glowing fog is a
-  // magnifying glass for them — fog is allowed to be blurry.
+  let world = uvToWorld(in.uv);
+  let dens = fogDensity(world);
+  // The glow channel holds the local light field (last frame's fluence)
+  // with a slightly warm tint. The march multiplies in (1 − e^(−σρΔs))
+  // itself, so density is NOT folded in here. A wide 5-tap blur: near a
+  // bright source the probe grid leaves faint rings, and glowing fog
+  // magnifies them. Fog is allowed to be blurry.
   let res = vec2f(FP.res);
   let o1 = vec2f(9.0, 3.0) / res;
   let o2 = vec2f(-3.0, 9.0) / res;
-  let tint = vec3f(1.0, 0.93, 0.82);
+  let tint = vec3f(1.0, 0.95, 0.88);
   let glow = (fluenceAt(in.uv) + fluenceAt(in.uv + o1) + fluenceAt(in.uv - o1) +
               fluenceAt(in.uv + o2) + fluenceAt(in.uv - o2)) * 0.2 * tint;
   return vec4f(glow, dens);
+}
+
+// ---- display ---------------------------------------------------------------------------
+
+fn backdrop(world: vec2f, uv: vec2f, light: vec3f) -> vec3f {
+  let mode = u32(FP.mode);
+  if (mode == 1u) {
+    // the room's back wall, dimly lit by whatever light reaches it
+    return light * 0.3;
+  }
+  if (mode == 2u && world.x > windowWallX()) {
+    return light * 0.3;
+  }
+  // open sky: zenith to horizon, with the sun's glow toward its direction
+  var sky = mix(FP.horizon.rgb, FP.zenith.rgb, smoothstep(0.92, 0.02, uv.y));
+  let sunAt = normalize(FP.sunDir) * 1.15 / FP.viewScale * FP.viewScale.y;
+  let ds = length((world - sunAt) * vec2f(1.0, 1.0));
+  sky += FP.sunColor.rgb * FP.sunColor.w * (exp(-ds * ds * 9.0) * 0.6 + exp(-ds * 2.2) * 0.12);
+  // a far row of pines, lost in the haze: drawn only, never lit or occluding
+  // (they stand somewhere behind the plane the light lives in)
+  if (mode == 0u) {
+    var fd = 1e3;
+    for (var k = 0; k < 9; k++) {
+      let bx = -2.4 + f32(k) * 0.6 + 0.17 * sin(f32(k) * 7.1);
+      let gy = groundY(bx) + 0.12;
+      let h = 0.55 + 0.25 * fract(sin(f32(k) * 12.9) * 43.7);
+      let q = world - vec2f(bx, gy);
+      let t = clamp(q.y / h, 0.0, 1.0);
+      let w = (1.0 - t) * 0.14 * h * mix(1.0, 0.55, fract(t * 5.0)) + 0.008;
+      fd = min(fd, max(abs(q.x) - w, max(-q.y - 0.3, q.y - h)));
+    }
+    let far = smoothstep(0.003, -0.003, fd);
+    sky = mix(sky, FP.horizon.rgb * 0.45 + FP.zenith.rgb * 0.3, far * 0.85);
+  }
+  return sky;
+}
+
+@fragment
+fn fsDisplayF(in: FullOut) -> @location(0) vec4f {
+  let world = uvToWorld(in.uv);
+  let aa = 2.0 / (FP.viewScale.y * FP.res.y);
+  let s = solidAt(world);
+  let light = airLightAt(world, in.uv, s.d);
+
+  // the air: backdrop seen through the fog, plus the fog's own glow
+  let dens = fogDensity(world);
+  let thick = dens * FP.sigma * 0.35;           // how much fog stands between you and the backdrop
+  var col = backdrop(world, in.uv, light) * exp(-thick);
+  col += light * dens * FP.scatter * FP.airGlow;
+
+  // solids: albedo × the light reaching their surface
+  let cov = smoothstep(aa, -aa, s.d);
+  if (cov > 0.0) {
+    let lit = s.albedo * incidentAt(world, s.d) * exp(min(s.d, 0.0) / 0.05) * 1.4 + s.albedo * 0.004;
+    // fog in front of a solid still glows a little
+    col = mix(col, lit * exp(-thick * 0.5) + light * dens * FP.scatter * FP.airGlow * 0.3, cov);
+  }
+  let lamp = lampAt(world, aa);
+  col = mix(col, lamp.rgb * 0.6, lamp.a);
+  return vec4f(col, 1.0);
 }

@@ -1,127 +1,212 @@
 // Scroll-driven diagram for part four: one ray sphere-traces toward a scene.
-// At every position the distance function hands the ray a radius of certified
-// empty space; the ray leaps exactly that far and asks again. The same
-// figure then shows the cheap miss: a ray that grazes the surface creeps.
+// At every position the distance function gives the ray a radius of empty
+// space; the ray moves that far and asks again. Then a second ray grazes an
+// edge and shows why silhouettes are expensive.
+//
+// The scene lives in world units with x across [0, 1] and y down across
+// [0, ASPECT]; one scale for both axes, so every circle drawn really is the
+// distance to the nearest surface.
 
 import { mountScrolly, PAL, phase, clamp01, label, arrow } from "../lib/scrolly";
 
-interface Circle { x: number; y: number; r: number }
+interface Circle {
+  x: number;
+  y: number;
+  r: number;
+}
+
+const ASPECT = 0.56;
+const FLOOR = 0.5; // a floor line near the bottom
+
+const blobs: Circle[] = [
+  { x: 0.74, y: 0.3, r: 0.11 },
+  { x: 0.91, y: 0.07, r: 0.065 },
+  { x: 0.6, y: 0.44, r: 0.055 },
+  { x: 0.33, y: 0.07, r: 0.045 },
+];
+
+function sdf(x: number, y: number): number {
+  let d = FLOOR - y;
+  for (const b of blobs) d = Math.min(d, Math.hypot(x - b.x, y - b.y) - b.r);
+  return d;
+}
+
+interface March {
+  pts: Circle[];
+  hit: boolean;
+}
+
+function march(ox: number, oy: number, ang: number, maxSteps: number): March {
+  const dx = Math.cos(ang);
+  const dy = Math.sin(ang);
+  const pts: Circle[] = [];
+  let t = 0;
+  for (let i = 0; i < maxSteps; i++) {
+    const x = ox + dx * t;
+    const y = oy + dy * t;
+    if (x > 1.02) return { pts, hit: false };
+    const r = sdf(x, y);
+    pts.push({ x, y, r });
+    if (r < 0.002) return { pts, hit: true };
+    t += r;
+  }
+  return { pts, hit: false };
+}
 
 export function mountSphereMarch(container: HTMLElement): void {
-  // scene in unit coords (x 0..1, y 0..1, y up drawn down later)
-  const blobs: Circle[] = [
-    { x: 0.78, y: 0.62, r: 0.16 },
-    { x: 0.86, y: 0.38, r: 0.12 },
-    { x: 0.62, y: 0.8, r: 0.1 },
-  ];
-
-  const sdf = (x: number, y: number): number => {
-    let d = Infinity;
-    for (const b of blobs) d = Math.min(d, Math.hypot(x - b.x, y - b.y) - b.r);
-    return d;
-  };
-
-  // precompute the two marches
-  const marchFrom = (ox: number, oy: number, dx: number, dy: number, n: number): { x: number; y: number; r: number }[] => {
-    const pts: { x: number; y: number; r: number }[] = [];
-    let t = 0;
-    for (let i = 0; i < n; i++) {
-      const x = ox + dx * t;
-      const y = oy + dy * t;
-      const r = sdf(x, y);
-      pts.push({ x, y, r });
-      if (r < 0.004) break;
-      t += r;
-    }
-    return pts;
-  };
-
-  const hit = marchFrom(0.07, 0.42, Math.cos(-0.12), Math.sin(-0.12), 10);
-  // grazing ray: passes just over the top blob
-  const graze = marchFrom(0.07, 0.28, Math.cos(0.06), Math.sin(0.06), 26);
+  // ray one heads for the big blob; ray two skims its top edge
+  const hitRay = march(0.04, 0.34, 0.05, 64);
+  // aim the grazing ray so it passes within a hair of the top of the big blob
+  const gx = 0.04;
+  const gy = 0.185;
+  const b0 = blobs[0];
+  const dist = Math.hypot(b0.x - gx, b0.y - gy);
+  const tangent = Math.atan2(b0.y - gy, b0.x - gx) - Math.asin((b0.r + 0.004) / dist);
+  const grazeRay = march(gx, gy, tangent, 200);
+  const nHit = hitRay.pts.length;
+  const nGraze = grazeRay.pts.length;
+  // how many of the grazing ray's steps were spent near the edge
+  const nearEdge = grazeRay.pts.filter((p) => p.r < 0.02).length;
 
   mountScrolly(container, {
     screens: 4,
-    aspect: 0.56,
+    aspect: ASPECT,
     steps: [
-      { at: 0.0, text: "One ray, marching toward a scene it cannot see. All it may do is ask, at any point: <em>how far is the nearest surface?</em>" },
-      { at: 0.18, text: "The answer is a radius of <em>certified empty space</em> — a circle that touches nothing. The ray can leap that far with no risk of skipping through a surface." },
-      { at: 0.42, text: "From the new position, ask again. Far from everything, the circles are huge and the ray crosses the scene in a few leaps. This is the distance field doing for one ray what it did for thousands in part one." },
-      { at: 0.62, text: "Close to a surface, the answers shrink, and the ray brakes to a halt exactly at the boundary — within ten steps here." },
-      { at: 0.78, text: "The failure mode: a ray that <em>grazes</em> a surface. Every answer is tiny — certified space is honest but unhelpful — and the ray creeps for dozens of steps. Step-count heatmaps glow brightest along silhouettes for exactly this reason." },
+      {
+        at: 0.0,
+        text: "A ray starts at the left. It can't see the scene. The only thing it can ask is how far it is to the nearest surface, from where it is right now.",
+      },
+      {
+        at: 0.16,
+        text: "The answer is the radius of a circle with nothing inside it. The ray can move that far along its direction and be sure it hasn't passed through anything.",
+      },
+      {
+        at: 0.36,
+        text: "So it moves, and asks again. Out in the open the circles are big and the ray covers ground quickly.",
+      },
+      {
+        at: 0.56,
+        text: `Near a surface the answers shrink and the ray slows down, until it's within a small tolerance of the surface. This ray took ${nHit} steps.`,
+      },
+      {
+        at: 0.72,
+        text: `A ray that only grazes a surface has it worse. Every answer along the edge is small, so it inches past: ${nGraze} steps, ${nearEdge} of them right at the edge. Silhouettes are expensive for this reason.`,
+      },
     ],
     draw(ctx, w, h, t) {
-      const X = (x: number): number => x * w;
-      const Y = (y: number): number => y * h;
+      // one scale for both axes, centred if the canvas is a little off-aspect
+      const s = Math.min(w, h / ASPECT);
+      const ox = (w - s) / 2;
+      const oy = (h - s * ASPECT) / 2;
+      const X = (x: number): number => ox + x * s;
+      const Y = (y: number): number => oy + y * s;
 
-      // the scene blobs
+      // floor
+      ctx.fillStyle = "#151a28";
+      ctx.fillRect(X(0), Y(FLOOR), s, h - Y(FLOOR));
+      ctx.strokeStyle = PAL.dim;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(FLOOR));
+      ctx.lineTo(X(1), Y(FLOOR));
+      ctx.stroke();
+
+      // the scene's shapes
       for (const b of blobs) {
         ctx.beginPath();
-        ctx.arc(X(b.x), Y(b.y), b.r * w, 0, Math.PI * 2);
+        ctx.arc(X(b.x), Y(b.y), b.r * s, 0, Math.PI * 2);
         ctx.fillStyle = "#1d2233";
         ctx.fill();
-        ctx.strokeStyle = PAL.dim;
+        ctx.strokeStyle = "#4a5270";
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
 
-      // phase 1: the hit march, circle by circle
-      const p1 = phase(t, 0.05, 0.6);
-      const shown = Math.min(hit.length, Math.floor(p1 * (hit.length + 1)));
-      for (let i = 0; i < shown; i++) {
-        const s = hit[i];
-        const a = clamp01(p1 * (hit.length + 1) - i);
-        ctx.beginPath();
-        ctx.arc(X(s.x), Y(s.y), Math.max(s.r * w, 1.2), 0, Math.PI * 2);
-        ctx.strokeStyle = PAL.accent;
-        ctx.globalAlpha = 0.55 * a;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.globalAlpha = a;
+      const drawMarch = (
+        m: March,
+        p: number,
+        color: string,
+        circleAlpha: number,
+        dot: number,
+      ): number => {
+        const n = m.pts.length;
+        // the first circle appears before the ray moves
+        const shown = Math.min(n, Math.floor(p * (n + 0.999)));
+        for (let i = 0; i < shown; i++) {
+          const c = m.pts[i];
+          const a = clamp01(p * (n + 0.999) - i);
+          if (c.r * s > 1.5) {
+            ctx.beginPath();
+            ctx.arc(X(c.x), Y(c.y), c.r * s, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.05 * a;
+            ctx.fill();
+            ctx.globalAlpha = circleAlpha * a;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = a;
+          if (i > 0) {
+            const q = m.pts[i - 1];
+            if (Math.hypot(X(c.x) - X(q.x), Y(c.y) - Y(q.y)) > 9) {
+              arrow(ctx, X(q.x), Y(q.y), X(c.x), Y(c.y), color, 1.6, 6);
+            } else {
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 1.6;
+              ctx.beginPath();
+              ctx.moveTo(X(q.x), Y(q.y));
+              ctx.lineTo(X(c.x), Y(c.y));
+              ctx.stroke();
+            }
+          }
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(X(c.x), Y(c.y), dot, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        return shown;
+      };
+
+      // ray one: first just the question, then the march
+      const p1 = phase(t, 0.1, 0.62);
+      const shown1 = drawMarch(hitRay, p1, PAL.warm, 0.6, 3);
+      label(ctx, "the ray", X(hitRay.pts[0].x), Y(hitRay.pts[0].y) - 14, { color: PAL.warm, size: 12 });
+      if (shown1 === 0) {
         ctx.fillStyle = PAL.warm;
         ctx.beginPath();
-        ctx.arc(X(s.x), Y(s.y), 3, 0, Math.PI * 2);
+        ctx.arc(X(hitRay.pts[0].x), Y(hitRay.pts[0].y), 3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
-        if (i > 0) {
-          const q = hit[i - 1];
-          ctx.globalAlpha = a;
-          arrow(ctx, X(q.x), Y(q.y), X(s.x), Y(s.y), PAL.warm, 1.6, 6);
-          ctx.globalAlpha = 1;
-        }
       }
-      if (p1 > 0 && shown > 0) {
-        label(ctx, "the ray", X(hit[0].x) - 4, Y(hit[0].y) - 14, { color: PAL.warm, size: 12 });
+      if (shown1 === 1) {
+        const c = hitRay.pts[0];
+        label(ctx, "nearest surface is this far", X(c.x) + c.r * s * 0.35, Y(c.y) + c.r * s * 0.55, {
+          color: PAL.muted,
+          size: 11,
+        });
+      }
+      if (shown1 >= nHit) {
+        const c = hitRay.pts[nHit - 1];
+        label(ctx, `hit · ${nHit} steps`, X(c.x) - 8, Y(c.y) + 18, { color: PAL.warm, size: 12, align: "right" });
       }
 
-      // phase 2: the grazing ray
-      const p2 = phase(t, 0.72, 0.98);
+      // ray two: the graze
+      const p2 = phase(t, 0.72, 0.97);
       if (p2 > 0) {
-        const shown2 = Math.min(graze.length, Math.floor(p2 * (graze.length + 2)));
-        for (let i = 0; i < shown2; i++) {
-          const s = graze[i];
-          ctx.beginPath();
-          ctx.arc(X(s.x), Y(s.y), Math.max(s.r * w, 1.0), 0, Math.PI * 2);
-          ctx.strokeStyle = PAL.red;
-          ctx.globalAlpha = 0.4;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = PAL.red;
-          ctx.beginPath();
-          ctx.arc(X(s.x), Y(s.y), 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (shown2 > 3) {
-          label(ctx, `${shown2} steps and still going…`, X(graze[shown2 - 1].x) - 30, Y(graze[shown2 - 1].y) - 16, {
-            color: PAL.red, size: 12, align: "right",
+        const shown2 = drawMarch(grazeRay, p2, PAL.red, 0.35, 2);
+        if (shown2 > 0) {
+          const c0 = grazeRay.pts[0];
+          label(ctx, "a grazing ray", X(c0.x), Y(c0.y) - 14, { color: PAL.red, size: 12 });
+          const c = grazeRay.pts[shown2 - 1];
+          const done = shown2 >= nGraze;
+          const txt = done ? `${nGraze} steps` : `${shown2} steps…`;
+          label(ctx, txt, Math.min(X(c.x) + 8, X(1) - 4), Y(c.y) - 14, {
+            color: PAL.red,
+            size: 12,
+            align: X(c.x) > X(0.85) ? "right" : "left",
           });
         }
-      }
-
-      // step counter for the hit march
-      if (shown > 1) {
-        label(ctx, `${Math.min(shown, hit.length)} steps`, X(0.06), Y(0.92), { color: PAL.muted, size: 12, mono: true });
       }
     },
   });

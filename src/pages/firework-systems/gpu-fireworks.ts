@@ -1,7 +1,9 @@
+import "../../styles/firework-systems.css";
 import { wirePage } from "../../core/wirePage";
 import {
   mountCapacityMap,
   mountCommandBudget,
+  mountFireworksLive,
   mountHeroFireworks,
   mountLiveCompaction,
   mountPipelineGraph,
@@ -13,4 +15,5 @@ wirePage({
   "live-compaction": mountLiveCompaction,
   "pipeline-graph": mountPipelineGraph,
   "capacity-map": mountCapacityMap,
+  "fireworks-live": mountFireworksLive,
 });

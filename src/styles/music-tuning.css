@@ -1,0 +1,215 @@
+/* Living Music parts 4 and 5 (twelve.html, scales.html): pickers, badges
+   and hero controls for the tuning figures. Everything is scoped under
+   .tn-page so other pages are unaffected. */
+
+.tn-page .demo-canvas {
+  background: #06070b;
+}
+
+/* ---- chip pickers ---- */
+
+.tn-page .tn-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tn-page .tn-chips-wide {
+  flex: 1 1 100%;
+}
+
+.tn-page .tn-chips-label {
+  font: 500 0.72rem ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+}
+
+.tn-page .tn-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tn-page .tn-chip {
+  font: 600 0.74rem ui-sans-serif, system-ui, sans-serif;
+  color: #c6cde0;
+  background: rgba(122, 162, 255, 0.05);
+  border: 1px solid rgba(122, 162, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.tn-page .tn-chip:hover {
+  border-color: rgba(122, 162, 255, 0.5);
+  color: #eef1f8;
+}
+
+.tn-page .tn-chip.is-on {
+  color: #0b0d14;
+  background: linear-gradient(135deg, #a9c1ff, #ffd0a0);
+  border-color: transparent;
+}
+
+.tn-page .tn-chip:focus-visible,
+.tn-page .tn-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tn-page .tn-toggle.is-on {
+  background: rgba(255, 184, 107, 0.16);
+  border-color: rgba(255, 184, 107, 0.55);
+  color: #ffe2c2;
+}
+
+.tn-page .tn-range {
+  min-width: 12rem;
+}
+
+.tn-page .tn-break {
+  flex-basis: 100%;
+  height: 0;
+}
+
+/* ---- tap-to-play badge ---- */
+
+.tn-page .tn-badge {
+  position: absolute;
+  top: 3.2rem;
+  right: 1.3rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.75rem 0.32rem 0.6rem;
+  border: 1px solid rgba(255, 184, 107, 0.5);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.82);
+  color: var(--accent-warm);
+  font: 600 0.7rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.tn-page .tn-badge.tn-badge-inline {
+  position: static;
+  order: 3;
+  padding: 0.16rem 0.6rem 0.16rem 0.48rem;
+  font-size: 0.62rem;
+  transition:
+    opacity 0.5s ease,
+    max-width 0.5s ease;
+  max-width: 14rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tn-page .tn-badge.tn-badge-inline.is-hidden {
+  opacity: 0;
+  max-width: 0;
+  padding: 0;
+  border-width: 0;
+}
+
+.tn-page .tn-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tn-page .tn-badge.is-hidden {
+  opacity: 0;
+}
+
+/* ---- hero ---- */
+
+.tn-page header.hero .demo-canvas {
+  cursor: pointer;
+}
+
+.tn-page .tn-hero-play {
+  border-color: rgba(255, 184, 107, 0.55);
+  background: rgba(255, 184, 107, 0.1);
+  color: #ffe2c2;
+  box-shadow: 0 0 22px rgba(255, 184, 107, 0.18);
+}
+
+.tn-page .tn-hero-play:not(.is-on) {
+  animation: tn-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes tn-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 184, 107, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(255, 184, 107, 0.35);
+  }
+}
+
+@media (max-width: 45.99rem) {
+  .tn-page header.hero .demo-controls {
+    justify-content: center;
+  }
+}
+
+/* ---- tables in the text ---- */
+
+.tn-page .tn-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.4rem;
+  font: 0.84rem/1.45 ui-sans-serif, system-ui, sans-serif;
+}
+
+.tn-page .tn-table th,
+.tn-page .tn-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.tn-page .tn-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tn-page .tn-table td.num {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tn-page .tn-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.4rem;
+}
+
+.tn-page .tn-table-wrap .tn-table {
+  margin: 0;
+}
+
+/* keyboard hint under a playable figure */
+.tn-page .tn-kbd {
+  font: 0.72rem ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+  padding: 0.5rem 0.3rem 0;
+}
+
+.tn-page .tn-kbd kbd {
+  font: 600 0.68rem ui-monospace, Menlo, monospace;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #151826;
+  color: #dfe5f7;
+}

@@ -44,10 +44,15 @@ struct LavaParams {
   floorY: f32,
   topY: f32,
   tension: f32,    // surface tension: pairwise cohesion strength
-  _pad: f32,
+  drag: f32,       // the water's drag on the wax, per second
+  heatSpread: f32, // width of the coil's hot spot, as a fraction of the base
+  heatFloor: f32,  // heating at the edges of the floor, relative to the centre
+  _p0: f32,
+  _p1: f32,
 }
 
 @group(0) @binding(0) var<uniform> LP: LavaParams;
+
 @group(0) @binding(1) var<storage, read_write> parts: array<Particle2>;
 @group(0) @binding(2) var<storage, read> cellStart: array<u32>;
 @group(0) @binding(3) var<storage, read> cellCount: array<u32>;
@@ -182,8 +187,8 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   let heatZone = LP.heaterY - LP.floorY;
   if (p.pv.y < LP.heaterY) {
     let f = 1.0 - (p.pv.y - LP.floorY) / max(heatZone, 1e-4);
-    let cx = p.pv.x / (LP.wallBottom * 0.35);
-    let centre = max(1.0 - cx * cx, 0.0);
+    let cx = p.pv.x / (LP.wallBottom * LP.heatSpread);
+    let centre = LP.heatFloor + (1.0 - LP.heatFloor) * max(1.0 - cx * cx, 0.0);
     t += LP.heatRate * LP.dt * clamp(f, 0.0, 1.0) * centre;
   }
   // radiative loss: almost nothing mid-flight so blobs ride the full height,
@@ -193,7 +198,8 @@ fn forcePass(@builtin(global_invocation_id) gid: vec3u) {
   t -= LP.coolRate * LP.dt * t * (0.35 + 5.0 * topF + 0.4 * wallF);
   t = clamp(t, 0.0, 1.15);
 
-  var vel = (p.pv.zw + acc * LP.dt) * 0.9996;
+  // the water the wax moves through: linear drag sets a calm terminal speed
+  var vel = (p.pv.zw + acc * LP.dt) / (1.0 + LP.drag * LP.dt);
   // viscosity falls as wax warms: cold wax is sluggish, hot wax is runny
   vel += dv * LP.xsph * (1.0 - 0.3 * clamp(t, 0.0, 1.0));
   let speed = length(vel);

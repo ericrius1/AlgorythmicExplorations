@@ -33,7 +33,9 @@ export interface SkyOpts {
   strength?: number;
 }
 
-const BRUSH_POOL = 64;
+// one uniform buffer per stamp in flight: every stamp in a frame needs its own,
+// because all the writes land before the command buffer runs
+const BRUSH_POOL = 128;
 
 export class RadianceCascades {
   readonly width: number;
@@ -81,11 +83,17 @@ export class RadianceCascades {
 
   private mediaBuf: GPUBuffer;
   private mediaEnabled: boolean;
+  private mediaData = new Float32Array(4);
+  private jitter: boolean;
+  private frameIndex = 0;
 
   /**
    * @param temporal blend-in rate per frame for an exponential moving average
    * over cascade 0 (0 = off). ~0.2 kills most GI noise (flickering point
    * lights, bounce-feedback boiling) at the cost of ~5 frames of light lag.
+   * With it on, every frame also rotates the cascades' ray directions by a
+   * new angle, so the average smooths out angular aliasing (beads and
+   * mottling around small lights) as well.
    * @param media optional fog texture, scene-sized (a = extinction density,
    * rgb = glow: density × fluence × fog albedo, rendered by the caller).
    * Rays attenuate through the density and pick up the glow on the way.
@@ -213,6 +221,7 @@ export class RadianceCascades {
     // density, rgb = glow), or a 1×1 dummy when off (enabled = 0 short-
     // circuits the march's fog work)
     this.mediaEnabled = !!media;
+    this.jitter = temporal > 0;
     const dummyMedia = dev.createTexture({
       size: [1, 1], format: "rgba16float",
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
@@ -301,10 +310,8 @@ export class RadianceCascades {
   // light dies in fog); scatter = how brightly the fog's glow (mediaTex.rgb)
   // is re-emitted along rays. No-op without a media texture.
   setMedia(opts: { sigma: number; scatter: number }): void {
-    this.dev.queue.writeBuffer(
-      this.mediaBuf, 0,
-      new Float32Array([opts.sigma, opts.scatter, this.mediaEnabled ? 1 : 0, 0]),
-    );
+    this.mediaData[0] = opts.sigma;
+    this.mediaData[1] = opts.scatter;
   }
 
   // Last frame's cascade 0 (the temporal history, when enabled) — sample it
@@ -314,23 +321,27 @@ export class RadianceCascades {
     return { view: this.histView ?? this.casc0View, probes: [this.probes0[0], this.probes0[1]] };
   }
 
-  clearScene(enc: GPUCommandEncoder): void {
+  clearScene(enc: GPUCommandEncoder, view: GPUTextureView = this.sceneView): void {
     const pass = enc.beginRenderPass({
-      colorAttachments: [{ view: this.sceneView, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store" }],
+      colorAttachments: [{ view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store" }],
     });
     pass.end();
   }
 
   // Stamp a brush into the scene (paint demo). Buffers come from a small
-  // ring, so many stamps can ride one command encoder.
-  brush(enc: GPUCommandEncoder, s: BrushStamp): void {
+  // ring, so many stamps can ride one command encoder. With `target`, the
+  // same stamp (still in scene pixels) lands in another rgba16float texture
+  // of any size instead — the paint demo keeps a full-resolution copy of the
+  // strokes for display.
+  brush(enc: GPUCommandEncoder, s: BrushStamp, target?: { view: GPUTextureView; width: number; height: number }): void {
     const i = this.brushCursor++ % BRUSH_POOL;
+    const k = target ? target.width / this.width : 1;
     const f = new Float32Array(12);
-    f.set([s.x, s.y, this.width, this.height, s.radius, s.hardness ?? 0.25, 0, 0]);
+    f.set([s.x * k, s.y * k, target?.width ?? this.width, target?.height ?? this.height, s.radius * k, s.hardness ?? 0.25, 0, 0]);
     f.set([s.color[0], s.color[1], s.color[2], s.occlusion], 8);
     this.dev.queue.writeBuffer(this.brushBufs[i], 0, f);
     const pass = enc.beginRenderPass({
-      colorAttachments: [{ view: this.sceneView, loadOp: "load", storeOp: "store" }],
+      colorAttachments: [{ view: target?.view ?? this.sceneView, loadOp: "load", storeOp: "store" }],
     });
     pass.setPipeline(s.erase ? this.erasePipe : this.paintPipe);
     pass.setBindGroup(0, this.brushGroups[i]);
@@ -343,6 +354,13 @@ export class RadianceCascades {
   // travelling further than the top interval, which is the most honest
   // possible demo of what each level contributes.
   encodeGI(enc: GPUCommandEncoder, cascades?: number): void {
+    // golden-ratio sequence: successive rotations fill the c0 bin (a quarter
+    // turn) evenly, so a short temporal average covers it well
+    this.frameIndex++;
+    this.mediaData[2] = this.mediaEnabled ? 1 : 0;
+    this.mediaData[3] = this.jitter ? ((this.frameIndex * 0.6180339887) % 1) * (Math.PI / 2) : 0;
+    this.dev.queue.writeBuffer(this.mediaBuf, 0, this.mediaData);
+
     const target = (view: GPUTextureView): GPURenderPassEncoder =>
       enc.beginRenderPass({ colorAttachments: [{ view, loadOp: "clear", storeOp: "store" }] });
 

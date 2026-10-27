@@ -10,21 +10,19 @@
     <title>The Grass — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A hundred thousand instanced grass blades, placed from simulated sediment and bent by procedural wind in the vertex shader."
+      content="Tens of thousands of grass blades planted from simulated sediment, merged into one buffer, bent by wind and lit from behind in the vertex and fragment shaders."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <!-- demos mount via src/grass.ts -->
+  <body class="essay">
     <header class="hero">
       <div data-demo="hero-grass"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Ground Truth · Part 3</p>
         <h1>The Grass</h1>
         <p class="subtitle">
-          Three hundred thousand blades are drawn as instances.
-          The CPU builds the meadow once; every gust you see
-          is the GPU bending seven vertices at a time, a hundred million times
-          a second.
+          A meadow of 72,000 blades, planted once on the CPU and moved by wind entirely on
+          the GPU.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -35,180 +33,208 @@
 
     <main>
       <p>
-        The series so far: <a href="/pages/ground-truth/heightfield.html">part one</a> raised
-        mountains out of noise, <a href="/pages/ground-truth/erosion.html">part two</a> rained
-        on them until they had drainage and soil. Both articles end with the
-        same kind of object — a landscape you look <em>at</em>. This one
-        adds dense ground cover. The problem is that "ground cover" means a number with
-        five zeros, and that number forces every decision in this article.
+        So far this series has made ground: <a href="/pages/ground-truth/heightfield.html">part
+        one</a> raised mountains out of noise, and
+        <a href="/pages/ground-truth/erosion.html">part two</a> rained on them until they had
+        drainage and soil. This part puts something on that ground, and the first thing
+        that grows there comes in large numbers.
       </p>
       <p>
-        A hundred thousand of anything changes what you're allowed to do.
-        One mesh per blade and the renderer chokes on draw calls. One
-        physics body per blade and the CPU melts. The discipline that makes
-        meadows possible is the oldest one in real-time graphics:
-        <strong>decide once, per blade, at planting time; per frame, touch
-        nothing</strong>. The CPU's job ends when the seeds are sown. After
-        that, the entire meadow — growth, color, wind, everything — has to
-        live in places that cost nothing to revisit: baked vertex data and
-        a few lines of shader.
+        Tens of thousands of anything changes the rules. One mesh per blade and the renderer
+        drowns in draw calls. Any per-blade work on the CPU each frame and the frame budget
+        is gone. So every decision about a blade gets made once, when it's planted: where it
+        stands, how tall it is, its colour, how it moves in the wind. After that the CPU
+        never touches it again. Everything that changes over time happens in a few lines of
+        shader code.
       </p>
-
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · The blade</span>Seven vertices per blade</h2>
       <p>
-        A believable blade of grass is a tapered ribbon with a curve. The
-        curve matters more than the count: grass is a cantilever, anchored
-        at the root and free at the tip, so it bends like one — barely at
-        the base, increasingly toward the top. The cheapest function with
-        that shape is the parabola, so each vertex at fraction t up the
-        blade leans sideways by an amount proportional to <strong>t²</strong>:
-      </p>
-      <pre><code>offset(t) = bend · t²        <span class="cm">// t = 0 root (pinned), t = 1 tip (free)</span>
-y(t) ≈ t − bend² · t² · k    <span class="cm">// arcs shorten: the tip drops as it swings</span></code></pre>
-      <div data-demo="blade"></div>
-      <p>
-        The dots are the vertices a real blade gets — three segments,
-        seven vertices, five triangles. The ghost line is the ideal curve
-        they're approximating. Slide the segment count up and the polyline
-        hugs the parabola; slide it down to one and the blade becomes a
-        stiff cardboard triangle. Three is the budget sweet spot: the
-        silhouette stays curved where eyes check (the tip) and nobody
-        audits the base. The second line of the recipe is the detail most
-        cheap grass skips — a bending blade must get <em>shorter</em> in y,
-        or it appears to stretch like rubber. Believability lives in
-        exactly these two terms.
+        The view at the top is a camera standing in a valley floor from a part-two storm,
+        looking toward a low sun. The 72,000 blades around it were planted from 340,000
+        candidate spots, thickest near the camera and thinning with distance.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Planting</span>Placement from sediment</h2>
+      <h2 id="blade"><span class="kicker">Step 1 · The blade</span>Seven vertices</h2>
       <p>
-        Grass placement comes from part two's erosion output. The
-        erosion simulation recorded how much material was removed or deposited
-        at every cell, producing a soil map.
-        Deposition zones are exactly the flat, wet, silt-rich valley floors
-        where real meadows happen. So the planter walks candidate points
-        (hashed positions, same determinism as everything else in this
-        series) and lets the ground vote: <strong>silt raises the odds</strong>
-        of a blade taking root, rain-stripped rock lowers them, steep
-        slopes and high altitude refuse outright. No one paints a grass
-        map; the storm already painted it.
+        A blade of grass is a tapered ribbon with a curve. The curve matters more than the
+        vertex count. A blade is held at the root and free at the tip, so it bends very
+        little near the ground and more and more toward the top. The cheapest curve with
+        that shape is a parabola, so a vertex at fraction t of the way up leans sideways in
+        proportion to t²:
+      </p>
+      <pre><code>bendX = lean · t² · height                     <span class="cm">// t = 0 at the root, 1 at the tip</span>
+y     = t · height − lean² · t² · 0.3 · height    <span class="cm">// a bent blade gets shorter</span></code></pre>
+      <p>
+        The second line is easy to forget. If the tip moves sideways without dropping, the
+        blade stretches like rubber as it bends. Taking a little height off in proportion to
+        lean² keeps its length roughly constant.
+      </p>
+
+      <div
+        data-demo="blade"
+        data-title="One blade, from the side"
+        data-hint="Change segments and lean"
+      ></div>
+
+      <p>
+        The dots are the vertices the GPU gets, and the dashed line is the ideal curve
+        they're approximating. Each segment is a pair of vertices, plus one at the tip, so
+        three segments is seven vertices and five triangles. Slide segments down to one and
+        the blade becomes a stiff triangle. Slide it up and the outline hugs the curve. I
+        went with three: the bend shows where your eye checks it, at the tip, and nobody
+        looks closely at the base. The wind in this figure uses the same formula as the
+        shader in step 3, and the label at the top shows the tip dropping as the blade
+        bends.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="planting"><span class="kicker">Step 2 · Planting</span>Reading the soil map</h2>
+      <p>
+        Part two's storm left a ledger: how much material each cell lost or gained. The
+        places where sediment piled up are the flat, wet valley floors where real meadows
+        grow, so the planter uses that ledger. It walks through candidate points (hashed
+        positions, like everything else in the series) and gives each one odds of taking
+        root:
+      </p>
+      <pre><code>if (h01 &lt; minH01 || h01 &gt; maxH01 || slope &gt; maxSlope) return 0;
+let p = 0.55 + Math.min(0.45, Math.max(0, delta) * boost);   <span class="cm">// silt raises the odds</span>
+if (delta &lt; 0) p *= Math.max(0.15, 1 + delta * 8);            <span class="cm">// cut ground lowers them</span>
+p *= 1 - smooth01((h01 - maxH01 * 0.7) / (maxH01 * 0.3));     <span class="cm">// thinner toward the grass line</span>
+p *= 1 - smooth01((slope - maxSlope * 0.6) / (maxSlope * 0.4)); <span class="cm">// and on steeper ground</span></code></pre>
+      <p>
+        Then a hash of the candidate's index decides whether it beats those odds. Nobody
+        paints a grass map. The storm already did.
       </p>
       <p>
-        Each accepted blade then rolls its character from the same hash:
-        height, width, lean, hue (greener in the damp, straw-colored toward
-        the tree line), and two numbers the wind will use later — a phase,
-        so the meadow doesn't move in lockstep, and a flexibility, because
-        tall young grass whips while short tufts shiver. All of it is baked
-        into vertex attributes, one decision at a time, never to be
-        revisited.
+        Each blade that takes root rolls the rest of its character from the same hash:
+        height, width, lean, facing, and colour (a random mix of greens and straw, getting
+        drier toward the grass line). Two more numbers are for the wind: a phase, so the meadow
+        doesn't move in lockstep, and a flexibility, since tall grass whips around while
+        short tufts barely move. One more is for the light: how much sun reaches that spot,
+        read from the terrain's baked shadows. All of it is written into vertex attributes
+        and never changes again.
       </p>
-      <div data-demo="meadow"></div>
+
+      <div
+        data-demo="meadow"
+        data-title="The planted meadow"
+        data-hint="Try the candidate count and wind"
+      ></div>
+
       <p>
-        The planted meadow. Watch where it <em>isn't</em>: the gullies'
-        steep walls stay bare, ridgelines stay bare, but the drainage
-        floors — where part two's droplets dropped their loads — grow
-        thick. Push the candidate count up and the fps readout barely
-        moves, because every blade added costs the CPU nothing after birth;
-        the whole meadow is one draw call. That indifference to count is
-        the entire economic argument of this article.
+        Look at where the grass isn't. The steep gully walls and the ridgelines stay bare,
+        and the valley floors, where part two's droplets dropped their loads, are thick with
+        it. About one candidate in five survives. Push the candidate count up and the frame
+        rate barely changes, because a blade costs the CPU nothing after it's planted. The
+        whole meadow is one draw call. The ground under it gets a darker green wherever the
+        odds are high, so where the blades thin out with distance the field still reads as
+        grass.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · One draw call, no instances</span>
+        <span class="note-label">Aside · One buffer, no instancing</span>
         <p>
-          The classic tool here is GPU instancing — upload one blade, stamp
-          it N times. This meadow uses something even simpler: all the
-          blades are merged into a single static buffer at planting time,
-          pre-transformed, pre-colored. Instancing helps when
-          instances move independently on the CPU or share serious geometry;
-          a seven-vertex blade has nothing to share, and none of them ever
-          moves on the CPU. Merged buffers also let every blade be subtly
-          unique — per-vertex color, per-blade wind data — without an
-          attribute scheme. The lesson generalizes: instancing is a tool,
-          not a reflex.
+          The usual tool for this is GPU instancing: upload one blade and stamp it out N
+          times. This meadow does something simpler. Every blade is written into one big
+          static buffer at planting time, already in its final position with its colour
+          baked in. Instancing pays off when copies share a lot of geometry or move
+          independently. A seven-vertex blade has little to share, and none of them ever
+          move on the CPU, so the merged buffer costs nothing extra and lets every vertex
+          carry its own data.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Wind</span>Procedural wind</h2>
+      <h2 id="wind"><span class="kicker">Step 3 · Wind</span>A gust field in two sines</h2>
       <p>
-        Next is wind. Simulating airflow in detail
-        pressure fields, turbulence, blade-on-blade collision — is absurd
-        for scenery. What eyes actually verify is much weaker:
-        <em>coherence</em>. Gusts should be patches, not pixels; they
-        should travel; nearby blades should agree and distant ones
-        shouldn't. A simple field with those properties is two
-        traveling sine waves at different scales and speeds:
+        Simulating real airflow over a meadow would be absurd. What the eye actually checks
+        is much weaker: gusts should come in patches, the patches should travel, and
+        neighbouring blades should agree while distant ones don't. Two travelling sine
+        waves at different scales and speeds do that well enough:
       </p>
-      <pre><code>gust(x, z, t) = 0.7 · sin(k·(x + 0.7z) + 1.7t + φ) + 0.3 · sin(2.9k·(x − 0.7z) + 3.4t + 1.7φ)
-sway = (gust · 0.5 + 0.62) · strength · t² · flex   <span class="cm">// never negative: lean with the wind, oscillate around it</span></code></pre>
+      <pre><code>w1   = k·(x + 0.7z) + 1.7t + φ
+w2   = k·(2.9x − 2.1z) + 3.4t + 1.7φ
+gust = 0.7·sin(w1) + 0.3·sin(w2)
+sway = (0.5·gust + 0.62) · strength · t² · flex      <span class="cm">// never negative</span>
+move the vertex by (0.82·sway, −0.45·sway², 0.57·sway)</code></pre>
       <p>
-        Evaluated per vertex, every frame, on the GPU — which is the punch
-        line of the whole article. The same t² that shaped the static curve
-        now scales the wind, so blades bend from the root exactly as
-        before; the per-blade phase φ breaks the lockstep; the offset
-        constant keeps sway non-negative, because real grass doesn't swing
-        like a metronome — it leans downwind and flutters around the lean.
-        Two sines are nowhere near a real gust field, but layered at 1:3
-        scale they produce patches that travel and overlap, and coherence
-        was the only thing being checked.
+        This runs per vertex, every frame, on the GPU. The same t² from step 1 scales the
+        wind, so blades bend from the root the same way. The per-blade phase φ breaks up the
+        lockstep, and the −0.45·sway² term shortens the arc as it bends, like the static
+        lean. The 0.62 offset keeps the sway positive, so grass leans downwind and flutters
+        around that lean instead of swinging back and forth like a metronome. The
+        <strong>gust size</strong> slider sets k and shows it as 1/k, roughly the width of
+        one gust in world units.
       </p>
-      <details class="fold">
-        <summary>Deep dive: why the meadow lights like velvet</summary>
-        <div class="fold-body">
-          <p>
-            A real blade's normal points sideways, perpendicular to the
-            ribbon. Light a hundred thousand ribbons geometrically and the
-            meadow turns into glitter — every blade a razor flashing as it
-            moves. A standard approximation keeps the normals fixed. Every vertex
-            here claims its normal points nearly straight up, with a slight
-            sideways tilt for variety, so the lighting model sees not a
-            ribbon but a fuzzy green carpet that happens to have blade
-            silhouettes. The meadow shades like a single soft surface —
-            which, at twenty meters, is what a meadow is. The same trick
-            (normals describing the aggregate, not the primitive) lights
-            fur, hair cards, and particle foliage everywhere in games.
-          </p>
-          <p>
-            Second subtlety: the baked colors darken toward the root
-            to approximate ambient occlusion, and
-            the displaced vertices keep their original normals even while
-            the wind moves them. Stale normals on moving grass turn out to
-            be invisible; the eye reads the motion from the silhouette, not
-            the shading. Knowing which errors are invisible is most of
-            real-time rendering.
-          </p>
-        </div>
-      </details>
+      <aside class="note">
+        <span class="note-label">Aside · The first computer grass</span>
+        <p>
+          The 1984 short <em>The Adventures of André &amp; Wally B.</em>, made by the
+          Lucasfilm graphics group that later became Pixar, had a forest and grass drawn
+          with particle systems. Bill Reeves and Ricki Blau described how in a 1985
+          SIGGRAPH paper: each blade and branch was a particle trail, and the shading was
+          approximated statistically, since there were far too many to light one by one.
+        </p>
+      </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Next: trees</h2>
+      <h2 id="light"><span class="kicker">Step 4 · Light</span>Lighting a field instead of a blade</h2>
       <p>
-        The meadow proves out the pipeline that the rest of the series
-        lives on: <em>decide at build time, bake into vertices, animate in
-        the shader, draw once</em>. Hold that sentence, because the next
-        article spends it on something with a skeleton. Trees — grown by
-        an algorithm that's closer to biology than geometry, space
-        colonization, where branches compete for light and the winners
-        thicken. And trees carry a responsibility grass doesn't: next door
-        in <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a>, an eagle is learning
-        to fly, and when she comes in to land she will need branches with
-        positions, thicknesses, and headroom — real perches, not scenery.
-        This series grows them for her.
+        A real blade's normal points sideways, out of the flat of the ribbon. Light tens of
+        thousands of ribbons that way and the meadow glitters, every blade flashing as it
+        turns. So the normals here describe the field instead: each vertex claims a normal
+        pointing almost straight up, tilted a little toward the blade's facing for variety.
+        The lighting then sees a soft green surface that happens to have blade-shaped edges,
+        which is what a meadow looks like from a few metres away. The normals don't follow
+        the wind either. On moving grass you read the motion from the outline, and nobody
+        notices that the shading stayed put.
+      </p>
+      <p>
+        Three more terms make it look like grass at golden hour. Sunlight mostly reaches
+        the top of each blade, so the sun term fades toward the root, where the colour is
+        already darkened. When you look toward the sun, light comes through the blades,
+        strongest near the tips, which makes backlit grass glow yellow-green. And the gust
+        value from the wind shader brightens the blades it's bending, so gusts show up as
+        waves of light rolling across the field.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <ul>
+        <li>
+          <strong>Decide once.</strong> Every per-blade choice is made at planting time and
+          baked into vertices.
+        </li>
+        <li>
+          <strong>Move in the shader.</strong> The wind is a function of position and time,
+          so it costs the CPU nothing and scales with the GPU.
+        </li>
+        <li>
+          <strong>Light the crowd, not the individual.</strong> Normals that describe the
+          field hide the fact that it's made of flat ribbons.
+        </li>
+        <li>
+          <strong>Use what the last step left behind.</strong> The erosion ledger became a
+          planting map without any extra work.
+        </li>
+      </ul>
+      <p>
+        Things I'd try next: generate the blades on the GPU from a hashed grid around the
+        camera, so the meadow follows you instead of being built once; add a distance-based
+        level of detail that drops to one triangle per blade far away; and bend the grass
+        away from objects moving through it with a small trail texture.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/ground-truth/trees.html">Part 4, The Trees</a>.</strong>
+        Trees grown by space colonization, thickened by the pipe model, and planted on these
+        hillsides.
       </p>
     </main>
 
     <footer>
       <p>
-        Ground Truth, part three ·
-        written in parallel with <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a> ·
-        rooted in <a href="/pages/ground-truth/erosion.html">part two's</a> sediment
-      </p>
-      <p>
-        Standing on the shoulders of:
-        <a href="https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-7-rendering-countless-blades-waving-grass">Pelzer, "Rendering Countless Blades of Waving Grass," GPU Gems (2004)</a> ·
-        <a href="https://www.gdcvault.com/play/1027214/Advanced-Graphics-Summit-Procedural-Grass">Snowdon, "Procedural Grass in Ghost of Tsushima," GDC (2021)</a> ·
-        <a href="https://doi.org/10.1111/j.1467-8659.2009.01279.x">Boulanger, Pattanaik &amp; Bouatouch, "Rendering Grass in Real Time with Dynamic Lighting" (2009)</a>
+        References:
+        <a href="https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-7-rendering-countless-blades-waving-grass">Pelzer, "Rendering Countless Blades of Waving Grass", GPU Gems (2004)</a> ·
+        <a href="https://www.gdcvault.com/play/1027214/Advanced-Graphics-Summit-Procedural-Grass">Wohllaib, "Procedural Grass in Ghost of Tsushima", GDC (2021)</a>
       </p>
     </footer>
 

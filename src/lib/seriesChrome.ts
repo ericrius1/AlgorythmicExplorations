@@ -1,4 +1,4 @@
-// Page chrome for series that opt in with <body class="series-pw">: figure
+// Page chrome for series that opt in with <body class="essay">: figure
 // headers that exist before their demos load (so nothing jumps when a demo
 // mounts), a reading-progress line under the nav, and a rail of the
 // article's steps that tracks where you are.
@@ -101,7 +101,7 @@ function stepRail(): void {
 }
 
 export function initSeriesChrome(): void {
-  if (!document.body.classList.contains("series-pw")) return;
+  if (!document.body.classList.contains("essay")) return;
   figureHeads();
   progressLine();
   stepRail();

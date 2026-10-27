@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <meta name="robots" content="noindex" />
+    <title>Music Lab — Algorythmic Explorations</title>
+    <meta name="description" content="Unlisted test bench for the shared music toolkit: instruments, input, master chain and audio views." />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="music-lab">
+    <main>
+      <h1>Music lab</h1>
+      <p class="subtitle">
+        Test bench for <code>src/lib/music/</code>. Not linked from the site. Play the keyboard with the
+        mouse, touch, your computer keyboard (A&nbsp;W&nbsp;S&nbsp;E&nbsp;D…, Z/X for octaves) or a MIDI
+        keyboard.
+      </p>
+
+      <h2 id="instruments">Instruments</h2>
+      <div class="demo" id="lab-instruments"></div>
+
+      <h2 id="views">Views</h2>
+      <div class="demo" id="lab-views"></div>
+
+      <h2 id="master">Master chain</h2>
+      <div class="demo" id="lab-master"></div>
+
+      <h2 id="legacy">Legacy piano</h2>
+      <div class="demo" id="lab-legacy"></div>
+    </main>
+    <script type="module" src="/src/pages/core/musicLab.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,148 @@
+/* Living Music parts 1 and 3 (vibration.html, harmony.html): the sound
+   figures. Everything is scoped to the .ms-* classes these figures create. */
+
+.ms-stage {
+  position: relative;
+  line-height: 0;
+}
+
+.ms-stage canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- the "tap to play" pill ---- */
+
+.ms-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.62rem 1.15rem 0.62rem 0.7rem;
+  border: 1px solid rgba(255, 184, 107, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffd9ac;
+  font: 600 0.8rem/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 0 rgba(255, 184, 107, 0.35),
+    0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: ms-pill-pulse 2.6s ease-out infinite;
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease,
+    background 0.15s ease;
+}
+
+.ms-pill:hover {
+  background: rgba(30, 26, 22, 0.9);
+}
+
+.ms-pill-top {
+  top: 1.1rem;
+  transform: translate(-50%, 0);
+}
+
+.ms-pill-bottom {
+  top: auto;
+  bottom: 1.1rem;
+  transform: translate(-50%, 0);
+}
+
+.ms-pill.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.92);
+}
+
+.ms-pill-top.is-hidden,
+.ms-pill-bottom.is-hidden {
+  transform: translate(-50%, 0) scale(0.92);
+}
+
+.ms-pill-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: #ffb86b;
+  box-shadow: 0 0 14px rgba(255, 184, 107, 0.6);
+}
+
+.ms-pill-icon::after {
+  content: "";
+  margin-left: 0.14rem;
+  border-style: solid;
+  border-width: 0.32rem 0 0.32rem 0.52rem;
+  border-color: transparent transparent transparent #1a1208;
+}
+
+@keyframes ms-pill-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(255, 184, 107, 0.38),
+      0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+  70%,
+  100% {
+    box-shadow:
+      0 0 0 14px rgba(255, 184, 107, 0),
+      0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-pill {
+    animation: none;
+  }
+}
+
+/* ---- control strip additions ---- */
+
+.ms-choice {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.demo-button.is-on {
+  border-color: var(--accent-warm);
+  color: #ffe1bd;
+  background: rgba(255, 184, 107, 0.13);
+}
+
+.demo-button.ms-play {
+  min-width: 6.2rem;
+}
+
+.demo-button.ms-play.is-on {
+  border-color: var(--accent-warm);
+  background: rgba(255, 184, 107, 0.16);
+}
+
+/* ---- heroes ---- */
+
+header.hero .ms-stage canvas {
+  touch-action: pan-y;
+}
+
+.essay header.hero .ms-hero-pill {
+  top: 42%;
+}
+
+@media (max-width: 46rem) {
+  .essay header.hero .ms-hero-pill {
+    top: 50%;
+  }
+}

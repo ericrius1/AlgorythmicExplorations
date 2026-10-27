@@ -1,0 +1,319 @@
+/* Living Music · Part 2, "The Synthesizer". Everything is scoped to the page. */
+
+.synth-page .glow-stage {
+  position: relative;
+  line-height: 0;
+}
+
+.synth-page .glow-stage .demo-canvas {
+  touch-action: pan-y;
+}
+
+.synth-page .glow-stage.is-grabby .demo-canvas {
+  touch-action: none;
+}
+
+.synth-page .glow-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.synth-page header.hero .glow-overlay {
+  border-radius: 0;
+}
+
+/* ---- tap to play ---- */
+
+.synth-page .synth-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.62rem 1.15rem 0.62rem 0.75rem;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 184, 107, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffd7a8;
+  font: 600 0.82rem ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 6px rgba(255, 184, 107, 0.06),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease,
+    background 0.15s ease;
+}
+
+.synth-page .synth-play:hover {
+  background: rgba(30, 24, 18, 0.88);
+}
+
+.synth-page .synth-play.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -40%);
+}
+
+.synth-page .synth-play-icon {
+  display: inline-block;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: var(--accent-warm);
+  position: relative;
+  box-shadow: 0 0 14px rgba(255, 184, 107, 0.7);
+  animation: synth-breathe 2.4s ease-in-out infinite;
+}
+
+.synth-page .synth-play-icon::after {
+  content: "";
+  position: absolute;
+  left: 0.6rem;
+  top: 0.45rem;
+  border-left: 0.5rem solid #1a1208;
+  border-top: 0.32rem solid transparent;
+  border-bottom: 0.32rem solid transparent;
+}
+
+@keyframes synth-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 184, 107, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(255, 184, 107, 0.95);
+  }
+}
+
+/* ---- which figure the computer keyboard plays ---- */
+
+.synth-page main .demo.synth-fig {
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.synth-page main .demo.synth-fig.synth-target {
+  border-color: rgba(255, 184, 107, 0.32);
+  box-shadow:
+    0 24px 60px -32px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 184, 107, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+/* ---- keyboard strip ---- */
+
+.synth-page .synth-keys {
+  margin: 0.7rem 0.1rem 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.synth-page .synth-keys-row {
+  position: relative;
+  height: 74px;
+  touch-action: none;
+}
+
+.synth-page .synth-key {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.08s ease;
+}
+
+.synth-page .synth-key.is-white {
+  height: 100%;
+  z-index: 1;
+  border: 1px solid #1d2131;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #d9dde9 0%, #f1f3f9 70%, #c9cedd 100%);
+}
+
+.synth-page .synth-key.is-black {
+  height: 60%;
+  z-index: 2;
+  border: 1px solid #07080c;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(180deg, #1b1f2c, #2a3042 85%, #151821);
+}
+
+.synth-page .synth-key.is-white.is-lit {
+  background: linear-gradient(180deg, #bccbff 0%, #dfe6ff 80%, #a9b9f2 100%);
+}
+
+.synth-page .synth-key.is-black.is-lit {
+  background: linear-gradient(180deg, #3d58b8, #5b78de);
+}
+
+.synth-page .synth-key.is-white.is-down {
+  background: linear-gradient(180deg, #ffcf96 0%, #ffe6c6 80%, #f2b878 100%);
+}
+
+.synth-page .synth-key.is-black.is-down {
+  background: linear-gradient(180deg, #b7712c, #e09447);
+}
+
+.synth-page .synth-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5px;
+  text-align: center;
+  font: 600 9px ui-monospace, "SF Mono", Menlo, monospace;
+  line-height: 1;
+  color: #69708a;
+  pointer-events: none;
+}
+
+.synth-page .synth-key.is-black .synth-cap {
+  color: #8f98b8;
+}
+
+.synth-page .synth-cname {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  text-align: center;
+  font: 600 8px ui-sans-serif, system-ui, sans-serif;
+  line-height: 1;
+  color: #9aa1b8;
+  pointer-events: none;
+}
+
+.synth-page .synth-keys-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.1rem 0;
+  font: 500 0.72rem ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.synth-page .synth-oct,
+.synth-page .synth-midi {
+  font: 600 0.72rem ui-sans-serif, system-ui, sans-serif;
+  color: #c9d2ee;
+  background: rgba(122, 162, 255, 0.07);
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  border-radius: 999px;
+  padding: 0.18rem 0.6rem;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.synth-page .synth-oct {
+  width: 1.7rem;
+  padding: 0.18rem 0;
+}
+
+.synth-page .synth-oct:hover,
+.synth-page .synth-midi:hover {
+  border-color: var(--accent);
+}
+
+.synth-page .synth-keys-label {
+  min-width: 1.7rem;
+  text-align: center;
+  font: 600 0.72rem ui-monospace, "SF Mono", Menlo, monospace;
+  color: #e6e9f2;
+}
+
+.synth-page .synth-keys-hint {
+  margin-left: 0.4rem;
+}
+
+.synth-page .synth-midi {
+  margin-left: auto;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.synth-page .synth-midi.is-on {
+  color: #9be8bb;
+  border-color: rgba(125, 214, 160, 0.4);
+  background: rgba(125, 214, 160, 0.08);
+}
+
+@media (max-width: 40rem) {
+  .synth-page .synth-keys-hint {
+    display: none;
+  }
+  .synth-page .synth-keys-row {
+    height: 64px;
+  }
+}
+
+/* ---- button groups ---- */
+
+.synth-page .synth-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.synth-page .synth-choice .demo-button {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.74rem;
+}
+
+.synth-page .demo-button.is-on {
+  color: #1a1208;
+  background: var(--accent-warm);
+  border-color: var(--accent-warm);
+}
+
+.synth-page .synth-choice-label {
+  width: 100%;
+  font: 600 0.62rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5d6582;
+  margin-bottom: -0.2rem;
+}
+
+/* sliders come in groups in the bigger figures */
+.synth-page .synth-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  width: 100%;
+}
+
+.synth-page .synth-group[hidden] {
+  display: none;
+}
+
+/* ---- hero ---- */
+
+.synth-page header.hero .glow-stage.is-grabby .demo-canvas {
+  cursor: crosshair;
+}
+
+.synth-page header.hero .synth-play {
+  top: 38%;
+}
+
+@media (max-width: 46rem) {
+  .synth-page header.hero .synth-play {
+    top: 50%;
+  }
+}

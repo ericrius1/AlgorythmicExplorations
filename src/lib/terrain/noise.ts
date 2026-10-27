@@ -33,14 +33,23 @@ export function perlin1(x: number, seed: number): number {
 
 // ---- 2D gradient noise -------------------------------------------------------------
 // Random unit gradient at each lattice corner, dotted with the offset to the
-// sample point, blended with the fade. Scaled to roughly [-1, 1].
+// sample point, blended with the fade. Scaled to roughly [-1, 1]. The hash
+// picks one of 256 evenly spaced directions from a table, which is the same
+// distribution as a random angle and skips two trig calls per corner.
+const GRAD_X = new Float32Array(256);
+const GRAD_Y = new Float32Array(256);
+for (let k = 0; k < 256; k++) {
+  GRAD_X[k] = Math.cos((k / 256) * Math.PI * 2);
+  GRAD_Y[k] = Math.sin((k / 256) * Math.PI * 2);
+}
+
 export function perlin2(x: number, y: number, seed: number): number {
   const ix = Math.floor(x), iy = Math.floor(y);
   const fx = x - ix, fy = y - iy;
 
   const grad = (cx: number, cy: number, dx: number, dy: number): number => {
-    const a = hash2(cx, cy, seed) * Math.PI * 2;
-    return Math.cos(a) * dx + Math.sin(a) * dy;
+    const k = (hash2(cx, cy, seed) * 256) | 0;
+    return GRAD_X[k] * dx + GRAD_Y[k] * dy;
   };
   const d00 = grad(ix, iy, fx, fy);
   const d10 = grad(ix + 1, iy, fx - 1, fy);

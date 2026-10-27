@@ -1,0 +1,281 @@
+/* Shared styles for the music series toolkit (src/lib/music/). Components
+   import this file themselves; music pages may import it too. Uses the site
+   tokens from src/style.css (--accent, --accent-warm, --border, --panel,
+   --muted, --text). */
+
+/* ==== core: sound control, keyboard, input (music-engine) ==== */
+
+/* -- sound control: floating pill, bottom-right -- */
+.sound-control {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(17, 19, 28, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  transition: border-color 0.3s ease;
+}
+
+.sound-control.is-inline {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  display: inline-flex;
+  box-shadow: none;
+}
+
+.sound-control.is-active {
+  border-color: rgba(122, 162, 255, 0.45);
+}
+
+.sound-control-toggle {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #1a1e2c;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.sound-control-toggle:hover,
+.sound-control-toggle:focus-visible {
+  background: #232838;
+}
+
+.sound-control-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.sound-control.is-muted .sound-control-toggle {
+  color: var(--muted);
+}
+
+.sound-control-volume {
+  width: 5.5rem;
+  height: 1.2rem;
+  margin: 0;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.sound-control-volume::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) var(--fill, 100%), #2a2f42 var(--fill, 100%));
+}
+
+.sound-control-volume::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) var(--fill, 100%), #2a2f42 var(--fill, 100%));
+}
+
+.sound-control-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #e6ebff;
+  border: 0;
+}
+
+.sound-control-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e6ebff;
+  border: 0;
+}
+
+.sound-control.is-muted .sound-control-volume {
+  opacity: 0.45;
+}
+
+/* slim level bar along the bottom edge of the pill */
+.sound-control-meter {
+  position: absolute;
+  left: 2.7rem;
+  right: 0.9rem;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, #7aa2ff, #a6c1ff 70%, #ffb86b);
+  transform: scaleX(var(--level, 0));
+  transform-origin: left center;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@media (max-width: 30rem) {
+  .sound-control-volume {
+    width: 4.2rem;
+  }
+}
+
+@media print {
+  .sound-control {
+    display: none;
+  }
+}
+
+/* -- piano keyboard widget -- */
+.playable {
+  margin-top: 0.7rem;
+}
+
+.pkb {
+  position: relative;
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0a0b10;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.pkb canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.kbd-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  padding: 0.5rem 0.2rem 0;
+  font: 0.74rem ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+}
+
+.kbd-hint kbd {
+  display: inline-block;
+  min-width: 1.25em;
+  padding: 0 0.3em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #151825;
+  color: var(--text);
+  font: 600 0.68rem ui-monospace, Menlo, monospace;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* touch-only devices have no keyboard to play with */
+@media (hover: none) and (pointer: coarse) {
+  .kbd-hint-keys {
+    display: none;
+  }
+}
+
+.midi-button[hidden] {
+  display: none;
+}
+
+.midi-button[data-status="ready"] {
+  border-color: rgba(122, 162, 255, 0.5);
+  color: var(--accent);
+}
+
+.midi-button[data-status="denied"] {
+  color: var(--muted);
+}
+
+/* the figure that receives computer-keyboard / MIDI notes */
+.is-note-target {
+  box-shadow: 0 0 0 1px rgba(255, 184, 107, 0.4), 0 0 22px rgba(255, 184, 107, 0.08);
+  transition: box-shadow 0.25s ease;
+}
+
+/* ==== end core ==== */
+
+/* ==== views: scope, spectrum, spectrogram, meter ==== */
+
+.music-view {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #06070b;
+  box-shadow: inset 0 0 0 1px rgba(122, 162, 255, 0.07);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.music-view > canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.music-view > .mv-front {
+  pointer-events: none;
+}
+
+.music-view + .music-view,
+.music-row + .music-view,
+.music-view + .music-row,
+.music-row + .music-row {
+  margin-top: 0.6rem;
+}
+
+.music-spectrum,
+.music-scope {
+  cursor: crosshair;
+}
+
+.level-meter {
+  background: #0b0d14;
+}
+
+.level-meter.is-vertical {
+  flex: 0 0 auto;
+}
+
+/* side-by-side views; they wrap on narrow screens */
+.music-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.music-row > .music-view:not(.is-vertical) {
+  flex: 1 1 12rem;
+  min-width: 0;
+  width: auto;
+}
+
+.music-row > .music-view + .music-view {
+  margin-top: 0;
+}
+
+/* ==== end views ==== */

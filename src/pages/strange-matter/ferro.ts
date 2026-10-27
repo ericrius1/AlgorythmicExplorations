@@ -1,11 +1,12 @@
 import { initNav } from "../../lib/siteNav";
 import { mountLazy } from "../../lib/demoShell";
 import { mountFerro } from "../../demos/ferro/ferroFluid";
+import { mountCrown } from "../../demos/ferro/ferroCrown";
 
 initNav();
 
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
-  "hero-ferro": (el) => mountFerro(el, { hero: true }),
+  "hero-ferro": (el) => mountCrown(el, { hero: true, wide: true }),
   mesh: (el) => mountFerro(el, { view: 1 }),
   ferro: (el) => mountFerro(el, { full: true }),
 };

@@ -9,6 +9,7 @@ import bonfireShader from "../../shaders/bonfire.wgsl?raw";
 import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { RadianceCascades } from "../../lib/radianceCascades";
+import { PostFX, HDR_FORMAT } from "../../lib/postfx";
 import { HandTracker } from "../../lib/hands";
 
 const DEBUG_NAMES = ["final", "scene (what the rays see)", "occupancy", "distance field", "light only"];
@@ -27,7 +28,7 @@ interface SkyKeyframe {
 }
 
 const NIGHT: SkyKeyframe = {
-  zenith: [0.004, 0.006, 0.016], horizon: [0.012, 0.016, 0.035],
+  zenith: [0.012, 0.018, 0.045], horizon: [0.03, 0.036, 0.07],
   sunDir: [0.3, -1], sunIntensity: 0, sunSharpness: 40, sunColor: [1, 1, 1],
 };
 const DUSK: SkyKeyframe = {
@@ -57,9 +58,15 @@ function skyAt(t: number): SkyKeyframe {
 
 export async function mountBonfire(container: HTMLElement, opts: BonfireOptions): Promise<Demo> {
   const dev = await getDevice();
-  const shell = new Shell(container, opts.mode === "hero" ? 0.52 : 0.62);
+  const narrow = (container.clientWidth || window.innerWidth) < 600;
+  const aspectRatio = opts.mode === "hero" ? (narrow ? 0.85 : 0.5) : narrow ? 0.8 : 0.62;
+  const shell = new Shell(container, aspectRatio);
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
+  const post = new PostFX(dev, ctx);
+  post.settings.exposure = 1.45;
+  post.settings.bloom = 0.2;
+  post.settings.vignette = 0.3;
 
   const fire = opts.mode === "hero" || opts.mode === "full" || opts.mode === "dusk";
   const modeNum = fire ? 0 : opts.mode === "sparks" ? 1 : 2;
@@ -67,18 +74,22 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   const W = shell.canvas.width;
   const Hpx = shell.canvas.height;
   const aspect = W / Hpx;
-  const viewScaleY = fire ? 1.0 : 0.98;
+  // the fire scene frames a fixed height of world and shows more of the
+  // clearing on wider screens; the rooms fit the canvas
+  const viewScaleY = fire ? 1.0 : 1.0;
   const viewScale: [number, number] = [viewScaleY / aspect, viewScaleY];
 
-  // GI runs at /2.5 — light is low-frequency, so the cascades don't need
-  // more. Geometry doesn't pay this price: the display path re-evaluates the
-  // procedural scene per canvas pixel (fsCompositeB). Temporal 0.2: EMA over
-  // cascade 0 smooths ember flicker and bounce-feedback boil — but not for
-  // the bounce room, whose one fast-moving lamp would smear into ghosts.
-  const rc = new RadianceCascades(dev, Math.floor(W / 2.5), Math.floor(Hpx / 2.5), 4, modeNum === 2 ? 0 : 0.2);
+  // GI at a fraction of the canvas — light is low-frequency, and the display
+  // path re-evaluates the geometry per canvas pixel (fsCompositeB), so edges
+  // stay sharp however coarse the light is. The temporal average (0.25)
+  // smooths ember flicker and bounce-feedback boil, and lets each frame
+  // rotate the cascades' rays so small lights don't bead.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rcDiv = Math.max(2.5, 2 * dpr);
+  const rc = new RadianceCascades(dev, Math.floor(W / rcDiv), Math.floor(Hpx / rcDiv), 4, modeNum === 2 ? 0.35 : 0.25);
 
   // ---- state ---------------------------------------------------------------------
-  let count = opts.mode === "sparks" ? 1024 : opts.mode === "room" ? 0 : opts.mode === "hero" ? 380 : 500;
+  let count = opts.mode === "sparks" ? 256 : opts.mode === "room" ? 0 : opts.mode === "hero" ? 380 : 500;
   const MAX = 8192;
   let wind = modeNum === 1 ? 0.5 : 0.25;
   let bounce = modeNum === 2 ? 1.0 : modeNum === 1 ? 0.4 : 0.7;
@@ -98,15 +109,6 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   const bp = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const bp2 = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const linSamp = dev.createSampler({ magFilter: "linear", minFilter: "linear" });
-
-  // display path: full-res HDR target — scene re-eval + fluence, then embers
-  // splatted on top, then one tonemap pass to the canvas
-  const hdrTex = dev.createTexture({
-    size: [W, Hpx],
-    format: "rgba16float",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  });
-  const hdrView = hdrTex.createView();
 
   const embers = dev.createBuffer({ size: MAX * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   {
@@ -133,7 +135,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       module,
       entryPoint: "fsEmber",
       targets: [{
-        format: "rgba16float",
+        format: HDR_FORMAT,
         blend: {
           color: { srcFactor: "one", dstFactor: "one", operation: "add" },
           alpha: { srcFactor: "one", dstFactor: "one", operation: "add" },
@@ -151,13 +153,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   const compositePipe = dev.createRenderPipeline({
     layout: "auto",
     vertex: { module, entryPoint: "vsFullB" },
-    fragment: { module, entryPoint: "fsCompositeB", targets: [{ format: "rgba16float" }] },
-    primitive: { topology: "triangle-list" },
-  });
-  const tonemapPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsFullB" },
-    fragment: { module, entryPoint: "fsTonemapB", targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }] },
+    fragment: { module, entryPoint: "fsCompositeB", targets: [{ format: HDR_FORMAT }] },
     primitive: { topology: "triangle-list" },
   });
 
@@ -198,14 +194,6 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       { binding: 3, resource: linSamp },
     ],
   });
-  const tonemapGroup = dev.createBindGroup({
-    layout: tonemapPipe.getBindGroupLayout(0),
-    entries: [
-      { binding: 3, resource: linSamp },
-      { binding: 5, resource: hdrView },
-    ],
-  });
-
   // ---- stirring: cursor, idle ghost, hands -------------------------------------------
   let stir: [number, number] = [99, 99];
   let stirVel: [number, number] = [0, 0];
@@ -364,7 +352,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     f.set([rc.fluence.probes[0], rc.fluence.probes[1], modeNum, 1], 24); // emitBoost 1: rays see raw emission
     dev.queue.writeBuffer(bp, 0, f);
     f.set([viewScale[0], viewScale[1], W, Hpx]); // display path: canvas res
-    f[27] = 0.7; // emitBoost, matching the old composite
+    f[27] = 0.42; // emitBoost: how bright the flame itself looks
     dev.queue.writeBuffer(bp2, 0, f);
   };
 
@@ -396,8 +384,10 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       pollHands(dt);
 
       // the bounce room's lamp wanders when nobody is holding it
-      if (modeNum === 2 && now - lastPointer > 2500) {
-        stir = [0.55 * Math.sin(time * 0.4), 0.5 * Math.sin(time * 0.27 + 1.3)];
+      if (modeNum === 2 && (lastPointer === 0 || now - lastPointer > 2500)) {
+        // wide enough to visit both coloured walls
+        const ex = 1 / viewScale[0] - 0.42;
+        stir = [ex * Math.sin(time * 0.33 + 4.2), 0.5 * Math.sin(time * 0.21 + 4.0)];
         stirVel = [0, 0];
       }
 
@@ -444,7 +434,8 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
         });
       } else {
         // display path: re-evaluate the scene per canvas pixel + upsampled
-        // fluence, splat embers full-res on top, tonemap to the canvas
+        // light, splat embers full-res on top, then bloom and tone map
+        const hdrView = post.sceneView();
         pass = enc.beginRenderPass({
           colorAttachments: [{ view: hdrView, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
         });
@@ -462,14 +453,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
           pass.draw(6, count);
           pass.end();
         }
-
-        pass = enc.beginRenderPass({
-          colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
-        });
-        pass.setPipeline(tonemapPipe);
-        pass.setBindGroup(0, tonemapGroup);
-        pass.draw(3);
-        pass.end();
+        post.encodePresent(enc);
       }
       dev.queue.submit([enc.finish()]);
     },
@@ -479,7 +463,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       embers.destroy();
       bp.destroy();
       bp2.destroy();
-      hdrTex.destroy();
+      post.dispose();
     },
   };
 }

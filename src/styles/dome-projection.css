@@ -1,0 +1,7 @@
+/* Dome Projection: the selected state for figure buttons that pick a mode. */
+
+.dome-projection .demo-button.is-on {
+  color: #0b0d14;
+  background: var(--accent);
+  border-color: var(--accent);
+}

@@ -6,6 +6,7 @@
 // unlockAudio() from a pointer/button handler before making sound.
 
 import * as Tone from "tone";
+import { masterChain, _registerBus } from "./music/master";
 
 export { Tone };
 
@@ -14,6 +15,10 @@ let master: Tone.Gain | null = null;
 let waveTap: Tone.Analyser | null = null;
 let fftTap: Tone.Analyser | null = null;
 
+// The bus feeds the shared master chain (src/lib/music/master.ts: DC block,
+// glue compressor, brickwall limiter, listener volume) instead of going
+// straight to the speakers, so several demos at once can't clip. The legacy
+// waveform()/spectrum() taps stay here, pre-chain, as before.
 export function masterBus(): Tone.Gain {
   if (!master) {
     master = new Tone.Gain(0.8);
@@ -22,10 +27,11 @@ export function masterBus(): Tone.Gain {
     fftTap.smoothing = 0.85;
     master.connect(waveTap);
     master.connect(fftTap);
-    master.toDestination();
+    master.connect(masterChain().input);
   }
   return master;
 }
+_registerBus(masterBus);
 
 export async function unlockAudio(): Promise<void> {
   if (!unlocked) {

@@ -1,177 +1,321 @@
-// The circle of fifths as a map of keys. Twelve major keys around the rim,
-// each one fifth from its neighbours; the inner ring is the chromatic
-// pitch-class clock with the chosen key's seven notes lit. The rim nodes are
-// tinted by how many notes each key shares with the chosen one — watch the
-// gradient: neighbours share six of seven, the key across the circle barely
-// knows you. Distance on this map is the cost of modulation.
+// Fig. 4 of Part 5: the circle of fifths as a map of keys. Major keys round
+// the outside, their relative minors (same notes, different home) inside.
+// Every key is marked with how many of its seven notes it shares with the
+// selected one, so distance on the map is how much changes when you move.
+// Click another key to hear a modulation: the old tonic chord, the new key's
+// dominant seventh, the new tonic.
 
-import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
-import { getDevice } from "../../lib/gpu";
-import { ShaderView } from "../../lib/shaderCanvas";
-import { Tone, masterBus, unlockAudio, frameGuard, soundHint, NOTE_NAMES } from "../../lib/audio";
+import { Shell, type Demo } from "../../lib/demoShell";
+import { unlockAudio, frameGuard } from "../../lib/audio";
+import { mod } from "./tuning/theory";
+import { COL, Surface, approach, clock, clockArc, glow, glowStroke, hex, heat, mixRgb, rgba, text, type RGB } from "./tuning/draw";
+import { Sound } from "./tuning/sound";
+import { tapBadge, button } from "./tuning/ui";
 
-const C4 = 261.63;
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
-// rim position k (clockwise from top) is the key k fifths up from C
-const KEY_LABELS = ["C", "G", "D", "A", "E", "B", "F♯", "D♭", "A♭", "E♭", "B♭", "F"];
-const SIGNATURES = ["—", "1♯", "2♯", "3♯", "4♯", "5♯", "6♯", "5♭", "4♭", "3♭", "2♭", "1♭"];
+const KEYS = ["C", "G", "D", "A", "E", "B", "F♯", "D♭", "A♭", "E♭", "B♭", "F"];
+const MINORS = ["a", "e", "b", "f♯", "c♯", "g♯", "d♯", "b♭", "f", "c", "g", "d"];
+const SIGS = ["no ♯ or ♭", "1♯", "2♯", "3♯", "4♯", "5♯", "6♯", "5♭", "4♭", "3♭", "2♭", "1♭"];
+// spelled scale notes for each key, for the readout
+const SPELL: Record<string, string> = {
+  C: "C D E F G A B",
+  G: "G A B C D E F♯",
+  D: "D E F♯ G A B C♯",
+  A: "A B C♯ D E F♯ G♯",
+  E: "E F♯ G♯ A B C♯ D♯",
+  B: "B C♯ D♯ E F♯ G♯ A♯",
+  "F♯": "F♯ G♯ A♯ B C♯ D♯ E♯",
+  "D♭": "D♭ E♭ F G♭ A♭ B♭ C",
+  "A♭": "A♭ B♭ C D♭ E♭ F G",
+  "E♭": "E♭ F G A♭ B♭ C D",
+  "B♭": "B♭ C D E♭ F G A",
+  F: "F G A B♭ C D E",
+};
 
-const SCENE = /* wgsl */ `
-fn nodeAt(k: u32, R: f32) -> vec2f {
-  let a = 1.5707963 - f32(k) * 6.2831853 / 12.0;
-  return vec2f(cos(a), sin(a)) * R;
-}
+const tonicPc = (k: number): number => mod(k * 7, 12);
+const keyPcs = (k: number): Set<number> => new Set(MAJOR.map((s) => mod(tonicPc(k) + s, 12)));
+const shared = (a: number, b: number): number => {
+  const A = keyPcs(a);
+  let n = 0;
+  for (const pc of keyPcs(b)) if (A.has(pc)) n++;
+  return n;
+};
 
-fn scene(uv: vec2f) -> vec3f {
-  let t = uf(0u);
-  let aspect = uf(1u);
-  let sel = u32(uf(4u));
-  let comet = uf(5u);
-  var col = vec3f(0.0);
-
-  let q = vec2f((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.35;
-
-  // rim: the twelve keys, tinted by overlap with the chosen key
-  for (var k = 0u; k < 12u; k++) {
-    let p = nodeAt(k, 0.86);
-    let share = D[k]; // 0..7 notes in common
-    let d = length(q - p);
-    let warmth = share / 7.0;
-    let isSel = f32(k == sel);
-    let hue = mix(0.62, 0.09, warmth * warmth);
-    let size = 0.02 + warmth * 0.014 + isSel * 0.016;
-    col += hsv(hue, 0.65, 0.4 + warmth * 0.7) * (glow(d, size) * (0.5 + warmth + isSel) + halo(d, 0.012) * 0.3 * warmth);
-    col += vec3f(1.0, 0.95, 0.85) * glow(d, 0.008) * isSel * (0.8 + 0.3 * sin(t * 3.0));
-  }
-  // neighbour bonds: selected key to its two fifth-neighbours
-  let pSel = nodeAt(sel, 0.86);
-  let pUp = nodeAt((sel + 1u) % 12u, 0.86);
-  let pDn = nodeAt((sel + 11u) % 12u, 0.86);
-  col += hsv(0.1, 0.7, 0.9) * (glow(sdSeg(q, pSel, pUp), 0.004) + glow(sdSeg(q, pSel, pDn), 0.004)) * 0.5;
-
-  // inner chromatic clock with the key's notes lit
-  for (var k = 0u; k < 12u; k++) {
-    let p = nodeAt(k, 0.45);
-    let lit = D[12u + k];
-    let d = length(q - p);
-    col += vec3f(0.06, 0.07, 0.12) * glow(d, 0.006);
-    if (lit > 0.5) {
-      let isRoot = f32(lit > 1.5);
-      col += hsv(mix(0.55, 0.085, isRoot), 0.6, 1.0) * (glow(d, 0.018 + isRoot * 0.008) * (0.8 + isRoot * 0.8));
-    }
-  }
-
-  if (comet > -5.0) {
-    let p = vec2f(cos(comet), sin(comet)) * 0.45;
-    col += vec3f(1.0, 0.95, 0.8) * glow(length(q - p), 0.016) * 1.2;
-  }
-
-  return col * vignette(uv);
-}
-`;
-
-export async function mountFifthsKeys(container: HTMLElement): Promise<Demo> {
-  const dev = await getDevice();
+export function mountFifthsKeys(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.66);
-  if (!dev) return gpuMissing(container);
-  const view = new ShaderView(dev, shell.canvas, SCENE, 24);
-  soundHint(container, "click a key");
+  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.12 : 0.6));
+  const sound = new Sound({ level: 1, reverb: 0.18 });
+  const badge = tapBadge(container, "tap a key");
 
-  let sel = 0; // rim index: k fifths up from C
-  const tonicPC = (k: number): number => (k * 7) % 12;
-  const keyPCs = (k: number): Set<number> => new Set(MAJOR.map((s) => (tonicPC(k) + s) % 12));
+  let sel = 0;
+  let from = -1; // last modulation's starting key, for the path
+  let pathT = 0;
+  let minorView = false;
+  const flash = new Array(12).fill(0);
+  const shownShare = new Array(12).fill(0).map((_, k) => shared(0, k));
+  let geo = { cx: 0, cy: 0, R: 1, r: 1 };
+  let hover = -1;
+  let lastChord: number[] = [];
 
-  const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "triangle" },
-    envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.6 },
-    volume: -11,
-  }).connect(masterBus());
-  let queue: { at: number; pc: number }[] = [];
-  const guard = frameGuard(() => {
-    synth.releaseAll();
-    queue = [];
-  });
+  const guard = frameGuard(() => sound.silence());
 
-  let lastFrame = 0;
-  const playKey = (k: number): void => {
-    if (performance.now() - lastFrame > 400) return;
-    const now = Tone.now();
-    const tonic = tonicPC(k);
-    const pcs = [...MAJOR, 12].map((s) => tonic + s);
-    queue = pcs.map((pc, i) => ({ at: now + i * 0.16, pc: pc % 12 }));
-    pcs.forEach((pc, i) => {
-      synth.triggerAttackRelease(C4 * Math.pow(2, (pc - 12) / 12), 0.15, now + i * 0.16);
+  // voice a chord near the previous one: each pitch class goes to the octave
+  // closest to the last chord's average, plus the root in the bass
+  const voice = (pcs: number[], rootPc: number): number[] => {
+    const center = lastChord.length ? lastChord.reduce((a, b) => a + b, 0) / lastChord.length : 64;
+    const upper = pcs.map((pc) => {
+      let m = 60 + pc;
+      while (m - center > 6) m -= 12;
+      while (center - m > 6) m += 12;
+      return m;
     });
-    // then the tonic chord
-    const chordAt = now + pcs.length * 0.16 + 0.1;
-    for (const s of [0, 4, 7]) {
-      synth.triggerAttackRelease(C4 * Math.pow(2, (tonic + s - 12) / 12), 1.1, chordAt);
-    }
+    lastChord = upper;
+    let bass = 36 + rootPc;
+    if (bass > 47) bass -= 12;
+    return [bass, ...upper];
+  };
+  const chordAt = (midis: number[], at: number, dur: number): void => {
+    midis.forEach((m, i) =>
+      sound.note(440 * Math.pow(2, (m - 69) / 12), at, { vel: i === 0 ? 0.5 : 0.42, dur, timbre: "keys", bright: 0.35 }),
+    );
+  };
+  const triad = (rootPc: number, minor = false): number[] => [rootPc, rootPc + (minor ? 3 : 4), rootPc + 7].map((x) => mod(x, 12));
+
+  const playKey = (k: number): void => {
+    const t0 = sound.now() + 0.05;
+    sound.silence(0.03);
+    const tonic = tonicPc(k);
+    const base = minorView ? mod(tonic + 9, 12) : tonic;
+    const scale = minorView ? [0, 2, 3, 5, 7, 8, 10, 12] : [...MAJOR, 12];
+    const startMidi = 60 + base - (base > 6 ? 12 : 0);
+    scale.forEach((s, i) => sound.note(440 * Math.pow(2, (startMidi + s - 69) / 12), t0 + i * 0.17, { vel: 0.55, dur: 0.6, timbre: "keys" }));
+    lastChord = [];
+    chordAt(voice(triad(base, minorView), base), t0 + scale.length * 0.17 + 0.1, 1.6);
+  };
+  const modulate = (a: number, b: number): void => {
+    const t0 = sound.now() + 0.05;
+    sound.silence(0.03);
+    lastChord = [];
+    const ta = tonicPc(a);
+    const tb = tonicPc(b);
+    const ra = minorView ? mod(ta + 9, 12) : ta;
+    const rb = minorView ? mod(tb + 9, 12) : tb;
+    chordAt(voice(triad(ra, minorView), ra), t0, 0.95);
+    // the new key's dominant seventh (the V7 of a minor key is major too)
+    const dom = mod(rb + 7, 12);
+    chordAt(voice([dom, dom + 4, dom + 7, dom + 10].map((x) => mod(x, 12)), dom), t0 + 0.9, 0.95);
+    chordAt(voice(triad(rb, minorView), rb), t0 + 1.8, 1.8);
   };
 
-  shell.canvas.addEventListener("pointerdown", () => {
-    // which rim node is closest to the click?
-    const aspect = shell.canvas.width / shell.canvas.height;
-    const qx = (view.pointer.x - 0.5) * aspect * 2.35;
-    const qy = (view.pointer.y - 0.5) * 2.35;
+  const pick = (x: number, y: number): number => {
+    const { cx, cy, R } = geo;
     let best = -1;
-    let bestD = 0.3;
+    let bd = Math.max(26, R * 0.17);
     for (let k = 0; k < 12; k++) {
-      const a = Math.PI / 2 - (k * 2 * Math.PI) / 12;
-      const d = Math.hypot(qx - Math.cos(a) * 0.86, qy - Math.sin(a) * 0.86);
-      if (d < bestD) {
-        bestD = d;
-        best = k;
+      for (const rr of [R, geo.r]) {
+        const [px, py] = clock(cx, cy, rr, k / 12);
+        const d = Math.hypot(px - x, py - y);
+        if (d < bd) {
+          bd = d;
+          best = k + (rr === geo.r ? 100 : 0);
+        }
       }
     }
-    if (best >= 0) {
-      sel = best;
-      void unlockAudio().then(() => playKey(sel));
-    }
+    return best;
+  };
+  shell.canvas.addEventListener("pointermove", (e) => {
+    const p = surf.local(e);
+    hover = pick(p.x, p.y);
+    shell.canvas.style.cursor = hover >= 0 ? "pointer" : "default";
   });
-
-  shell.button("◀ fifth down", () => {
-    sel = (sel + 11) % 12;
-    void unlockAudio().then(() => playKey(sel));
+  shell.canvas.addEventListener("pointerleave", () => (hover = -1));
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = surf.local(e);
+    const hit = pick(p.x, p.y);
+    if (hit < 0) return;
+    const k = hit % 100;
+    const wantMinor = hit >= 100;
+    badge.hide();
+    void unlockAudio().then(() => {
+      if (wantMinor !== minorView) {
+        minorView = wantMinor;
+        from = -1;
+        sel = k;
+        flash[k] = 1;
+        playKey(k);
+        return;
+      }
+      if (k === sel) {
+        flash[k] = 1;
+        playKey(k);
+      } else {
+        from = sel;
+        pathT = 0;
+        sel = k;
+        flash[k] = 1;
+        modulate(from, k);
+      }
+    });
   });
-  shell.button("fifth up ▶", () => {
-    sel = (sel + 1) % 12;
-    void unlockAudio().then(() => playKey(sel));
+  button(shell.controls, "◀ a fifth down", () => {
+    badge.hide();
+    const k = mod(sel - 1, 12);
+    void unlockAudio().then(() => {
+      from = sel;
+      pathT = 0;
+      sel = k;
+      flash[k] = 1;
+      modulate(from, k);
+    });
+  });
+  button(shell.controls, "a fifth up ▶", () => {
+    badge.hide();
+    const k = mod(sel + 1, 12);
+    void unlockAudio().then(() => {
+      from = sel;
+      pathT = 0;
+      sel = k;
+      flash[k] = 1;
+      modulate(from, k);
+    });
+  });
+  button(shell.controls, "▶ play this key", () => {
+    badge.hide();
+    void unlockAudio().then(() => {
+      flash[sel] = 1;
+      playKey(sel);
+    });
   });
 
   shell.setInfo(() => {
-    const here = keyPCs(sel);
-    const up = [...keyPCs((sel + 1) % 12)].filter((pc) => here.has(pc)).length;
-    return `${KEY_LABELS[sel]} major · ${SIGNATURES[sel]} · shares ${up} of 7 notes with each neighbour · ${NOTE_NAMES[tonicPC(sel)]} is home`;
+    const name = minorView ? `${MINORS[sel]} minor` : `${KEYS[sel]} major`;
+    const steps = from >= 0 ? Math.min(mod(sel - from, 12), mod(from - sel, 12)) : 0;
+    const move =
+      from >= 0
+        ? ` · from ${minorView ? MINORS[from] + " minor" : KEYS[from] + " major"}: ${steps} step${steps === 1 ? "" : "s"} round the circle, ${shared(from, sel)} notes in common`
+        : "";
+    const notes = SPELL[KEYS[sel]].split(" ");
+    const spelled = minorView ? [...notes.slice(5), ...notes.slice(0, 5)] : notes;
+    return `${name} · ${SIGS[sel]} · ${spelled.join(" ")}${move}`;
   });
 
+  let last = performance.now();
   return {
     frame() {
       shell.tick();
       guard.pulse();
-      lastFrame = performance.now();
-
-      const here = keyPCs(sel);
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      pathT = Math.min(1, pathT + dt / 1.8);
       for (let k = 0; k < 12; k++) {
-        const other = keyPCs(k);
-        let n = 0;
-        for (const pc of other) if (here.has(pc)) n++;
-        view.data[k] = n;
+        shownShare[k] = approach(shownShare[k], shared(sel, k), 8, dt);
+        flash[k] = approach(flash[k], 0, 2.5, dt);
       }
-      for (let pc = 0; pc < 12; pc++) view.data[12 + pc] = here.has(pc) ? 1 : 0;
-      view.data[12 + tonicPC(sel)] = 2;
 
-      const now = Tone.now();
-      let comet = -10;
-      for (const q of queue) {
-        if (Math.abs(now - q.at) < 0.09) comet = Math.PI / 2 - (q.pc * 2 * Math.PI) / 12;
+      surf.fit();
+      const { ctx, w, h } = surf;
+      surf.clear();
+      const narrow = w < 600;
+      const R = narrow ? Math.min(w * 0.38, h * 0.36) : Math.min(w * 0.27, h * 0.38);
+      const r = R * 0.62;
+      const cx = narrow ? w / 2 : w * 0.36;
+      const cy = narrow ? R + 44 : h * 0.5;
+      geo = { cx, cy, R, r };
+      const fs = narrow ? 11 : 13;
+
+      glow(ctx, cx, cy, R * 1.25, [40, 52, 96], 0.2);
+      ctx.strokeStyle = "rgba(122, 140, 200, 0.14)";
+      ctx.lineWidth = 1;
+      for (const rr of [R, r]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+        ctx.stroke();
       }
-      view.uniforms[4] = sel;
-      view.uniforms[5] = comet;
-      view.draw();
+
+      // modulation path along the rim
+      if (from >= 0 && pathT < 1) {
+        const d = mod(sel - from, 12) <= 6 ? mod(sel - from, 12) : mod(sel - from, 12) - 12;
+        const t0 = from / 12;
+        const t1 = (from + d * Math.min(1, pathT * 1.6)) / 12;
+        clockArc(ctx, cx, cy, minorView ? r : R, Math.min(t0, t1), Math.max(t0, t1));
+        glowStroke(ctx, hex("#ffd9a0"), 0.9 * (1 - pathT * 0.6), 3);
+      }
+
+      for (let k = 0; k < 12; k++) {
+        const s = shownShare[k];
+        const isSel = k === sel;
+        // 7 shared = home, 6 = neighbour … 2 = far side
+        const warmth = (s - 2) / 5;
+        const col: RGB = isSel ? [255, 214, 150] : mixRgb(hex("#5a6fd6"), hex("#ffb86b"), warmth);
+        for (const [rr, lab, isMinor] of [
+          [R, KEYS[k], false],
+          [r, MINORS[k], true],
+        ] as [number, string, boolean][]) {
+          const [x, y] = clock(cx, cy, rr, k / 12);
+          const active = isMinor === minorView;
+          const rad = (isMinor ? 0.75 : 1) * (narrow ? 15 : 19) * (1 + 0.15 * (isSel && active ? flash[k] : 0));
+          const hov = hover === k + (isMinor ? 100 : 0);
+          glow(ctx, x, y, rad * 2.6, col, (active ? 0.18 + 0.32 * warmth : 0.05) + (isSel && active ? 0.25 : 0));
+          ctx.fillStyle = rgba(mixRgb(col, [8, 9, 14], active ? 0.55 : 0.8), 1);
+          ctx.beginPath();
+          ctx.arc(x, y, rad, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = rgba(mixRgb(col, [255, 255, 255], 0.3), active ? (isSel ? 1 : hov ? 0.9 : 0.55) : 0.25);
+          ctx.lineWidth = isSel && active ? 2.2 : 1;
+          ctx.stroke();
+          text(ctx, lab, x, y + 0.5, {
+            size: (isMinor ? 0.85 : 1) * fs,
+            color: active ? "#f4f6fc" : "#7a8199",
+            align: "center",
+            base: "middle",
+            weight: 700,
+          });
+        }
+        // shared-note count outside the rim
+        const [nx, ny] = clock(cx, cy, R + (narrow ? 26 : 34), k / 12);
+        const n = Math.round(s);
+        text(ctx, isSel ? "home" : `${n}`, nx, ny, {
+          size: isSel ? fs * 0.8 : fs,
+          color: isSel ? "#ffd9a0" : rgba(mixRgb(heat(1 - (n - 2) / 5), [255, 255, 255], 0.2), 1),
+          align: "center",
+          base: "middle",
+          weight: 700,
+          mono: !isSel,
+        });
+      }
+      text(ctx, "notes shared with", cx, cy - 8, { size: 10, color: COL.dim, align: "center" });
+      text(ctx, minorView ? `${MINORS[sel]} minor` : `${KEYS[sel]} major`, cx, cy + 9, { size: fs, color: "#ffd9a0", align: "center", weight: 700 });
+
+      // ---- side panel: the selected key's notes and its neighbours ----
+      if (!narrow) {
+        const px = w * 0.7;
+        let py = h * 0.2;
+        text(ctx, minorView ? `${MINORS[sel]} minor` : `${KEYS[sel]} major`, px, py, { size: 18, color: "#f4f6fc", weight: 700 });
+        py += 22;
+        text(ctx, SIGS[sel], px, py, { size: 11, color: COL.dim });
+        py += 30;
+        const rows: [string, number][] = [
+          ["a fifth up", mod(sel + 1, 12)],
+          ["a fifth down", mod(sel - 1, 12)],
+          ["across the circle", mod(sel + 6, 12)],
+        ];
+        for (const [lab, k] of rows) {
+          const n = shared(sel, k);
+          text(ctx, lab, px, py, { size: 11, color: COL.dim });
+          text(ctx, `${minorView ? MINORS[k] : KEYS[k]}: ${n} of 7`, px + 112, py, { size: 11, color: COL.text, mono: true });
+          py += 20;
+        }
+        py += 16;
+        text(ctx, "click another key to modulate:", px, py, { size: 10.5, color: COL.dim });
+        py += 16;
+        text(ctx, "home chord → new V7 → new home", px, py, { size: 10.5, color: "#f0c08a" });
+        py += 16;
+        text(ctx, "inner ring: relative minors", px, py, { size: 10.5, color: COL.dim });
+      }
     },
     dispose() {
-      synth.releaseAll();
+      sound.silence();
     },
   };
 }

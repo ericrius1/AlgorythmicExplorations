@@ -1,158 +1,254 @@
-// The interval as geometry: tone A drives x, tone B drives y, the dot's path
-// is the Lissajous figure of their frequency ratio. Whole-number ratios close
-// into knots after a few cycles — the picture of a short combined period.
-// Nudge the ratio off a knot and the figure starts precessing and filling the
-// square: the geometric face of "never quite repeats".
+// Fig. 2 of "Consonance and Roughness": an interval as a repeating pattern.
+// Left: tone A drives the dot sideways, tone B up and down (a Lissajous
+// figure), drawn from the real signals over the last few milliseconds. At an
+// exact ratio p:q the path closes and stands still; a hair off, it turns, at
+// exactly the rate the pattern slips (|q·f2 − p·f1| times a second). Right:
+// the same two waves on a time line, with the stretch after which their sum
+// repeats.
 
-import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
-import { getDevice } from "../../lib/gpu";
-import { ShaderView } from "../../lib/shaderCanvas";
-import { Tone, masterBus, unlockAudio, frameGuard, soundHint, cents } from "../../lib/audio";
+import type { Demo } from "../../lib/demoShell";
+import { ctx, dest, now, unlockAudio, simpleRatio, justNear, etNear, guardSound } from "./sound/core";
+import { Stage, PlayPill, playButton, glowStroke, glowDot, rgba, mix, text, hline, roundRect, BLUE, ORANGE } from "./sound/draw";
 
-const N = 480; // polyline points
 const F1 = 220;
-const CYCLES = 8;
-
-export const JUST: { r: number; label: string; name: string }[] = [
-  { r: 1, label: "1:1", name: "unison" },
-  { r: 9 / 8, label: "9:8", name: "major second" },
-  { r: 6 / 5, label: "6:5", name: "minor third" },
-  { r: 5 / 4, label: "5:4", name: "major third" },
-  { r: 4 / 3, label: "4:3", name: "perfect fourth" },
-  { r: 3 / 2, label: "3:2", name: "perfect fifth" },
-  { r: 5 / 3, label: "5:3", name: "major sixth" },
-  { r: 2, label: "2:1", name: "octave" },
+const SNAPS: [number, number][] = [
+  [1, 1],
+  [2, 1],
+  [3, 2],
+  [4, 3],
+  [5, 4],
+  [6, 5],
+  [5, 3],
+  [45, 32],
 ];
 
-const SCENE = /* wgsl */ `
-fn scene(uv: vec2f) -> vec3f {
-  let t = uf(0u);
-  let aspect = uf(1u);
-  var col = vec3f(0.0);
-
-  let q = vec2f((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.5;
-
-  // frame: the unit square the figure lives in
-  let fr = max(abs(q.x), abs(q.y));
-  col += vec3f(0.05, 0.06, 0.11) * glow(abs(fr - 1.04), 0.006);
-
-  var d = 1e9;
-  var hueAt = 0.0;
-  for (var i = 0u; i < ${N - 1}u; i++) {
-    let a = vec2f(D[i * 2u], D[i * 2u + 1u]);
-    let b = vec2f(D[i * 2u + 2u], D[i * 2u + 3u]);
-    let di = sdSeg(q, a, b);
-    if (di < d) {
-      d = di;
-      hueAt = f32(i) / f32(${N});
-    }
-  }
-  let hue = 0.52 + hueAt * 0.35;
-  col += hsv(hue, 0.65, 1.0) * (glow(d, 0.006) * 1.15 + halo(d, 0.008) * 0.45);
-
-  // the moving dot — "now"
-  let headI = u32(fract(t * 0.21) * f32(${N - 1})) * 2u;
-  let head = vec2f(D[headI], D[headI + 1u]);
-  col += vec3f(1.0, 0.95, 0.85) * glow(length(q - head), 0.018) * 1.4;
-
-  return col * vignette(uv);
-}
-`;
-
-export interface LissajousOpts {
-  mode?: "hero" | "lab";
-}
-
-export async function mountLissajous(container: HTMLElement, opts: LissajousOpts = {}): Promise<Demo> {
-  const hero = opts.mode === "hero";
-  const dev = await getDevice();
-  const shell = new Shell(container, hero ? 0.42 : 0.62);
-  if (!dev) return gpuMissing(container);
-  const view = new ShaderView(dev, shell.canvas, SCENE, N * 2);
-  soundHint(container, hero ? "tap to hear the interval" : "tap for sound");
+export async function mountLissajous(container: HTMLElement): Promise<Demo> {
+  const stage = new Stage(container, { aspect: 0.56, narrowAspect: 1.3 });
+  const { shell } = stage;
 
   let ratio = 3 / 2;
-  let shownRatio = ratio;
   let playing = false;
 
-  const gain = new Tone.Gain(0).connect(masterBus());
-  const a = new Tone.Oscillator(F1, "sine").connect(gain);
-  const b = new Tone.Oscillator(F1 * ratio, "sine").connect(gain);
-
+  // ---- sound -------------------------------------------------------------------
+  const c = ctx();
+  const gain = c.createGain();
+  gain.gain.value = 0;
+  gain.connect(dest());
+  let oa: OscillatorNode | null = null;
+  let ob: OscillatorNode | null = null;
   const setPlaying = (on: boolean): void => {
+    if (on === playing) return;
     playing = on;
+    const t = now();
     if (on) {
-      if (a.state !== "started") {
-        a.start();
-        b.start();
-      }
-      gain.gain.rampTo(0.28, 0.2);
+      oa = c.createOscillator();
+      ob = c.createOscillator();
+      oa.frequency.value = F1;
+      ob.frequency.value = F1 * ratio;
+      oa.connect(gain);
+      ob.connect(gain);
+      oa.start(t);
+      ob.start(t);
+      gain.gain.cancelScheduledValues(t);
+      gain.gain.setTargetAtTime(0.1, t, 0.04);
     } else {
-      gain.gain.rampTo(0, 0.2);
+      gain.gain.cancelScheduledValues(t);
+      gain.gain.setTargetAtTime(0, t, 0.04);
+      const a = oa;
+      const b = ob;
+      oa = ob = null;
+      window.setTimeout(() => {
+        a?.stop();
+        b?.stop();
+        a?.disconnect();
+        b?.disconnect();
+      }, 300);
     }
+    sync(on);
+    pill.show(!on);
   };
-  const guard = frameGuard(() => setPlaying(false));
-
+  const toggle = (): void => {
+    void unlockAudio().then(() => setPlaying(!playing));
+  };
+  const pill = new PlayPill(stage, "Tap to play the interval", toggle, stage.narrow ? [0.5, 0.2] : [0.25, 0.5]);
+  const sync = playButton(stage, ["▶ play", "■ stop"], toggle);
   const setRatio = (r: number): void => {
     ratio = r;
-    b.frequency.rampTo(F1 * r, 0.05);
+    ob?.frequency.setTargetAtTime(F1 * r, now(), 0.01);
   };
-
-  if (hero) {
-    shell.canvas.addEventListener("pointerdown", () => {
-      void unlockAudio().then(() => setPlaying(!playing));
-    });
-    // drift through the consonances forever
-    let idx = 5;
-    window.setInterval(() => {
-      idx = (idx + 1) % JUST.length;
-      setRatio(JUST[idx].r);
-    }, 7000);
-  } else {
-    shell.button("▶ play interval", () => {
-      void unlockAudio().then(() => setPlaying(!playing));
-    });
-    const playBtn = shell.controls.lastElementChild as HTMLButtonElement;
-    window.setInterval(() => (playBtn.textContent = playing ? "■ stop" : "▶ play interval"), 300);
-
-    let sliderEl: HTMLInputElement;
-    sliderEl = shell.slider({
-      label: "frequency ratio",
-      min: 1,
-      max: 2.05,
-      step: 0.0005,
-      value: ratio,
-      format: (v) => v.toFixed(4),
-      onInput: (v) => setRatio(v),
-    });
-    for (const j of JUST) {
-      shell.button(j.label, () => {
-        setRatio(j.r);
-        sliderEl.value = String(j.r);
-        sliderEl.dispatchEvent(new Event("input"));
-      });
-    }
-  }
-
-  shell.setInfo(() => {
-    const near = JUST.find((j) => Math.abs(cents(ratio / j.r)) < 4);
-    const what = near ? `${near.label} — ${near.name}, the figure closes` : `${ratio.toFixed(4)} — irrational territory, the figure precesses`;
-    return `${F1} Hz × ${(F1 * ratio).toFixed(1)} Hz · ${what}`;
+  const slider = shell.slider({
+    label: "frequency ratio",
+    min: 1,
+    max: 2.05,
+    step: 0.0005,
+    value: ratio,
+    format: (v) => v.toFixed(4),
+    onInput: (v) => setRatio(v),
   });
+  const row = document.createElement("div");
+  row.className = "ms-choice";
+  for (const [p, q] of SNAPS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "demo-button";
+    b.textContent = `${p}:${q}`;
+    b.addEventListener("click", () => {
+      slider.value = String(p / q);
+      slider.dispatchEvent(new Event("input"));
+      setRatio(p / q);
+    });
+    row.appendChild(b);
+  }
+  shell.controls.appendChild(row);
 
-  let phi = 0;
+  const guard = guardSound(container, () => setPlaying(false));
+
+  // what the pattern does at this ratio
+  const describe = (): { exact: { p: number; q: number } | null; text: string } => {
+    const f2 = F1 * ratio;
+    const exact = simpleRatio(ratio, 32, 0.05);
+    if (exact) {
+      const rep = F1 / exact.q;
+      const name = justNear(ratio, 1)?.name ?? etNear(ratio).name;
+      const below = Math.log2(F1 / rep);
+      const where =
+        exact.q === 1
+          ? "the same as the lower tone"
+          : Number.isInteger(below)
+            ? `${below === 1 ? "an octave" : `${below} octaves`} below the lower tone`
+            : rep < 20
+              ? "too slow to hear as a pitch"
+              : "below both tones";
+      return {
+        exact,
+        text: `${exact.p}:${exact.q} (${name}) · the sum repeats every ${((1000 * exact.q) / F1).toFixed(2)} ms, ${rep < 20 ? rep.toFixed(1) : Math.round(rep)} times a second, ${where}`,
+      };
+    }
+    const near = simpleRatio(ratio, 8, 40);
+    if (near) {
+      const slip = Math.abs(near.q * f2 - near.p * F1);
+      return { exact: null, text: `${ratio.toFixed(4)}: ${Math.abs(near.off).toFixed(1)}¢ off ${near.p}:${near.q} · the pattern slips ${slip < 10 ? slip.toFixed(1) : Math.round(slip)} times a second` };
+    }
+    return { exact: null, text: `${ratio.toFixed(4)}: no short repeating pattern` };
+  };
+  shell.setInfo(() => `${F1} Hz and ${(F1 * ratio).toFixed(1)} Hz · ${describe().text}`);
+
+  let phA = 0;
+  let phB = 0;
+  let lastT = performance.now() / 1000;
   return {
     frame() {
       shell.tick();
       guard.pulse();
-      phi += 0.0035; // slow phase drift = the figure slowly "rotates"
-      shownRatio += (ratio - shownRatio) * 0.08;
-      for (let i = 0; i < N; i++) {
-        const s = (i / (N - 1)) * CYCLES;
-        view.data[i * 2] = Math.sin(2 * Math.PI * s + phi) * 0.96;
-        view.data[i * 2 + 1] = Math.sin(2 * Math.PI * shownRatio * s) * 0.96;
+      const t = performance.now() / 1000;
+      const dt = Math.min(0.1, t - lastT);
+      lastT = t;
+      const f2 = F1 * ratio;
+      phA = (phA + 2 * Math.PI * F1 * dt) % (2 * Math.PI * 1e4);
+      phB = (phB + 2 * Math.PI * f2 * dt) % (2 * Math.PI * 1e4);
+      const d = describe();
+
+      const g = stage.begin();
+      const W = stage.w;
+      const H = stage.h;
+      const narrow = stage.narrow;
+
+      // ---- the Lissajous figure ----
+      const side = narrow ? Math.min(W - 40, H * 0.46) : Math.min(H - 56, W * 0.38);
+      const lx = narrow ? W / 2 : 20 + side / 2;
+      const ly = narrow ? 26 + side / 2 : H / 2 + 6;
+      const R = side / 2 - 8;
+      g.save();
+      g.fillStyle = "rgba(122,162,255,0.035)";
+      roundRect(g, lx - side / 2, ly - side / 2, side, side, 10);
+      g.fill();
+      g.restore();
+      hline(g, lx - side / 2 + 6, lx + side / 2 - 6, ly, "rgba(122,162,255,0.08)");
+      const WINDOW = 8 / F1; // eight periods of the lower tone
+      const N = 900;
+      const path = new Path2D();
+      for (let i = 0; i <= N; i++) {
+        const back = (1 - i / N) * WINDOW;
+        const x = lx + R * Math.sin(phA - 2 * Math.PI * F1 * back);
+        const y = ly - R * Math.sin(phB - 2 * Math.PI * f2 * back);
+        if (i === 0) path.moveTo(x, y);
+        else path.lineTo(x, y);
       }
-      view.draw();
+      glowStroke(g, path, d.exact ? [190, 220, 255] : mix(BLUE, ORANGE, 0.5), 1.15, 0.9);
+      glowDot(g, lx + R * Math.sin(phA), ly - R * Math.sin(phB), 3.4, [255, 240, 220], 1);
+      text(g, `${F1} Hz →`, lx, ly + side / 2 + 14, { size: 9.5, align: "center", color: rgba(BLUE, 0.85), mono: true });
+      if (!narrow) {
+        g.save();
+        g.translate(lx - side / 2 - 8, ly);
+        g.rotate(-Math.PI / 2);
+        text(g, `${f2.toFixed(0)} Hz →`, 0, 0, { size: 9.5, align: "center", color: rgba(ORANGE, 0.85), mono: true });
+        g.restore();
+      }
+
+      // ---- the time line ----
+      const tx0 = narrow ? 16 : lx + side / 2 + 34;
+      const tx1 = W - 14;
+      const ty0 = narrow ? ly + side / 2 + 40 : 34;
+      const ty1 = H - 24;
+      const rowH = (ty1 - ty0) / 3;
+      const span = d.exact ? Math.min(0.06, Math.max(0.012, (2.2 * d.exact.q) / F1)) : 0.03;
+      const NPT = Math.round((tx1 - tx0) * 1.3);
+      const rows: [string, (tau: number) => number, readonly [number, number, number], number][] = [
+        [`${F1} Hz`, (tau) => Math.sin(2 * Math.PI * F1 * tau), BLUE, 0.85],
+        [`${f2.toFixed(1)} Hz`, (tau) => Math.sin(2 * Math.PI * f2 * tau), ORANGE, 0.85],
+        ["sum", (tau) => 0.5 * (Math.sin(2 * Math.PI * F1 * tau) + Math.sin(2 * Math.PI * f2 * tau)), [255, 240, 220], 1],
+      ];
+      rows.forEach(([name, fn, col, k], ri) => {
+        const mid = ty0 + rowH * (ri + 0.5);
+        const half = rowH * 0.36;
+        hline(g, tx0, tx1, mid, "rgba(122,162,255,0.08)");
+        const p = new Path2D();
+        for (let i = 0; i <= NPT; i++) {
+          const tau = (i / NPT) * span;
+          const y = mid - fn(tau) * half;
+          const x = tx0 + (i / NPT) * (tx1 - tx0);
+          if (i === 0) p.moveTo(x, y);
+          else p.lineTo(x, y);
+        }
+        glowStroke(g, p, col, ri === 2 ? 1.3 : 1, k * (ri === 2 ? 0.95 : 0.7));
+        text(g, name, tx0, mid - half - 5, { size: 9.5, color: rgba(col, 0.75), mono: true });
+      });
+      // repeat brackets on the sum
+      if (d.exact) {
+        const T = d.exact.q / F1;
+        const yb = ty0 + rowH * 2 + rowH * 0.06;
+        for (let k = 0; k * T <= span + 1e-9; k++) {
+          const x = tx0 + ((k * T) / span) * (tx1 - tx0);
+          g.save();
+          g.strokeStyle = rgba(ORANGE, 0.55);
+          g.setLineDash([3, 4]);
+          g.beginPath();
+          g.moveTo(x, ty0 + rowH * 2 + 4);
+          g.lineTo(x, ty1);
+          g.stroke();
+          g.restore();
+        }
+        const x1 = tx0 + (T / span) * (tx1 - tx0);
+        if (x1 <= tx1 + 1) {
+          g.save();
+          g.strokeStyle = rgba(ORANGE, 0.9);
+          g.lineWidth = 1.2;
+          g.beginPath();
+          g.moveTo(tx0, yb + 5);
+          g.lineTo(tx0, yb);
+          g.lineTo(x1, yb);
+          g.lineTo(x1, yb + 5);
+          g.stroke();
+          g.restore();
+          text(g, `repeats every ${((1000 * d.exact.q) / F1).toFixed(2)} ms`, (tx0 + x1) / 2, yb - 4, {
+            size: 10,
+            align: x1 - tx0 > 140 ? "center" : "left",
+            color: rgba(ORANGE, 1),
+            weight: 600,
+          });
+        }
+      }
+      text(g, `${(span * 1000).toFixed(span < 0.02 ? 1 : 0)} ms`, tx1, ty1 + 14, { size: 9.5, align: "right", color: "rgba(150,160,190,0.55)", mono: true });
     },
     dispose() {
       setPlaying(false);

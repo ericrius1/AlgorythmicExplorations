@@ -10,22 +10,19 @@
     <title>The Rain — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Hydraulic erosion in the browser: simulated raindrops move downhill, carry sediment, and carve procedural mountains into drainage networks."
+      content="Hydraulic erosion in the browser: simulated raindrops roll downhill, pick up and drop sediment, and carve procedural mountains into connected valleys, flat floors, and ponds."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <!-- demos mount via src/erosion.ts -->
+  <body class="essay">
     <header class="hero">
       <div data-demo="hero-erosion"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Ground Truth · Part 2</p>
         <h1>The Rain</h1>
         <p class="subtitle">
-          The mountains under this camera are being rained on right now. Each
-          drop rolls downhill, erodes material up to its carrying capacity, and deposits it where it
-          slows — and by the time the storm passes, the noise from
-          <a href="/pages/ground-truth/heightfield.html">part one</a> will have gullies, fans,
-          and flat-floored valleys it never had before. Noise plus history.
+          Ninety thousand simulated raindrops carve the terrain from part one while you
+          watch. Each one only knows the slope under it.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -36,188 +33,213 @@
 
     <main>
       <p>
-        <a href="/pages/ground-truth/heightfield.html">Part one</a> produced mountains without erosion. Fractal noise gets the silhouette of
-        terrain right — detail at every scale — but real landscapes are not
-        just statistics. They are records. Every valley on Earth is the
-        memory of water that passed through it, and noise has no memory at
-        all. You can see the difference instantly even if you can't name it:
-        fBm valleys wander aimlessly; real valleys <em>connect</em>, joining
-        each other downstream in tree-shaped networks, because water that
-        finds a channel makes that channel better at being found.
+        The mountains from <a href="/pages/ground-truth/heightfield.html">part one</a> have
+        the right silhouette, but they've never been rained on. Noise has detail at every
+        scale and no history. Real valleys are a record of water. They join each other
+        downstream in branching networks, because water that finds a channel deepens it and
+        the next drop finds it more easily. Valleys in fBm wander about and dead-end.
       </p>
       <p>
-        This article adds a simulated history. The
-        tool is <em>hydraulic erosion</em> — not the full fluid dynamics of a
-        watershed, but a simplified approximation: one raindrop at a time, simulated as a particle
-        rolling over the heightfield, allowed to do only two things — pick up
-        dirt and put it down. Run a few hundred thousand of them and geology
-        comes out.
+        This part adds the history with <em>hydraulic erosion</em>. The method doesn't
+        simulate the water as a fluid. Each raindrop is a particle that rolls over the
+        heightfield and can do two things: pick up dirt and put it down. Run enough of them
+        and the valleys connect.
+      </p>
+      <p>
+        The view at the top started out as plain part-one terrain. It gets 3,000 droplets a
+        second until 90,000 have fallen, which takes about thirty seconds, and the camera
+        keeps circling afterwards. The blue is where the droplets' paths collected: ponds in
+        the basins, and the odd stream between them.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · One droplet</span>Droplet simulation</h2>
+      <h2 id="droplet"><span class="kicker">Step 1 · One droplet</span>A particle that rolls downhill</h2>
       <p>
-        A droplet is five numbers: a position on the map, a direction, a
-        speed, an amount of water, and a load of sediment. Its life is a
-        loop:
+        A droplet is five numbers: a position on the map, a direction, a speed, an amount of
+        water, and a load of sediment. Each step of its life looks like this:
       </p>
-      <pre><code>dir    = dir · inertia − gradient · (1 − inertia)   <span class="cm">// downhill, with momentum</span>
+      <pre><code>dir    = dir · inertia − gradient · (1 − inertia)   <span class="cm">// downhill, with some momentum</span>
 move one cell along dir
 speed  = √(speed² + drop · gravity)                 <span class="cm">// falling makes it faster</span>
-water *= (1 − evaporation)                          <span class="cm">// shrinking makes it weaker</span></code></pre>
+water *= (1 − evaporation)                          <span class="cm">// and it slowly dries up</span></code></pre>
       <p>
-        The <strong>inertia</strong> blend prevents abrupt direction changes.
-        A droplet that follows the gradient exactly turns on a dime at
-        every cell and gets trapped by every pebble-sized dimple in the
-        noise. A droplet with momentum cuts smooth curves and can coast
-        across small flats — which is how real water behaves, and it is the
-        difference between drainage that meanders like a river and drainage
-        that jitters like static. The height and gradient under the droplet
-        come from bilinear interpolation, so the droplet feels a continuous
-        landscape even though we only stored a grid.
+        <strong>Inertia</strong> keeps the droplet from turning sharply. With inertia 0 it
+        follows the gradient exactly, turns at every cell, and gets caught in every small
+        dent in the noise. A little momentum lets it cut smooth curves and coast across
+        small flats. The default is 0.06. The height and gradient under the droplet come
+        from bilinear interpolation of the four surrounding grid cells, so it moves over a
+        continuous surface even though only a grid is stored.
       </p>
-      <div data-demo="droplets"></div>
+
+      <div
+        data-demo="droplets"
+        data-title="Droplets finding the drainage"
+        data-hint="Watch, then try inertia"
+      ></div>
+
       <p>
-        Rain on the map and watch the paths. Nobody routed them — each
-        droplet only ever sees the slope under its own feet — but they merge
-        into the same channels, because converging is what downhill
-        <em>means</em>. The demo shows how drainage networks emerge from local
-        downhill motion rather than being drawn explicitly. Increase the
-        inertia slider and the streams swing wide like
-        rivers in flood; set it to zero and they hug every wrinkle.
+        Rain falls on this 220 × 220 map three droplets a frame, and each droplet's path is
+        drawn as it runs downhill. Nobody routes them. Each droplet only sees the slope under
+        it, and still the paths gather into the same lines, because downhill paths from a
+        wide area all funnel into the same low ground. When a droplet goes six steps without
+        reaching a new low point it's sloshing around in a pit, so the drawing stops and
+        leaves a faint blue dot. The dots pile up where ponds would form. Push inertia up and
+        the paths swing wide and overshoot the bends.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Sediment</span>The carrying capacity</h2>
+      <h2 id="sediment"><span class="kicker">Step 2 · Sediment</span>Carrying capacity</h2>
       <p>
-        Tracing paths is hydrology; changing the ground is erosion. The
-        rule that turns one into the other is <em>carrying capacity</em> —
-        how much sediment a droplet can hold:
+        Tracing paths only finds the drainage. To change the ground, each droplet carries
+        sediment, and it has a <em>carrying capacity</em>:
       </p>
-      <pre><code>capacity = slope · speed · water · C
-if sediment &gt; capacity:  deposit the surplus    <span class="cm">// slow, flat, or drying up → drop it</span>
-else:                    erode toward capacity  <span class="cm">// fast and hungry → dig</span></code></pre>
+      <pre><code>capacity = max(drop, 0.01) · speed · water · C
+if sediment &gt; capacity: deposit some of the surplus   <span class="cm">// slow, flat, or drying up</span>
+else:                   erode toward capacity          <span class="cm">// fast and hungry</span></code></pre>
       <p>
-        Everything geological follows from the product. On a steep face the
-        droplet is fast, capacity is high, and it strips material. When it
-        reaches the valley floor, slope collapses, capacity collapses with
-        it, and the droplet sheds its load — which is why mountain streams
-        run over bare rock while valley floors fill with soft flat alluvium.
-        That one product is enough to reproduce both effects.
+        Most of the behaviour comes from that product. On a steep face the droplet is fast
+        and drops a long way each step, so its capacity is high and it strips material. On
+        the valley floor the slope goes away, the capacity goes with it, and the droplet
+        sheds its load. That's why mountain streams run over bare rock while valley floors
+        fill up with soft, flat sediment.
       </p>
       <p>
-        Two constraints keep the erosion stable. A droplet never erodes more
-        than the height it is about to descend — otherwise it digs a spike
-        pit below its own path and the terrain fills with needle holes. And
-        it never digs at a single point: the bite is spread over a soft
-        <strong>brush</strong> a few cells wide, because a real stream
-        undercuts its banks and pulls the walls down after it. Skip the
-        brush and you get channels exactly one cell wide — drainage drawn
-        with a needle instead of carved by water.
+        A droplet that would have to climb is at the bottom of a pit. It drops sediment
+        there, up to the height of the climb, and over many droplets that fills basins with
+        flat floors. In the view at the top those floors are the green flats around the
+        ponds.
       </p>
-      <div data-demo="erode"></div>
       <p>
-        Press rain and let the storm run — each second of it is thousands
-        of complete droplet lifetimes. Flip <strong>before/after</strong> to
-        see what the water did to the raw fBm: ridgelines survive nearly
-        untouched (droplets are born slow and starving up there), slopes
-        grow rills and gullies that join downstream, and the valley floors
-        — watch them with <strong>sediment paint</strong> on — flatten under
-        pale fans of deposited silt. That last one matters beyond scenery:
-        part one faked flat valleys with a power curve; the rain produces
-        them for the underlying reason.
+        Two limits keep the digging stable. A droplet never erodes more than the height it's
+        about to descend, or it digs a hole below its own path and the terrain fills up with
+        needle-thin pits. And it never digs at a single point. The material comes from a
+        soft <strong>brush</strong>, 21 cells within a radius of 2.5, weighted by
+        1 − distance / radius, so channels come out shaped like valleys instead of one cell
+        wide.
+      </p>
+      <p>
+        There's a third limit near the edges of the map. Droplets that reach the edge leave
+        and take their sediment with them, so a hole dug near the edge is never refilled,
+        and every droplet that falls into it digs it deeper. An earlier version of this code
+        let the brush reach the border, and after 100,000 droplets on a 256-cell grid one
+        cell had been dug more than 19,000 units deep. Now nothing is eroded within the
+        brush radius plus two cells of the edge. Deposits are still allowed there, since they
+        can only return material that was dug up somewhere else.
+      </p>
+
+      <div
+        data-demo="erode"
+        data-title="The storm, in 3D"
+        data-hint="Drag to orbit, try before / after"
+      ></div>
+
+      <p>
+        This is a 16-unit block of terrain, 256 cells on a side. The storm starts on its own
+        and gets 2.5 ms of every frame until 200,000 droplets have fallen. The readout shows
+        how many droplets a second that works out to on your machine. Flip
+        <strong>before / after</strong> to compare with the raw terrain: the ridgelines
+        survive almost untouched (droplets start slow and empty up there), the slopes grow
+        gullies that join on the way down, and the basins get flat floors.
+        <strong>Sediment paint</strong> shows where the material went, darker where ground
+        was cut away and pale where it was laid down. The blue is the flow record, the cells
+        the most water passed through.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Earlier erosion models</span>
         <p>
-          Eroding fractal terrain is almost as old as fractal terrain.
-          Musgrave, Kolb and Mace's 1989 paper — the same one that gave
-          part one its ridges — already ran hydraulic and thermal erosion
-          over noise, on hardware with less memory than this paragraph.
-          Thermal erosion is the lesser-known sibling: no water at all, just
-          "scree slides downhill until slopes are stable," which rounds
-          everything toward a desert look. Hydraulic carves, thermal
-          relaxes; landscapes you believe tend to need a little of both.
+          Eroding fractal terrain is nearly as old as fractal terrain. Musgrave, Kolb and
+          Mace's 1989 paper ran both hydraulic erosion and thermal weathering over noise.
+          Thermal weathering uses no water at all: material slides downhill wherever a slope
+          is steeper than some angle of repose, which rounds everything off. The droplet
+          model on this page, with its inertia, capacity, and brush, follows Hans Beyer's
+          2015 thesis. Grid-based methods instead simulate shallow water flowing over every
+          cell at once, and they map well onto GPUs.
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: why the result is stochastic</summary>
+        <summary>Why it looks random, and what it costs</summary>
         <div class="fold-body">
           <p>
-            Each droplet is randomized only at birth — where it lands. From
-            then on it is fully deterministic, and yet the aggregate looks
-            richly stochastic. That's because the heightfield itself is the
-            random number generator: tiny differences in landing position
-            route droplets into entirely different watersheds. It also means
-            the simulation is <em>reproducible</em> — same seed, same storm,
-            same canyon. The droplets use the same hash as the mountains,
-            preserving deterministic generation.
+            The only randomness is where each droplet lands, which comes from the same hash
+            as the mountains. From then on a droplet is fully deterministic. The aggregate
+            still looks varied because the terrain itself scrambles things: two droplets
+            that land a fraction of a cell apart can end up in different watersheds. It's
+            also reproducible. The same seed gives the same storm and the same valleys.
           </p>
           <p>
-            The expensive part is not the math per step (a bilinear sample
-            and a multiply) but the brush — a 5×5-ish stamp on every eroding
-            step. The budget arithmetic: 100,000 droplets × ~60 steps × ~20
-            brush cells ≈ 10⁸ memory touches, which is why the hero storm
-            takes a few seconds to pass rather than a few frames. GPU
-            implementations run the droplets in parallel and pay instead in
-            collisions — two droplets writing one cell — whose errors mostly
-            average out because erosion is already a statistical process.
+            A droplet costs a few microseconds in JavaScript, and most of that is the brush,
+            21 cells touched on every eroding step. Running droplets in parallel on a GPU is
+            harder than it sounds, because two droplets can write the same cell at once.
+            Implementations that do it accept those collisions, since erosion is a
+            statistical process and the errors mostly average out.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Outputs</span>Resulting terrain</h2>
+      <h2 id="outputs"><span class="kicker">Step 3 · What comes out</span>Valleys, floors, and a soil map</h2>
       <p>
-        The next articles build on several outputs. <strong>Drainage networks:</strong>
-        valleys now join downstream instead of wandering, one of the strongest
-        visual cues of eroded terrain. <strong>Flat
-        floors:</strong> deposition fills the low ground, making the only
-        terrain flat enough to walk on, build on, or — looking ahead — grow
-        a meadow on. <strong>Sharpened relief:</strong> erosion steepens the
-        middle slopes while sparing the crests, stretching the histogram of
-        slopes toward both ends. And one more, subtle: the
-        <strong>sediment map</strong> itself. Recording where material was
-        removed and deposited produces a useful soil map. Parts three and five
-        use it to place vegetation.
+        The storm leaves more behind than new heights. The valleys now join downstream
+        instead of wandering, which is one of the strongest cues that terrain has been
+        weathered. The basins have flat floors, the only ground in the scene flat enough to
+        grow a meadow on. The middle slopes are steeper and the crests are mostly untouched,
+        so the relief is sharper than before.
+      </p>
+      <p>
+        And the simulation keeps a ledger. Every cell records its net change, negative where
+        material was cut away and positive where it was laid down. That's a soil map for
+        free: deep sediment in the valley floors, bare rock in the gullies. Part three plants
+        grass from it.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Limits of precomputed erosion</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>The cost of history</h2>
       <p>
-        This approach introduces a constraint that matters for streaming.
-        Part one's mountains were a pure function — ask
-        h(x, z) at any coordinate, get the same answer forever, no storage.
-        The rain broke that. Erosion is a <em>process</em>: each droplet
-        changes the ground the next droplet sees, so the carved terrain
-        exists only as a grid of modified heights — bounded, stored,
-        finite. Unlike the source height function, eroded terrain cannot be
-        evaluated at an arbitrary coordinate without prior simulation. Part
-        six addresses this directly: streamed chunks cannot each carry
-        a hundred-thousand-droplet history that agrees with their
-        neighbors'. The practical solution is to use erosion nearby and the
-        procedural height function at a distance.
+        Erosion breaks something part one was careful about. The height function was pure:
+        ask for any coordinate and get the same answer, with nothing stored. The rain is a
+        process. Each droplet changes the ground the next one sees, so the eroded terrain
+        only exists as a stored grid that has to be simulated in order. That's fine for a
+        patch of terrain, and a problem for a world with no edges. Part six comes back to
+        it.
       </p>
+      <ul>
+        <li>
+          <strong>Local rules, global shapes.</strong> No droplet knows where the river is.
+          The river is where the droplets agree.
+        </li>
+        <li>
+          <strong>One product does most of the geology.</strong> Slope × speed × water
+          decides where ground is cut and where it's laid down.
+        </li>
+        <li>
+          <strong>Check the boundaries.</strong> The edge of the map broke the simulation in
+          a way the interior never would.
+        </li>
+        <li>
+          <strong>Keep the ledger.</strong> Recording what changed costs one extra array and
+          gives the next part its soil map.
+        </li>
+      </ul>
       <p>
-        Next, the sediment map places a hundred thousand instanced,
-        wind-bent grass blades. In parallel,
-        <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a> adds a skeleton to the
-        eagle that will later fly over this terrain.
+        Things I'd try next: run the droplets in a compute shader and accept the write
+        collisions; add a thermal pass so the steepest faces settle into scree slopes; and
+        erode at a coarse resolution, then add fine noise back on top, which gets most of
+        the look for a fraction of the droplets.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/ground-truth/grass.html">Part 3, The Grass</a>.</strong>
+        Hundreds of thousands of blades, planted from this soil map and moved by wind in the
+        vertex shader.
       </p>
     </main>
 
     <footer>
       <p>
-        Ground Truth, part two ·
-        written in parallel with <a href="/pages/feather-bone/eagle.html">Feather &amp; Bone</a> ·
-        the mountains being eroded are <a href="/pages/ground-truth/heightfield.html">part one's</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
+        References:
         <a href="https://doi.org/10.1145/74333.74337">Musgrave, Kolb &amp; Mace, "The Synthesis and Rendering of Eroded Fractal Terrains" (1989)</a> ·
         <a href="https://www.firespark.de/resources/downloads/implementation%20of%20a%20methode%20for%20hydraulic%20erosion.pdf">Beyer, "Implementation of a Method for Hydraulic Erosion" (2015)</a> ·
         <a href="https://web.mit.edu/cesium/Public/terrain.pdf">Olsen, "Realtime Procedural Terrain Generation" (2004)</a> ·
-        <a href="https://doi.org/10.1145/1342250.1342267">Št'ava, Beneš, Brisbin &amp; Křivánek, "Interactive Terrain Modeling Using Hydraulic Erosion" (2008)</a>
+        <a href="https://doi.org/10.1145/1342250.1342267">Šťava, Beneš, Brisbin &amp; Křivánek, "Interactive Terrain Modeling Using Hydraulic Erosion" (2008)</a>
       </p>
     </footer>
 

@@ -1,19 +1,23 @@
-// The crown: part one's renderer (splat field → marching squares → glossy
-// fill) driven by the part-two sim, where the fluid magnetizes itself.
-// New teaching view: every particle's magnetic moment drawn as an arrow.
+// Strange Matter part two: part one's renderer (splat field → marching
+// squares → shaded fluid) driven by a sim where the fluid magnetizes itself.
+// Under a uniform field, the pool grows a crown of spikes. New teaching
+// view: the particles' magnetic moments as arrows.
 
-import renderShader from "../../shaders/ferrorender.wgsl?raw";
 import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
-import { Ferro2Sim, FERRO2_KNOBS, H, type Ferro2Knobs } from "../../lib/ferroSim2";
+import { Ferro2Sim, FERRO2_KNOBS, type Ferro2Knobs } from "../../lib/ferroSim2";
+import { SPACING, poolDepth, type Tray } from "../../lib/ferroSim";
+import { Ferro2DRenderer, VIEW_FINAL, VIEW_MOMENTS } from "./ferro2dRenderer";
+import { devKnobs } from "./devKnobs";
 
-const VIEW_NAMES = ["final", "mesh only", "field + contour", "particles", "moments"];
-const MAX_SEGS = 65536;
+const VIEW_NAMES = ["final", "mesh", "field", "particles", "moments"];
+const POLE_TO_DIPOLE = 0.05; // the cursor magnet's dipole sits inside its bar
 
 export interface CrownOptions {
   hero?: boolean;
+  wide?: boolean; // hero framing: the whole dish instead of a close-up
   full?: boolean; // sliders + view cycling
-  view?: number; // starting debug view
+  view?: number; // starting view
   duel?: boolean; // force-model toggle only
 }
 
@@ -22,216 +26,91 @@ export async function mountCrown(container: HTMLElement, opts: CrownOptions): Pr
   const shell = new Shell(container, opts.hero ? 0.5 : 0.62);
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
-  const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 
-  const W = shell.canvas.width;
-  const Hpx = shell.canvas.height;
-  const aspect = W / Hpx;
-  const viewScaleY = 1.04;
-  const viewScale: [number, number] = [viewScaleY / aspect, viewScaleY];
-
-  const fieldW = Math.floor(W / 2);
-  const fieldH = Math.floor(Hpx / 2);
-
-  const knobs: Ferro2Knobs = { ...FERRO2_KNOBS };
-  const count = opts.hero ? 16000 : opts.view === 4 ? 12000 : 16000;
-  let view = opts.view ?? 0;
+  const tray: Tray = opts.hero ? { floorY: -0.5, wallX: 0.97, topY: 0.95 } : { floorY: -0.5, wallX: 0.8, topY: 0.95 };
+  const knobs: Ferro2Knobs = devKnobs({ ...FERRO2_KNOBS });
+  const count = opts.hero ? 24000 : 20000;
+  const surfaceY = tray.floorY + poolDepth(count, tray);
+  let view = opts.view ?? VIEW_FINAL;
   let time = 0;
-  let segsDrawn = 0;
 
-  const sim = new Ferro2Sim(dev, count);
-
-  // ---- pipelines (part one's, plus arrows) -----------------------------------------
-  const module = dev.createShaderModule({ code: renderShader });
-  const fieldTex = dev.createTexture({
-    size: [fieldW, fieldH],
-    format: "rgba16float",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  const sim = new Ferro2Sim(dev, count, tray);
+  const close = opts.hero && !opts.wide;
+  const rnd = new Ferro2DRenderer(dev, ctx, shell.canvas, {
+    tray,
+    spacing: SPACING,
+    center: [0, surfaceY + (close ? 0.035 : opts.hero ? 0.13 : 0.2)],
+    halfWidth: close ? 0.42 : opts.hero ? 0.99 : 0.86,
+    minHalfHeight: close ? 0.16 : 0.36,
+    rimY: surfaceY + 0.1,
   });
-  const fieldView = fieldTex.createView();
-  const linSamp = dev.createSampler({ magFilter: "linear", minFilter: "linear" });
-  const rp = dev.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-
-  const segBuf = dev.createBuffer({ size: MAX_SEGS * 16, usage: GPUBufferUsage.STORAGE });
-  const segCount = dev.createBuffer({
-    size: 4,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
-  });
-  const indirectBuf = dev.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT });
-  const segStaging = dev.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-  let stagingBusy = false;
-
-  const alphaBlend: GPUBlendState = {
-    color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
-    alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
-  };
-  const splatPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsSplat" },
-    fragment: {
-      module,
-      entryPoint: "fsSplat",
-      targets: [{
-        format: "rgba16float",
-        blend: {
-          color: { srcFactor: "one", dstFactor: "one", operation: "add" },
-          alpha: { srcFactor: "one", dstFactor: "one", operation: "add" },
-        },
-      }],
-    },
-    primitive: { topology: "triangle-list" },
-  });
-  const fillPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsFull" },
-    fragment: { module, entryPoint: "fsFill", targets: [{ format: canvasFormat }] },
-    primitive: { topology: "triangle-list" },
-  });
-  const segPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsSegs" },
-    fragment: { module, entryPoint: "fsSegs", targets: [{ format: canvasFormat, blend: alphaBlend }] },
-    primitive: { topology: "triangle-list" },
-  });
-  const dotsPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsDots" },
-    fragment: { module, entryPoint: "fsDots", targets: [{ format: canvasFormat, blend: alphaBlend }] },
-    primitive: { topology: "triangle-list" },
-  });
-  const arrowPipe = dev.createRenderPipeline({
-    layout: "auto",
-    vertex: { module, entryPoint: "vsArrows" },
-    fragment: { module, entryPoint: "fsArrows", targets: [{ format: canvasFormat, blend: alphaBlend }] },
-    primitive: { topology: "triangle-list" },
-  });
-  const msPipe = dev.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "msCells" } });
-  const indPipe = dev.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "msIndirect" } });
-
-  // ---- bind groups -----------------------------------------------------------------
-  let splatGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
-  let dotGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
-  let arrowGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!];
-  const particleGroups = (pipe: GPURenderPipeline): [GPUBindGroup, GPUBindGroup] =>
-    sim.buffers.map((b) =>
-      dev.createBindGroup({
-        layout: pipe.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: rp } },
-          { binding: 1, resource: { buffer: b } },
-        ],
-      }),
-    ) as [GPUBindGroup, GPUBindGroup];
-  const bindParticles = (): void => {
-    splatGroups = particleGroups(splatPipe);
-    dotGroups = particleGroups(dotsPipe);
-    arrowGroups = particleGroups(arrowPipe);
-  };
-  bindParticles();
-
-  const fillGroup = dev.createBindGroup({
-    layout: fillPipe.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: rp } },
-      { binding: 2, resource: fieldView },
-      { binding: 3, resource: linSamp },
-    ],
-  });
-  const msGroup = dev.createBindGroup({
-    layout: msPipe.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: rp } },
-      { binding: 2, resource: fieldView },
-      { binding: 4, resource: { buffer: segBuf } },
-      { binding: 5, resource: { buffer: segCount } },
-    ],
-  });
-  const indGroup = dev.createBindGroup({
-    layout: indPipe.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: rp } },
-      { binding: 5, resource: { buffer: segCount } },
-      { binding: 6, resource: { buffer: indirectBuf } },
-    ],
-  });
-  const segGroup = dev.createBindGroup({
-    layout: segPipe.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: rp } },
-      { binding: 7, resource: { buffer: segBuf } },
-    ],
-  });
+  rnd.bindParticles(sim.buffers);
 
   // ---- the cursor magnet -------------------------------------------------------------
-  let pointer: [number, number] | null = null;
-  shell.canvas.addEventListener("pointermove", (e) => {
-    const r = shell.canvas.getBoundingClientRect();
-    const cx = ((e.clientX - r.left) / r.width) * 2 - 1;
-    const cy = -(((e.clientY - r.top) / r.height) * 2 - 1);
-    pointer = [cx / viewScale[0], cy / viewScale[1]];
-  });
-  shell.canvas.addEventListener("pointerleave", () => (pointer = null));
-
-  const idleMagnet = (): [number, number] => [
-    0.42 * Math.sin(time * 0.5),
-    -0.05 + 0.28 * Math.sin(time * 0.77 + 1.3),
+  // A small one: it adds to the uniform field near the cursor, so the spikes
+  // under it stand taller, without tearing the crown apart.
+  const minPole = surfaceY + 0.08;
+  const clampMag = (p: [number, number]): [number, number] => [
+    Math.max(-tray.wallX + 0.03, Math.min(tray.wallX - 0.03, p[0])),
+    Math.max(minPole, Math.min(rnd.visibleTop - 0.14, p[1])),
   ];
+  let pointer: [number, number] | null = null;
+  shell.canvas.addEventListener("pointermove", (e) => (pointer = clampMag(rnd.toWorld(e.clientX, e.clientY))));
+  shell.canvas.addEventListener("pointerleave", () => (pointer = null));
+  const magMoment = view === VIEW_MOMENTS ? 8 : 4;
 
   // ---- controls ------------------------------------------------------------------------
   const modelName = (): string => (knobs.kelvin ? "Kelvin" : "current loop");
   if (opts.full) {
     shell.slider({
       label: "susceptibility χ",
-      min: 0, max: 20, step: 0.5, value: knobs.chi,
+      min: 0, max: 5, step: 0.1, value: knobs.chi,
       onInput: (v) => (knobs.chi = v),
     });
     shell.slider({
       label: "field strength",
-      min: 0, max: 10, step: 0.1, value: knobs.hExt,
+      min: 0, max: 8, step: 0.1, value: knobs.hExt,
       onInput: (v) => (knobs.hExt = v),
     });
     shell.slider({
       label: "surface tension",
-      min: 0, max: 8, step: 0.1, value: knobs.tension,
+      min: 0, max: 10, step: 0.1, value: knobs.tension,
       onInput: (v) => (knobs.tension = v),
     });
   }
   if (opts.full || opts.duel) {
-    shell.button(`force model: ${modelName()}`, function (this: void) {
+    const modelBtn = shell.button(`force model: ${modelName()}`, () => {
       knobs.kelvin = !knobs.kelvin;
+      modelBtn.textContent = `force model: ${modelName()}`;
     });
-    const modelBtn = shell.controls.querySelectorAll("button")[0];
-    modelBtn?.addEventListener("click", () => (modelBtn.textContent = `force model: ${modelName()}`));
   }
   if (opts.full) {
-    shell.button(`view: ${VIEW_NAMES[view]}`, function (this: void) {
+    const viewBtn = shell.button(`view: ${VIEW_NAMES[view]}`, () => {
       view = (view + 1) % VIEW_NAMES.length;
+      viewBtn.textContent = `view: ${VIEW_NAMES[view]}`;
     });
-    const viewBtn = shell.controls.querySelectorAll("button")[1];
-    viewBtn?.addEventListener("click", () => (viewBtn.textContent = `view: ${VIEW_NAMES[view]}`));
     shell.button("re-pour", () => {
       sim.rebuild(count);
-      bindParticles();
+      rnd.bindParticles(sim.buffers);
+      time = 0;
     });
   }
   shell.setInfo(() => {
-    if (opts.hero) return `${count.toLocaleString()} particles, each one a magnet · uniform field, no cursor needed`;
-    if (opts.duel) return `${modelName()} model · ${count.toLocaleString()} mutually magnetized particles`;
-    if (view === 4) return `${count.toLocaleString()} moments · solved by warm-started relaxation, one iteration per frame`;
-    return `${modelName()} · ${segsDrawn.toLocaleString()} segments · χ, field, and tension set the crown`;
+    if (opts.hero) return `${count.toLocaleString()} particles, each one a magnet · uniform field · cursor adds a magnet`;
+    if (opts.duel) return `${modelName()} model · ${count.toLocaleString()} particles`;
+    if (view === VIEW_MOMENTS) return `${count.toLocaleString()} moments, one relaxation sweep per frame · every 5th drawn`;
+    return `${modelName()} · ${rnd.segsDrawn.toLocaleString()} segments · ${count.toLocaleString()} particles`;
   });
 
-  const writeRP = (mag: [number, number], magOn: boolean): void => {
-    const f = new Float32Array([
-      viewScale[0], viewScale[1], fieldW, fieldH,
-      H * 5.4, 1.05, 0.85, time,
-      mag[0], mag[1], magOn ? 1 : 0, view === 4 ? 0 : view,
-      H * 0.62, MAX_SEGS, 0.12, 2, // _pad = moment scale, arrow stride
-    ]);
-    dev.queue.writeBuffer(rp, 0, f);
-  };
-
-  // pre-warm with the field off so the pool arrives settled, not mid-eruption
+  // The field comes up over the first second and a half; before that the
+  // pool settles with it off, so the crown grows out of a flat surface.
+  const RAMP = 1.5;
+  const frameKnobs = (): Ferro2Knobs => ({
+    ...knobs,
+    hExt: knobs.hExt * Math.min(1, time / RAMP),
+    magMoment: pointer ? magMoment : 0,
+  });
+  const magPos = (): [number, number] => (pointer ? [pointer[0], pointer[1] + POLE_TO_DIPOLE] : [0, 5]);
   {
     sim.writeParams({ ...knobs, hExt: 0, magMoment: 0 }, 0.0016, [0, 5], false);
     for (let chunk = 0; chunk < 3; chunk++) {
@@ -239,99 +118,43 @@ export async function mountCrown(container: HTMLElement, opts: CrownOptions): Pr
       sim.encodeSteps(enc, 200, false);
       dev.queue.submit([enc.finish()]);
     }
+    // heroes start with the crown already sprouting
+    if (opts.hero) {
+      for (let chunk = 0; chunk < 16; chunk++) {
+        const enc = dev.createCommandEncoder();
+        for (let f = 0; f < 15; f++) {
+          time += 1 / 60;
+          sim.writeParams(frameKnobs(), 0.0016, magPos(), false);
+          sim.encodeSteps(enc, 5);
+        }
+        dev.queue.submit([enc.finish()]);
+      }
+    }
   }
 
   return {
     frame() {
       shell.tick();
       time += 1 / 60;
-
-      // hero: the uniform field breathes, so the crown grows and relaxes on
-      // its own; the cursor adds a movable magnet on top in every demo
-      const fieldGain = opts.hero ? 0.6 + 0.4 * Math.sin(time * 0.35 - 0.8) : 1.0;
-      const mag = pointer ?? (opts.view === 4 ? idleMagnet() : [0, 5] as [number, number]);
-      const magOn = pointer !== null || opts.view === 4;
-      const frameKnobs: Ferro2Knobs = {
-        ...knobs,
-        hExt: knobs.hExt * fieldGain,
-        magMoment: magOn ? (opts.view === 4 ? 40 : 30) : 0,
-      };
-      sim.writeParams(frameKnobs, 0.0016, mag, magOn);
-      writeRP(mag, magOn);
+      sim.writeParams(frameKnobs(), 0.0016, magPos(), pointer !== null);
 
       const enc = dev.createCommandEncoder();
       sim.encodeSteps(enc, 5);
-
-      // splat particles into the field
-      let pass = enc.beginRenderPass({
-        colorAttachments: [{ view: fieldView, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store" }],
+      rnd.encode(enc, {
+        buffer: sim.currentIndex,
+        count: sim.count,
+        view,
+        mag: pointer ?? [0, 5],
+        magOn: pointer !== null,
+        time,
+        momentScale: 0.15,
       });
-      pass.setPipeline(splatPipe);
-      pass.setBindGroup(0, splatGroups[sim.currentIndex]);
-      pass.draw(6, sim.count);
-      pass.end();
-
-      // marching squares: field → segments → indirect args
-      enc.clearBuffer(segCount);
-      const cpass = enc.beginComputePass();
-      cpass.setPipeline(msPipe);
-      cpass.setBindGroup(0, msGroup);
-      cpass.dispatchWorkgroups(Math.ceil(fieldW / 8), Math.ceil(fieldH / 8));
-      cpass.setPipeline(indPipe);
-      cpass.setBindGroup(0, indGroup);
-      cpass.dispatchWorkgroups(1);
-      cpass.end();
-      if (!stagingBusy) enc.copyBufferToBuffer(segCount, 0, segStaging, 0, 4);
-
-      // composite to canvas
-      pass = enc.beginRenderPass({
-        colorAttachments: [{
-          view: ctx.getCurrentTexture().createView(),
-          clearValue: { r: 0.016, g: 0.018, b: 0.03, a: 1 },
-          loadOp: "clear",
-          storeOp: "store",
-        }],
-      });
-      if (view === 0 || view === 2 || view === 4) {
-        pass.setPipeline(fillPipe);
-        pass.setBindGroup(0, fillGroup);
-        pass.draw(3);
-      }
-      if (view === 0 || view === 1) {
-        pass.setPipeline(segPipe);
-        pass.setBindGroup(0, segGroup);
-        pass.drawIndirect(indirectBuf, 0);
-      }
-      if (view === 3) {
-        pass.setPipeline(dotsPipe);
-        pass.setBindGroup(0, dotGroups[sim.currentIndex]);
-        pass.draw(6, sim.count);
-      }
-      if (view === 4) {
-        pass.setPipeline(arrowPipe);
-        pass.setBindGroup(0, arrowGroups[sim.currentIndex]);
-        pass.draw(6, Math.floor(sim.count / 2));
-      }
-      pass.end();
       dev.queue.submit([enc.finish()]);
-
-      if (!stagingBusy) {
-        stagingBusy = true;
-        segStaging.mapAsync(GPUMapMode.READ).then(() => {
-          segsDrawn = Math.min(new Uint32Array(segStaging.getMappedRange())[0], MAX_SEGS);
-          segStaging.unmap();
-          stagingBusy = false;
-        }).catch(() => (stagingBusy = false));
-      }
+      rnd.afterSubmit();
     },
     dispose() {
       sim.dispose();
-      fieldTex.destroy();
-      rp.destroy();
-      segBuf.destroy();
-      segCount.destroy();
-      indirectBuf.destroy();
-      segStaging.destroy();
+      rnd.dispose();
     },
   };
 }

@@ -1,193 +1,372 @@
-// Hearing the lie. Two tunings of the same C-major chord, side by side:
-// pure ratios (4:5:6) on the left, equal temperament on the right. Between
-// each pair of notes hangs a "beat light" that pulses at the true beating
-// rate of their nearest harmonic collision — steady on the just side,
-// shimmering on the tempered side. The third is the casualty: 13.7¢ off,
-// beating ten times a second on every piano you've ever heard.
+// Fig. 2 of Part 4: where a tuning error becomes audible. Each note is drawn
+// as its ladder of harmonics on a log-frequency axis. Wherever a harmonic of
+// one note lands near a harmonic of another, the two beat at the difference
+// of their frequencies; the lamps pulse at that rate (gently) and the strip
+// at the bottom draws the loudness envelope of the strongest collision over
+// one second. Pure ratios line the harmonics up exactly. Equal temperament
+// leaves the fifth beating about once a second and the major third about ten.
 
-import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
-import { getDevice } from "../../lib/gpu";
-import { ShaderView } from "../../lib/shaderCanvas";
-import { Tone, masterBus, unlockAudio, frameGuard, soundHint } from "../../lib/audio";
+import { Shell, type Demo } from "../../lib/demoShell";
+import { unlockAudio, frameGuard } from "../../lib/audio";
+import { COL, Surface, dot, glow, hex, label, mixRgb, rgba, text, type RGB } from "./tuning/draw";
+import { Sound, type Held } from "./tuning/sound";
+import { chips, range, tapBadge, toggle } from "./tuning/ui";
 
-const C4 = 261.63;
-const P = 6; // partials per voice
-
-interface Tuning {
+interface Chord {
+  id: string;
   name: string;
-  freqs: [number, number, number]; // C, E, G
+  just: number[]; // ratios to the root
+  et: number[]; // semitones above the root
+  names: string[];
 }
-const JUSTT: Tuning = { name: "pure ratios 4:5:6", freqs: [C4, C4 * 1.25, C4 * 1.5] };
-const ET: Tuning = {
-  name: "equal temperament",
-  freqs: [C4, C4 * Math.pow(2, 4 / 12), C4 * Math.pow(2, 7 / 12)],
-};
-// nearest harmonic collisions inside a major triad: C–E meet at 5:4,
-// C–G at 3:2, E–G at 6:5
-const PAIRS: [number, number, number, number][] = [
-  [0, 1, 5, 4],
-  [0, 2, 3, 2],
-  [1, 2, 6, 5],
+
+const CHORDS: Chord[] = [
+  { id: "p5", name: "fifth", just: [1, 3 / 2], et: [0, 7], names: ["C", "G"] },
+  { id: "p4", name: "fourth", just: [1, 4 / 3], et: [0, 5], names: ["C", "F"] },
+  { id: "M3", name: "major third", just: [1, 5 / 4], et: [0, 4], names: ["C", "E"] },
+  { id: "m3", name: "minor third", just: [1, 6 / 5], et: [0, 3], names: ["C", "E♭"] },
+  { id: "triad", name: "major triad", just: [1, 5 / 4, 3 / 2], et: [0, 4, 7], names: ["C", "E", "G"] },
 ];
 
-const SCENE = /* wgsl */ `
-fn panel(q: vec2f, side: f32, t: f32, active: f32) -> vec3f {
-  var col = vec3f(0.0);
-  // three voices: vertical strings at x = -0.5, 0, 0.5 within the panel
-  for (var v = 0u; v < 3u; v++) {
-    let x = (f32(v) - 1.0) * 0.5;
-    let shimmer = D[u32(side) * 8u + 6u + 0u]; // overall shimmer of this side
-    let wob = sin(t * 5.0 + f32(v) * 2.1) * 0.006 * shimmer * active;
-    let d = sdSeg(q, vec2f(x + wob, -0.62), vec2f(x - wob, 0.45));
-    let hue = 0.56 + f32(v) * 0.07 + f32(side) * 0.04;
-    col += hsv(hue, 0.6, 1.0) * (glow(d, 0.006) * (0.5 + active * 0.6) + halo(d, 0.006) * 0.25);
-  }
-  // beat lights between the pairs
-  for (var k = 0u; k < 3u; k++) {
-    let bright = D[u32(side) * 8u + k];           // 0..1 pulse
-    let rate = D[u32(side) * 8u + 3u + k];        // beats/sec, for tinting
-    let cx = select(select(0.25, -0.25, k == 0u), 0.0, k == 1u);
-    let cy = select(0.62, 0.78, k == 1u);
-    let p = vec2f(cx, cy);
-    let d = length(q - p);
-    let steady = smoothstep(2.0, 0.2, rate);     // calm pairs glow white-green
-    let tint = mix(vec3f(1.0, 0.3, 0.2), vec3f(0.55, 1.0, 0.7), steady);
-    col += tint * glow(d, 0.035 + 0.025 * bright) * (0.25 + bright) * active;
-    col += tint * halo(d, 0.02) * 0.15 * active;
-  }
-  return col;
+const NOTE_COLORS: RGB[] = [hex("#ffc27a"), hex("#7fb0ff"), hex("#c79bff")];
+const PARTIALS = 8;
+
+interface Hit {
+  a: number;
+  b: number;
+  i: number; // partial number on note a
+  j: number; // partial number on note b
+  fa: number;
+  fb: number;
+  rate: number;
 }
 
-fn scene(uv: vec2f) -> vec3f {
-  let t = uf(0u);
-  let aspect = uf(1u);
-  let activeL = uf(4u);
-  let activeR = uf(5u);
-  var col = vec3f(0.0);
+const PITCH_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
 
-  // divider
-  col += vec3f(0.06, 0.07, 0.12) * glow(abs(uv.x - 0.5), 0.0015);
+export function mountCommaLab(container: HTMLElement): Demo {
+  const shell = new Shell(container, 0.56);
+  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.05 : 0.54));
+  const sound = new Sound({ level: 1 });
+  const badge = tapBadge(container, "tap for sound");
 
-  let scale = 1.25;
-  if (uv.x < 0.5) {
-    let q = vec2f((uv.x - 0.25) * aspect, uv.y - 0.45) * scale * 2.0;
-    col += panel(q, 0.0, t, 0.35 + 0.65 * activeL);
-  } else {
-    let q = vec2f((uv.x - 0.75) * aspect, uv.y - 0.45) * scale * 2.0;
-    col += panel(q, 1.0, t, 0.35 + 0.65 * activeR);
-  }
-  return col * vignette(uv);
-}
-`;
+  let chord = CHORDS[4];
+  let tuning: "just" | "et" = "et";
+  let rootMidi = 60;
+  let held: Held | null = null;
+  let ab = 0;
+  // which collision the envelope strip shows: clicked, or the most audible
+  let pinned: { a: number; b: number; i: number; j: number } | null = null;
+  let lamps: { x: number; y: number; hit: Hit }[] = [];
 
-export async function mountCommaLab(container: HTMLElement): Promise<Demo> {
-  const dev = await getDevice();
-  const shell = new Shell(container, 0.52);
-  if (!dev) return gpuMissing(container);
-  const view = new ShaderView(dev, shell.canvas, SCENE, 16);
-  soundHint(container);
+  const rootHz = (): number => 440 * Math.pow(2, (rootMidi - 69) / 12);
+  const freqs = (): number[] =>
+    tuning === "just" ? chord.just.map((r) => rootHz() * r) : chord.et.map((s) => rootHz() * Math.pow(2, s / 12));
 
-  // one oscillator bank per side, three voices of P gentle partials each
-  const mkBank = (tuning: Tuning): { gain: Tone.Gain; oscs: Tone.Oscillator[] } => {
-    const gain = new Tone.Gain(0).connect(masterBus());
-    const oscs = tuning.freqs.map((f) => {
-      const o = new Tone.Oscillator(f, "sine").connect(gain);
-      o.partials = Array.from({ length: P }, (_, k) => 1 / (k + 1) ** 1.4);
-      return o;
-    });
-    return { gain, oscs };
-  };
-  const left = mkBank(JUSTT);
-  const right = mkBank(ET);
-
-  let activeL = 0;
-  let activeR = 0;
-  let alternating = 0;
-
-  const setSide = (side: "just" | "et" | "off"): void => {
-    activeL = side === "just" ? 1 : 0;
-    activeR = side === "et" ? 1 : 0;
-    for (const bank of [left, right]) {
-      for (const o of bank.oscs) if (o.state !== "started") o.start();
+  const hits = (): Hit[] => {
+    const f = freqs();
+    const out: Hit[] = [];
+    for (let a = 0; a < f.length; a++) {
+      for (let b = a + 1; b < f.length; b++) {
+        for (let i = 1; i <= PARTIALS; i++) {
+          for (let j = 1; j <= PARTIALS; j++) {
+            const fa = f[a] * i;
+            const fb = f[b] * j;
+            if (Math.abs(1200 * Math.log2(fb / fa)) < 45) out.push({ a, b, i, j, fa, fb, rate: Math.abs(fa - fb) });
+          }
+        }
+      }
     }
-    left.gain.gain.rampTo(activeL * 0.16, 0.12);
-    right.gain.gain.rampTo(activeR * 0.16, 0.12);
+    return out.sort((x, y) => x.i + x.j - (y.i + y.j));
   };
-  const guard = frameGuard(() => {
-    clearInterval(alternating);
-    setSide("off");
-  });
 
-  shell.button("▶ pure 4:5:6", () => {
-    void unlockAudio().then(() => {
-      clearInterval(alternating);
-      setSide(activeL ? "off" : "just");
-    });
-  });
-  shell.button("▶ equal-tempered", () => {
-    void unlockAudio().then(() => {
-      clearInterval(alternating);
-      setSide(activeR ? "off" : "et");
-    });
-  });
-  shell.button("alternate A/B", () => {
-    void unlockAudio().then(() => {
-      clearInterval(alternating);
-      let onJust = true;
-      setSide("just");
-      alternating = window.setInterval(() => {
-        onJust = !onJust;
-        setSide(onJust ? "just" : "et");
-      }, 1600);
-    });
-  });
-  shell.button("silence", () => {
-    clearInterval(alternating);
-    setSide("off");
-  });
-
-  // beat rates per pair per side (fixed — the physics doesn't change)
-  const beatRate = (tu: Tuning, pi: number): number => {
-    const [i, j, hi, hj] = PAIRS[pi];
-    return Math.abs(tu.freqs[i] * hi - tu.freqs[j] * hj);
+  const stopAB = (): void => {
+    clearInterval(ab);
+    ab = 0;
+    abBtn.set(false);
   };
+  const silence = (): void => {
+    stopAB();
+    held?.release(0.3);
+    held = null;
+    play.set(false);
+  };
+  const guard = frameGuard(silence);
+
+  const retune = (glide = 0.18): void => {
+    if (held) held.set(freqs(), glide);
+  };
+  const start = (): void => {
+    badge.hide();
+    void unlockAudio().then(() => {
+      held?.release(0.1);
+      held = sound.hold(freqs(), { timbre: "organ", level: 0.05, attack: 0.15, cutoff: 4500 });
+      play.set(true);
+    });
+  };
+
+  chips(shell.controls, {
+    label: "interval",
+    options: CHORDS.map((c) => ({ value: c.id, text: c.name })),
+    value: chord.id,
+    onChange: (id) => {
+      chord = CHORDS.find((c) => c.id === id)!;
+      pinned = null;
+      if (held) {
+        // voice count may change: restart the held chord
+        held.release(0.08);
+        held = sound.hold(freqs(), { timbre: "organ", level: 0.05, attack: 0.08, cutoff: 4500 });
+      }
+    },
+  });
+  const tuneChips = chips<"just" | "et">(shell.controls, {
+    label: "tuning",
+    options: [
+      { value: "just", text: "pure ratios" },
+      { value: "et", text: "equal temperament" },
+    ],
+    value: tuning,
+    onChange: (v) => {
+      tuning = v;
+      retune();
+    },
+  });
+  const br = document.createElement("div");
+  br.className = "tn-break";
+  shell.controls.appendChild(br);
+  const play = toggle(shell.controls, ["▶ hold the chord", "■ stop"], (on) => {
+    if (on) start();
+    else silence();
+  });
+  const abBtn = toggle(shell.controls, ["A/B every 2 s", "A/B on"], (on) => {
+    if (!on) {
+      stopAB();
+      return;
+    }
+    if (!held) start();
+    ab = window.setInterval(() => {
+      tuning = tuning === "just" ? "et" : "just";
+      tuneChips.set(tuning);
+      retune(0.12);
+    }, 2000);
+  });
+  range(shell.controls, {
+    label: "root note",
+    min: 48,
+    max: 72,
+    step: 1,
+    value: rootMidi,
+    format: (v) => `${PITCH_NAMES[v % 12]}${Math.floor(v / 12) - 1} · ${(440 * Math.pow(2, (v - 69) / 12)).toFixed(1)} Hz`,
+    onInput: (v) => {
+      rootMidi = v;
+      retune(0.08);
+    },
+  });
 
   shell.setInfo(() => {
-    const thirdsBeat = beatRate(ET, 0).toFixed(1);
-    const fifthBeat = beatRate(ET, 1).toFixed(1);
-    return `tempered third beats ${thirdsBeat}×/s · tempered fifth only ${fifthBeat}×/s · pure side: 0`;
+    const hs = hits().filter((h) => h.i + h.j <= 12);
+    if (!hs.length) return "no harmonics close enough to beat";
+    const main = hs.slice(0, 3).map((h) => {
+      const n = noteNames();
+      const r = h.rate < 0.01 ? "locked, 0 beats/s" : `${h.rate.toFixed(h.rate < 2 ? 2 : 1)} beats/s`;
+      return `${n[h.a]}×${h.i} vs ${n[h.b]}×${h.j}: ${r}`;
+    });
+    return main.join(" · ");
   });
 
-  const phases = new Float32Array(6);
-  let last = performance.now();
+  const mainHit = (hs: Hit[], fMax: number): Hit | null => {
+    const vis = hs.filter((x) => x.fa <= fMax && x.fb <= fMax);
+    if (pinned) {
+      const p = pinned;
+      const m = vis.find((x) => x.a === p.a && x.b === p.b && x.i === p.i && x.j === p.j);
+      if (m) return m;
+    }
+    // loudest beating: the weaker partial's level times the rate (fast beats
+    // above ~12/s blur into roughness, so cap there)
+    let best: Hit | null = null;
+    let score = -1;
+    for (const x of vis) {
+      const s = Math.min(1 / x.i, 1 / x.j) * Math.min(x.rate, 12);
+      if (s > score + 1e-9) {
+        score = s;
+        best = x;
+      }
+    }
+    return best;
+  };
+
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = surf.local(e);
+    let best: Hit | null = null;
+    let bd = 22;
+    for (const l of lamps) {
+      const d = Math.hypot(l.x - p.x, l.y - p.y);
+      if (d < bd) {
+        bd = d;
+        best = l.hit;
+      }
+    }
+    if (best) pinned = { a: best.a, b: best.b, i: best.i, j: best.j };
+  });
+
+  const noteNames = (): string[] => {
+    const shift = rootMidi % 12;
+    return chord.et.map((s) => PITCH_NAMES[(shift + s) % 12]);
+  };
+
+  const t0 = performance.now();
   return {
     frame() {
       shell.tick();
       guard.pulse();
-      const now = performance.now();
-      const dt = (now - last) / 1000;
-      last = now;
+      const t = (performance.now() - t0) / 1000;
+      surf.fit();
+      const { ctx, w, h } = surf;
+      surf.clear();
+      const narrow = w < 600;
+      const f = freqs();
+      const names = noteNames();
+      const hs = hits();
 
-      for (let side = 0; side < 2; side++) {
-        const tu = side === 0 ? JUSTT : ET;
-        let shimmer = 0;
-        for (let k = 0; k < 3; k++) {
-          const rate = beatRate(tu, k);
-          phases[side * 3 + k] += 2 * Math.PI * rate * dt;
-          const pulse = rate < 0.05 ? 1 : 0.5 + 0.5 * Math.cos(phases[side * 3 + k]);
-          view.data[side * 8 + k] = pulse;
-          view.data[side * 8 + 3 + k] = rate;
-          shimmer += Math.min(rate / 12, 1);
-        }
-        view.data[side * 8 + 6] = shimmer / 3;
+      // ---- harmonic ladders ----
+      const padL = narrow ? 34 : 64;
+      const padR = 18;
+      const top = 34;
+      const ladderH = h * (narrow ? 0.5 : 0.56);
+      const fMin = rootHz() * 0.88;
+      const fMax = rootHz() * 8.6;
+      const X = (hz: number): number => padL + ((w - padL - padR) * Math.log(hz / fMin)) / Math.log(fMax / fMin);
+      const rows = f.length;
+      const rowH = (ladderH - top) / rows;
+      const rowY = (r: number): number => top + rowH * (r + 0.5);
+
+      // octave gridlines with Hz labels
+      for (let o = 0; o < 4; o++) {
+        const hz = rootHz() * Math.pow(2, o);
+        const x = X(hz);
+        ctx.strokeStyle = "rgba(122, 140, 200, 0.10)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, top - 8);
+        ctx.lineTo(x, ladderH + 4);
+        ctx.stroke();
+        text(ctx, `${Math.round(hz)} Hz`, x + 3, top - 12, { size: 9.5, color: COL.dim, mono: true, alpha: 0.7 });
       }
-      view.uniforms[4] = activeL;
-      view.uniforms[5] = activeR;
-      view.draw();
+
+      for (let r = 0; r < rows; r++) {
+        const col = NOTE_COLORS[r];
+        const y = rowY(r);
+        text(ctx, names[r], narrow ? 6 : 14, y + 4, { size: narrow ? 12 : 14, color: rgba(col, 1), weight: 700 });
+        if (!narrow)
+          text(ctx, `${f[r].toFixed(1)}`, 14, y + 18, { size: 9, color: COL.dim, mono: true });
+        ctx.strokeStyle = rgba(col, 0.12);
+        ctx.beginPath();
+        ctx.moveTo(padL - 6, y);
+        ctx.lineTo(w - padR, y);
+        ctx.stroke();
+        for (let k = 1; k <= PARTIALS; k++) {
+          const hz = f[r] * k;
+          if (hz > fMax) break;
+          const x = X(hz);
+          const amp = 1 / k;
+          const hh = rowH * 0.36 * (0.35 + 0.65 * amp);
+          ctx.strokeStyle = rgba(col, 0.85);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, y - hh);
+          ctx.lineTo(x, y + hh);
+          ctx.stroke();
+          glow(ctx, x, y, hh * 1.6, col, 0.18);
+          if (rowH > 34 || k <= 3)
+            text(ctx, String(k), x, y + hh + 11, { size: 9, color: rgba(col, 0.7), align: "center", mono: true });
+        }
+      }
+
+      // collisions: connectors and beat lamps
+      lamps = [];
+      for (const hit of hs) {
+        if (hit.fa > fMax || hit.fb > fMax) continue;
+        const xa = X(hit.fa);
+        const xb = X(hit.fb);
+        const ya = rowY(hit.a);
+        const yb = rowY(hit.b);
+        const locked = hit.rate < 0.01;
+        const col: RGB = locked ? hex("#7dd6a0") : hit.rate < 2 ? hex("#e8d27a") : hex("#ff6b6b");
+        ctx.strokeStyle = rgba(col, 0.55);
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash(locked ? [] : [3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xa, ya);
+        ctx.lineTo(xb, yb);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const mx = (xa + xb) / 2;
+        const my = (ya + yb) / 2;
+        const pulse = locked ? 1 : 0.72 + 0.28 * Math.cos(2 * Math.PI * hit.rate * t);
+        dot(ctx, mx, my, 3.2, col, pulse, 4.5);
+        lamps.push({ x: mx, y: my, hit });
+        if (hit.i + hit.j <= 9 || rows === 2) {
+          const s = locked ? "0" : hit.rate.toFixed(hit.rate < 2 ? 2 : 1);
+          label(ctx, `${s}/s`, mx, my - 13, { size: 9.5, mono: true, color: rgba(mixRgb(col, [255, 255, 255], 0.4), 1) });
+        }
+      }
+
+      // ---- the strongest collision as a loudness envelope over one second ----
+      const main = mainHit(hs, fMax);
+      if (main) {
+        // ring the collision the strip is showing
+        const mx = (X(main.fa) + X(main.fb)) / 2;
+        const my = (rowY(main.a) + rowY(main.b)) / 2;
+        ctx.strokeStyle = "rgba(255, 220, 190, 0.6)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(mx, my, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      const ey0 = ladderH + (narrow ? 44 : 40);
+      const ey1 = h - 22;
+      const eh = ey1 - ey0;
+      const ex0 = padL;
+      const ex1 = w - padR;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
+      ctx.fillRect(ex0, ey0, ex1 - ex0, eh);
+      if (main) {
+        const a1 = 1 / main.i;
+        const a2 = 1 / main.j;
+        const locked = main.rate < 0.01;
+        const col: RGB = locked ? hex("#7dd6a0") : hex("#ff8a6e");
+        const mid = ey0 + eh / 2;
+        const scale = (eh / 2 - 6) / (a1 + a2);
+        ctx.beginPath();
+        const cols = Math.max(60, Math.floor(ex1 - ex0));
+        for (let i = 0; i <= cols; i++) {
+          const tt = i / cols; // seconds, one-second window
+          const env = Math.sqrt(a1 * a1 + a2 * a2 + 2 * a1 * a2 * Math.cos(2 * Math.PI * main.rate * (tt - t * 0.25)));
+          const x = ex0 + (ex1 - ex0) * tt;
+          const y = mid - env * scale;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        for (let i = cols; i >= 0; i--) {
+          const tt = i / cols;
+          const env = Math.sqrt(a1 * a1 + a2 * a2 + 2 * a1 * a2 * Math.cos(2 * Math.PI * main.rate * (tt - t * 0.25)));
+          ctx.lineTo(ex0 + (ex1 - ex0) * tt, mid + env * scale);
+        }
+        ctx.closePath();
+        ctx.fillStyle = rgba(col, 0.22);
+        ctx.fill();
+        ctx.strokeStyle = rgba(col, 0.85);
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        const desc = locked
+          ? `${names[main.a]}×${main.i} and ${names[main.b]}×${main.j} coincide: steady`
+          : `${names[main.a]}×${main.i} vs ${names[main.b]}×${main.j}: ${main.rate.toFixed(main.rate < 2 ? 2 : 1)} swells per second`;
+        text(ctx, desc, ex0, ey0 - 8, { size: 10.5, color: rgba(mixRgb(col, [255, 255, 255], 0.35), 1), mono: true });
+        text(ctx, "one second →", ex1, ey1 + 14, { size: 9.5, color: COL.dim, align: "right" });
+        text(ctx, "click a lamp to show a different pair", ex0, ey1 + 14, { size: 9.5, color: COL.dim });
+      }
     },
     dispose() {
-      clearInterval(alternating);
-      setSide("off");
+      silence();
     },
   };
 }

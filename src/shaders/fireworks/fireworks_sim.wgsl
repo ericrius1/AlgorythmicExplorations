@@ -1,15 +1,22 @@
+// Simulation for the fireworks: four compute entry points that run in this
+// order every frame (beginFrame, simulateCompact, emitParticles, finishFrame).
+// Particles live in two buffers. simulateCompact reads last frame's list and
+// appends the survivors to the other one; emitParticles appends new particles
+// after them; finishFrame publishes the count for the indirect draw and for
+// next frame's indirect dispatch.
+
 struct Params {
-  viewport: vec4f,
-  timeMouse: vec4f,
-  scene: vec4f,
-  launch: vec4f,
-  simA: vec4f,
-  simB: vec4f,
-  renderA: vec4f,
-  renderB: vec4f,
-  systemA: vec4f,
-  systemB: vec4f,
-  debugA: vec4f,
+  viewport: vec4f,   // width, height, aspect, image aspect
+  timeMouse: vec4f,  // time, dt, mouse x, mouse y
+  scene: vec4f,      // parallax strength, depth power, exposure, unused
+  launch: vec4f,     // last burst uv (xy), unused
+  simA: vec4f,       // seconds since last burst, capacity, gravity, drag
+  simB: vec4f,       // wind, curl grid scale, curl strength, shell spin
+  renderA: vec4f,    // unused, spark size, rocket size, trail stretch
+  renderB: vec4f,    // smoke size, depth occlusion, glow, unused
+  systemA: vec4f,    // unused, collapse delay, collapse duration, collapse strength
+  systemB: vec4f,    // hash cell size, stickiness, spiral strength, return scatter
+  flash: vec4f,      // last burst colour (rgb), unused
 }
 
 struct Particle {
@@ -294,14 +301,19 @@ fn emit_trail(cmd: EmitCommand, local: u32) -> Particle {
     size = 0.0024 + rand(seed, 6.0) * 0.0034;
     kind = select(KIND_SPARK, KIND_SMOKE, rand(seed, 7.0) > 0.82);
     level = 0.0;
-  } else if (local < 3u) {
+  } else if (local < 4u) {
     let angle = baseAngle + (rand(seed, 1.0) * 1.1 - 0.55);
     let speed = 0.035 + rand(seed, 2.0) * 0.095;
-    pos += vec2f(rand(seed, 3.0) * 0.012 - 0.006, rand(seed, 4.0) * 0.012 - 0.006);
+    // spread the sparks back along the stretch the rocket covered since the
+    // last trail command (cmd.homeParams.w seconds), so the trail is a
+    // continuous streak instead of a row of dots
+    pos -= cmd.velLifeSize.xy * rand(seed, 8.0) * cmd.homeParams.w;
+    pos += vec2f(rand(seed, 3.0) * 0.006 - 0.003, rand(seed, 4.0) * 0.006 - 0.003);
     vel = vec2f(cos(angle) * speed + rand(seed, 5.0) * 0.05 - 0.025, sin(angle) * speed);
     life = 0.42 + rand(seed, 6.0) * 0.48;
     size = 0.0018 + rand(seed, 7.0) * 0.0026;
   } else {
+    pos -= cmd.velLifeSize.xy * rand(seed, 8.0) * cmd.homeParams.w;
     vel = vec2f(rand(seed, 1.0) * 0.04 - 0.02, rand(seed, 2.0) * 0.06 - 0.015);
     life = 0.7 + rand(seed, 3.0) * 0.65;
     size = 0.007 + rand(seed, 4.0) * 0.007;
@@ -455,8 +467,9 @@ fn beginFrame(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x != 0u) {
     return;
   }
+  // overflow is never reset: it counts every append that didn't fit since
+  // the page loaded, so a readback can't miss one
   atomicStore(&counters.write, 0u);
-  atomicStore(&counters.overflow, 0u);
   drawArgs.vertexCount = 6u;
   drawArgs.instanceCount = 0u;
   drawArgs.firstVertex = 0u;

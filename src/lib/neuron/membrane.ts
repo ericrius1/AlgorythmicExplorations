@@ -1,44 +1,46 @@
-// Simplified Hodgkin–Huxley-style membrane dynamics for teaching demos.
-// Not a research model — tuned for readable voltage traces and clear phases.
+// Hodgkin–Huxley membrane, the 1952 squid giant axon model in the modern
+// sign convention (rest near −65 mV, depolarization positive). Units: mV, ms,
+// µF/cm², mS/cm², µA/cm². Temperature is 6.3 °C, the temperature of the
+// voltage-clamp experiments, so the rate constants are used unscaled.
+//
+// HH lumped every non-Na⁺/K⁺ current into one leak with E = −54.4 mV. The
+// demos split that leak into a K⁺ part and a Na⁺ part with the same total
+// conductance and the same reversal, so a reader can pull on each ion
+// separately. At the default settings the two are identical to classic HH.
 
-export const REST = -70; // mV resting potential
-export const THRESH = -55;
-export const PEAK = 40;
-export const REFRACTORY_MS = 2.5;
+export const E_NA = 50;
+export const E_K = -77;
 
-export interface MembraneState {
-  v: number; // membrane potential (mV)
-  n: number; // K+ activation gate (0–1)
-  m: number; // Na+ activation gate (0–1)
-  h: number; // Na+ inactivation gate (0–1)
-  refractory: number; // ms remaining
+export interface HHParams {
+  cm: number;
+  gNa: number; // voltage-gated Na⁺, maximum
+  gK: number; // voltage-gated K⁺, maximum
+  gLeakK: number; // always-open K⁺ leak
+  gLeakNa: number; // always-open Na⁺ leak
 }
 
-export interface MembraneParams {
-  gNa: number; // Na+ conductance scale
-  gK: number; // K+ conductance scale
-  gLeak: number;
-  eNa: number;
-  eK: number;
-  eLeak: number;
-  cm: number; // membrane capacitance (µF/cm² scale)
-}
-
-export const DEFAULT_PARAMS: MembraneParams = {
+// gLeakK + gLeakNa = 0.3 mS/cm² and their weighted reversal is −54.4 mV,
+// HH's original leak.
+export const HH: HHParams = {
+  cm: 1,
   gNa: 120,
   gK: 36,
-  gLeak: 0.3,
-  eNa: 55,
-  eK: -77,
-  eLeak: -54.4,
-  cm: 1,
+  gLeakK: 0.24661,
+  gLeakNa: 0.05339,
 };
 
-// HH α/β rate functions (classic Hodgkin–Huxley, 1952).
+export interface HHState {
+  v: number;
+  m: number; // Na⁺ activation (fast)
+  h: number; // Na⁺ inactivation (slow)
+  n: number; // K⁺ activation (slow)
+}
+
+// α/β rate constants, 1/ms. The removable singularities in αm and αn are
+// patched with their limits.
 function alphaM(v: number): number {
   const x = v + 40;
-  if (Math.abs(x) < 1e-6) return 1;
-  return (0.1 * x) / (1 - Math.exp(-x / 10));
+  return Math.abs(x) < 1e-6 ? 1 : (0.1 * x) / (1 - Math.exp(-x / 10));
 }
 function betaM(v: number): number {
   return 4 * Math.exp(-(v + 65) / 18);
@@ -51,115 +53,119 @@ function betaH(v: number): number {
 }
 function alphaN(v: number): number {
   const x = v + 55;
-  if (Math.abs(x) < 1e-6) return 0.1;
-  return (0.01 * x) / (1 - Math.exp(-x / 10));
+  return Math.abs(x) < 1e-6 ? 0.1 : (0.01 * x) / (1 - Math.exp(-x / 10));
 }
 function betaN(v: number): number {
   return 0.125 * Math.exp(-(v + 65) / 80);
 }
 
-function gatesAt(v: number): { m: number; h: number; n: number } {
-  const m = alphaM(v) / (alphaM(v) + betaM(v));
-  const h = alphaH(v) / (alphaH(v) + betaH(v));
-  const n = alphaN(v) / (alphaN(v) + betaN(v));
-  return { m, h, n };
+export function steadyGates(v: number): { m: number; h: number; n: number } {
+  const am = alphaM(v), bm = betaM(v);
+  const ah = alphaH(v), bh = betaH(v);
+  const an = alphaN(v), bn = betaN(v);
+  return { m: am / (am + bm), h: ah / (ah + bh), n: an / (an + bn) };
 }
 
-function totalIonicCurrent(v: number, m: number, h: number, n: number, p: MembraneParams): number {
-  const iNa = p.gNa * m * m * m * h * (v - p.eNa);
-  const iK = p.gK * n * n * n * n * (v - p.eK);
-  const iLeak = p.gLeak * (v - p.eLeak);
-  return iNa + iK + iLeak;
+export interface Currents {
+  iNa: number; // voltage-gated Na⁺ (negative = inward)
+  iK: number; // voltage-gated K⁺ (positive = outward)
+  iLeakNa: number;
+  iLeakK: number;
+  gNa: number; // open conductances, mS/cm²
+  gK: number;
 }
 
-export function restingState(p: MembraneParams = DEFAULT_PARAMS): MembraneState {
-  // Find V where ionic currents balance (fixed point for the HH gates).
-  let v = REST;
-  for (let i = 0; i < 24; i++) {
-    const { m, h, n } = gatesAt(v);
-    const i = totalIonicCurrent(v, m, h, n, p);
-    v -= i * 0.15;
+export function currents(s: HHState, p: HHParams): Currents {
+  const gNa = p.gNa * s.m * s.m * s.m * s.h;
+  const gK = p.gK * s.n * s.n * s.n * s.n;
+  return {
+    iNa: gNa * (s.v - E_NA),
+    iK: gK * (s.v - E_K),
+    iLeakNa: p.gLeakNa * (s.v - E_NA),
+    iLeakK: p.gLeakK * (s.v - E_K),
+    gNa,
+    gK,
+  };
+}
+
+function netCurrentAtRest(v: number, p: HHParams): number {
+  const g = steadyGates(v);
+  const c = currents({ v, ...g }, p);
+  return c.iNa + c.iK + c.iLeakNa + c.iLeakK;
+}
+
+// The voltage where the steady-state currents cancel. With a strong Na⁺ leak
+// that point can exist and still be unstable (the cell fires on its own);
+// stepping the model is the only way to find out.
+export function restingVoltage(p: HHParams = HH): number {
+  let lo = -100;
+  let hi = -30;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (netCurrentAtRest(mid, p) > 0) hi = mid;
+    else lo = mid;
   }
-  const { m, h, n } = gatesAt(v);
-  return { v, m, h, n, refractory: 0 };
+  return (lo + hi) / 2;
 }
 
-function clamp01(x: number): number {
-  return Math.min(1, Math.max(0, x));
+export function restingState(p: HHParams = HH): HHState {
+  const v = restingVoltage(p);
+  return { v, ...steadyGates(v) };
 }
 
-// One integration step. `iSyn` is injected synaptic current (µA/cm² scale).
-export function stepMembrane(
-  s: MembraneState,
-  dt: number,
-  p: MembraneParams,
-  iSyn = 0,
-): MembraneState {
-  const steps = 8;
-  const h = dt / steps;
-  let state = s;
+// One step of `dt` ms with an injected current `iExt` (µA/cm², positive
+// depolarizes). Gates use exponential Euler (exact for a fixed voltage) and
+// the voltage uses the same trick on its conductance form, which stays stable
+// at any step size. Mutates `s`.
+export function stepHH(s: HHState, dt: number, p: HHParams, iExt = 0): void {
+  const v = s.v;
+  const am = alphaM(v), bm = betaM(v);
+  const ah = alphaH(v), bh = betaH(v);
+  const an = alphaN(v), bn = betaN(v);
+  const relax = (x: number, a: number, b: number): number => {
+    const k = a + b;
+    const inf = a / k;
+    return inf + (x - inf) * Math.exp(-dt * k);
+  };
+  s.m = relax(s.m, am, bm);
+  s.h = relax(s.h, ah, bh);
+  s.n = relax(s.n, an, bn);
 
-  for (let i = 0; i < steps; i++) {
-    if (state.refractory > 0) {
-      state = {
-        ...state,
-        refractory: Math.max(0, state.refractory - h * 1000),
-        v: state.v + (REST - state.v) * (1 - Math.exp(-h * 8)),
-      };
-      continue;
-    }
-
-    const { v, m, h: hg, n } = state;
-    const iNa = p.gNa * m * m * m * hg * (v - p.eNa);
-    const iK = p.gK * n * n * n * n * (v - p.eK);
-    const iLeak = p.gLeak * (v - p.eLeak);
-    const dv = (-(iNa + iK + iLeak) + iSyn) / p.cm;
-
-    const dm = alphaM(v) * (1 - m) - betaM(v) * m;
-    const dh = alphaH(v) * (1 - hg) - betaH(v) * hg;
-    const dn = alphaN(v) * (1 - n) - betaN(v) * n;
-
-    let nv = v + dv * h * 100; // scale dt for visible dynamics
-    let fired = false;
-    if (nv >= THRESH && v < THRESH) {
-      nv = PEAK;
-      fired = true;
-    }
-
-    state = {
-      v: Math.max(-95, Math.min(PEAK, nv)),
-      m: clamp01(m + dm * h * 100),
-      h: clamp01(hg + dh * h * 100),
-      n: clamp01(n + dn * h * 100),
-      refractory: fired ? REFRACTORY_MS : 0,
-    };
-  }
-
-  return state;
+  const gNa = p.gNa * s.m * s.m * s.m * s.h + p.gLeakNa;
+  const gK = p.gK * s.n * s.n * s.n * s.n + p.gLeakK;
+  const g = gNa + gK;
+  const vInf = (gNa * E_NA + gK * E_K + iExt) / g;
+  s.v = vInf + (v - vInf) * Math.exp((-dt * g) / p.cm);
 }
 
-// Leaky integrate-and-fire for network demos (faster, cheaper).
-export interface LIFNeuron {
+// Leaky integrate-and-fire, for the circuit figures: a capacitor and a leak,
+// plus a rule that says "at threshold, call it a spike and reset". Voltages
+// in mV, times in ms. Synaptic input arrives as instant voltage kicks.
+export interface LIFCell {
   v: number;
-  refractory: number;
+  refractory: number; // ms left
 }
 
-export function stepLIF(
-  n: LIFNeuron,
-  dt: number,
-  input: number,
-  tau = 12,
-): { state: LIFNeuron; fired: boolean } {
-  if (n.refractory > 0) {
-    return {
-      state: { v: REST, refractory: Math.max(0, n.refractory - dt * 1000) },
-      fired: false,
-    };
+export const LIF = {
+  rest: -70,
+  threshold: -55,
+  reset: -70,
+  tau: 20, // ms
+  refractory: 2, // ms
+};
+
+// Returns true if the cell fired during this step.
+export function stepLIF(c: LIFCell, dt: number, drive = 0, tau = LIF.tau): boolean {
+  if (c.refractory > 0) {
+    c.refractory = Math.max(0, c.refractory - dt);
+    c.v = LIF.reset;
+    return false;
   }
-  const dv = (-(n.v - REST) + input) / tau;
-  let v = n.v + dv * dt * 1000;
-  if (v >= THRESH) {
-    return { state: { v: REST, refractory: REFRACTORY_MS }, fired: true };
+  c.v += ((LIF.rest - c.v + drive) / tau) * dt;
+  if (c.v >= LIF.threshold) {
+    c.v = LIF.reset;
+    c.refractory = LIF.refractory;
+    return true;
   }
-  return { state: { v, refractory: 0 }, fired: false };
+  return false;
 }

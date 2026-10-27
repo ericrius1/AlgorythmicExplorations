@@ -30,20 +30,29 @@ export interface LavaKnobs {
   coolRate: number;
   diffusion: number;
   tension: number;
+  drag: number;
+  heatSpread: number;
+  heatFloor: number;
 }
 
+// Tuned for a slow cycle: the pool warms from the whole floor (hottest over
+// the middle of the coil), a fat plume lifts off every ten seconds or so,
+// and the water's drag keeps it to a calm drift.
 export const DEFAULT_KNOBS: LavaKnobs = {
-  gravity: 3.0,
+  gravity: 1.5,
   stiffness: 80.0,
   restDensity: 2.4,
   nearStiffness: 260.0,
-  xsph: 0.22,
+  xsph: 0.32,
   beta: 0.2,
-  buoyancy: 5.0,
-  heatRate: 1.5,
-  coolRate: 1.1,
-  diffusion: 0.02,
-  tension: 2.0,
+  buoyancy: 3.2,
+  heatRate: 1.0,
+  coolRate: 0.5,
+  diffusion: 0.25,
+  tension: 4.5,
+  drag: 1.5,
+  heatSpread: 0.6,
+  heatFloor: 0.5,
 };
 
 export function vesselHalfWidth(y: number): number {
@@ -87,7 +96,7 @@ export class LavaSim {
     this.dev = dev;
     this.count = count;
     this.sort = new GridSort2(dev);
-    this.params = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.params = dev.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const buf = (type: GPUBufferBindingType): GPUBindGroupLayoutEntry["buffer"] => ({ type });
     this.layout = dev.createBindGroupLayout({
       entries: [
@@ -133,7 +142,7 @@ export class LavaSim {
   }
 
   writeParams(knobs: LavaKnobs, dt: number, mouse: [number, number], mouseVel: [number, number]): void {
-    const dv = new DataView(new ArrayBuffer(112));
+    const dv = new DataView(new ArrayBuffer(128));
     dv.setUint32(0, this.count, true);
     dv.setUint32(4, GRID, true);
     dv.setFloat32(8, H, true);
@@ -161,6 +170,9 @@ export class LavaSim {
     dv.setFloat32(96, LAMP.floorY, true);
     dv.setFloat32(100, LAMP.topY, true);
     dv.setFloat32(104, knobs.tension, true);
+    dv.setFloat32(108, knobs.drag, true);
+    dv.setFloat32(112, knobs.heatSpread, true);
+    dv.setFloat32(116, knobs.heatFloor, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 

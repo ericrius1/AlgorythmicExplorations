@@ -1,26 +1,30 @@
 // Part five: a progressive path tracer, aimed at the Cornell box.
-// fsTrace adds `spp` fresh Monte Carlo samples per pixel per frame on top of
-// the running sum in prevTex (rgba32float: rgb = radiance sum, a = sample
-// count); fsDisplay divides, tonemaps, and shows the estimate so far.
+// fsTrace adds `spp` fresh Monte Carlo samples per pixel on top of the running
+// sum in prevTex (rgba32float: rgb = Σ radiance, a = Σ luminance², which the
+// noise readout uses). fsDisplay divides by the sample count, upsamples
+// bilinearly to the canvas, and hands linear HDR to PostFX for tone mapping.
 //
-// The scene is analytic and tiny: five walls, a ceiling light you can move
-// and resize, one diffuse sphere, and one sphere whose material is a knob
-// (diffuse / mirror / glossy). Everything else is the estimator.
+// The scene is analytic and tiny: the box (floor, ceiling, three walls, open
+// at the front), a ceiling lamp you can move and resize, one matte sphere and
+// one sphere whose material is a knob (matte / mirror / glossy). In the hero
+// the box also sits on a dark floor, so light spills out of the opening.
 
 struct TraceParams {
-  res: vec2f,        // accumulation buffer px
-  frame: f32,        // frame index since last reset (0 = discard prevTex)
-  spp: f32,          // samples added per frame
-  lightPos: vec2f,   // light center, xz on the ceiling
-  lightSize: vec2f,  // light half-extents, xz
+  res: vec2f,        // trace buffer size, px
+  frame: f32,        // frames since the last reset (0 = start a fresh sum)
+  spp: f32,          // samples added per pixel this frame
+  lightPos: vec2f,   // lamp centre, xz on the ceiling
+  lightSize: vec2f,  // lamp half-extents, xz
   maxBounces: f32,
-  nee: f32,          // 1: sample the light directly at every diffuse bounce
-  matB: f32,         // sphere B: 0 diffuse · 1 mirror · 2 glossy
-  rough: f32,        // glossy cone width
-  exposure: f32,
-  lightBoost: f32,
-  _p0: f32,
-  _p1: f32,
+  nee: f32,          // 1: sample the lamp directly at every diffuse bounce
+  matB: f32,         // sphere B: 0 matte · 1 mirror · 2 glossy
+  rough: f32,        // glossy blur
+  count: f32,        // samples per pixel in the sum being displayed
+  lightLe: f32,      // lamp radiance
+  stage: f32,        // 1: the box sits on an outside floor
+  seed: f32,         // per-frame RNG seed
+  eye: vec4f,        // camera position · w: focal length
+  look: vec4f,       // look-at point · w: exposure
 }
 
 @group(0) @binding(0) var<uniform> TP: TraceParams;
@@ -41,40 +45,58 @@ fn vsFullC(@builtin(vertex_index) vi: u32) -> FullOut {
   return out;
 }
 
-// ---- rng: one u32 of state per pixel-sample, PCG-style ----------------------------
+// ---- rng: PCG hash, seeded from pixel and frame ----------------------------------
+
+fn pcg(v: u32) -> u32 {
+  let s = v * 747796405u + 2891336453u;
+  let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+  return (w >> 22u) ^ w;
+}
 
 var<private> rngState: u32;
 
 fn rnd() -> f32 {
-  rngState = rngState * 747796405u + 2891336453u;
-  var w = ((rngState >> ((rngState >> 28u) + 4u)) ^ rngState) * 277803737u;
-  w = (w >> 22u) ^ w;
-  return f32(w) / 4294967296.0;
+  rngState = pcg(rngState);
+  return f32(rngState >> 8u) / 16777216.0; // 24 bits, so it never rounds up to 1
 }
 
 // ---- scene ------------------------------------------------------------------------
-// the box: x ∈ [−1,1], y ∈ [0,2], z ∈ [−1,1]; camera looks down −z.
+// the box: x ∈ [−1,1], y ∈ [0,2], z ∈ [−1,1], open toward +z
 
-const EMIT_SCALE: f32 = 1.0;
+const WHITE: vec3f = vec3f(0.73);
+const RED: vec3f = vec3f(0.63, 0.065, 0.05);
+const GREEN: vec3f = vec3f(0.14, 0.45, 0.091);
+const OUTSIDE: vec3f = vec3f(0.2, 0.19, 0.18);   // the box's outer skin
+const STAGE: vec3f = vec3f(0.23, 0.22, 0.21);    // the floor it stands on
+const SPHERE_A: vec4f = vec4f(-0.45, 0.5, -0.35, 0.5);
+const SPHERE_B: vec4f = vec4f(0.5, 0.35, 0.35, 0.35);
 
 struct Hit {
   t: f32,
-  n: vec3f,
+  n: vec3f,       // faces the incoming ray
   albedo: vec3f,
-  mat: i32, // 0 diffuse · 1 mirror · 2 glossy · 3 light
+  mat: i32,       // 0 diffuse · 1 mirror · 2 glossy · 3 lamp · −1 nothing
 }
 
-fn hitSphere(ro: vec3f, rd: vec3f, c: vec3f, r: f32) -> f32 {
-  let oc = ro - c;
+fn hitSphere(ro: vec3f, rd: vec3f, s: vec4f) -> f32 {
+  let oc = ro - s.xyz;
   let b = dot(oc, rd);
-  let det = b * b - (dot(oc, oc) - r * r);
+  let det = b * b - (dot(oc, oc) - s.w * s.w);
   if (det < 0.0) { return -1.0; }
-  let s = sqrt(det);
-  let t1 = -b - s;
-  if (t1 > 1e-3) { return t1; }
-  let t2 = -b + s;
-  if (t2 > 1e-3) { return t2; }
+  let r = sqrt(det);
+  let t1 = -b - r;
+  if (t1 > 1e-4) { return t1; }
+  let t2 = -b + r;
+  if (t2 > 1e-4) { return t2; }
   return -1.0;
+}
+
+// distance along the ray to the plane p[axis] = c, or −1
+fn planeT(ro: vec3f, rd: vec3f, axis: i32, c: f32) -> f32 {
+  let d = rd[axis];
+  if (abs(d) < 1e-7) { return -1.0; }
+  let t = (c - ro[axis]) / d;
+  return select(-1.0, t, t > 1e-4);
 }
 
 fn intersect(ro: vec3f, rd: vec3f) -> Hit {
@@ -82,95 +104,99 @@ fn intersect(ro: vec3f, rd: vec3f) -> Hit {
   h.t = 1e9;
   h.mat = -1;
 
-  // axis planes; each checked against the box cross-section
-  // floor y=0
-  if (rd.y < -1e-6) {
-    let t = (0.0 - ro.y) / rd.y;
-    if (t > 1e-3 && t < h.t) {
-      let p = ro + rd * t;
-      if (abs(p.x) < 1.0 && abs(p.z) < 1.0) {
-        h.t = t; h.n = vec3f(0.0, 1.0, 0.0); h.albedo = vec3f(0.73); h.mat = 0;
+  // walls are two-sided: light from outside must not leak through them
+  // floor y = 0 (inside the box, plus the stage floor around it in the hero)
+  var t = planeT(ro, rd, 1, 0.0);
+  if (t > 0.0 && t < h.t && rd.y < 0.0) {
+    let p = ro + rd * t;
+    let inBox = abs(p.x) < 1.0 && abs(p.z) < 1.0;
+    if (inBox || (TP.stage > 0.5 && abs(p.x) < 40.0 && p.z < 40.0)) {
+      h.t = t; h.n = vec3f(0.0, 1.0, 0.0); h.mat = 0;
+      h.albedo = select(STAGE, WHITE, inBox);
+    }
+  }
+  // ceiling y = 2, with the lamp cut into its underside
+  t = planeT(ro, rd, 1, 2.0);
+  if (t > 0.0 && t < h.t) {
+    let p = ro + rd * t;
+    if (abs(p.x) < 1.0 && abs(p.z) < 1.0) {
+      let below = rd.y > 0.0;
+      h.t = t; h.n = vec3f(0.0, select(1.0, -1.0, below), 0.0); h.mat = 0;
+      h.albedo = select(OUTSIDE, WHITE, below);
+      if (below && abs(p.x - TP.lightPos.x) < TP.lightSize.x && abs(p.z - TP.lightPos.y) < TP.lightSize.y) {
+        h.mat = 3;
       }
     }
   }
-  // ceiling y=2 (and the light cut into it)
-  if (rd.y > 1e-6) {
-    let t = (2.0 - ro.y) / rd.y;
-    if (t > 1e-3 && t < h.t) {
-      let p = ro + rd * t;
-      if (abs(p.x) < 1.0 && abs(p.z) < 1.0) {
-        h.t = t; h.n = vec3f(0.0, -1.0, 0.0); h.albedo = vec3f(0.73); h.mat = 0;
-        if (abs(p.x - TP.lightPos.x) < TP.lightSize.x && abs(p.z - TP.lightPos.y) < TP.lightSize.y) {
-          h.mat = 3;
-        }
-      }
+  // back wall z = −1
+  t = planeT(ro, rd, 2, -1.0);
+  if (t > 0.0 && t < h.t) {
+    let p = ro + rd * t;
+    if (abs(p.x) < 1.0 && p.y > 0.0 && p.y < 2.0) {
+      let inside = rd.z < 0.0;
+      h.t = t; h.n = vec3f(0.0, 0.0, select(-1.0, 1.0, inside)); h.mat = 0;
+      h.albedo = select(OUTSIDE, WHITE, inside);
     }
   }
-  // back wall z=−1
-  if (rd.z < -1e-6) {
-    let t = (-1.0 - ro.z) / rd.z;
-    if (t > 1e-3 && t < h.t) {
-      let p = ro + rd * t;
-      if (abs(p.x) < 1.0 && p.y > 0.0 && p.y < 2.0) {
-        h.t = t; h.n = vec3f(0.0, 0.0, 1.0); h.albedo = vec3f(0.73); h.mat = 0;
-      }
+  // left wall x = −1: red on the inside
+  t = planeT(ro, rd, 0, -1.0);
+  if (t > 0.0 && t < h.t) {
+    let p = ro + rd * t;
+    if (p.y > 0.0 && p.y < 2.0 && abs(p.z) < 1.0) {
+      let inside = rd.x < 0.0;
+      h.t = t; h.n = vec3f(select(-1.0, 1.0, inside), 0.0, 0.0); h.mat = 0;
+      h.albedo = select(OUTSIDE, RED, inside);
     }
   }
-  // left wall x=−1: the famous red
-  if (rd.x < -1e-6) {
-    let t = (-1.0 - ro.x) / rd.x;
-    if (t > 1e-3 && t < h.t) {
-      let p = ro + rd * t;
-      if (p.y > 0.0 && p.y < 2.0 && abs(p.z) < 1.0) {
-        h.t = t; h.n = vec3f(1.0, 0.0, 0.0); h.albedo = vec3f(0.65, 0.06, 0.06); h.mat = 0;
-      }
-    }
-  }
-  // right wall x=1: the famous green
-  if (rd.x > 1e-6) {
-    let t = (1.0 - ro.x) / rd.x;
-    if (t > 1e-3 && t < h.t) {
-      let p = ro + rd * t;
-      if (p.y > 0.0 && p.y < 2.0 && abs(p.z) < 1.0) {
-        h.t = t; h.n = vec3f(-1.0, 0.0, 0.0); h.albedo = vec3f(0.12, 0.45, 0.15); h.mat = 0;
-      }
+  // right wall x = 1: green on the inside
+  t = planeT(ro, rd, 0, 1.0);
+  if (t > 0.0 && t < h.t) {
+    let p = ro + rd * t;
+    if (p.y > 0.0 && p.y < 2.0 && abs(p.z) < 1.0) {
+      let inside = rd.x > 0.0;
+      h.t = t; h.n = vec3f(select(1.0, -1.0, inside), 0.0, 0.0); h.mat = 0;
+      h.albedo = select(OUTSIDE, GREEN, inside);
     }
   }
 
   // sphere A: matte, rear left
-  let tA = hitSphere(ro, rd, vec3f(-0.45, 0.5, -0.35), 0.5);
-  if (tA > 0.0 && tA < h.t) {
-    h.t = tA;
-    h.n = normalize(ro + rd * tA - vec3f(-0.45, 0.5, -0.35));
-    h.albedo = vec3f(0.73);
+  t = hitSphere(ro, rd, SPHERE_A);
+  if (t > 0.0 && t < h.t) {
+    h.t = t;
+    h.n = normalize(ro + rd * t - SPHERE_A.xyz);
+    h.albedo = WHITE;
     h.mat = 0;
   }
   // sphere B: the material knob, front right
-  let tB = hitSphere(ro, rd, vec3f(0.5, 0.35, 0.35), 0.35);
-  if (tB > 0.0 && tB < h.t) {
-    h.t = tB;
-    h.n = normalize(ro + rd * tB - vec3f(0.5, 0.35, 0.35));
-    h.albedo = vec3f(0.85, 0.65, 0.35);
+  t = hitSphere(ro, rd, SPHERE_B);
+  if (t > 0.0 && t < h.t) {
+    h.t = t;
+    h.n = normalize(ro + rd * t - SPHERE_B.xyz);
     h.mat = i32(TP.matB);
-    if (h.mat == 0) { h.albedo = vec3f(0.73); }
+    h.albedo = select(vec3f(0.9, 0.72, 0.42), WHITE, h.mat == 0); // gold when it's metal
   }
   return h;
 }
 
 fn lightLe() -> vec3f {
-  // radiance, not power: shrink the panel and it stays the same brightness
-  // per unit area, the room just gets darker
-  return vec3f(1.0, 0.82, 0.6) * 22.0 * TP.lightBoost;
+  return vec3f(1.0, 0.86, 0.68) * TP.lightLe;
 }
 
-// cosine-weighted hemisphere around n — importance sampling the Lambert lobe
+// cosine-weighted hemisphere around n: importance sampling the Lambert lobe
 fn cosineDir(n: vec3f) -> vec3f {
   let r1 = rnd() * 6.28318530718;
   let r2 = rnd();
   let sr2 = sqrt(r2);
-  var u = normalize(cross(n, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(n.y) > 0.9)));
+  let u = normalize(cross(n, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(n.y) > 0.9)));
   let v = cross(n, u);
-  return normalize(u * cos(r1) * sr2 + v * sin(r1) * sr2 + n * sqrt(1.0 - r2));
+  return normalize(u * (cos(r1) * sr2) + v * (sin(r1) * sr2) + n * sqrt(1.0 - r2));
+}
+
+fn inUnitSphere() -> vec3f {
+  let z = rnd() * 2.0 - 1.0;
+  let a = rnd() * 6.28318530718;
+  let r = sqrt(max(1.0 - z * z, 0.0));
+  return vec3f(r * cos(a), r * sin(a), z) * pow(rnd(), 1.0 / 3.0);
 }
 
 fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
@@ -178,19 +204,21 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
   var rd = rd0;
   var throughput = vec3f(1.0);
   var radiance = vec3f(0.0);
-  var specularLast = true; // the camera counts as specular: a direct view of the light must show it
+  // the camera counts as specular: looking straight at the lamp must show it
+  var specularLast = true;
 
   let bounces = i32(TP.maxBounces);
   for (var b = 0; b < 12; b++) {
     if (b >= bounces) { break; }
     let h = intersect(ro, rd);
-    if (h.mat < 0) { break; } // out the open front: black studio
+    if (h.mat < 0) { break; } // out of the open front, into the dark
 
     let p = ro + rd * h.t;
 
     if (h.mat == 3) {
-      // hitting the panel: count it only if no NEE already paid this path,
-      // or the previous bounce was specular (NEE can't see through mirrors)
+      // hit the lamp. If light sampling already paid for this path at the
+      // last diffuse bounce, counting it again would double it; after a
+      // mirror, light sampling couldn't see the lamp, so this is the only way
       if (TP.nee < 0.5 || specularLast) {
         radiance += throughput * lightLe();
       }
@@ -198,15 +226,14 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
     }
 
     if (h.mat == 1 || h.mat == 2) {
-      // mirror / glossy: reflect, optionally jitter inside a cone
+      // mirror, or a mirror with its reflection scattered into a blur
       var r = reflect(rd, h.n);
       if (h.mat == 2) {
-        let j = vec3f(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5) * 2.0;
-        r = normalize(r + j * TP.rough);
-        if (dot(r, h.n) < 0.0) { r = reflect(r, h.n); }
+        r = normalize(r + inUnitSphere() * TP.rough);
+        if (dot(r, h.n) <= 0.0) { r = reflect(r, h.n); }
       }
       throughput *= h.albedo;
-      ro = p + h.n * 1e-3;
+      ro = p + h.n * 1e-4;
       rd = r;
       specularLast = true;
       continue;
@@ -216,86 +243,115 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
     if (TP.nee > 0.5) {
       let lp = vec3f(
         TP.lightPos.x + (rnd() * 2.0 - 1.0) * TP.lightSize.x,
-        2.0 - 1e-4,
+        2.0,
         TP.lightPos.y + (rnd() * 2.0 - 1.0) * TP.lightSize.y,
       );
       let toL = lp - p;
       let d2 = dot(toL, toL);
-      let ld = normalize(toL);
+      let ld = toL * inverseSqrt(d2);
       let cosS = dot(h.n, ld);
-      let cosL = ld.y; // cos at the panel: dot((0,−1,0), −ld) — it faces down
+      let cosL = ld.y; // the lamp faces straight down
       if (cosS > 0.0 && cosL > 0.0) {
-        let sh = intersect(p + h.n * 1e-3, ld);
-        // unoccluded iff the first thing in that direction is the panel
+        let sh = intersect(p + h.n * 1e-4, ld);
         if (sh.mat == 3) {
+          // pdf is 1/area over the lamp; convert to solid angle: d² / (cosL · area)
           let area = 4.0 * TP.lightSize.x * TP.lightSize.y;
-          radiance += throughput * h.albedo * lightLe() * (cosS * cosL * area / (3.14159265 * d2));
+          radiance += throughput * (h.albedo / 3.14159265) * lightLe() * (cosS * cosL * area / d2);
         }
       }
     }
 
+    // continue: cosine sampling cancels the cosθ/π of the Lambert BRDF,
+    // so the throughput just picks up the surface colour
     throughput *= h.albedo;
-    ro = p + h.n * 1e-3;
+    ro = p + h.n * 1e-4;
     rd = cosineDir(h.n);
     specularLast = false;
 
-    // russian roulette after a few bounces keeps deep paths cheap
-    if (b > 3) {
-      let q = max(throughput.x, max(throughput.y, throughput.z));
+    // russian roulette after a few bounces keeps deep paths cheap and unbiased
+    if (b > 2) {
+      let q = min(max(throughput.x, max(throughput.y, throughput.z)), 0.95);
       if (rnd() > q) { break; }
-      throughput /= max(q, 1e-3);
+      throughput /= q;
     }
   }
   return radiance;
 }
 
+fn cameraRay(pix: vec2f) -> array<vec3f, 2> {
+  let eye = TP.eye.xyz;
+  let fwd = normalize(TP.look.xyz - eye);
+  let right = normalize(cross(fwd, vec3f(0.0, 1.0, 0.0)));
+  let up = cross(right, fwd);
+  let uv = pix / TP.res;
+  let aspect = TP.res.x / TP.res.y;
+  let px = (uv.x * 2.0 - 1.0) * aspect;
+  let py = 1.0 - uv.y * 2.0;
+  return array<vec3f, 2>(eye, normalize(fwd * TP.eye.w + right * px + up * py));
+}
+
 @fragment
 fn fsTrace(in: FullOut) -> @location(0) vec4f {
   let pix = vec2u(in.pos.xy);
-  rngState = pix.x * 1973u + pix.y * 9277u + u32(TP.frame) * 26699u + 1u;
-  // scramble a little — low frame indices correlate otherwise
-  rngState = rngState ^ (rngState >> 16u);
+  rngState = pcg(pix.x + pcg(pix.y + pcg(u32(TP.seed))));
 
   var prev = vec4f(0.0);
   if (TP.frame > 0.5) {
     prev = textureLoad(prevTex, vec2i(pix), 0);
   }
 
-  let aspect = TP.res.x / TP.res.y;
   var sum = vec3f(0.0);
+  var sumSq = 0.0;
   let n = i32(TP.spp);
-  for (var s = 0; s < 8; s++) {
+  for (var s = 0; s < 16; s++) {
     if (s >= n) { break; }
-    // jittered pinhole camera at the open face of the box
-    let jitter = vec2f(rnd(), rnd());
-    let uv = (in.pos.xy + jitter - 0.5) / TP.res;
-    let px = (uv.x * 2.0 - 1.0) * aspect;
-    let py = 1.0 - uv.y * 2.0;
-    let ro = vec3f(0.0, 1.0, 3.6);
-    let rd = normalize(vec3f(px * 0.78, py * 0.78, -2.0));
-    sum += tracePath(ro, rd);
+    // a random point inside the pixel each time: antialiasing for free
+    let ray = cameraRay(vec2f(pix) + vec2f(rnd(), rnd()));
+    let L = tracePath(ray[0], ray[1]);
+    sum += L;
+    let lum = dot(L, vec3f(0.2126, 0.7152, 0.0722));
+    sumSq += lum * lum;
   }
 
-  return vec4f(prev.rgb + sum, prev.a + f32(n));
+  return vec4f(prev.rgb + sum, prev.a + sumSq);
 }
 
 // ---- display -------------------------------------------------------------------
 
-fn hashC(p: vec2f) -> f32 {
-  var q = fract(p * vec2f(123.34, 456.21));
-  q += dot(q, q + 45.32);
-  return fract(q.x * q.y);
+fn texel(p: vec2i) -> vec3f {
+  let mx = vec2i(textureDimensions(accumTex)) - 1;
+  return textureLoad(accumTex, clamp(p, vec2i(0), mx), 0).rgb;
 }
 
 @fragment
 fn fsDisplay(in: FullOut) -> @location(0) vec4f {
-  let dims = vec2f(textureDimensions(accumTex));
-  let pix = vec2i(in.uv * dims);
-  let acc = textureLoad(accumTex, clamp(pix, vec2i(0), vec2i(dims) - 1), 0);
-  var col = acc.rgb / max(acc.a, 1.0);
-  col *= TP.exposure;
-  col = col / (1.0 + col);
-  col = pow(col, vec3f(0.4545));
-  col += (hashC(in.pos.xy) - 0.5) / 255.0;
-  return vec4f(col, 1.0);
+  // the trace buffer is coarser than the canvas: filter it bilinearly
+  let f = in.uv * vec2f(textureDimensions(accumTex)) - 0.5;
+  let i = vec2i(floor(f));
+  let w = fract(f);
+  let top = mix(texel(i), texel(i + vec2i(1, 0)), w.x);
+  let bot = mix(texel(i + vec2i(0, 1)), texel(i + vec2i(1, 1)), w.x);
+  let col = mix(top, bot, w.y) / max(TP.count, 1.0);
+  return vec4f(col * TP.look.w, 1.0);
+}
+
+// ---- noise readout: a sparse grid of pixels reports its standard error ---------
+
+@group(0) @binding(3) var statTex: texture_2d<f32>;
+@group(0) @binding(4) var<storage, read_write> stats: array<atomic<u32>, 2>;
+
+@compute @workgroup_size(8, 8)
+fn noiseStats(@builtin(global_invocation_id) id: vec3u) {
+  let dims = vec2u(textureDimensions(statTex));
+  let p = id.xy * 3u;
+  if (p.x >= dims.x || p.y >= dims.y) { return; }
+  let a = textureLoad(statTex, vec2i(p), 0);
+  let n = TP.count;
+  if (n < 1.5) { return; }
+  let mean = dot(a.rgb, vec3f(0.2126, 0.7152, 0.0722)) / n;
+  // unbiased sample variance of one sample, then the error of the mean of n
+  let variance = max(a.a - n * mean * mean, 0.0) / (n - 1.0);
+  let se = sqrt(variance / n);
+  atomicAdd(&stats[0], u32(min(se, 4.0) * 8192.0));
+  atomicAdd(&stats[1], u32(min(mean, 4.0) * 8192.0));
 }

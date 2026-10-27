@@ -1,0 +1,157 @@
+/* Living Music parts 6 and 7 (chords, jukebox). Scoped to body.mh-page. */
+
+/* ---- the "tap to play" pill over a figure's canvas ---- */
+
+.mh-page .mh-tap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.62rem 1.25rem 0.62rem 0.7rem;
+  border: 1px solid rgba(255, 184, 107, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffd9ae;
+  font: 650 0.86rem ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 6px rgba(255, 184, 107, 0.06),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease,
+    background 0.15s ease;
+  animation: mh-breathe 2.8s ease-in-out infinite;
+}
+
+.mh-page .mh-tap:hover {
+  background: rgba(30, 24, 18, 0.88);
+}
+
+.mh-page .mh-tap-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--accent-warm);
+  color: #1a1206;
+  font-size: 0.8rem;
+  padding-left: 0.12rem;
+}
+
+.mh-page .mh-tap.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -40%);
+  animation: none;
+}
+
+@keyframes mh-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 6px rgba(255, 184, 107, 0.05),
+      0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 11px rgba(255, 184, 107, 0.1),
+      0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* toggled control buttons */
+.mh-page .demo-button.mh-on {
+  border-color: var(--accent-warm);
+  background: rgba(255, 184, 107, 0.14);
+  color: #ffe2bf;
+}
+
+/* compact button groups inside a figure's control strip */
+.mh-page .mh-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mh-page .mh-group-label {
+  font: 600 0.68rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
+.mh-page .demo-controls .mh-group .demo-button {
+  padding: 0.3rem 0.75rem;
+}
+
+/* the hero canvases take pointer input (taps on chords, rings) */
+.mh-page header.hero .demo-canvas {
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+/* hero controls float top-right on wide screens; keep them compact */
+.mh-page header.hero .demo-controls {
+  gap: 0.5rem;
+}
+
+@media (max-width: 46rem) {
+  .mh-page header.hero .demo-controls {
+    justify-content: center;
+    padding: 0.6rem 1rem 0;
+  }
+
+  .mh-page header.hero .demo-readout {
+    padding: 0.4rem 1rem 0;
+  }
+}
+
+/* figure tables (rhythm catalogue) */
+.mh-page table.mh-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.6rem;
+  font: 0.86rem/1.45 ui-sans-serif, system-ui, sans-serif;
+}
+
+.mh-page table.mh-table th,
+.mh-page table.mh-table td {
+  text-align: left;
+  padding: 0.42rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.mh-page table.mh-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mh-page table.mh-table td code {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.mh-page .mh-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.6rem;
+}
+
+.mh-page .mh-table-wrap table.mh-table {
+  margin: 0;
+  min-width: 30rem;
+}

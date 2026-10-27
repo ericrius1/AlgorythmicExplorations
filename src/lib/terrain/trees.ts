@@ -2,13 +2,32 @@
 // attraction points where foliage could live, let branch tips grow toward the
 // ones they can see, kill points as they're reached — branching emerges from
 // competition for space, the way it does outdoors. Radii come from the pipe
-// model (a parent carries the cross-section of its children), the mesh is
-// deliberately faceted to match this site's creatures, and every tree ships
-// a list of perches — because the eagle from the sister series is going to need
-// somewhere to land.
+// model (a parent carries the cross-section of its children), and the
+// skeleton stays around after meshing so it can be queried (for perches:
+// branches a bird could stand on).
 
 import * as THREE from "three/webgpu";
+import type { Node } from "three/webgpu";
+import {
+  attribute,
+  positionLocal,
+  positionGeometry,
+  positionWorld,
+  cameraPosition,
+  normalWorldGeometry,
+  sin,
+  uniform,
+  vec3,
+  vec4,
+  float,
+  dot,
+  normalize,
+} from "three/tsl";
 import { hash2 } from "./noise";
+import type { Look } from "./look";
+
+type F = Node<"float">;
+type V3 = Node<"vec3">;
 
 export interface TreeParams {
   seed: number;
@@ -232,10 +251,19 @@ export function findPerches(
 
 // ---- the mesh ---------------------------------------------------------------------------
 
-const C_BARK_LO = new THREE.Color().setHex(0x4a3c2e, THREE.SRGBColorSpace);
-const C_BARK_HI = new THREE.Color().setHex(0x77614a, THREE.SRGBColorSpace);
-const C_LEAF_A = new THREE.Color().setHex(0x4d7a35, THREE.SRGBColorSpace);
-const C_LEAF_B = new THREE.Color().setHex(0x86a843, THREE.SRGBColorSpace);
+// Bark is a ring of SIDES vertices around every node, joined to the ring
+// around its parent, with smooth normals pointing straight out from the
+// branch. It's non-indexed and stored in growth order, so drawing the first
+// k vertices shows the tree as it was after the first few rounds of growth.
+// Leaves are small diamond-shaped cards scattered along the thin twigs.
+// Both carry aLight = (sun, occlusion), estimated from where each point sits
+// in the crown: deep inside and on the far side from the sun is darker.
+
+const C_BARK_LO = new THREE.Color().setHex(0x3e3226, THREE.SRGBColorSpace);
+const C_BARK_HI = new THREE.Color().setHex(0x6b5a46, THREE.SRGBColorSpace);
+const C_LEAF_A = new THREE.Color().setHex(0x3f6b2a, THREE.SRGBColorSpace);
+const C_LEAF_B = new THREE.Color().setHex(0x7d9c3a, THREE.SRGBColorSpace);
+const C_LEAF_C = new THREE.Color().setHex(0x9a9442, THREE.SRGBColorSpace);
 
 export interface TreeBuild {
   bark: THREE.BufferGeometry; // non-indexed, in growth order — drawRange animates growth
@@ -243,37 +271,61 @@ export interface TreeBuild {
   perches: Perch[];
   segmentCount: number;
   leafCount: number;
+  crown: { x: number; y: number; z: number; r: number; top: number };
 }
 
-const SIDES = 5; // pentagonal branches: low-poly enough to read as deliberate
+const SIDES = 6;
+const DEFAULT_SUN = new THREE.Vector3(0.5, 0.45, -0.6).normalize();
 
-export function buildTreeGeometry(skel: TreeSkeleton): TreeBuild {
+export function buildTreeGeometry(skel: TreeSkeleton, opts: { sun?: THREE.Vector3; leafScale?: number } = {}): TreeBuild {
   const nodes = skel.nodes;
+  const seed = skel.params.seed;
+  const sun = opts.sun ?? DEFAULT_SUN;
   const segs: number[] = [];
   for (let i = 0; i < nodes.length; i++) if (nodes[i].parent >= 0) segs.push(i);
 
-  const vPerSeg = SIDES * 6; // 5 quads = 10 triangles, non-indexed
+  // the crown: centroid and spread of the thin wood, where the leaves go
+  let cx = 0, cy = 0, cz = 0, cn = 0, top = 0;
+  for (const n of nodes) {
+    top = Math.max(top, n.y);
+    if (n.radius < 0.035 && n.depth > 2) { cx += n.x; cy += n.y; cz += n.z; cn++; }
+  }
+  cx /= cn || 1; cy /= cn || 1; cz /= cn || 1;
+  let cr = 0;
+  for (const n of nodes) if (n.radius < 0.035 && n.depth > 2) cr += Math.hypot(n.x - cx, (n.y - cy) * 1.3, n.z - cz);
+  cr = Math.max(0.5, (cr / (cn || 1)) * 1.35);
+
+  // light inside the crown: points on the sun side and near the surface see
+  // the sun; points deep inside or behind it see less of both sun and sky
+  const crownLight = (x: number, y: number, z: number): [number, number] => {
+    const dx = x - cx, dy = (y - cy) * 1.3, dz = z - cz;
+    const d = Math.hypot(dx, dy, dz) / cr;
+    const toward = (dx * sun.x + dy * sun.y + dz * sun.z) / (Math.hypot(dx, dy, dz) || 1);
+    const inside = Math.max(0, 1 - d);
+    const sunVis = Math.min(1, Math.max(0.08, 0.55 + 0.6 * toward * Math.min(1, d) - 0.5 * inside));
+    const ao = Math.min(1, Math.max(0.3, 0.35 + 0.75 * Math.min(1, d)));
+    return [sunVis, ao];
+  };
+
+  const vPerSeg = SIDES * 6;
   const bp = new Float32Array(segs.length * vPerSeg * 3);
   const bn = new Float32Array(segs.length * vPerSeg * 3);
   const bc = new Float32Array(segs.length * vPerSeg * 3);
+  const bl = new Float32Array(segs.length * vPerSeg * 2);
 
-  const up = new THREE.Vector3();
-  const dir = new THREE.Vector3();
-  const side = new THREE.Vector3();
-  const fwd = new THREE.Vector3();
+  const dir = new THREE.Vector3(), up = new THREE.Vector3(), side = new THREE.Vector3(), fwd = new THREE.Vector3();
   const c = new THREE.Color();
-  const ringA: THREE.Vector3[] = [], ringB: THREE.Vector3[] = [];
-  for (let s = 0; s < SIDES; s++) {
-    ringA.push(new THREE.Vector3());
-    ringB.push(new THREE.Vector3());
-  }
-  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), fnorm = new THREE.Vector3();
-
-  let v = 0;
+  const ring = (n: TreeNode, a: number, out: number[]): void => {
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const ox = ca * side.x + sa * fwd.x, oy = ca * side.y + sa * fwd.y, oz = ca * side.z + sa * fwd.z;
+    out[0] = n.x + ox * n.radius; out[1] = n.y + oy * n.radius; out[2] = n.z + oz * n.radius;
+    out[3] = ox; out[4] = oy; out[5] = oz;
+  };
+  const A0: number[] = [], A1: number[] = [], B0: number[] = [], B1: number[] = [];
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 1);
 
-  for (let s2 = 0; s2 < segs.length; s2++) {
-    const i = segs[s2];
+  let v = 0;
+  for (const i of segs) {
     const n = nodes[i];
     const par = nodes[n.parent];
     dir.set(n.x - par.x, n.y - par.y, n.z - par.z).normalize();
@@ -281,44 +333,21 @@ export function buildTreeGeometry(skel: TreeSkeleton): TreeBuild {
     if (Math.abs(dir.y) > 0.95) up.set(1, 0, 0);
     side.crossVectors(dir, up).normalize();
     fwd.crossVectors(side, dir).normalize();
-
-    // the child ring is rotated half a step — twisting the facets hides the
-    // pentagon's seams and reads as bark grain
-    for (let sct = 0; sct < SIDES; sct++) {
-      const a0 = (sct / SIDES) * Math.PI * 2;
-      const a1 = a0 + Math.PI / SIDES;
-      ringA[sct].set(
-        par.x + (Math.cos(a0) * side.x + Math.sin(a0) * fwd.x) * par.radius,
-        par.y + (Math.cos(a0) * side.y + Math.sin(a0) * fwd.y) * par.radius,
-        par.z + (Math.cos(a0) * side.z + Math.sin(a0) * fwd.z) * par.radius,
-      );
-      ringB[sct].set(
-        n.x + (Math.cos(a1) * side.x + Math.sin(a1) * fwd.x) * n.radius,
-        n.y + (Math.cos(a1) * side.y + Math.sin(a1) * fwd.y) * n.radius,
-        n.z + (Math.cos(a1) * side.z + Math.sin(a1) * fwd.z) * n.radius,
-      );
-    }
-
-    const tone = 0.85 + 0.3 * hash2(i, 13, skel.params.seed);
+    const tone = 0.85 + 0.3 * hash2(i, 13, seed);
     c.copy(C_BARK_LO).lerp(C_BARK_HI, (n.depth / maxDepth) * 0.8).multiplyScalar(tone);
+    const [sv, ao] = crownLight(n.x, n.y, n.z);
+    const baseAo = Math.min(1, 0.55 + n.y * 0.3); // a little darker at the foot of the trunk
 
-    for (let sct = 0; sct < SIDES; sct++) {
-      const a = ringA[sct], b = ringA[(sct + 1) % SIDES];
-      const d = ringB[sct], e = ringB[(sct + 1) % SIDES];
-      // two flat triangles per quad, each with its honest face normal
-      const tri = (p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3): void => {
-        e1.subVectors(p1, p0);
-        e2.subVectors(p2, p0);
-        fnorm.crossVectors(e1, e2).normalize();
-        for (const pt of [p0, p1, p2]) {
-          bp[v * 3] = pt.x; bp[v * 3 + 1] = pt.y; bp[v * 3 + 2] = pt.z;
-          bn[v * 3] = fnorm.x; bn[v * 3 + 1] = fnorm.y; bn[v * 3 + 2] = fnorm.z;
-          bc[v * 3] = c.r; bc[v * 3 + 1] = c.g; bc[v * 3 + 2] = c.b;
-          v++;
-        }
-      };
-      tri(a, d, b);
-      tri(b, d, e);
+    for (let k = 0; k < SIDES; k++) {
+      const a0 = (k / SIDES) * Math.PI * 2, a1 = ((k + 1) / SIDES) * Math.PI * 2;
+      ring(par, a0, A0); ring(par, a1, A1); ring(n, a0, B0); ring(n, a1, B1);
+      for (const q of [A0, B0, A1, A1, B0, B1]) {
+        bp[v * 3] = q[0]; bp[v * 3 + 1] = q[1]; bp[v * 3 + 2] = q[2];
+        bn[v * 3] = q[3]; bn[v * 3 + 1] = q[4]; bn[v * 3 + 2] = q[5];
+        bc[v * 3] = c.r; bc[v * 3 + 1] = c.g; bc[v * 3 + 2] = c.b;
+        bl[v * 2] = sv; bl[v * 2 + 1] = ao * baseAo;
+        v++;
+      }
     }
   }
 
@@ -326,49 +355,60 @@ export function buildTreeGeometry(skel: TreeSkeleton): TreeBuild {
   bark.setAttribute("position", new THREE.BufferAttribute(bp, 3));
   bark.setAttribute("normal", new THREE.BufferAttribute(bn, 3));
   bark.setAttribute("color", new THREE.BufferAttribute(bc, 3));
+  bark.setAttribute("aLight", new THREE.BufferAttribute(bl, 2));
 
-  // ---- leaves: a hash-dented icosahedron at every twig --------------------------------
-  const ico = new THREE.IcosahedronGeometry(1, 0);
-  const ipos = ico.getAttribute("position");
-  const leafNodes: number[] = [];
+  // ---- leaves: diamond cards along the thin twigs ----------------------------------
+  const scale = opts.leafScale ?? 1;
+  const leafAt: { i: number; count: number }[] = [];
+  let total = 0;
   for (let i = 0; i < nodes.length; i++) {
-    if (nodes[i].children === 0 && nodes[i].depth > 3) leafNodes.push(i);
+    const n = nodes[i];
+    if (n.parent < 0 || n.depth <= 3 || n.radius > 0.032) continue;
+    const count = n.children === 0 ? 10 : 5 + Math.floor(hash2(i, 3, seed) * 4);
+    leafAt.push({ i, count });
+    total += count;
   }
-
-  const lvPer = ipos.count; // already non-indexed: 60 verts, 20 faces
-  const lp = new Float32Array(leafNodes.length * lvPer * 3);
-  const ln = new Float32Array(leafNodes.length * lvPer * 3);
-  const lc = new Float32Array(leafNodes.length * lvPer * 3);
-  let lv = 0;
-  const p0 = new THREE.Vector3(), p1 = new THREE.Vector3(), p2 = new THREE.Vector3();
-
-  for (let k = 0; k < leafNodes.length; k++) {
-    const n = nodes[leafNodes[k]];
-    const scale = 0.16 + 0.18 * hash2(k, 17, skel.params.seed);
-    const sy = scale * (0.7 + 0.4 * hash2(k, 29, skel.params.seed)); // squashed blobs read leafier
-    c.copy(C_LEAF_A).lerp(C_LEAF_B, hash2(k, 41, skel.params.seed));
-
-    for (let f = 0; f < lvPer; f += 3) {
-      // dent each face's corners by a hash of the *face*, keeping it flat
-      const read = (slot: number, out: THREE.Vector3): void => {
-        const idx = f + slot;
-        const dent = 1 + (hash2(k * 64 + f, 71 + slot, skel.params.seed) - 0.5) * 0.5;
-        out.set(ipos.getX(idx) * scale * dent, ipos.getY(idx) * sy * dent, ipos.getZ(idx) * scale * dent);
-        out.x += n.x;
-        out.y += n.y + scale * 0.4;
-        out.z += n.z;
-      };
-      read(0, p0); read(1, p1); read(2, p2);
-      e1.subVectors(p1, p0);
-      e2.subVectors(p2, p0);
-      fnorm.crossVectors(e1, e2).normalize();
-      const tone = 0.82 + 0.36 * hash2(f, k, skel.params.seed);
-      for (const pt of [p0, p1, p2]) {
-        lp[lv * 3] = pt.x; lp[lv * 3 + 1] = pt.y; lp[lv * 3 + 2] = pt.z;
-        ln[lv * 3] = fnorm.x; ln[lv * 3 + 1] = fnorm.y; ln[lv * 3 + 2] = fnorm.z;
-        lc[lv * 3] = c.r * tone; lc[lv * 3 + 1] = c.g * tone; lc[lv * 3 + 2] = c.b * tone;
+  const lp = new Float32Array(total * 6 * 3);
+  const ln = new Float32Array(total * 6 * 3);
+  const lc = new Float32Array(total * 6 * 3);
+  const ll = new Float32Array(total * 6 * 2);
+  const lph = new Float32Array(total * 6);
+  const P = new THREE.Vector3(), N = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3(), O = new THREE.Vector3(), S = new THREE.Vector3();
+  let lv = 0, leafCount = 0;
+  for (const { i, count } of leafAt) {
+    const n = nodes[i], par = nodes[n.parent];
+    for (let k = 0; k < count; k++) {
+      const h = (s: number): number => hash2(i * 16 + k, s, seed);
+      const t = 0.3 + 0.7 * h(1);
+      P.set(par.x + (n.x - par.x) * t, par.y + (n.y - par.y) * t, par.z + (n.z - par.z) * t);
+      P.x += (h(2) - 0.5) * 0.12; P.y += (h(3) - 0.5) * 0.1; P.z += (h(4) - 0.5) * 0.12;
+      O.set(P.x - cx, (P.y - cy) * 1.3, P.z - cz).normalize(); // outward from the crown
+      N.set(O.x + (h(5) - 0.5) * 1.4, O.y + 0.6 + (h(6) - 0.5) * 1.2, O.z + (h(7) - 0.5) * 1.4).normalize();
+      S.set(h(8) - 0.5, h(9) - 0.5, h(10) - 0.5);
+      U.crossVectors(N, S).normalize();
+      V.crossVectors(N, U).normalize();
+      if (V.y < 0) V.negate(); // leaves point up and out, not down
+      const len = (0.17 + 0.1 * h(11)) * scale, wid = len * (0.45 + 0.15 * h(12));
+      const base = [P.x - V.x * len * 0.1, P.y - V.y * len * 0.1, P.z - V.z * len * 0.1];
+      const tip = [P.x + V.x * len * 0.9, P.y + V.y * len * 0.9, P.z + V.z * len * 0.9];
+      const mid = [P.x + V.x * len * 0.35, P.y + V.y * len * 0.35, P.z + V.z * len * 0.35];
+      const left = [mid[0] - U.x * wid * 0.5, mid[1] - U.y * wid * 0.5, mid[2] - U.z * wid * 0.5];
+      const right = [mid[0] + U.x * wid * 0.5, mid[1] + U.y * wid * 0.5, mid[2] + U.z * wid * 0.5];
+      // shading normal: mostly the crown's outward direction, a little the leaf's own
+      const sn = new THREE.Vector3().copy(O).multiplyScalar(0.7).addScaledVector(N, 0.3).normalize();
+      const tone = 0.8 + 0.4 * h(13);
+      c.copy(C_LEAF_A).lerp(C_LEAF_B, h(14)).lerp(C_LEAF_C, h(15) * h(15) * 0.6).multiplyScalar(tone);
+      const [sv, ao] = crownLight(P.x, P.y, P.z);
+      const phase = h(16) * Math.PI * 2;
+      for (const q of [base, right, tip, base, tip, left]) {
+        lp[lv * 3] = q[0]; lp[lv * 3 + 1] = q[1]; lp[lv * 3 + 2] = q[2];
+        ln[lv * 3] = sn.x; ln[lv * 3 + 1] = sn.y; ln[lv * 3 + 2] = sn.z;
+        lc[lv * 3] = c.r; lc[lv * 3 + 1] = c.g; lc[lv * 3 + 2] = c.b;
+        ll[lv * 2] = sv; ll[lv * 2 + 1] = ao;
+        lph[lv] = phase;
         lv++;
       }
+      leafCount++;
     }
   }
 
@@ -376,12 +416,58 @@ export function buildTreeGeometry(skel: TreeSkeleton): TreeBuild {
   leaves.setAttribute("position", new THREE.BufferAttribute(lp, 3));
   leaves.setAttribute("normal", new THREE.BufferAttribute(ln, 3));
   leaves.setAttribute("color", new THREE.BufferAttribute(lc, 3));
+  leaves.setAttribute("aLight", new THREE.BufferAttribute(ll, 2));
+  leaves.setAttribute("aPhase", new THREE.BufferAttribute(lph, 1));
 
   return {
     bark,
     leaves,
     perches: findPerches(skel),
     segmentCount: segs.length,
-    leafCount: leafNodes.length,
+    leafCount,
+    crown: { x: cx, y: cy, z: cz, r: cr, top },
   };
+}
+
+// ---- materials: light and a little wind ----------------------------------------------------
+
+export interface TreeMaterials {
+  bark: THREE.MeshBasicNodeMaterial;
+  leaves: THREE.MeshBasicNodeMaterial;
+  time: { value: number };
+  wind: { value: number };
+}
+
+// The whole tree leans with a slow gust field that travels across the
+// forest (so neighbours sway together and distant trees don't), more at the
+// top than the bottom; leaves add a quick flutter of their own.
+export function makeTreeMaterials(look: Look): TreeMaterials {
+  const time = uniform(0);
+  const wind = uniform(1);
+  const hy = positionGeometry.y.max(0); // height in the tree's own frame
+  const at = positionLocal;
+  const gust = sin(at.x.mul(0.21).add(at.z.mul(0.13)).add(time.mul(0.9)))
+    .mul(0.6)
+    .add(sin(at.x.mul(0.47).sub(at.z.mul(0.31)).add(time.mul(1.7))).mul(0.4));
+  const sway = gust.mul(0.5).add(0.5).mul(hy.mul(hy)).mul(0.006).mul(wind);
+  const swayVec = vec3(sway.mul(0.82), float(0), sway.mul(0.57));
+
+  const bark = new THREE.MeshBasicNodeMaterial();
+  bark.positionNode = at.add(swayVec);
+  const barkLight = attribute("aLight", "vec2") as unknown as Node<"vec2">;
+  bark.colorNode = vec4(look.lit(attribute("color", "vec3") as unknown as V3, normalWorldGeometry as unknown as V3, barkLight.x, barkLight.y), 1);
+
+  const leaves = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+  const phase = attribute("aPhase", "float") as unknown as F;
+  const flutter = sin(time.mul(4.3).add(phase)).mul(0.012).mul(wind);
+  leaves.positionNode = at.add(swayVec).add(vec3(flutter, flutter.mul(0.6), flutter.mul(-0.7)));
+  const leafLight = attribute("aLight", "vec2") as unknown as Node<"vec2">;
+  const albedo = attribute("color", "vec3") as unknown as V3;
+  const diffuse = look.lit(albedo, normalWorldGeometry as unknown as V3, leafLight.x, leafLight.y, 0.35);
+  const viewToFrag = normalize(positionWorld.sub(cameraPosition)) as unknown as V3;
+  const back = dot(viewToFrag, look.uSunDir).max(0).pow(5).mul(leafLight.x);
+  const through = albedo.mul(vec3(0.85, 1.2, 0.4)).mul(look.uSun).mul(back.mul(0.55));
+  leaves.colorNode = vec4(diffuse.add(through), 1);
+
+  return { bark, leaves, time, wind };
 }

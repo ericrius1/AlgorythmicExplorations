@@ -116,7 +116,7 @@ struct MediaParams {
                 // light re-emitted as glow. ≤ 1 conserves energy; above 1
                 // the fog becomes a gain medium and the time loop diverges.
   enabled: f32,
-  _p0: f32,
+  rotation: f32, // this frame's rotation of every cascade's direction set (radians)
 }
 @group(0) @binding(13) var mediaTex: texture_2d<f32>;
 @group(0) @binding(14) var<uniform> MU: MediaParams;
@@ -199,7 +199,12 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
   let spacing = sceneRes / CU.probes;
   let origin = (vec2f(probe) + 0.5) * spacing;
 
-  let ang = 6.28318530718 * (f32(dirIdx) + 0.5) / dirCount;
+  // Fixed directions alias near small bright things: a light that slips
+  // between two rays at one probe is caught by the next, so it smears into
+  // beads. Rotating the whole direction set by the same angle at every level
+  // keeps the hierarchy consistent within a frame, and the temporal average
+  // over cascade 0 blends the rotations into a smooth result.
+  let ang = 6.28318530718 * (f32(dirIdx) + 0.5) / dirCount + MU.rotation;
   let dir = vec2f(cos(ang), sin(ang));
   let start = origin + dir * CU.intervalStart;
 
@@ -366,4 +371,38 @@ fn fsBrush(in: BrushOut) -> @location(0) vec4f {
   if (q > 1.0) { discard; }
   let a = 1.0 - smoothstep(BU.hardness, 1.0, q);
   return vec4f(BU.color.rgb * a, BU.color.a * a);
+}
+
+// ---- paint demo display: full-resolution strokes over the transported light ------
+// The cascades run on a downscaled copy of the strokes; this pass draws the
+// strokes from a full-resolution copy so edges stay crisp, and lights the
+// air with the upsampled cascade-0 fluence. Linear HDR out, for PostFX.
+
+struct PaintParams {
+  probes0: vec2f,
+  exposure: f32,
+  airGain: f32,
+}
+@group(0) @binding(15) var paintTex: texture_2d<f32>;
+@group(0) @binding(16) var<uniform> PP: PaintParams;
+
+@fragment
+fn fsPaintDisplay(in: FullOut) -> @location(0) vec4f {
+  let texFull = vec2f(textureDimensions(cascade0Tex));
+  let local = clamp(in.uv, vec2f(0.5) / PP.probes0, 1.0 - vec2f(0.5) / PP.probes0);
+  var fluence = vec3f(0.0);
+  for (var d = 0u; d < 4u; d++) {
+    let cb = vec2f(f32(d % 2u), f32(d / 2u));
+    let uv = (cb + local) * PP.probes0 / texFull;
+    fluence += textureSampleLevel(cascade0Tex, linSamp, uv, 0.0).rgb;
+  }
+  fluence *= 0.25;
+  let s = textureSampleLevel(paintTex, linSamp, in.uv, 0.0);
+  // air shows the light field; walls are dark slate that picks up a little
+  // of the light around them; lights are their own colour
+  let solid = smoothstep(0.35, 0.75, s.a);
+  let wall = vec3f(0.010, 0.011, 0.016) + fluence * 0.3;
+  var col = mix(fluence * PP.airGain, wall, solid);
+  col += s.rgb;
+  return vec4f(col * PP.exposure, 1.0);
 }
