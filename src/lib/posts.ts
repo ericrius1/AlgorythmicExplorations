@@ -377,7 +377,7 @@ export const POSTS: Post[] = [
     series: "Spark & Signal",
     part: 1,
     title: "How Neurons Signal",
-    subtitle: "Resting potential, action potentials, synaptic transmission, and neural circuits",
+    subtitle: "From a single ion to twenty thousand neurons: resting potential, spikes, myelin, synapses, and circuits, live on the GPU",
   },
 ];
 
