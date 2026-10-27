@@ -37,10 +37,6 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "Interactive explanations of sound, tuning, scales, chords, rhythm, and generative accompaniment.",
   "Acoustic Spaces":
     "Spatial audio as an instrument: band-limited materials, sparse routes, media, and shareable musical rooms.",
-  "Waking Bodies":
-    "A procedural bear modeled from triangles, rigged by distance, and animated with inverse kinematics and springs.",
-  "Feather & Bone":
-    "A bald eagle lofted ring by ring, feathered quill by quill, rigged, animated, and flown with a real aerodynamic model.",
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
   "Solar Stack":
@@ -252,76 +248,6 @@ export const POSTS: Post[] = [
     part: 2,
     title: "The Room Instrument",
     subtitle: "A shareable spatial-audio music toy for composing with materials, media, distance, and routed sound",
-  },
-  {
-    href: "/pages/waking-bodies/bear.html",
-    series: "Waking Bodies",
-    part: 1,
-    title: "The Bear",
-    subtitle: "A procedural character lofted from vertex rings, stitched into triangles, and shaded in TSL",
-  },
-  {
-    href: "/pages/waking-bodies/rig.html",
-    series: "Waking Bodies",
-    part: 2,
-    title: "The Skeleton",
-    subtitle: "A bone hierarchy, proximity-based skin weights, and linear blend skinning",
-  },
-  {
-    href: "/pages/waking-bodies/reach.html",
-    series: "Waking Bodies",
-    part: 3,
-    title: "The Reach",
-    subtitle: "Two-bone inverse kinematics, pole vectors, gaze constraints, and FABRIK",
-  },
-  {
-    href: "/pages/waking-bodies/qigong.html",
-    series: "Waking Bodies",
-    part: 4,
-    title: "The Form",
-    subtitle: "Poses as targets, springs as blends, and layered procedural motion",
-  },
-  {
-    href: "/pages/feather-bone/eagle.html",
-    series: "Feather & Bone",
-    part: 1,
-    title: "The Eagle",
-    subtitle: "A bald eagle lofted from rings of vertices, with every flight feather its own mesh",
-  },
-  {
-    href: "/pages/feather-bone/bones.html",
-    series: "Feather & Bone",
-    part: 2,
-    title: "The Bones",
-    subtitle: "Seventeen joints, proximity-based skin weights, pinned beaks and talons, and idle motion",
-  },
-  {
-    href: "/pages/feather-bone/wingbeat.html",
-    series: "Feather & Bone",
-    part: 3,
-    title: "The Wingbeat",
-    subtitle: "The law of cosines unfolds the wing; slots, splay, and lag make the feathers fly it",
-  },
-  {
-    href: "/pages/feather-bone/flight.html",
-    series: "Feather & Bone",
-    part: 4,
-    title: "Flight",
-    subtitle: "Lift, drag, weight, and flap thrust integrated every frame — at eagle weight and speed",
-  },
-  {
-    href: "/pages/feather-bone/landing.html",
-    series: "Feather & Bone",
-    part: 5,
-    title: "The Landing",
-    subtitle: "Guidance laws, a landing flare, procedural boughs, and a two-voiced scream",
-  },
-  {
-    href: "/pages/feather-bone/sky.html",
-    series: "Feather & Bone",
-    part: 6,
-    title: "The Sky",
-    subtitle: "The simulated eagle and the grown terrain combined in one manual or autopilot demo",
   },
   {
     href: "/pages/ground-truth/heightfield.html",

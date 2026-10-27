@@ -40,7 +40,7 @@ export class Shell {
     // Series pages lay the title over the hero, so let it fill most of the
     // window instead of a fixed 16:9-ish strip.
     if (hero && document.body.classList.contains("series-pw")) {
-      const w = container.clientWidth || window.innerWidth;
+      const w = container.clientWidth || window.innerWidth || 1280;
       // .hero-title-below keeps the title under the canvas (for scenes whose
       // action is at the bottom) and the demo's own aspect
       const below = container.closest(".hero-title-below") !== null;

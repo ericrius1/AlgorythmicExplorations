@@ -3,8 +3,8 @@
 // ones they can see, kill points as they're reached — branching emerges from
 // competition for space, the way it does outdoors. Radii come from the pipe
 // model (a parent carries the cross-section of its children), the mesh is
-// deliberately faceted to match this site's creatures, and every tree ships
-// a list of perches — because the eagle from the sister series is going to need
+// deliberately faceted, and every tree ships
+// a list of perches — because a landing controller would need
 // somewhere to land.
 
 import * as THREE from "three/webgpu";
