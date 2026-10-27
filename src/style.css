@@ -1003,6 +1003,43 @@ footer {
   display: block;
 }
 
+.site-nav-menu-links {
+  display: none;
+  border-top: 1px solid var(--border);
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+}
+
+@media (max-width: 40rem) {
+  .site-nav {
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .site-nav-home {
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .site-nav-right {
+    gap: 0.4rem;
+  }
+
+  .site-nav-right > .site-nav-github {
+    display: none;
+  }
+
+  .site-nav-menu-links {
+    display: block;
+  }
+}
+
+@media (max-width: 27rem) {
+  .site-nav-where {
+    display: none;
+  }
+}
+
 .site-nav-series {
   font-size: 0.7rem;
   font-weight: 600;

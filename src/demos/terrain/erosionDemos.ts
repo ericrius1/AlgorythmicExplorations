@@ -279,7 +279,7 @@ const AFTER_RAIN: Mood = {
 
 export async function mountErosionHero(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.5);
-  const stage = await createTerrainStage(shell.canvas, AFTER_RAIN, { fov: 50, near: 0.1, far: 1500 });
+  const stage = await createTerrainStage(shell.canvas, AFTER_RAIN, { orbit: false, fov: 50, near: 0.1, far: 1500 });
   const look = stage.look;
 
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, frequency: 0.04, amplitude: 11, seed: 12, octaves: 7 };

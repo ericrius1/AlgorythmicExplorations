@@ -200,7 +200,7 @@ export function sittingVoice(fs: number): Float32Array {
 
 export function toBuffer(ch: Float32Array[], fs: number): AudioBuffer {
   const b = rawCtx().createBuffer(ch.length, ch[0].length, fs);
-  ch.forEach((c, i) => b.copyToChannel(c, i));
+  ch.forEach((c, i) => b.copyToChannel(c as Float32Array<ArrayBuffer>, i));
   return b;
 }
 

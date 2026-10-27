@@ -33,76 +33,68 @@ export function headShadowMag(f: number, incidence: number): number {
   return Math.sqrt((1 + a * a * x * x) / (1 + x * x));
 }
 
-// The same filter as AudioWorklet code, plus a fractional delay per ear, so a
-// moving source can be rendered live. Parameters: azimuth (radians, 0 =
-// ahead, +π/2 = right).
-export const BINAURAL_WORKLET = /* js */ `
-const A = ${HEAD_RADIUS}, C = ${C_SOUND};
-const AMIN = ${ALPHA_MIN}, TMIN = ${THETA_MIN};
-function alphaOf(inc) { return 1 + AMIN / 2 + (1 - AMIN / 2) * Math.cos((inc / TMIN) * Math.PI); }
-class MpBinaural extends AudioWorkletProcessor {
-  static get parameterDescriptors() {
-    return [
-      { name: "azimuth", defaultValue: 0, automationRate: "k-rate" },
-      { name: "mode", defaultValue: 1, automationRate: "k-rate" },
-    ];
+// The same two cues as live audio nodes, so a moving source can be heard as
+// it moves: a delay per ear for the time difference, and a high-shelf filter
+// per ear standing in for the head-shadow filter. Brown and Duda's filter has
+// unit gain at low frequencies, gain α at high ones, and its transition
+// between ω = 2c/a and 2c/(aα), so the shelf sits at the geometric middle of
+// those and has gain 20·log10 α.
+export class BinauralPanner {
+  readonly input: GainNode;
+  readonly output: GainNode;
+  private delays: DelayNode[];
+  private shelves: BiquadFilterNode[];
+  private pan: StereoPannerNode;
+  private binGain: GainNode;
+  private panGain: GainNode;
+  private ctx: BaseAudioContext;
+
+  constructor(ctx: BaseAudioContext) {
+    this.ctx = ctx;
+    this.input = ctx.createGain();
+    this.output = ctx.createGain();
+    const merger = ctx.createChannelMerger(2);
+    this.binGain = ctx.createGain();
+    this.panGain = ctx.createGain();
+    this.panGain.gain.value = 0;
+    this.delays = [0, 1].map(() => ctx.createDelay(0.01));
+    this.shelves = [0, 1].map(() => {
+      const f = ctx.createBiquadFilter();
+      f.type = "highshelf";
+      return f;
+    });
+    for (let e = 0; e < 2; e++) {
+      this.input.connect(this.delays[e]);
+      this.delays[e].connect(this.shelves[e]);
+      this.shelves[e].connect(merger, 0, e);
+    }
+    merger.connect(this.binGain);
+    this.binGain.connect(this.output);
+    this.pan = ctx.createStereoPanner();
+    this.input.connect(this.pan);
+    this.pan.connect(this.panGain);
+    this.panGain.connect(this.output);
   }
-  constructor() {
-    super();
-    this.size = 2048;
-    this.buf = new Float32Array(this.size);
-    this.w = 0;
-    this.state = [0, 0];
-    this.az = 0;
-    this.dl = [0, 0];
-  }
-  process(inputs, outputs, params) {
-    const inp = inputs[0][0];
-    const out = outputs[0];
-    if (!out || out.length < 2) return true;
-    const target = params.azimuth[0];
-    const mode = params.mode[0];
-    const n = out[0].length;
-    // ease the angle so a dragged source doesn't click
-    this.az += (target - this.az) * 0.2;
-    const s = Math.sin(this.az);
-    const phi = Math.asin(Math.max(-1, Math.min(1, s)));
-    const itd = (A / C) * (phi + Math.sin(phi));
-    const delays = [Math.max(0, itd) * sampleRate, Math.max(0, -itd) * sampleRate];
-    const w0 = C / A;
+
+  // azimuth: radians, 0 = ahead, +π/2 = right. mode "pan" is a plain
+  // equal-power stereo pan, for comparison.
+  set(azimuth: number, mode: "both" | "itd" | "ild" | "pan", tau = 0.03): void {
+    const t = this.ctx.currentTime;
+    const s = Math.sin(azimuth);
+    const itd = itdSeconds(s);
     for (let e = 0; e < 2; e++) {
       const side = e === 0 ? -1 : 1;
+      const delay = mode === "both" || mode === "itd" ? (e === 0 ? Math.max(0, itd) : Math.max(0, -itd)) : 0;
+      this.delays[e].delayTime.setTargetAtTime(delay, t, tau);
       const inc = Math.acos(Math.max(-1, Math.min(1, side * s)));
-      const a = mode > 0.5 ? alphaOf(inc) : 1;
-      // bilinear transform of (1 + s·a/2w0) / (1 + s/2w0)
-      const K = 2 * sampleRate;
-      const tz = a / (2 * w0);
-      const tp = 1 / (2 * w0);
-      const b0 = (1 + K * tz) / (1 + K * tp);
-      const b1 = (1 - K * tz) / (1 + K * tp);
-      const a1 = (1 - K * tp) / (1 + K * tp);
-      const ch = out[e];
-      let z = this.state[e];
-      for (let i = 0; i < n; i++) {
-        const x = inp ? inp[i] : 0;
-        if (e === 0) this.buf[(this.w + i) % this.size] = x;
-        this.dl[e] += ((mode > 0.5 ? delays[e] : 0) - this.dl[e]) * 0.002;
-        const pos = this.w + i - this.dl[e];
-        const p0 = Math.floor(pos);
-        const fr = pos - p0;
-        const s0 = this.buf[(p0 + this.size * 4) % this.size];
-        const s1 = this.buf[(p0 + 1 + this.size * 4) % this.size];
-        const xd = s0 + (s1 - s0) * fr;
-        // direct form II transposed, first order
-        const y = b0 * xd + z;
-        z = b1 * xd - a1 * y;
-        ch[i] = y;
-      }
-      this.state[e] = z;
+      const a = mode === "both" || mode === "ild" ? shadowAlpha(inc) : 1;
+      const w0 = C_SOUND / HEAD_RADIUS;
+      const fc = (2 * w0) / Math.sqrt(Math.max(a, 0.05)) / (2 * Math.PI);
+      this.shelves[e].frequency.setTargetAtTime(Math.min(16000, fc), t, tau);
+      this.shelves[e].gain.setTargetAtTime(20 * Math.log10(a), t, tau);
     }
-    this.w = (this.w + n) % this.size;
-    return true;
+    this.pan.pan.setTargetAtTime(s, t, tau);
+    this.binGain.gain.setTargetAtTime(mode === "pan" ? 0 : 1, t, 0.02);
+    this.panGain.gain.setTargetAtTime(mode === "pan" ? 1 : 0, t, 0.02);
   }
 }
-registerProcessor("mp-binaural", MpBinaural);
-`;

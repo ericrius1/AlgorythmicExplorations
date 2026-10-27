@@ -9,11 +9,17 @@
 // at about one trace pixel per CSS pixel. Any knob that changes the scene
 // resets the sum. The display pass filters the sum up to the canvas and
 // PostFX tone maps it. Once a figure reaches its sample cap it stops tracing.
+//
+// The two noise figures use plain random numbers and show the raw sum, so
+// their readouts mean what the text says. The hero, the bounce figure and the
+// full figure use the stratified blue-noise sampler, cap the metal sphere's
+// caustic, and run an edge-aware filter over the sum while it's young.
 
 import cornellShader from "../../shaders/cornell.wgsl?raw";
 import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { PostFX, HDR_FORMAT } from "../../lib/postfx";
+import { blueNoiseTexture } from "./blueNoise";
 
 export interface CornellOptions {
   mode: "hero" | "noise" | "nee" | "bounces" | "full";
@@ -59,6 +65,8 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
   let lightPos: [number, number] = [0, 0];
   let lightSize = mode === "nee" ? 0.12 : SIZE_REF;
   const cap = mode === "noise" ? 65536 : hero ? 16384 : 8192;
+  const teaching = mode === "noise" || mode === "nee";
+  let denoise = !teaching;
   let dirty = true; // something to draw this frame
 
   const reset = (): void => {
@@ -78,7 +86,8 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
 
   // ---- GPU --------------------------------------------------------------------
   const module = dev.createShaderModule({ code: cornellShader });
-  const tp = dev.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const tp = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const blue = blueNoiseTexture(dev);
 
   const accum = [0, 1].map(() =>
     dev.createTexture({
@@ -88,11 +97,27 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
     }),
   );
   const accumViews = accum.map((t) => t.createView());
+  const mkTarget = (): GPUTexture =>
+    dev.createTexture({
+      size: [tw, th],
+      format: "rgba32float",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+  const guide = mkTarget(); // first hit per pixel: normal, depth, surface
+  const filtered = mkTarget();
+  const guideView = guide.createView();
+  const filteredView = filtered.createView();
 
   const tracePipe = dev.createRenderPipeline({
     layout: "auto",
     vertex: { module, entryPoint: "vsFullC" },
-    fragment: { module, entryPoint: "fsTrace", targets: [{ format: "rgba32float" }] },
+    fragment: { module, entryPoint: "fsTrace", targets: [{ format: "rgba32float" }, { format: "rgba32float" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const filterPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullC" },
+    fragment: { module, entryPoint: "fsFilter", targets: [{ format: "rgba32float" }] },
     primitive: { topology: "triangle-list" },
   });
   const displayPipe = dev.createRenderPipeline({
@@ -108,6 +133,17 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
       entries: [
         { binding: 0, resource: { buffer: tp } },
         { binding: 1, resource: accumViews[i] },
+        { binding: 7, resource: blue.createView() },
+      ],
+    }),
+  );
+  const filterGroups = [0, 1].map((i) =>
+    dev.createBindGroup({
+      layout: filterPipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: tp } },
+        { binding: 2, resource: accumViews[i] },
+        { binding: 8, resource: guideView },
       ],
     }),
   );
@@ -120,6 +156,13 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
       ],
     }),
   );
+  const displayFiltered = dev.createBindGroup({
+    layout: displayPipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: tp } },
+      { binding: 2, resource: filteredView },
+    ],
+  });
 
   // noise readout (noise figure only): mean standard error over a sparse grid
   let noise: {
@@ -214,6 +257,11 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
     });
   }
   if (mode === "full") {
+    const dnBtn = shell.button("denoise: on", () => {
+      denoise = !denoise;
+      dnBtn.textContent = denoise ? "denoise: on" : "denoise: off";
+      dirty = true;
+    });
     const matBtn = shell.button(`sphere: ${MAT_NAMES[matB]}`, () => {
       matB = (matB + 1) % 3;
       matBtn.textContent = `sphere: ${MAT_NAMES[matB]}`;
@@ -257,7 +305,7 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
   });
 
   const writeTP = (add: number): void => {
-    const f = new Float32Array(24);
+    const f = new Float32Array(28);
     const le = LE_REF * (SIZE_REF / lightSize) ** 2;
     const count = samples + add;
     f.set([tw, th, frame, add]);
@@ -266,6 +314,7 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
     f.set([count, le, hero ? 1 : 0, seed], 12);
     f.set([...cam.eye, cam.focal], 16);
     f.set([...cam.target, hero ? 0.95 : 1.0], 20);
+    f.set([teaching ? 0 : 1, filterStrength(count), samples, teaching ? 0 : 1], 24);
     dev.queue.writeBuffer(tp, 0, f);
   };
 
@@ -284,6 +333,14 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
         n.at = at;
       }
     });
+  };
+
+  // The filter's radius shrinks as 1/√samples, like the noise it's hiding,
+  // and switches off once there's little left to hide.
+  const filterStrength = (count: number): number => {
+    if (!denoise || count < 1) return 0;
+    const k = Math.min(1, Math.sqrt(48 / count));
+    return k < 0.2 ? 0 : k;
   };
 
   // adaptive work per frame for the hero: as many samples as keep it smooth
@@ -314,7 +371,10 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
 
       if (tracing) {
         const pass = enc.beginRenderPass({
-          colorAttachments: [{ view: accumViews[dst], loadOp: "clear", storeOp: "store" }],
+          colorAttachments: [
+            { view: accumViews[dst], loadOp: "clear", storeOp: "store" },
+            { view: guideView, loadOp: "clear", storeOp: "store" },
+          ],
         });
         pass.setPipeline(tracePipe);
         pass.setBindGroup(0, traceGroups[src]);
@@ -322,11 +382,22 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
         pass.end();
       }
 
+      const filtering = filterStrength(samples + add) > 0;
+      if (filtering) {
+        const fp = enc.beginRenderPass({
+          colorAttachments: [{ view: filteredView, loadOp: "clear", storeOp: "store" }],
+        });
+        fp.setPipeline(filterPipe);
+        fp.setBindGroup(0, filterGroups[dst]);
+        fp.draw(3);
+        fp.end();
+      }
+
       const pass2 = enc.beginRenderPass({
         colorAttachments: [{ view: post.sceneView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
       });
       pass2.setPipeline(displayPipe);
-      pass2.setBindGroup(0, displayGroups[dst]);
+      pass2.setBindGroup(0, filtering ? displayFiltered : displayGroups[dst]);
       pass2.draw(3);
       pass2.end();
       post.encodePresent(enc);
@@ -351,7 +422,7 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
       dirty = false;
     },
     dispose() {
-      for (const t of accum) t.destroy();
+      for (const t of [...accum, guide, filtered, blue]) t.destroy();
       tp.destroy();
       post.dispose();
       noise?.buf.destroy();

@@ -230,16 +230,20 @@ export function mountPhotonWalk(container: HTMLElement): void {
         }
         // running throughput beside each bounce, once the path has left it
         const showAt = i === 0 ? 1.15 : i + 1.15;
-        if (i < segs - 1 && prog >= showAt && pCrowd < 0.5 && (i > 0 || t > 0.4)) {
+        if (i < segs - 1 && prog >= showAt && pCrowd < 0.25 && (i > 0 || t > 0.4)) {
           const wNext = Math.pow(ALBEDO, i + 1);
-          const onFloor = p1.y > (T + B) / 2;
+          // walls get their number outside the box, clear of the paths;
+          // the sphere gets it just above its surface
+          const onCeil = Math.abs(p1.y - T) < 1e-3;
+          const onFloorWall = Math.abs(p1.y - B) < 1e-3;
           const nearBack = p1.x > 0.85;
-          label(ctx, wNext.toFixed(2), X(p1.x) + (nearBack ? -7 : 6), Y(p1.y) + (onFloor ? -12 : 14), {
+          const dy = onCeil ? -10 : onFloorWall ? 14 : p1.y > (T + B) / 2 ? -12 : 14;
+          label(ctx, wNext.toFixed(2), X(p1.x) + (nearBack ? -7 : 6), Y(p1.y) + dy, {
             align: nearBack ? "right" : "left",
             color: PAL.muted,
             size: 11,
             mono: true,
-            alpha: 1 - 2 * pCrowd,
+            alpha: 1 - 4 * pCrowd,
           });
         }
       }
@@ -268,8 +272,10 @@ export function mountPhotonWalk(container: HTMLElement): void {
         label(ctx, "pick one at random", X(P0.x), Y(P0.y - 0.12), { color: PAL.accent, align: "center", size: 11, alpha: pFan });
       }
 
-      if (prog >= 1.15 && pCrowd < 0.5) {
-        label(ctx, "numbers: throughput so far", X(R), Y(B) + 14, { color: PAL.muted, size: 11, align: "right", alpha: 1 - 2 * pCrowd });
+      // the legend sits above the box until the payoff label needs the room
+      const pLegend = 1 - phase(t, 0.56, 0.6);
+      if (prog >= 1.15 && pLegend > 0) {
+        label(ctx, "numbers = throughput", X(L), Y(T) - 12, { color: PAL.muted, size: 11, align: "left", alpha: pLegend });
       }
 
       // the payoff
@@ -286,7 +292,7 @@ export function mountPhotonWalk(container: HTMLElement): void {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
         const right = end.x > 0.6;
-        label(ctx, `found it · worth ${lastWeight.toFixed(2)}`, X(end.x) + (right ? -10 : 10), Y(end.y) + 28, {
+        label(ctx, `found it · worth ${lastWeight.toFixed(2)}`, X(end.x) + (right ? -10 : 10), Y(end.y) - 12, {
           color: PAL.warm,
           alpha: pWin,
           size: 12,
@@ -310,7 +316,7 @@ export function mountPhotonWalk(container: HTMLElement): void {
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
-        label(ctx, `${found} of ${shown} found the lamp`, X(R), Y(B) + 14, { color: PAL.warm, align: "right", size: 12 });
+        label(ctx, `${found} of ${shown} found the lamp`, X(R), Y(B) + 14, { color: PAL.warm, align: "right", size: 12, alpha: clamp01((pCrowd - 0.2) * 5) });
       }
     },
   });

@@ -17,6 +17,10 @@ struct U {
   blend: f32,    // show page: 0 = raw overlaps, 1 = blended
   yaw: f32,
   pitch: f32,
+  bandTop: f32,     // fisheye page: the visible band between the nav and
+  bandBottom: f32,  // an overlaid title, in -1..1 vertical units
+  _pad1: f32,
+  _pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: U;
@@ -278,9 +282,10 @@ fn fs(v: VOut) -> @location(0) vec4f {
 
   if (u.mode > 0.5 && u.mode < 1.5) {
     // fisheye page: slide every pixel's direction toward the one it has in an
-    // equidistant 180-degree fisheye master centred on the frame
-    let radius = 0.94;
-    let f = q / radius;
+    // equidistant 180-degree fisheye master, fitted inside the part of the
+    // frame that the nav and the title don't cover
+    let radius = max(0.2, (u.bandTop - u.bandBottom) * 0.46);
+    let f = (q - vec2f(0.0, 0.5 * (u.bandTop + u.bandBottom))) / radius;
     let rho = length(f);
     let zen = min(rho, 1.0) * PI * 0.5;
     let az = atan2(-f.y, f.x);
@@ -375,6 +380,10 @@ fn fs(v: VOut) -> @location(0) vec4f {
       // Unblended, each adds its whole image in its own tint, so the overlaps
       // come out twice as bright; blended, the sum is one even sky.
       let za = zen_az(dir);
+      // the show content: the sky plus a grid, so you can see it run
+      // unbroken across the seams once the blend is on
+      let g = polar_grid(dir, pix, PI / 12.0, 12.0);
+      col += vec3f(0.6, 0.65, 0.8) * g * 0.09 * mask;
       var rawSum = vec3f(0.0);
       for (var i = 0; i < 3; i++) {
         let aimAz = PROJ_AZ0 + f32(i) * TAU / 3.0 + PI;
@@ -385,8 +394,6 @@ fn fs(v: VOut) -> @location(0) vec4f {
       }
       let raw = col * rawSum + rawSum * 0.035 * mask;
       col = mix(raw, col, u.blend);
-      let g = polar_grid(dir, pix, PI / 12.0, 12.0);
-      col += vec3f(0.6, 0.65, 0.8) * g * 0.1 * (1.0 - u.blend) * mask;
     } else {
       col += outline * 0.5 * mask + fill * 0.008 * mask;
     }

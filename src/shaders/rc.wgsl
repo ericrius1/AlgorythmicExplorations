@@ -87,6 +87,8 @@ struct CascadeParams {
   ambient: f32,
   _p0: f32,
   _p1: f32,
+  offset: vec2f,        // this frame's shift of this level's probe grid (scene px)
+  upperOffset: vec2f,   // … and of the level above
 }
 
 // The environment: what the top cascade merges with instead of darkness.
@@ -153,7 +155,7 @@ fn marchInterval(start: vec2f, dir: vec2f, maxLen: f32, sceneRes: vec2f) -> RayR
   var t = 0.0;
   // fog varies smoothly, so cap the leap: ~12 samples across the interval
   let fogStep = max(maxLen / 12.0, 3.0);
-  for (var s = 0; s < 32; s++) {
+  for (var s = 0; s < 48; s++) {
     let pos = start + dir * t;
     if (pos.x < 0.0 || pos.y < 0.0 || pos.x >= sceneRes.x || pos.y >= sceneRes.y) {
       break; // off the canvas: a miss — let the cascade above (or the sky) answer
@@ -197,7 +199,13 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
 
   let sceneRes = vec2f(textureDimensions(distTex));
   let spacing = sceneRes / CU.probes;
-  let origin = (vec2f(probe) + 0.5) * spacing;
+  // Probe-grid jitter: each level above cascade 0 shifts its whole grid by a
+  // new sub-spacing offset every frame. Interpolating between coarse probes
+  // leaves a faint pattern tied to where those probes sit (blotches the size
+  // of the coarse spacing, and a cross around small lights); moving the grid
+  // moves the pattern, and the temporal average over cascade 0 smooths it out.
+  // Cascade 0 stays put, so its history needs no reprojection.
+  let origin = (vec2f(probe) + 0.5) * spacing + CU.offset;
 
   // Fixed directions alias near small bright things: a light that slips
   // between two rays at one probe is caught by the next, so it smears into
@@ -226,7 +234,7 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
   // results with the bilinear weights. 4× the rays, no rings — and occlusion
   // along the actual bridge path kills light leaks through thin walls too.
   let upSpacing = sceneRes / CU.upperProbes;
-  let g = origin / upSpacing - 0.5;     // position in the upper probe grid
+  let g = (origin - CU.upperOffset) / upSpacing - 0.5; // position in the upper probe grid
   let baseIdx = floor(g);
   let fw = g - baseIdx;                 // bilinear fractions
   let t1 = CU.intervalStart + CU.intervalLen; // = upper cascade's interval start
@@ -236,7 +244,7 @@ fn fsCascade(in: FullOut) -> @location(0) vec4f {
     let corner = vec2f(f32(k & 1u), f32(k >> 1u));
     let w = mix(1.0 - fw.x, fw.x, corner.x) * mix(1.0 - fw.y, fw.y, corner.y);
     let cornerIdx = clamp(vec2i(baseIdx + corner), vec2i(0), vec2i(CU.upperProbes) - 1);
-    let upPos = (vec2f(cornerIdx) + 0.5) * upSpacing;
+    let upPos = (vec2f(cornerIdx) + 0.5) * upSpacing + CU.upperOffset;
     let bridge = upPos + dir * t1 - start;
     let len = max(length(bridge), 1e-4);
     let r = marchInterval(start, bridge / len, len, sceneRes);

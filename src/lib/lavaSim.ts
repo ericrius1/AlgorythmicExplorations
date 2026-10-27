@@ -48,9 +48,9 @@ export const DEFAULT_KNOBS: LavaKnobs = {
   buoyancy: 3.2,
   heatRate: 1.0,
   coolRate: 0.5,
-  diffusion: 0.25,
-  tension: 4.5,
-  drag: 1.5,
+  diffusion: 0.06,
+  tension: 6.0,
+  drag: 2.0,
   heatSpread: 0.6,
   heatFloor: 0.5,
 };

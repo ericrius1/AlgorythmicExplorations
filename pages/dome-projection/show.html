@@ -125,19 +125,18 @@ ramp the light:   (0.5^(1/2.2))^2.2 * 2         = 1.0    <span class="cm">// sea
       <p>
         The strip at the top is what the audience sees: a bright-to-dark ramp with grid lines
         on it above a band of pure black, lit by projector A from the left and B from the
-        right. Under it, the blue and
-        orange curves are the light each projector puts out for white content, and the white
-        curve is their total. With no blend the overlap is twice as bright. Ramping the pixel
-        values sags to 44% in the middle, and ramping the light stays flat at 100%. Then
-        raise the black level and watch the black band, and add some
-        misalignment to watch the grid lines double inside the overlap, where both
+        right. Under it, the blue and orange curves are the light each projector puts out
+        for white content, and the white curve is their total. With no blend the overlap is
+        twice as bright. Ramping the pixel values sags to 44% in the middle, and ramping the
+        light stays flat at 100%. Then raise the black level and watch the black band, and
+        add some misalignment to watch the grid lines double inside the overlap, where both
         projectors draw them.
       </p>
       <aside class="note">
         <span class="note-label">Aside · 2.2 is an approximation</span>
         <p>
           Real projectors don't follow a single power law, and two units of the same model
-          rarely match each other exactly. Good blending measures each projector's actual
+          rarely match each other. Good blending measures each projector's actual
           response with a camera or a meter and builds its ramp from that curve. 2.2 is the
           sRGB-ish starting point, and it's close enough to show why the band appears.
         </p>
@@ -148,7 +147,7 @@ ramp the light:   (0.5^(1/2.2))^2.2 * 2         = 1.0    <span class="cm">// sea
       <p>
         Lining up the geometry is only the first thing the eye catches. Two projectors can
         agree on where every line goes and still disagree on brightness, black level, focus
-        or white point. That's why calibration uses dull images before beautiful ones:
+        or white point. That's why calibration uses dull images before pretty ones:
       </p>
       <pre><code>rings and meridians   → geometry and seams
 grey ramps            → gamma, brightness and black level

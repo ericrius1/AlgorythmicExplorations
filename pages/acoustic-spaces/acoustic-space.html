@@ -10,468 +10,387 @@
     <title>Rooms That Play Back — Acoustic Spaces</title>
     <meta
       name="description"
-      content="Probe-based acoustic simulation for spatial audio in the browser: direct audibility rays, sparse pathing, material transmittance, participating media, and a generative sound-bath voice."
+      content="Room acoustics you can hear in the browser: image sources, Sabine's reverberation time, absorption by frequency, room modes, two-ear hearing, and Alvin Lucier's I am sitting in a room, all computed live."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <main>
-      <h1>Rooms That Play Back</h1>
-      <p>
-        Most browser spatial audio treats space as a knob: pan left, pan right,
-        maybe add a fixed reverb. Real rooms are not knobs. A wall removes high
-        frequencies, leaks low frequencies, reflects part of the wave, and
-        changes the path by which sound reaches you. A doorway matters. A
-        water-filled volume matters. The same emitter should sound intimate,
-        muffled, distant, or blooming depending on where you stand.
-      </p>
-      <p>
-        This article explains a probe-based acoustic system built for a
-        browser scene. It is inspired by Steam Audio's idea of precomputed
-        spatial information, but the graph is intentionally sparse: probes are
-        placed only where routing changes, connections are partial, and each
-        link stores just enough directionality to make corner paths convincing.
-        The simulation does not synthesize the sound. It produces a small set
-        of control signals: low/mid/high energy for the direct path, low/mid/high
-        energy for the routed path, and a media label. The instrument listens
-        to those signals.
-      </p>
-      <p>
-        I like this framing because it separates three jobs that are often
-        tangled together. Geometry answers reachability questions. Acoustic
-        materials answer color questions. The instrument answers taste
-        questions. If the wall is between you and a source, the geometry should
-        say so; it should not decide whether the result is alarming, meditative,
-        metallic, or warm. That choice belongs to the voice that consumes the
-        simulation.
-      </p>
-      <p>
-        The system therefore behaves less like a single effect and more like a
-        tiny audio operating system. The room produces a set of slowly smoothed
-        buses: direct low, direct mid, direct high, routed low, routed mid,
-        routed high, plus a few descriptors such as path length and medium
-        mixture. Synth voices, granular beds, convolution reverbs, and UI meters
-        can all subscribe to the same buses without knowing how the room was
-        queried. That is what makes it possible to keep the physics legible
-        while changing the musical surface completely.
-      </p>
-      <p>
-        The sound design is intentionally gentle. Long sine drones, filtered
-        breath noise, slow detune drift, and sparse bell partials leave enough
-        room for the acoustics to speak without turning every occlusion event
-        into a sharp filter edge. The goal is not to make the solver less
-        expressive. The goal is to make the room audible as motion, warmth, and
-        distance.
-      </p>
-
-      <h2><span class="kicker">The signal</span>What the simulation outputs</h2>
-      <p>
-        The audio engine wants a mix curve, not a physics paper. Every frame,
-        each emitter asks the room a few questions:
-      </p>
-      <pre><code>direct = primary rays from emitter to listener
-path   = best sparse-probe route around occluders
-media  = distance through participating volumes
-bands  = { low, mid, high } energy after material and media loss</code></pre>
-      <p>
-        The important design choice is the three bands. A blocked source should
-        not simply become quieter. Walls leak bass and kill brightness; water
-        removes high frequencies faster than low ones; absorptive panels reduce
-        reflected energy without necessarily sealing the room. Three bands are
-        crude compared to a full spectrum, but they are expressive enough to
-        make the room audible.
-      </p>
-      <p>
-        A single frame is deliberately small. The emitter does not request a
-        new impulse response, allocate a filter graph, or rebuild a reverb. It
-        asks for the current acoustic state between two moving points. The
-        answer is a handful of floats that can be ramped over tens or hundreds
-        of milliseconds. That ramping matters as much as the numbers
-        themselves. Without it, a source crossing the edge of a wall would
-        chatter between bright and muted, and the ear would hear the algorithm
-        instead of the room.
-      </p>
-      <pre><code>state = solveAcoustics(emitter, listener)
-directBus.setTarget(state.directBands,  80ms)
-routeBus.setTarget(state.routedBands, 180ms)
-airBus.setTarget(state.mediaMix,      250ms)
-instrument.renderFromBuses()</code></pre>
-      <p>
-        The direct bus is allowed to move quickly because it describes
-        immediate audibility. The routed bus moves more slowly because reflected
-        and corner-bent energy is perceptually less precise. This is not a
-        cheat so much as a psychoacoustic contract: nearby line-of-sight sound
-        should feel responsive, while the room's bloom can lag and breathe.
-      </p>
-      <p>
-        The small state vector also keeps debugging honest. When a path sounds
-        wrong, the HUD can show whether the direct ray is blocked, which
-        material was crossed, how much distance traveled through a medium, and
-        which probes were chosen. You can inspect the acoustic cause before
-        touching the synthesizer.
-      </p>
-
-      <div class="demo-slot" data-demo="room"></div>
-
-      <p>
-        The direct ray in the interactive figure is the cheapest and most
-        important test. If it is clear, the listener hears the source with
-        distance rolloff and only mild air/media loss. If it crosses a surface,
-        the material's transmittance curve becomes a color filter. A concrete
-        wall and a glass slot are not just different meshes; they are different
-        low/mid/high transfer functions.
-      </p>
-      <p>
-        In practice I cast more than one primary ray. A single segment is too
-        binary for a moving first-person listener: one pixel of doorway can
-        flip a source from hidden to visible. A tiny bundle aimed at the head,
-        shoulders, and source radius gives a fractional visibility estimate. It
-        is still cheap, but it produces the soft transitions that make the
-        instrument feel continuous. The same bundle also gives a better answer
-        for partially submerged or partially occluded sources.
-      </p>
-      <p>
-        The acoustic output is intentionally independent of camera rendering.
-        The renderer can use any art direction it wants, but the acoustic world
-        needs clean collision surfaces, medium volumes, and materials with
-        stable names. In a larger scene I would treat the acoustic mesh as a
-        simplified sibling of the visual mesh, not as a verbatim copy. The ear
-        does not need every bevel, screw, and trim strip. It needs the surfaces
-        that change audibility and timbre.
-      </p>
-
-      <h2><span class="kicker">Materials</span>Absorb, transmit, scatter</h2>
-      <p>
-        Each surface carries an acoustic material. Rendering already needs a
-        material; audio adds a second representation:
-      </p>
-      <pre><code>material = {
-  absorption:    { low, mid, high },   // energy removed from reflections
-  transmittance: { low, mid, high },   // energy allowed through the surface
-  scatter:       0..1                  // how directional the bounce remains
-}</code></pre>
-      <p>
-        This is why sound outside a wall can still leak through. That leak is not
-        a bug in collision. It is the wall's transmittance, mostly in the low
-        band. The useful perceptual trick is that the leaked source changes
-        color: less presence, less sparkle, more body. Your ear reads that
-        color change as "behind a barrier" faster than it reads volume alone.
-      </p>
-      <p>
-        Absorption and transmittance are kept separate because they describe
-        different stories. Absorption is energy that fails to return to the
-        room after a bounce. Transmittance is energy that survives through a
-        barrier. A thick curtain can absorb reflected highs while transmitting
-        a surprising amount of low body. A pane of glass can transmit a hard,
-        narrow band while reflecting a bright snap. A game-like "occlusion"
-        slider would flatten all of those cases into the same muffled sound.
-      </p>
-      <p>
-        Scatter is the third knob because real surfaces do not all reflect like
-        mirrors. A polished tile wall preserves directionality; a bookshelf or
-        rippled water boundary smears it. In the sparse-probe graph, scatter
-        widens the baked directional lobe so more outgoing paths remain
-        plausible, but with reduced focus. Musically, high scatter tends to make
-        a space feel wider and less localizable. Low scatter makes routes feel
-        sharper, as if the sound is slipping through a specific doorway or
-        reflecting from a hard corner.
-      </p>
-
-      <div class="demo-slot" data-demo="material"></div>
-
-      <aside class="note">
-        <span class="note-label">Implementation note</span>
-        <p>
-          The implementation keeps these values deliberately small: three bands
-          and a few floats per surface. That makes the acoustic result easy to
-          feed into Web Audio gain nodes and filters. If the renderer later
-          grows a physically based material library, the acoustic material can
-          still remain independent; visual roughness and acoustic scatter are
-          related metaphors, not the same number.
+  <body class="essay">
+    <header class="hero hero-title-below">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Acoustic Spaces · Part 1</p>
+        <h1>Rooms That Play Back</h1>
+        <p class="subtitle">
+          A room answers every sound with thousands of echoes, and you can work them out. Tap
+          the plan above to clap in an empty hall, and hear it from where the head is standing.
         </p>
-      </aside>
+      </div>
+    </header>
+
+    <main>
       <p>
-        One useful authoring workflow is to start with a small material palette:
-        hard wall, soft wall, glass, curtain, water surface, and open portal.
-        Those labels are enough to hear whether the system is behaving. After
-        that, the values can be tuned by scene scale and musical taste. The
-        numbers do not have to pretend to be laboratory measurements to be
-        useful; they need to be consistent, directional, and perceptually
-        distinct.
+        <a href="/pages/living-music/vibration.html">Living Music</a> was about notes up to
+        the moment they leave the instrument. This series is about what happens next. Before
+        a sound reaches you it has hit the walls, the floor, the ceiling and the furniture,
+        and each of those sends back a copy that's a little later, a little quieter and a
+        little duller. The copies arrive by the thousand. You don't hear them as echoes. You
+        hear them as the room.
+      </p>
+      <p>
+        Everything on this page runs on one model: a rectangular room with six surfaces, each
+        made of a material whose absorption is known in six octave bands, from 125 Hz to
+        4 kHz. From that the page builds an <em>impulse response</em>, the room's complete
+        answer to a single click, and then plays sounds through it by convolution. The plan at
+        the top is an empty hall, 12 × 7 × 4 metres, with a brick wall, a glass wall, wood
+        panels and plaster. The ripple is a separate wave simulation, slowed down 65 times so
+        you can watch the sound spread and bounce. The dashed lines light up as the slowed
+        wavefront reaches the head along the direct path and the four first reflections off
+        the walls. What you hear is the impulse response, at the real speed of sound. Drag the
+        head somewhere else and clap again.
       </p>
 
-      <h2><span class="kicker">Pathing</span>Why probes need direction</h2>
+      <!-- ================================================================ -->
+      <h2 id="mirror-rooms"><span class="kicker">Step 1 · Reflections</span>Mirror rooms</h2>
       <p>
-        Routing sound around a corner looks like graph search, but a plain graph
-        is not enough. If the sound arrives at a probe from the left and leaves
-        forward, that may represent a plausible reflection. If it arrives from
-        behind and leaves forward, the same edge pair may be impossible or very
-        lossy. A probe is therefore more than a point. It stores directional
-        compatibility: "energy coming from this region can leave toward that
-        region with this strength."
+        A flat wall reflects sound the way a mirror reflects light: the angle going in equals
+        the angle coming out. That means the reflected sound reaches you as if it came from a
+        copy of the source standing behind the wall, as far behind it as the real source is
+        in front. Mirror the copy in a second wall and you get the path that bounces twice.
+        Keep going and the whole plane fills with mirrored rooms, each holding one
+        <em>image source</em>, and every image is one path from the source to you.
       </p>
       <p>
-        A navigation graph answers the question "can an agent move from A to
-        B?" An acoustic graph has to answer a stricter question: "can energy
-        arriving from this direction plausibly leave in that direction after
-        interacting with the nearby surfaces?" That directional dependency is
-        why a naive corner route can sound wrong even when it is geometrically
-        short. Sound is not a token teleporting between probe centers. It has a
-        history.
+        Each image needs only two numbers to become sound: how far it is, and which walls it
+        bounced off on the way. Distance gives the delay (343 metres per second) and the
+        spreading loss (pressure falls as one over distance). Each bounce multiplies the
+        pressure by √(1 − α), where α is the fraction of energy the wall absorbs, per octave
+        band. Jont Allen and David Berkley wrote this down for rectangular rooms in 1979, and
+        it's still how most room simulators start. Here is the gain of one image in each band,
+        from <code>room.ts</code>:
       </p>
+      <pre><code><span class="cm">// beta = √(1 − α) per surface and band; hits = bounces off each of the six surfaces</span>
+const gain = BANDS.map((_, b) =&gt; {
+  let g = 1 / dist;
+  for (let i = 0; i &lt; 6; i++) if (hits[i]) g *= Math.pow(beta[i][b], hits[i]);
+  return g * Math.exp(-0.5 * AIR_M[b] * dist); <span class="cm">// and the air takes a little</span>
+});</code></pre>
       <p>
-        The system bakes that compatibility with spherical Gaussian lobes. At
-        runtime, Dijkstra only searches a sparse graph, but each turn on the
-        path gets weighted by the baked lobe. The result is a route that behaves
-        like reflected sound instead of like a video-game AI walking around a
-        box.
-      </p>
-      <p>
-        During baking, each probe samples nearby surfaces and portals. For each
-        incoming direction, it records a compact outgoing distribution: a
-        center direction, a sharpness value, and per-band energy. You can think
-        of it as a tiny directional impulse response without the full audio
-        buffer. Runtime pathing only needs to ask whether the current turn lines
-        up with that lobe. If it does, the path keeps energy. If it cuts across
-        an impossible reflection angle, the path becomes expensive or dies.
-      </p>
-      <p>
-        This is the reason partial connections work. The graph does not need to
-        connect every probe to every other probe, because the lobe already says
-        which directions are meaningful. In an open hall, a few long links are
-        enough. Around a doorway, a small cluster of probes captures the turn.
-        Near a thick obstruction, links can exist on both sides without
-        pretending there is a direct acoustic shortcut through the center.
+        The figure is a 6 × 4 metre room seen from above. To keep it flat I made the floor and
+        ceiling fully absorbing, so only the four walls reflect. The real room is in the middle;
+        the rest are its mirror images, with one dot per image source, coloured by how many
+        bounces it stands for. One second-order path is selected to start with: the dashed line
+        runs straight from its image to the listener, and the solid line is the same path
+        folded back into the real room. Tap any dot, or any bar in the echogram underneath, to
+        see its path. The clap plays only these paths, with no reverb added.
       </p>
 
-      <div class="demo-slot" data-demo="probes"></div>
+      <div
+        data-demo="images"
+        data-title="Mirror rooms"
+        data-hint="Drag the dots, then clap"
+      ></div>
 
       <p>
-        Sparse probes are the practical win. A dense regular probe field is easy
-        to reason about and expensive to traverse. A sparse field follows the
-        shape of the space: probes cluster near corners, occluders, portals,
-        and volume boundaries; empty open space needs only a few anchors. With
-        partial links, the number of edges stays small, so route cost grows
-        sub-linearly with the number of probes in the scene.
-      </p>
-      <p>
-        The placement rule is "put information where the answer changes." A
-        huge empty warehouse does not need a checkerboard of acoustic samples.
-        A single doorway in that warehouse deserves attention because crossing
-        it changes visibility, reflection, and transmittance. The same logic
-        applies to stairs, balconies, waterline boundaries, and soft partitions.
-        This is a better fit for authored spaces than a uniform grid because it
-        spends detail where a listener can actually hear the difference.
-      </p>
-      <p>
-        At runtime, the emitter and listener are temporarily attached to the
-        graph by finding nearby visible probes. Then a normal shortest-path
-        search runs, except edge cost includes distance, material loss, medium
-        loss, and directional lobe compatibility. The winning path is not
-        necessarily the shortest geometric route. It is the route with the most
-        believable surviving energy.
+        At order 0 you hear the dry clap. At order 1 you hear four distinct slaps, which is
+        what a small hard room sounds like if you listen for it. By order 6 or so they run
+        together into a short buzz, and by 12 it starts to sound like a space. The count grows
+        fast. In this flat room it grows with the square of the time; in a real 3D room the
+        number of images within reach after <em>t</em> seconds is about
+        4π(<em>ct</em>)³ / 3<em>V</em>, so they arrive at a rate of 4π<em>c</em>³<em>t</em>² /
+        <em>V</em> per second. In the hall at the top (336 m³) that passes 4,000 a second after
+        about 50 milliseconds. Beyond that, counting stops being useful, and the next step
+        replaces the count with a statistic.
       </p>
 
-      <div class="demo-slot" data-demo="lobe"></div>
-
+      <!-- ================================================================ -->
+      <h2 id="sabine"><span class="kicker">Step 2 · The tail</span>Sabine's stopwatch</h2>
       <p>
-        The lobe diagram is the missing piece in many "sound around corners"
-        sketches. If the outgoing ray points into the bright part of the lobe,
-        the route keeps energy. If it points into the dark part, the route is
-        technically connected but acoustically weak. That distinction lets a
-        sparse graph feel continuous without letting every connected edge become
-        an equally valid portal.
+        In 1895 Harvard's president asked Wallace Clement Sabine, a 27-year-old physics
+        instructor, to do something about the lecture room in the new Fogg Art Museum, where
+        nobody could understand the speakers. Sabine decided to measure how long a sound
+        lingered. He sounded an organ pipe at 512 Hz, cut it off, and timed with a chronograph
+        how long it took to become inaudible. Then he borrowed the seat cushions from Sanders
+        Theatre, laid them out in the room a few at a time, and timed it again, working at
+        night when the street was quiet. The time multiplied by the total absorption, the
+        room's own plus the cushions', came out constant.
+      </p>
+      <p>
+        That gave him a formula. With the room's volume <em>V</em> in cubic metres and its
+        total absorption <em>A</em> = Σ <em>S</em>·α in square metres (each surface's area
+        times its absorption coefficient), the reverberation time is
+      </p>
+      <pre><code>T = 0.161 · V / A   <span class="cm">// seconds, to fall by 60 dB</span></code></pre>
+      <p>
+        He published it in 1900, the year Boston's Symphony Hall opened with Sabine as its
+        acoustician. Today the reverberation time is defined as the time for the sound to fall
+        by 60 dB, to a millionth of its energy. In 1930 Carl Eyring pointed out that Sabine's
+        formula overestimates the time in very dead rooms (cover every surface with something
+        that absorbs everything and Sabine still predicts a small echo), and gave a version
+        with −<em>S</em>·ln(1 − ᾱ) in place of <em>A</em>. The two agree when the room is
+        live and part ways when it isn't.
+      </p>
+      <p>
+        The figure is a plaster hall with the proportions of a long lecture room, 2 : 1.4 : 1.
+        Change its volume, from 60 to 20,000 m³, and cover its floor with a seated audience. The
+        left panel is both formulas against coverage. The right panel is the decay that
+        actually comes out of the impulse response the figure builds, measured the way
+        acousticians do it, by integrating the energy backwards from the end (Manfred
+        Schroeder's method, from 1965). Press the organ pipe to hear Sabine's test: the
+        stopwatch starts when the pipe stops.
       </p>
 
-      <h2><span class="kicker">Media</span>Air and water are both part of the room</h2>
-      <p>
-        Participating media are handled as volumes. A ray or routed segment
-        measures how much distance it spends inside each volume and applies a
-        band attenuation curve. This is Beer-Lambert extinction in the simple
-        form that matters for audio:
-      </p>
-      <pre><code>energy.band *= exp(-volume.attenuation.band * distanceInside)</code></pre>
-      <p>
-        Air has mild high-frequency loss over distance. Water can be much more
-        aggressive, especially in the high band, and the system does not require
-        the volume to be a box. Any shape that can answer "how far did the segment
-        travel inside me?" can participate.
-      </p>
-      <p>
-        Volumes are evaluated per segment, so they work for both direct rays and
-        routed paths. A source can be in air, pass through a water pocket, leave
-        through a doorway, and then reach a listener in air again. Each segment
-        contributes its own extinction. The final band energy is the product of
-        all those small losses, which makes mixed spaces feel gradual instead
-        of switching between presets.
-      </p>
-      <p>
-        The same idea can describe fog, heavy cloth, glass, or sci-fi fields if
-        the project wants them. They do not need to be physically literal. A
-        volume is any region that colors sound as it crosses it. For a musical
-        browser piece, that makes media a composition tool: entering water can
-        soften bells, a warm mist can roll off presence, and a thin bright
-        portal can let only a shimmer through.
-      </p>
-      <p>
-        The hard part is avoiding discontinuities at volume boundaries. The
-        solver treats volume distance as a continuous measurement and smooths the
-        resulting bus. When a listener hovers at the surface of the water, the
-        sound should not click between two worlds. It should feel like dipping
-        your ears below a line.
-      </p>
-
-      <h2><span class="kicker">The instrument</span>Making the room beautiful</h2>
-      <p>
-        The instrument is built to make the simulation beautiful rather than
-        merely obvious. Slow sine and triangle drones, tiny detune drift,
-        filtered breath noise, long reverb, and sparse bell tones give the
-        acoustic system a soft body to shape. The room still controls the mix,
-        but harsh partials are not waiting to punish every occlusion event.
-      </p>
-      <p>
-        The gentler voice is built from layers with different responsibilities.
-        The low layer is body: slow sines near stable musical intervals, with
-        tiny detune drift so the sound never locks into a sterile loop. The mid
-        layer is presence: quiet tones and filtered breath that make the room
-        feel occupied. The high layer is air: sparse triangle partials and bell
-        tones, kept low enough that occlusion removes sparkle without creating a
-        brittle edge.
-      </p>
-      <pre><code>direct.low  -> warm body
-direct.mid  -> presence
-direct.high -> small amount of air, never a bright saw edge
-path.*      -> slower attack, longer delay, wetter reverb</code></pre>
-      <p>
-        This is the central lesson: simulation output should be treated as a
-        musical control signal. Correct physics can still sound bad if it drives
-        an ugly instrument. A gentle instrument lets the listener hear the room
-        as motion, color, and distance rather than as a harsh filter sweep.
-      </p>
-      <p>
-        This is also why the path bus is treated differently from the direct
-        bus. The routed signal gets a softer attack, a little more reverb, and a
-        wetter delay. It is not pretending to be a measured late reflection
-        impulse response. It is taking the acoustic fact "energy arrived by a
-        longer indirect route" and turning that fact into a musical gesture:
-        less point, more halo.
-      </p>
-      <p>
-        If the same solver were driving footsteps, alarms, or voice chat, the
-        synth would change again. Footsteps might use the low band for thumps
-        and the high band for shoe texture. Voice chat would need speech
-        intelligibility protection and more conservative filtering. A healing
-        sound bath can be more willing to blur, sustain, and bloom. The solver
-        stays general because the instrument stays replaceable.
-      </p>
-
-      <div class="demo-slot" data-demo="healing"></div>
-
-      <h2><span class="kicker">Frame budget</span>Why this fits in a browser</h2>
-      <p>
-        The frame loop has two modes. With pathing disabled, each simulated
-        emitter casts primary audibility rays and evaluates material/media loss:
-        constant time with respect to probe count. With pathing enabled, it
-        connects the emitter and listener to nearby visible probes, searches the
-        sparse graph, and evaluates the chosen route. The graph is intentionally
-        smaller than a uniform probe mesh, and the path search touches only the
-        useful neighborhood.
-      </p>
-      <pre><code>without pathing: direct rays + band filters                  ≈ constant
-with pathing:    visible probe anchors + sparse route search ≈ small graph cost</code></pre>
-      <p>
-        The important phrase is "with respect to probe count." Direct audibility
-        still scales with the number of active simulated emitters, because each
-        emitter needs its own answer. What the no-pathing mode avoids is paying
-        for the global probe field. That makes it a good default for many
-        sources: ambient beds, small props, or distant emitters can use primary
-        occlusion only, while important foreground sources opt into routed
-        energy.
-      </p>
-
-      <div class="demo-slot" data-demo="budget"></div>
+      <div
+        data-demo="sabine"
+        data-title="Sabine's stopwatch"
+        data-hint="Cover the floor, sound the pipe"
+      ></div>
 
       <p>
-        This interactive cost diagram is not a profiler. It is a mental model
-        for why the sparse graph stays manageable. Turning pathing off leaves
-        only the direct rays and band output. Turning pathing on adds anchor
-        selection and graph search, but the graph is partial: each probe sees a
-        few useful neighbors instead of every possible neighbor. Raising the
-        link budget improves route options and costs more, which is exactly the
-        tradeoff an author should be able to tune.
+        Empty, the 1,200 m³ hall rings for 6.7 seconds at 500 Hz. A quarter of the floor full
+        of people halves it, to 3.2, and a full floor brings it down to 1.3 seconds (1.1 by
+        Eyring). That's the whole lesson Sabine took from the cushions: reverberation time
+        follows the absorption you put in the room, and audiences are most of it. It's also
+        why a hall sounds different in rehearsal and in concert.
       </p>
       <p>
-        In the browser implementation, the simulation cost is deliberately
-        small compared with rendering. With pathing active, the route search
-        lands around the low millisecond range on the example scene. Without
-        pathing, direct audibility and band shaping stay near a tenth of a
-        millisecond. Those numbers are scene-dependent, but the architecture
-        matters more than the exact timing: local ray tests remain local,
-        sparse pathing remains sparse, and Web Audio does the sample-rate work
-        after receiving smoothed targets.
-      </p>
-      <p>
-        The output is tiny: six gain targets, one panner position, and a few
-        labels for the HUD. Web Audio then handles interpolation, smoothing,
-        HRTF panning, delays, and reverb. The renderer, the simulation, and the
-        synth stay separate, which is what keeps the project debuggable.
-      </p>
-      <p>
-        Separation also keeps failure modes understandable. If a path is too
-        bright, inspect material transmittance. If it bends through an
-        impossible corner, inspect lobe compatibility. If it arrives too late
-        or too wet, inspect the instrument's mapping from route length to
-        reverb and delay. Each layer owns a different class of mistake.
+        The tail in the impulse response is not a sum of image sources. Once the reflections
+        are too dense to count (the <em>mixing time</em>, when they reach about 4,000 a second,
+        kept between 45 and 250 ms), I switch to noise. The noise is made in frames of 1,024
+        samples with random phases. Each frequency starts at the level the image sources had
+        reached by then and falls at its own band's rate: 6.9 / <em>T</em> nepers a second in
+        amplitude, which is 60 dB in <em>T</em> seconds. The two parts overlap and crossfade
+        over the last 15% of the mixing time.
       </p>
 
-      <h2><span class="kicker">Debugging</span>What to show while tuning</h2>
+      <!-- ================================================================ -->
+      <h2 id="bands"><span class="kicker">Step 3 · Colour</span>Six bands, six clocks</h2>
       <p>
-        Acoustic systems need visual debug tools because the ear cannot tell
-        you which part of the pipeline lied. I want overlays for primary rays,
-        crossed surfaces, volume intersections, chosen probes, rejected probes,
-        lobe energy at each turn, and final low/mid/high bands. The goal is not
-        to make the screen busy during normal play. The goal is to let the
-        author pause on a bad moment and see the complete causal chain.
+        Sabine's formula gives one number, but rooms don't absorb all frequencies equally, so
+        every band gets its own. Carpet hardly touches 125 Hz (it absorbs 2%) and soaks up 65%
+        at 4 kHz. Drywall on studs does the opposite: the board flexes, and at 125 Hz it
+        absorbs 29%. Glazed tile reflects 99% of everything. The air itself takes a share of
+        the high frequencies over long distances, which matters in big halls. So a room has
+        six clocks running at once, and the balance between them is most of its character:
+        a carpeted room with drywall sounds boomy and dull; a tiled one sounds bright.
       </p>
       <p>
-        A good tuning session usually starts with the direct path. Move the
-        listener around a wall and watch the visibility fraction. It should
-        change continuously near doorways and edges. Then enable material bars
-        and make sure blocked paths lose brightness before they lose body. Only
-        after that should pathing be tuned, because pathing can hide direct-ray
-        problems by adding plausible indirect energy.
-      </p>
-      <p>
-        The final pass is musical rather than physical. Walk the listener in a
-        loop and listen for fatigue. If a repeated route creates a whistle,
-        lower the high band or widen the lobe. If every room feels like the same
-        cave, reduce the wet path mapping and let direct energy speak. If a
-        barrier feels fake, increase the color difference between transmitted
-        low and transmitted high. The debug display finds the cause; the
-        instrument decides whether the result is beautiful.
+        Pick a room, or set the walls, floor and ceiling yourself. The top row is the
+        absorption of the three surfaces. Below left, each band's decay in the room's impulse
+        response; below right, the reverberation time per band, from Eyring's formula (bars)
+        and measured from the response between −5 and −35 dB (white ticks, the standard
+        <em>T</em><sub>30</sub> measurement). They should agree, since the tail is built from those
+        times. The check is that nothing between the formula and the speaker, no filter and no
+        join, bends it.
       </p>
 
-      <h2><span class="kicker">Coda</span>The room becomes part of the music</h2>
+      <div
+        data-demo="bands"
+        data-title="Six bands, six clocks"
+        data-hint="Pick a room, then listen"
+      ></div>
+
       <p>
-        A spatial audio system is easy to describe as realism: make the sound
-        behave like it would in the room. But the more useful framing is
-        instrument design. The room is a performer. Materials shape timbre,
-        media shape distance, probes shape routes, and the listener conducts by
-        walking. Once the synthesis is gentle enough, the acoustic simulation
-        stops feeling like an effect and starts feeling like a place that plays
-        back.
+        Every room here is empty and a perfect box, so the times run long next to real rooms
+        with furniture, doors and people in them. The shapes are right, though. The tiled
+        bathroom rings for 3.8 seconds at 1 kHz but only 1.1 at 125 Hz, because the drywall
+        ceiling eats the bass. The empty living room holds 500 Hz for 1.3 seconds and loses
+        4 kHz in 0.37. The vocal booth is under a tenth of a second everywhere. The concert
+        hall, 42 × 26 × 18 metres with its floor full of people, stays close to 1.9 seconds
+        from 125 Hz to 2 kHz and drops to 1.5 at 4 kHz, which is about what good halls are
+        built for. The church
+        holds the middle for 13 seconds. Try the voice in the booth and then in the church.
+        The words are hard to follow in the church because each syllable is still sounding
+        when the next one arrives.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="modes"><span class="kicker">Step 4 · Bass</span>The room's own notes</h2>
+      <p>
+        At low frequencies the picture of rays bouncing off walls breaks down. A 50 Hz wave is
+        6.9 metres long, bigger than most rooms, and the room behaves like a box-shaped organ
+        pipe. It has resonances, called <em>modes</em>, at the frequencies where a whole number
+        of half-wavelengths fits between the walls in each direction:
+      </p>
+      <pre><code>f = (c / 2) · √( (nx/L)² + (ny/W)² + (nz/H)² )   <span class="cm">// nx, ny, nz = 0, 1, 2, …</span></code></pre>
+      <p>
+        A mode with one nonzero index bounces between two opposite walls (axial); two indices
+        means it goes around four walls (tangential); three means all six (oblique). The
+        room in the figure is 5.2 × 3.8 × 2.6 metres, with drywall walls and ceiling and a wood
+        floor. Its lowest modes are 33.0 Hz (1,0,0), 45.1 Hz (0,1,0), 55.9 Hz (1,1,0) and a
+        pair at 66.0 Hz, one along the length and one between floor and ceiling. Below 200 Hz
+        there are 67 of them.
+      </p>
+      <p>
+        Each mode is a standing wave with fixed loud spots and silent lines, so the bass you
+        hear depends on where you stand. Manfred Schroeder worked out in the 1950s where this
+        stops mattering: above roughly 2000 √(<em>T</em> / <em>V</em>) Hz the modes overlap so
+        much that the response turns into a dense, random-looking jumble, and the statistical
+        picture from Step 2 takes over. For this room that's 158 Hz. The impulse responses
+        on this page don't model what happens below it, since their tail is noise, so this
+        figure computes the modes directly: a sum over all of them, each damped at the room's
+        125 Hz reverberation time (0.32 s).
+      </p>
+      <p>
+        The map shows how loud a bass tone from the speaker in the corner is at every point at
+        ear height (1.2 m). The curve below is the response where the head is standing. Drag
+        the head along the room at 64 Hz and the level changes by almost 20 dB within a metre
+        of the dark line.
+        You'll need headphones: laptop speakers can't play this low.
+      </p>
+
+      <div
+        data-demo="modes"
+        data-title="The room's own notes"
+        data-hint="Drag the head, sweep the note"
+      ></div>
+
+      <p>
+        The speaker sits in a corner on purpose. Every mode has a pressure maximum in every
+        corner, so a speaker there drives all of them, which is also why bass gets boomy when
+        you push a subwoofer into one. The deep notches in the curve are frequencies where
+        the listener is on a silent line of the strongest nearby mode. Sweep the note and you
+        hear the room's bass as a series of swells and holes that have nothing to do with the
+        music. Mixing engineers sit in a measured spot for this reason, and treat the room
+        with bass traps, which are absorbers thick enough to work at these wavelengths.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="ears"><span class="kicker">Step 5 · Direction</span>Two ears</h2>
+      <p>
+        So far the room has had one listener with one ear. You have two, about 17.5 cm apart
+        with a head in between, and that's how you know where a sound comes from. In 1907 Lord
+        Rayleigh described two separate cues, an idea now called the <em>duplex theory</em>.
+        At low frequencies the wavelength is longer than the head, the sound bends around it
+        easily, and what differs between the ears is the arrival time. At high frequencies the
+        head casts an acoustic shadow, and what differs is the level.
+      </p>
+      <p>
+        For a round head of radius <em>a</em> the extra distance to the far ear is the straight
+        part plus the arc around the head, which gives Robert Woodworth's formula for the time
+        difference: (<em>a</em> / <em>c</em>)(θ + sin θ) for a source at angle θ off centre. With
+        <em>a</em> = 8.75 cm it peaks at 656 µs for a sound straight to one side. For the
+        shadow I used Richard Brown and Richard Duda's spherical-head filter from 1998: one
+        pole and one zero per ear, with the high frequencies boosted by up to 6 dB on the side
+        facing the sound and cut by up to 20 dB in the shadow. In the live figure each ear gets
+        a delay and a high-shelf filter set from those formulas.
+      </p>
+
+      <div
+        data-demo="ears"
+        data-title="Two ears"
+        data-hint="Headphones on, drag the sound"
+      ></div>
+
+      <p>
+        The sound circles once every 14 seconds until you drag it. With timing only, the
+        high frequencies are equally loud in both ears. With level only, nothing is delayed,
+        and the low voice barely moves, because the shadow mostly acts above 1 kHz. With both,
+        the sound should leave the middle of your head and sit off to the side. The plain pan
+        only changes the balance between the channels, the same at every frequency, with no
+        delay. Watch the dashed circle marked "same cues". A sphere
+        gives identical timing and shadow for a sound in front and its mirror image behind, so
+        this model can't tell them apart, and it can't hear height at all. Real ears separate
+        them with the folds of the outer ear, which filter the sound differently from each
+        direction (measured as a <em>head-related transfer function</em>), and with small head
+        movements.
+      </p>
+      <p>
+        The impulse responses on this page use the same head. Every image source arrives from
+        its own direction and gets its own time difference and shadow filter for each ear, and
+        the late tail uses a separate noise for each ear, so the reverb surrounds you instead
+        of sitting in the middle. That's why the hero sounds like standing in the hall, if you
+        have headphones on.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="lucier"><span class="kicker">Step 6 · Feedback</span>I am sitting in a room</h2>
+      <p>
+        In 1969 the composer Alvin Lucier recorded himself reading a short text, played the
+        recording back into the same room and recorded it again, and kept going. Each pass adds
+        the room's response once more, and after a few dozen passes the words are gone and
+        what's left is a set of pitches: the frequencies the room favours. The text he reads
+        describes the process. It turns out to be easy to compute.
+      </p>
+      <p>
+        Playing a sound into a room multiplies its spectrum by the room's frequency response
+        <em>H</em>(<em>f</em>). Doing it <em>n</em> times multiplies it by |<em>H</em>|<sup><em>n</em></sup>,
+        and the tallest peaks of <em>H</em> win by more each time. The figure does this 32 times
+        by convolution, at 24 kHz to save work, rolling off below 70 Hz and above 7 kHz at each
+        pass the way a loudspeaker and microphone would. The voice is the vowel synthesizer
+        from the other figures, seven syllables with no consonants, since I don't have
+        Lucier's recording to use. Each row of the waterfall is one generation's spectrum.
+      </p>
+
+      <div
+        data-demo="lucier"
+        data-title="I am sitting in a room"
+        data-hint="Pick a generation, play it"
+      ></div>
+
+      <p>
+        The formants of the voice are the broad bright bands at the top. By generation 8 they
+        are breaking into narrow lines, and by 16 only the lines are left. The readout names the
+        pitches that survive in each room. Which pitches they are depends on what was in the
+        voice to begin with, since a room can only boost what it's given, and on where the
+        speaker and the microphone stand. Above the Schroeder frequency the response of a room is a
+        tangle of peaks whose positions change when you move a few centimetres. That's true of
+        real rooms, and here it's true of the random tail, so the room's "notes" belong to the
+        positions as much as to the room.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="lessons"><span class="kicker">Epilogue</span>What a room does</h2>
+      <p>A few lessons from this part:</p>
+      <ul>
+        <li>
+          <strong>Reflections are mirrored sources.</strong> One rule, reflect the room, turns
+          echoes into geometry: a delay, a distance and a list of walls.
+        </li>
+        <li>
+          <strong>After a few dozen milliseconds, count statistically.</strong> The images
+          arrive too fast to matter one at a time, and a noise tail with the right decay per
+          band sounds the same.
+        </li>
+        <li>
+          <strong>Absorption sets the time.</strong> Sabine's formula is still the first
+          estimate for a live room, and Eyring's for a dead one.
+        </li>
+        <li>
+          <strong>Bass is a different problem.</strong> Below the Schroeder frequency the room
+          is a resonator, and where you stand matters more than what the walls are made of.
+        </li>
+        <li>
+          <strong>Two ears make it a place.</strong> A time difference and a filter per ear
+          move the room from between your ears to around you.
+        </li>
+      </ul>
+      <p>
+        Things I'd try next: rooms that aren't boxes, which need ray tracing or a wave solver
+        instead of mirrors; scattering, since real walls aren't perfect mirrors and a rough
+        surface spreads its reflection out; measured head-related transfer functions instead of
+        a sphere, to get front, back and height; and a low-frequency part built from the modes,
+        joined to the noise tail at the Schroeder frequency.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/acoustic-spaces/room-instrument.html">Part 2, The Room Instrument</a>.</strong>
+        A room becomes a sequencer: its echoes set the rhythm, its walls the tone, and the
+        whole thing fits in a link.
       </p>
     </main>
 
     <footer>
       <p>
-        <a href="/pages/living-music/accompanist.html">← From Living Music: The Accompanist</a> ·
-        <a href="/pages/acoustic-spaces/room-instrument.html">Part two: The Room Instrument →</a>
-      </p>
-      <p>
-        Built with Web Audio and live canvas diagrams. Related ideas:
-        Valve's Steam Audio, image-source reflections, probe-based visibility,
-        directional impulse responses, and band-limited acoustic materials.
+        References:
+        <a href="https://doi.org/10.1121/1.382599">Allen &amp; Berkley, Image method for efficiently simulating small-room acoustics (1979)</a> ·
+        <a href="https://archive.org/details/collectedpaperso00sabi">Sabine, Collected Papers on Acoustics (1922)</a> ·
+        <a href="https://doi.org/10.1121/1.1901884">Eyring, Reverberation time in "dead" rooms (1930)</a> ·
+        <a href="https://doi.org/10.1121/1.1909343">Schroeder, New method of measuring reverberation time (1965)</a> ·
+        <a href="https://doi.org/10.1121/1.1909022">Schroeder &amp; Kuttruff, On frequency response curves in rooms (1962)</a> ·
+        <a href="https://doi.org/10.1201/9781315372150">Kuttruff, Room Acoustics</a> ·
+        <a href="https://doi.org/10.1080/14786440709463595">Rayleigh, On our perception of sound direction (1907)</a> ·
+        <a href="https://doi.org/10.1109/89.709673">Brown &amp; Duda, A structural model for binaural sound synthesis (1998)</a> ·
+        <a href="https://www.sengpielaudio.com/calculator-RT60Coeff.htm">Absorption coefficients of common materials (sengpielaudio)</a> ·
+        Lucier, <em>I am sitting in a room</em> (1969; Lovely Music recording, 1981)
       </p>
     </footer>
 

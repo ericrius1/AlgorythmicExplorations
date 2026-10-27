@@ -7,6 +7,7 @@ initNav();
 const mounts: Record<string, (el: HTMLElement) => ReturnType<Parameters<typeof mountLazy>[1]>> = {
   "hero-prism": (el) => mountPrism(el, { mode: "hero" }),
   bench: (el) => mountPrism(el, { mode: "bench" }),
+  spectrum: (el) => mountPrism(el, { mode: "spectrum" }),
   caustics: (el) => mountPrism(el, { mode: "caustics" }),
   full: (el) => mountPrism(el, { mode: "full" }),
 };

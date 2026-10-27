@@ -167,7 +167,7 @@ const SCALES: World[] = [
     down: [5, 4, 3, 2, 1, 0],
     drone: null,
     timbre: "metal",
-    caption: "five nearly equal steps (231–253¢); average of 28 measured gamelan, octave 1208¢",
+    caption: "five nearly equal steps (231–253¢); average of measured Central Javanese sets, octave 1208¢",
   },
   {
     id: "pelog",
@@ -227,7 +227,7 @@ const TRAD_COLOR: Record<World["tradition"], RGB> = {
 
 export function mountWorldScales(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.5);
-  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 0.92 : 0.42));
+  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.02 : 0.42));
   const sound = new Sound({ level: 1, reverb: 0.2 });
   const badge = tapBadge(container, "tap for sound");
 
@@ -389,7 +389,17 @@ export function mountWorldScales(container: HTMLElement): Demo {
       const tcol = TRAD_COLOR[sc.tradition];
 
       text(ctx, sc.title, x0, narrow ? 24 : 30, { size: narrow ? 14 : 16, color: "#f4f6fc", weight: 700 });
-      text(ctx, sc.caption, x0, narrow ? 42 : 50, { size: narrow ? 10 : 11, color: COL.dim });
+      // the caption wraps to the figure width (two or three lines on a phone)
+      ctx.font = `400 ${narrow ? 10 : 11}px ui-sans-serif, system-ui, sans-serif`;
+      const capLines: string[] = [];
+      for (const word of sc.caption.split(" ")) {
+        const cur = capLines.length ? capLines[capLines.length - 1] : "";
+        if (cur && ctx.measureText(`${cur} ${word}`).width > x1 - x0) capLines.push(word);
+        else if (capLines.length) capLines[capLines.length - 1] = cur ? `${cur} ${word}` : word;
+        else capLines.push(word);
+      }
+      capLines.forEach((ln, i) => text(ctx, ln, x0, (narrow ? 42 : 50) + i * 13, { size: narrow ? 10 : 11, color: COL.dim }));
+      const capExtra = (capLines.length - 1) * 13;
 
       // the twelve-note grid: one cell per equal-tempered semitone
       for (let s = 0; s <= 12; s++) {
@@ -428,7 +438,7 @@ export function mountWorldScales(container: HTMLElement): Demo {
 
       // pins
       pins = [];
-      const top = narrow ? 70 : 82;
+      const top = (narrow ? 70 : 82) + capExtra;
       const rows = 2;
       const visible = sc.notes.map((n, i) => ({ n, i })).concat([{ n: { c: sc.octave, name: sc.notes[0].name, sub: sc.notes[0].sub }, i: sc.notes.length }]);
       visible.forEach(({ n, i }, k) => {

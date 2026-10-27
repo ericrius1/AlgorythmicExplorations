@@ -134,7 +134,7 @@ export function buildIR(room: Room, src: V3, lis: Listener, o: IROptions): IR {
   if (!late) images = imageSources(room, src, lis.pos, C_SOUND * (o.maxLength ?? 0.3), o.maxOrder ?? 99, o.skip ?? [], o.maxImages ?? 3000);
 
   const Tmax = Math.max(...T);
-  const length = Math.min(o.maxLength ?? 6, late ? tm + Tmax * 1.05 + 0.05 : (images[images.length - 1]?.dist ?? 1) / C_SOUND + 0.05);
+  const length = Math.min(o.maxLength ?? 6, late ? tm + Tmax * 1.15 + 0.05 : (images[images.length - 1]?.dist ?? 1) / C_SOUND + 0.05);
   const N = Math.ceil(length * fs) + n;
   const nch = o.binaural ? 2 : 1;
   const ch = Array.from({ length: nch }, () => new Float32Array(N));
@@ -187,47 +187,58 @@ export function buildIR(room: Room, src: V3, lis: Listener, o: IROptions): IR {
     }
   }
 
-  // ---- late part: band-limited noise, decaying at each band's T60 ----
+  // ---- late part: noise whose spectrum decays at each band's T60 ----
+  // Built in short overlapping frames: each frame is random-phase noise with
+  // a magnitude per frequency set by the band levels at that moment, so every
+  // frequency dies away at its own rate and nothing leaks between bands.
   if (late) {
     const win0 = tm * 0.6;
     const winLen = tm - win0;
-    for (let b = 0; b < 6; b++) {
+    const psd = BANDS.map((_, b) => {
       let e = 0;
       for (const im of images) {
         const t = im.dist / C_SOUND;
         if (t >= win0 && t <= tm) e += im.gain[b] ** 2;
       }
-      // power per sample, carried forward from the window's middle to tm
-      const decayRate = 6.908 / T[b]; // amplitude e-folding per second
-      let psd = e / (winLen * fs);
-      psd *= Math.exp(-2 * decayRate * (tm - (win0 + tm) / 2));
-      if (!(psd > 0)) {
-        // nothing in the window (tiny room or capped order): fall back to Sabine's diffuse level
-        psd = 1e-6;
-      }
-      const sigma = Math.sqrt(psd);
-      const start = Math.floor(tm * 0.85 * fs);
-      const fadeEnd = Math.floor(tm * fs);
-      for (let c = 0; c < nch; c++) {
-        const rnd = noise(1234 + b * 97 + c * 7919);
-        const len = N - half - start;
-        if (len <= 0) continue;
-        const buf = new Float32Array(len);
-        for (let i = 0; i < len; i++) buf[i] = rnd();
-        bandpass(buf, BANDS[b], Math.SQRT2, fs);
-        // white noise through this band-pass has ~1/Q·(π/2)·f/fs… normalise to unit power in-band
-        let pw = 0;
-        for (let i = 0; i < len; i++) pw += buf[i] * buf[i];
-        pw /= len;
-        const bwFrac = (BANDS[b] / Math.SQRT2 / (fs / 2)) * (Math.PI / 2);
-        const norm = Math.sqrt(bwFrac / Math.max(pw, 1e-12));
-        const out = ch[c];
-        for (let i = 0; i < len; i++) {
-          const s = start + i + half;
-          const t = (start + i) / fs;
-          let env = sigma * norm * Math.exp(-decayRate * (t - tm));
-          if (start + i < fadeEnd) env *= 0.5 - 0.5 * Math.cos((Math.PI * (start + i - start)) / (fadeEnd - start));
-          out[s] += buf[i] * env;
+      // energy per sample, carried forward from the window's middle to tm
+      let p = e / (winLen * fs);
+      p *= Math.exp((-2 * 6.908 * (tm - (win0 + tm) / 2)) / T[b]);
+      return p > 0 ? p : 1e-9;
+    });
+    const F = 1024;
+    const hop = F / 2;
+    const sig = new Float64Array(F / 2 + 1);
+    const rate = new Float64Array(F / 2 + 1);
+    bandCurve(psd.map((p) => Math.log(p)), F, fs, sig);
+    bandCurve(T.map((t) => 6.908 / t), F, fs, rate);
+    for (let k = 0; k <= F / 2; k++) sig[k] = Math.sqrt(Math.exp(sig[k]) * F); // |X_k| for unit-variance scaling
+    const win = new Float64Array(F);
+    for (let i = 0; i < F; i++) win[i] = Math.sin((Math.PI * (i + 0.5)) / F); // sine window: w² overlaps to 1
+    const start = Math.floor(tm * 0.85 * fs);
+    const fadeEnd = Math.floor(tm * fs);
+    const re = new Float64Array(F);
+    const imv = new Float64Array(F);
+    for (let c = 0; c < nch; c++) {
+      const rnd = noise(1234 + c * 7919);
+      const out = ch[c];
+      for (let f0 = start - hop; f0 < N - half; f0 += hop) {
+        const tc = (f0 + F / 2) / fs - tm;
+        re[0] = imv[0] = re[F / 2] = imv[F / 2] = 0;
+        for (let k = 1; k < F / 2; k++) {
+          const a = sig[k] * Math.exp(-rate[k] * tc);
+          const ph = Math.PI * rnd();
+          re[k] = a * Math.cos(ph);
+          imv[k] = a * Math.sin(ph);
+          re[F - k] = re[k];
+          imv[F - k] = -imv[k];
+        }
+        fft(re, imv, true);
+        for (let i = 0; i < F; i++) {
+          const n0 = f0 + i;
+          if (n0 < start || n0 + half >= N) continue;
+          let v = re[i] * win[i];
+          if (n0 < fadeEnd) v *= 0.5 - 0.5 * Math.cos((Math.PI * (n0 - start)) / (fadeEnd - start));
+          out[n0 + half] += v;
         }
       }
     }
@@ -239,7 +250,7 @@ export function buildIR(room: Room, src: V3, lis: Listener, o: IROptions): IR {
 // in dB, sampled every `step` seconds.
 export function decayCurve(x: Float32Array, fs: number, band: number, step = 0.005): Float32Array {
   const y = Float32Array.from(x);
-  bandpass(y, BANDS[band], Math.SQRT2, fs);
+  for (let k = 0; k < 3; k++) bandpass(y, BANDS[band], 2, fs);
   const cum = new Float64Array(y.length + 1);
   for (let i = y.length - 1; i >= 0; i--) cum[i] = cum[i + 1] + y[i] * y[i];
   const total = cum[0] || 1;

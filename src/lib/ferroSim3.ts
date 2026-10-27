@@ -15,8 +15,14 @@ export const DISH = {
   topZ: 0.85,
 };
 
+// The density field is a 128³ grid fitted around the dish rather than the
+// whole sim box, so its voxels are 0.96/128 = 0.0075 wide, about half a
+// particle spacing.
 export const FIELD_N = 128;
 export const FIELD_SCALE = 256;
+export const FIELD_SPAN = 0.96;
+export const FIELD_VOXEL = FIELD_SPAN / FIELD_N;
+export const FIELD_MIN: [number, number, number] = [-FIELD_SPAN / 2, -FIELD_SPAN / 2, DISH.floorZ - 0.04];
 export const SPLAT_R = H3 * 1.1;
 export const CURSOR_H3 = 0.12;
 
@@ -42,7 +48,7 @@ export const FERRO3_KNOBS: Ferro3Knobs = {
   xsph: 0.12,
   tension: 2.8,
   chi: 4.0,
-  hExt: 5.0,
+  hExt: 4.4,
   magMoment: 0.0,
   forceScale: 0.17,
   kelvin: false,
@@ -90,7 +96,7 @@ export class Ferro3Sim {
     this.dev = dev;
     this.count = count;
     this.sort = new GridSort3(dev);
-    this.params = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.params = dev.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.field = dev.createBuffer({
       size: FIELD_N * FIELD_N * FIELD_N * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -143,7 +149,7 @@ export class Ferro3Sim {
   }
 
   writeParams(knobs: Ferro3Knobs, dt: number, mag: [number, number, number], magOn: boolean): void {
-    const dv = new DataView(new ArrayBuffer(112));
+    const dv = new DataView(new ArrayBuffer(128));
     dv.setUint32(0, this.count, true);
     dv.setUint32(4, GRID3, true);
     dv.setFloat32(8, H3, true);
@@ -172,6 +178,10 @@ export class Ferro3Sim {
     dv.setUint32(100, FIELD_N, true);
     dv.setFloat32(104, SPLAT_R, true);
     dv.setFloat32(108, FIELD_SCALE, true);
+    dv.setFloat32(112, FIELD_MIN[0], true);
+    dv.setFloat32(116, FIELD_MIN[1], true);
+    dv.setFloat32(120, FIELD_MIN[2], true);
+    dv.setFloat32(124, FIELD_VOXEL, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 

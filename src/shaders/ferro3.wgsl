@@ -1,11 +1,11 @@
 // The ferrofluid in three dimensions: part two's physics — warm-started
 // magnetization, current-loop pair forces — ported to a z-up dish, plus a
-// volume splat that deposits the particles into a 128³ scalar field for the
-// surface extractors in surface3.wgsl.
+// volume splat that deposits the particles into a 128³ scalar field, fitted
+// around the dish, for the surface extractors in surface3.wgsl.
 //
 // The magnetic kernels (cubic spline W, its ball-average W̄, the smoothed
-// dipole and its gradient) were derived in 3D from the start; the 2D article
-// borrowed them, this one uses them in their native dimension. Pair reach is
+// dipole and its gradient) were derived in 3D from the start; part two had
+// to rework them for line dipoles, and this one uses the originals. Pair reach is
 // truncated at 3h (±3 cells, 343-cell neighborhood) — the near field that
 // makes columns gather and the first lobe of far-field repulsion that makes
 // them space apart both fit inside.
@@ -46,6 +46,8 @@ struct FerroParams3 {
   fieldN: u32,    // field resolution per axis (128)
   splatR: f32,    // splat radius, world units
   fieldScale: f32,// fixed-point scale for the u32 field
+  fieldMin: vec3f,// world position of the field's corner voxel
+  voxel: f32,     // field voxel size, world units
 }
 
 @group(0) @binding(0) var<uniform> FP: FerroParams3;
@@ -335,11 +337,10 @@ fn splatPass(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
   if (i >= FP.count) { return; }
   let p = parts[i].pos.xyz;
-  let nf = f32(FP.fieldN);
-  let voxel = 2.0 / nf;
+  let voxel = FP.voxel;
   let R = FP.splatR;
   let rv = i32(ceil(R / voxel));
-  let pc = vec3i(floor((p + 1.0) * 0.5 * nf));
+  let pc = vec3i(floor((p - FP.fieldMin) / voxel));
   let ni = i32(FP.fieldN);
 
   for (var oz = -rv; oz <= rv; oz++) {
@@ -347,12 +348,12 @@ fn splatPass(@builtin(global_invocation_id) gid: vec3u) {
       for (var ox = -rv; ox <= rv; ox++) {
         let v = pc + vec3i(ox, oy, oz);
         if (any(v < vec3i(0)) || any(v >= vec3i(ni))) { continue; }
-        let center = -1.0 + (vec3f(v) + 0.5) * voxel;
+        let center = FP.fieldMin + (vec3f(v) + 0.5) * voxel;
         let q2 = dot(center - p, center - p) / (R * R);
         if (q2 >= 1.0) { continue; }
         let w = (1.0 - q2) * (1.0 - q2);
         let vi = (u32(v.z) * FP.fieldN + u32(v.y)) * FP.fieldN + u32(v.x);
-        atomicAdd(&field[vi], u32(w * FP.fieldScale));
+        atomicAdd(&field[vi], u32(round(w * FP.fieldScale)));
       }
     }
   }

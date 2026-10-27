@@ -44,7 +44,8 @@ const STEP_COLORS: RGB[] = [hex("#6f9bff"), hex("#ffb86b"), hex("#ff6b5e")];
 export function mountSpiralFifths(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.62);
   const narrow = (w: number): boolean => w < 600;
-  const surf = new Surface(shell.canvas, (w) => (narrow(w) ? 1.5 : 0.6));
+  // phone: spiral, folded circle and ruler stack vertically (2·0.4w + 2·0.25w + 232 px)
+  const surf = new Surface(shell.canvas, (w) => (narrow(w) ? 1.3 + 232 / w : 0.6));
   const spiral = new PitchSpiral();
   const sound = new Sound({ level: 0.9, reverb: 0.15 });
   const badge = tapBadge(container, "tap for sound");
@@ -185,7 +186,7 @@ export function mountSpiralFifths(container: HTMLElement): Demo {
       // ---- left / top: the spiral ----
       let sx: number, sy: number, sR: number;
       if (isNarrow) {
-        sR = Math.min(w * 0.4, h * 0.27);
+        sR = w * 0.4;
         sx = w / 2;
         sy = sR + 30;
       } else {
@@ -214,10 +215,10 @@ export function mountSpiralFifths(container: HTMLElement): Demo {
 
       let fx: number, fy: number, fR: number, rulerY: number, rx0: number, rx1: number;
       if (isNarrow) {
-        fR = Math.min(w * 0.3, h * 0.15);
+        fR = w * 0.25;
         fx = w / 2;
         fy = sy + sR + 46 + fR;
-        rulerY = fy + fR + 62;
+        rulerY = fy + fR + 80;
         rx0 = 22;
         rx1 = w - 22;
       } else {

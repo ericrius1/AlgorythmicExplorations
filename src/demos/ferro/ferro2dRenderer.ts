@@ -12,7 +12,7 @@ export const VIEW_PARTICLES = 3;
 export const VIEW_MOMENTS = 4;
 
 const MAX_SEGS = 131072;
-const ARROW_STRIDE = 5; // moments view: every fifth particle draws an arrow
+const ARROW_STRIDE = 6; // moments view: every sixth particle draws an arrow
 
 export interface Tray2D {
   floorY: number;

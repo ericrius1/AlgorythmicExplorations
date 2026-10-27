@@ -13,9 +13,10 @@
 //   3. densityPass / forcePass — the part-one SPH core, unchanged except the
 //      force pass now just adds the cached magnetic acceleration.
 //
-// All magnetic kernels use the 3D cubic spline smoothed over a ball
-// (W and W̄ below), which makes the dipole field finite at r = 0 — SPH's
-// favorite trick, applied to magnetostatics.
+// The magnetic kernels are the cubic spline W and its average W̄ over a
+// disk (the 2D twin of Huang et al.'s ball average, see below), which keeps
+// the dipole field finite at r = 0: SPH's usual smoothing, applied to
+// magnetostatics.
 
 struct Particle2 {
   pv: vec4f,  // pos.xy, vel.zw

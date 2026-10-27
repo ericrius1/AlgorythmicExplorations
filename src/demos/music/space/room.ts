@@ -13,13 +13,15 @@ export interface Material {
   color: string; // for drawing
 }
 
-// Absorption coefficients from the sengpielaudio.com table of common
-// materials (125 Hz … 4 kHz).
+// Absorption coefficients (125 Hz … 4 kHz) from the sengpielaudio.com table
+// of common materials; drywall is ½-inch gypsum board on studs, from the same
+// kind of table (it flexes, so it soaks up bass).
 export const MATERIALS: Material[] = [
   { id: "tile", name: "glazed tile", alpha: [0.01, 0.01, 0.01, 0.01, 0.02, 0.02], color: "#cfe3f0" },
   { id: "concrete", name: "concrete", alpha: [0.01, 0.01, 0.015, 0.02, 0.02, 0.02], color: "#9aa3ad" },
   { id: "brick", name: "brick", alpha: [0.03, 0.03, 0.03, 0.04, 0.05, 0.07], color: "#c47c5a" },
-  { id: "plaster", name: "plaster", alpha: [0.013, 0.015, 0.02, 0.03, 0.04, 0.05], color: "#e8e1d4" },
+  { id: "plaster", name: "plaster on brick", alpha: [0.013, 0.015, 0.02, 0.03, 0.04, 0.05], color: "#e8e1d4" },
+  { id: "drywall", name: "drywall", alpha: [0.29, 0.1, 0.05, 0.04, 0.07, 0.09], color: "#d6d0e8" },
   { id: "glass", name: "window glass", alpha: [0.35, 0.25, 0.18, 0.12, 0.07, 0.04], color: "#8fd6e8" },
   { id: "wood", name: "wood panels", alpha: [0.28, 0.22, 0.17, 0.09, 0.1, 0.11], color: "#c99a62" },
   { id: "woodfloor", name: "wood floor", alpha: [0.15, 0.11, 0.1, 0.07, 0.06, 0.07], color: "#b7894f" },
@@ -30,7 +32,38 @@ export const MATERIALS: Material[] = [
   { id: "water", name: "water", alpha: [0.008, 0.008, 0.013, 0.015, 0.02, 0.025], color: "#4fa8d8" },
 ];
 
-export const material = (id: string): Material => MATERIALS.find((m) => m.id === id) ?? MATERIALS[3];
+const CUSTOM = new Map<string, Material>();
+
+export const material = (id: string): Material => CUSTOM.get(id) ?? MATERIALS.find((m) => m.id === id) ?? MATERIALS[3];
+
+// A made-up surface that absorbs the same fraction at every frequency.
+export function flatMaterial(alpha: number): string {
+  const a = Math.max(0.001, Math.min(0.99, alpha));
+  const id = `flat@${a.toFixed(3)}`;
+  if (!CUSTOM.has(id)) {
+    const c = Math.round(120 + 120 * (1 - a));
+    CUSTOM.set(id, { id, name: `α = ${a.toFixed(2)}`, alpha: BANDS.map(() => a), color: `rgb(${c},${c + 8},${c + 20})` });
+  }
+  return id;
+}
+
+// A surface that is part one material and part another (a floor with some of
+// it covered in cushions, say): area-weighted absorption. Returns its id.
+export function blendMaterial(a: string, b: string, frac: number): string {
+  const f = Math.max(0, Math.min(1, frac));
+  const id = `${a}+${b}@${f.toFixed(3)}`;
+  if (!CUSTOM.has(id)) {
+    const ma = material(a);
+    const mb = material(b);
+    CUSTOM.set(id, {
+      id,
+      name: `${ma.name} / ${mb.name}`,
+      alpha: ma.alpha.map((v, i) => v * (1 - f) + mb.alpha[i] * f),
+      color: mb.color,
+    });
+  }
+  return id;
+}
 
 // Energy absorbed by the air per metre, per band (about 20 °C, 50–70% humidity).
 export const AIR_M = [0.0001, 0.0002, 0.0004, 0.0009, 0.0022, 0.0075];

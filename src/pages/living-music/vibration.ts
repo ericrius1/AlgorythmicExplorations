@@ -1,5 +1,6 @@
 import { initNav } from "../../lib/siteNav";
 import { mountLazy, type Demo } from "../../lib/demoShell";
+import { mountSoundControl } from "../../lib/music/soundControl";
 import { mountNoteHero } from "../../demos/music/noteHero";
 import { mountOscillo } from "../../demos/music/oscillo";
 import { mountPluckString } from "../../demos/music/pluckString";
@@ -11,6 +12,7 @@ import { mountShepard } from "../../demos/music/sound/shepard";
 import "../../styles/music-sound.css";
 
 initNav();
+mountSoundControl();
 
 const mounts: Record<string, (el: HTMLElement) => Demo | Promise<Demo>> = {
   hero: mountNoteHero,

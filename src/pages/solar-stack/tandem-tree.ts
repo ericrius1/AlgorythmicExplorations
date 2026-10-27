@@ -1,36 +1,28 @@
+import "../../styles/solar-stack.css";
 import { wirePage } from "../../core/wirePage";
+import { mountTandemHero } from "../../demos/solar/hero";
+import { mountTandemTechTree } from "../../demos/solar/tandemExplainers";
+import { mountBandgapLossMap, mountSpectrumSplitter } from "../../demos/solar/spectrumFigs";
 import {
-  mountBandgapLossMap,
   mountBandAlignment,
-  mountCarrierJourney,
-  mountCompositionCompass,
-  mountCostYieldMap,
-  mountDegradationMap,
-  mountJVCurveExplorer,
-  mountLayerTradeoffs,
-  mountManufacturingGauntlet,
-  mountProcessWindow,
+  mountLayerStack,
   mountSiliconArchitecture,
-  mountSpectrumSplitter,
-  mountTandemTechTree,
-  mountTandemCircuit,
+  mountTandemJV,
   mountTextureCoating,
-} from "../../demos/solar/tandemExplainers";
+} from "../../demos/solar/deviceFigs";
+import { mountCostPerWatt, mountLifetimeEnergy, mountYieldArea } from "../../demos/solar/factoryFigs";
 
 wirePage({
+  hero: mountTandemHero,
   "tandem-tree": mountTandemTechTree,
   "bandgap-loss-map": mountBandgapLossMap,
-  "carrier-journey": mountCarrierJourney,
-  "silicon-architecture": mountSiliconArchitecture,
-  "band-alignment": mountBandAlignment,
   "spectrum-splitter": mountSpectrumSplitter,
-  "composition-compass": mountCompositionCompass,
-  "tandem-circuit": mountTandemCircuit,
+  "silicon-architecture": mountSiliconArchitecture,
+  "layer-stack": mountLayerStack,
+  "band-alignment": mountBandAlignment,
+  "tandem-jv": mountTandemJV,
   "texture-coating": mountTextureCoating,
-  "layer-tradeoffs": mountLayerTradeoffs,
-  "jv-curve": mountJVCurveExplorer,
-  "degradation-map": mountDegradationMap,
-  "process-window": mountProcessWindow,
-  "manufacturing-gauntlet": mountManufacturingGauntlet,
-  "cost-yield-map": mountCostYieldMap,
+  "yield-area": mountYieldArea,
+  "lifetime-energy": mountLifetimeEnergy,
+  "cost-per-watt": mountCostPerWatt,
 });

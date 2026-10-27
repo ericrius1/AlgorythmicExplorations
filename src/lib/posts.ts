@@ -36,11 +36,11 @@ export const SERIES_TAGLINES: Record<string, string> = {
   "Living Music":
     "Interactive explanations of sound, tuning, scales, chords, rhythm, and generative accompaniment.",
   "Acoustic Spaces":
-    "Spatial audio as an instrument: band-limited materials, sparse routes, media, and shareable musical rooms.",
+    "Rooms as instruments: echoes, reverberation, materials, room modes, binaural hearing, and a room that plays music.",
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
   "Solar Stack":
-    "The technology tree behind perovskite/silicon tandem solar cells: bandgaps, passivated interfaces, and the long second act of silicon.",
+    "Perovskite-on-silicon tandem solar cells, worked through with live detailed-balance models: bandgaps, current matching, contacts, texture, yield, lifetime and cost.",
   "Spark & Signal":
     "Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.",
 };
@@ -110,16 +110,23 @@ export const POSTS: Post[] = [
     subtitle: "Turning dome directions into fisheye pixels, inverse mapping, projection lenses, and sampler seams",
   },
   {
-    href: "/pages/dome-projection/show.html",
+    href: "/pages/dome-projection/cubemap.html",
     series: "Dome Projection",
     part: 3,
+    title: "Six Square Cameras",
+    subtitle: "Cubemaps versus fisheye masters: two addresses for one direction, what each costs to render, and how to choose",
+  },
+  {
+    href: "/pages/dome-projection/show.html",
+    series: "Dome Projection",
+    part: 4,
     title: "The Dome Show",
     subtitle: "Projector cameras, warp meshes, edge blends, color matching, and seamless visuals across projectors",
   },
   {
     href: "/pages/dome-projection/realtime.html",
     series: "Dome Projection",
-    part: 4,
+    part: 5,
     title: "Dome-Native Three.js",
     subtitle: "Realtime scene rendering for domes: direct projector cameras, render targets, calibration meshes, and when fisheye masters still help",
   },
@@ -191,14 +198,14 @@ export const POSTS: Post[] = [
     series: "Living Music",
     part: 1,
     title: "The Anatomy of a Note",
-    subtitle: "Pitch, loudness, and timbre explained with oscillators and one vibrating string",
+    subtitle: "Pitch, loudness, and timbre: standing waves, the harmonic series, formants, and pitch illusions you can play",
   },
   {
     href: "/pages/living-music/synth.html",
     series: "Living Music",
     part: 2,
     title: "The Synthesizer",
-    subtitle: "Oscillators, filters, envelopes, FM, and physical models: making any sound from scratch",
+    subtitle: "Oscillators, filters, envelopes, FM and a plucked string, built one module at a time",
   },
   {
     href: "/pages/living-music/harmony.html",
@@ -226,14 +233,14 @@ export const POSTS: Post[] = [
     series: "Living Music",
     part: 6,
     title: "Major and Minor",
-    subtitle: "Triad construction, functional harmony, and voice leading",
+    subtitle: "Why major and minor sound the way they do, tension and release, and the Tonnetz",
   },
   {
     href: "/pages/living-music/jukebox.html",
     series: "Living Music",
     part: 7,
     title: "The Infinite Jukebox",
-    subtitle: "Euclidean rhythm, random-walk melody, voice leading, and generative form",
+    subtitle: "Euclidean rhythm, polyrhythm, swing, a melody walker, and a band that writes its own songs",
   },
   {
     href: "/pages/living-music/accompanist.html",
@@ -247,14 +254,14 @@ export const POSTS: Post[] = [
     series: "Acoustic Spaces",
     part: 1,
     title: "Rooms That Play Back",
-    subtitle: "Probe-based acoustic simulation, sparse pathing, material transmittance, and generative spatial sound",
+    subtitle: "Image sources, Sabine's reverberation time, absorption by frequency, room modes, two-ear hearing, and I am sitting in a room",
   },
   {
     href: "/pages/acoustic-spaces/room-instrument.html",
     series: "Acoustic Spaces",
     part: 2,
     title: "The Room Instrument",
-    subtitle: "A shareable spatial-audio music toy for composing with materials, media, distance, and routed sound",
+    subtitle: "A room whose echoes write the rhythm, heard binaurally and shared as a link",
   },
   {
     href: "/pages/ground-truth/heightfield.html",
@@ -275,35 +282,35 @@ export const POSTS: Post[] = [
     series: "Ground Truth",
     part: 3,
     title: "The Grass",
-    subtitle: "A hundred thousand instanced blades placed from sediment and animated in the vertex shader",
+    subtitle: "Tens of thousands of blades planted from sediment, merged into one buffer, and moved by wind in the shader",
   },
   {
     href: "/pages/ground-truth/trees.html",
     series: "Ground Truth",
     part: 4,
     title: "The Trees",
-    subtitle: "Space colonization, pipe-model thickness, low-poly meshes, and indexed perches",
+    subtitle: "Space colonization, pipe-model thickness, bark rings and leaf cards, and an instanced grove",
   },
   {
     href: "/pages/ground-truth/biomes.html",
     series: "Ground Truth",
     part: 5,
     title: "The Biomes",
-    subtitle: "A moisture field, biome classification, and deterministic placement of a million plants",
+    subtitle: "A moisture field, biome classification, and a world-indexed jittered grid that places every tree and rock",
   },
   {
     href: "/pages/ground-truth/horizon.html",
     series: "Ground Truth",
     part: 6,
     title: "The Horizon",
-    subtitle: "Chunks, LOD rings, skirts, and a millisecond build budget for continuous terrain streaming",
+    subtitle: "Chunks, LOD rings, skirts, a millisecond build budget and a coarse backdrop for an endless streamed world",
   },
   {
     href: "/pages/solar-stack/tandem-tree.html",
     series: "Solar Stack",
     part: 1,
     title: "The Tandem Tree",
-    subtitle: "The technical lineage that led to perovskite/silicon tandem solar cells",
+    subtitle: "Why a thin perovskite film on silicon can pass silicon's own limit, and what decides whether it lasts on a roof",
   },
   {
     href: "/pages/spark-signal/signaling.html",

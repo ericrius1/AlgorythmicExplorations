@@ -1,6 +1,12 @@
+import "../../styles/music-play.css";
 import { wirePage } from "../../core/wirePage";
-import { mountRoomInstrument } from "../../demos/music/roomInstrument";
+import { mountSoundControl } from "../../lib/music/soundControl";
+import { mountOneStone, mountRoomInstrument } from "../../demos/music/roomInstrument";
 
 wirePage({
-  instrument: mountRoomInstrument,
+  instrument: (el) => mountRoomInstrument(el, { hero: true, controls: "share", syncUrl: true }),
+  builder: (el) => mountRoomInstrument(el, { hero: true, controls: "full", syncUrl: true }),
+  onestone: mountOneStone,
 });
+
+mountSoundControl();

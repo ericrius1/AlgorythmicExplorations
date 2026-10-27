@@ -413,7 +413,7 @@ export function writeSong(seed: number, forceStyle?: StyleName): Song {
   const lofiKickB = pick(rng, lofiKicks);
   const bell = E(7, 12); // x.xx.x.xx.x.
   const conga = E(5, 12, 2 + Math.floor(rng() * 3));
-  const clave = E(5, 16, 13); // bossa clave: x..x..x...x..x..
+  const clave = E(5, 16, 6); // bossa clave: x..x..x...x..x..
   const popHatK = 11 + Math.floor(rng() * 3);
   const rings: { name: DrumName; pattern: boolean[] }[] = [];
   const toPat = (steps: number[], n: number): boolean[] => Array.from({ length: n }, (_, i) => steps.includes(i));
@@ -862,30 +862,30 @@ export class Band {
     this.duckGain = new Tone.Gain(1);
     const duckOut = this.duckGain;
     this.strips = {
-      bass: strip({ db: -4 }),
-      keys: strip({ db: -7, reverb: 0.22, pan: -0.15, dest: duckOut }),
-      pad: strip({ db: -11, reverb: 0.4, dest: duckOut }),
-      lead: strip({ db: -6, reverb: 0.24, delay: 0.2, pan: 0.12 }),
+      bass: strip({ db: -6 }),
+      keys: strip({ db: -6, reverb: 0.22, pan: -0.15, dest: duckOut }),
+      pad: strip({ db: -2, reverb: 0.4, dest: duckOut }),
+      lead: strip({ db: -5, reverb: 0.24, delay: 0.2, pan: 0.12 }),
     };
     duckOut.connect(strip({ db: 0 }).input);
     const d = (db: number, pan = 0, reverb = 0): Strip => strip({ db, pan, reverb });
     this.drumStrips = {
-      kick: d(-2),
-      snare: d(-6, 0.04, 0.14),
-      clap: d(-7, -0.04, 0.16),
-      hat: d(-12, 0.28),
-      openhat: d(-13, 0.28, 0.08),
-      shaker: d(-13, -0.32, 0.05),
-      rim: d(-10, -0.18, 0.1),
-      bell: d(-11, 0.3, 0.08),
-      conga: d(-8, -0.22, 0.1),
-      crash: d(-15, 0.18, 0.1),
+      kick: d(0),
+      snare: d(-4, 0.04, 0.14),
+      clap: d(-3, -0.04, 0.16),
+      hat: d(-10, 0.28),
+      openhat: d(-11, 0.28, 0.08),
+      shaker: d(-5, -0.32, 0.05),
+      rim: d(-6, -0.18, 0.1),
+      bell: d(-3, 0.3, 0.08),
+      conga: d(-6, -0.22, 0.1),
+      crash: d(-13, 0.18, 0.1),
     };
     const dests: Partial<Record<DrumName, Tone.InputNode>> = {};
     for (const [k, s] of Object.entries(this.drumStrips)) dests[k as DrumName] = s!.input;
     this.kit = drumKit(dests, this.drumStrips.kick!.input);
     this.inst.bass = makeBass(this.strips.bass!.input, -10);
-    const p = makePad(this.strips.pad!.input, -20, 1200);
+    const p = makePad(this.strips.pad!.input, -12, 1200);
     this.padCut = p.filter;
     this.inst.pad = p;
     for (const t of TRACKS) if (this.muted.has(t)) this.setMute(t, true);
@@ -896,12 +896,13 @@ export class Band {
     const S = STYLES[this.song.style];
     if (this.keysKind !== S.keys) {
       this.inst.keys?.dispose();
-      this.inst.keys = S.keys === "epiano" ? epiano(this.strips.keys!.input, -9) : makeLead(S.keys, this.strips.keys!.input, S.keys === "pluck" ? -14 : -12);
+      // per-instrument trims, set by offline renders of each part soloed
+      this.inst.keys = S.keys === "epiano" ? epiano(this.strips.keys!.input, -9) : makeLead(S.keys, this.strips.keys!.input, S.keys === "pluck" ? -2 : -6);
       this.keysKind = S.keys;
     }
     if (this.leadKind !== S.lead) {
       this.inst.lead?.dispose();
-      this.inst.lead = makeLead(S.lead, this.strips.lead!.input, -12);
+      this.inst.lead = makeLead(S.lead, this.strips.lead!.input, S.lead === "square" ? -7 : -12);
       this.leadKind = S.lead;
     }
     this.padCut?.frequency.rampTo(S.padCutoff, 0.5);

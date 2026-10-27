@@ -367,13 +367,20 @@ export async function mountPluckString(container: HTMLElement): Promise<Demo> {
       const by1 = H - 30;
       const by0 = H * (stage.narrow ? 0.62 : 0.64);
       const bw = (xb - xa) / BARS;
-      text(g, bowing ? "what you hear: every harmonic, falling as 1/n" : "what you hear: harmonic n at sin(nπp)/n", xa, by0 - 10, {
+      // on phones the two captions stack instead of sharing a line
+      const twoLines = stage.narrow && miss.length > 0 && !grab;
+      text(g, bowing ? "what you hear: every harmonic, falling as 1/n" : "what you hear: harmonic n at sin(nπp)/n", xa, by0 - (twoLines ? 24 : 10), {
         size: 10.5,
         color: "rgba(180,188,210,0.8)",
       });
       if (miss.length && !grab) {
         const list = miss.slice(0, 4).join(", ") + (miss.length > 4 ? " …" : "");
-        text(g, `missing: ${list}`, xb, by0 - 10, { size: 10.5, align: "right", color: rgba(harmonicRgb(miss[0], 0.75), 0.95), weight: 600 });
+        text(g, `missing: ${list}`, twoLines ? xa : xb, by0 - 10, {
+          size: 10.5,
+          align: twoLines ? "left" : "right",
+          color: rgba(harmonicRgb(miss[0], 0.75), 0.95),
+          weight: 600,
+        });
       }
       hline(g, xa, xb, by1, "rgba(122,162,255,0.18)");
       for (let n = 1; n <= BARS; n++) {

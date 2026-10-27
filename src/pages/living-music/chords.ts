@@ -1,12 +1,14 @@
 import "../../styles/music-harmony.css";
 import { initNav } from "../../lib/siteNav";
 import { mountLazy, type Demo } from "../../lib/demoShell";
+import { mountSoundControl } from "../../lib/music/soundControl";
 import { mountTonnetz } from "../../demos/music/harmony/tonnetz";
 import { mountTriadLab } from "../../demos/music/triadLab";
 import { mountChordSpace } from "../../demos/music/harmony/chordSpace";
 import { mountVoiceLoop } from "../../demos/music/voiceLoop";
 
 initNav();
+mountSoundControl();
 
 const mounts: Record<string, (el: HTMLElement) => Demo | Promise<Demo>> = {
   hero: (el) => mountTonnetz(el, { hero: true }),

@@ -144,7 +144,9 @@ export class Look {
 
   // The background: sky plus the sun disc, dithered against banding.
   background(): Node {
-    const dir = normalWorldGeometry as unknown as V3;
+    // the background is drawn on a coarse sphere around the camera, so the
+    // interpolated normal has to be renormalized or the sun disc goes oval
+    const dir = normalize(normalWorldGeometry) as unknown as V3;
     const c = dot(dir, this.uSunDir);
     const disc = smoothstep(0.99988, 0.99994, c).mul(16);
     const col = this.sky(dir).add(this.uSun.mul(disc));
@@ -294,6 +296,9 @@ export interface TerrainStageOptions {
   fov?: number;
   near?: number;
   far?: number;
+  // false for heroes and figures that drive their own camera: no orbit
+  // handlers, so the wheel scrolls the page instead of dollying nothing
+  orbit?: boolean;
 }
 
 export async function createTerrainStage(canvas: HTMLCanvasElement, mood: Mood, opts: TerrainStageOptions = {}): Promise<TerrainStage> {
@@ -319,7 +324,7 @@ export async function createTerrainStage(canvas: HTMLCanvasElement, mood: Mood, 
   if (opts.minElevation !== undefined) orbit.minElevation = opts.minElevation;
   if (opts.maxElevation !== undefined) orbit.maxElevation = opts.maxElevation;
   orbit.autoSpin = opts.autoSpin ?? 0.0007;
-  orbit.attach(canvas);
+  if (opts.orbit !== false) orbit.attach(canvas);
 
   return {
     renderer,

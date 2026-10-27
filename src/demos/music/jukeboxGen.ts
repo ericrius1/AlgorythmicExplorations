@@ -81,7 +81,9 @@ fn scene(uv: vec2f) -> vec3f {
   let binF = clamp(pow(r * 0.62, 1.3), 0.0, 0.999) * f32(${BINS - 1});
   let bi = u32(binF);
   let mag = mix(D[bi], D[min(bi + 1u, ${BINS - 1}u)], fract(binF));
-  let fil = pow(fbm(vec2f(a2 * 1.7, r * 2.2 - t * 0.05)), 2.0);
+  // the swirl enters only through cos/sin, so there's no seam where atan2 wraps
+  let dir = vec2f(cos(a2), sin(a2));
+  let fil = pow(fbm(dir * 1.9 + vec2f(r * 2.2 - t * 0.05, r * 1.3)), 2.0);
   let hue = fract(hueBase + r * 0.16 + sw * 0.1);
   col += hsv(hue, 0.6, 1.0) * mag * (0.25 + fil * 1.3) * 0.9;
   // a faint resting haze so the hero isn't black before the music starts
@@ -132,7 +134,7 @@ export async function mountJukeboxGen(container: HTMLElement, opts: JukeboxOpts 
     container,
     hero ? "Tap to start the band" : "Tap to play",
     () => void begin(),
-    hero ? ((container.clientWidth || 800) < 740 ? 0.86 : 0.66) : 0.55,
+    hero ? ((container.clientWidth || 800) < 740 ? 0.86 : 0.54) : 0.55,
   );
   const begin = async (): Promise<void> => {
     tap.hide();
@@ -147,6 +149,8 @@ export async function mountJukeboxGen(container: HTMLElement, opts: JukeboxOpts 
   const guard = frameGuard(() => {
     if (band.isRunning) stop();
   });
+  // tapping the picture starts or stops the band, like the pill
+  canvas.addEventListener("pointerdown", () => (band.isRunning ? stop() : void begin()));
 
   // ---- controls ---------------------------------------------------------------------------
   const playBtn = shell.button("▶ play", () => (band.isRunning ? stop() : void begin()));
@@ -241,7 +245,7 @@ export async function mountJukeboxGen(container: HTMLElement, opts: JukeboxOpts 
     const narrow = w / px < 740;
     const cx = w / 2;
     const cy = narrow ? h * 0.5 : h * 0.4;
-    const R = Math.min(w * 0.42, h * (narrow ? 0.4 : 0.34));
+    const R = Math.min(w * 0.42, h * (narrow ? 0.36 : 0.29));
     if (nebula) {
       ctx.clearRect(0, 0, w, h);
     } else {
@@ -504,10 +508,10 @@ export async function mountJukeboxGen(container: HTMLElement, opts: JukeboxOpts 
       if (hero) {
         drawHero();
         if (nebula) {
-          const fft = spectrum();
+          const fft = band.isRunning ? spectrum() : null;
           for (let i = 0; i < BINS; i++) {
-            const db = fft[Math.floor((i / BINS) * 100)];
-            const val = band.isRunning ? Math.max(0, (Number.isFinite(db) ? db + 95 : 0) / 60) : 0;
+            const db = fft ? fft[Math.floor((i / BINS) * 100)] : -Infinity;
+            const val = Number.isFinite(db) ? Math.max(0, (db + 95) / 60) : 0;
             smoothBins[i] += (Math.min(val, 1.5) - smoothBins[i]) * 0.2;
             nebula.data[i] = smoothBins[i];
           }

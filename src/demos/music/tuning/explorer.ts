@@ -291,8 +291,9 @@ export function mountExplorer(container: HTMLElement): Demo {
         const x = DX(d.f);
         ctx.fillStyle = "rgba(200, 210, 240, 0.5)";
         ctx.fillRect(x - 0.5, dialY - 7, 1, 14);
-        const lower = d.name === "31-equal" || d.name === "53-equal";
-        const align: CanvasTextAlign = i === 0 ? "left" : i === DETENTS.length - 1 ? "right" : d.name === "¼-comma" || d.name === "Pythagorean" ? "right" : lower ? "left" : "center";
+        // on a phone 12-equal and Pythagorean are 13 px apart, so Pythagorean drops a row
+        const lower = d.name === "31-equal" || d.name === "53-equal" || (narrow && d.name === "Pythagorean");
+        const align: CanvasTextAlign = i === 0 ? "left" : i === DETENTS.length - 1 ? "right" : d.name === "¼-comma" || (d.name === "Pythagorean" && !lower) ? "right" : lower ? "left" : "center";
         const near = Math.abs(d.f - fifth) < 0.05;
         if (!narrow || [0, 2, 4, 6, 7].includes(i))
           text(ctx, d.name, x + (align === "left" ? -2 : align === "right" ? 2 : 0), dialY + (lower ? 32 : 20), {
@@ -303,7 +304,15 @@ export function mountExplorer(container: HTMLElement): Demo {
           });
       });
       dot(ctx, DX(fifth), dialY, 6, hex("#ffd9a0"), 1, 3);
-      text(ctx, "fifth size, 685.7¢ to 720¢ (the middle is stretched; the green glow is where major thirds are pure)", x0, dialY - 14, { size: 10, color: COL.dim });
+      text(
+        ctx,
+        narrow
+          ? "fifth size, 685.7¢ to 720¢ (green: pure thirds)"
+          : "fifth size, 685.7¢ to 720¢ (the middle is stretched; the green glow is where major thirds are pure)",
+        x0,
+        dialY - 14,
+        { size: 10, color: COL.dim },
+      );
 
       // ---- pads: two octaves of the scale ----
       const padTop = dialY + (narrow ? 50 : 52);

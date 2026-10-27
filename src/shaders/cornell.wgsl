@@ -4,6 +4,18 @@
 // noise readout uses). fsDisplay divides by the sample count, upsamples
 // bilinearly to the canvas, and hands linear HDR to PostFX for tone mapping.
 //
+// Three things keep the figures that aren't about noise quiet:
+//   · the first bounce's light sample and direction come from a Halton
+//     sequence, rotated per pixel by a blue-noise tile (Cranley–Patterson),
+//     so samples within a pixel are stratified and the leftover error is
+//     fine and even instead of blotchy
+//   · paths that reach the lamp only through the metal sphere after a
+//     diffuse bounce (its caustic) are capped, since nothing else can find them
+//   · fsFilter, an edge-aware blur that runs only while the sum is young. It
+//     never mixes pixels across different surfaces, normals or depths, it
+//     backs off where neighbours differ by more than their own noise, and its
+//     radius shrinks as samples arrive, so the converged image is unfiltered.
+//
 // The scene is analytic and tiny: the box (floor, ceiling, three walls, open
 // at the front), a ceiling lamp you can move and resize, one matte sphere and
 // one sphere whose material is a knob (matte / mirror / glossy). In the hero
@@ -25,11 +37,14 @@ struct TraceParams {
   seed: f32,         // per-frame RNG seed
   eye: vec4f,        // camera position · w: focal length
   look: vec4f,       // look-at point · w: exposure
+  opts: vec4f,       // x: 1 = blue-noise Halton sampling · y: filter strength · z: samples before this frame · w: caustic cap (0 = none)
 }
 
 @group(0) @binding(0) var<uniform> TP: TraceParams;
 @group(0) @binding(1) var prevTex: texture_2d<f32>;
 @group(0) @binding(2) var accumTex: texture_2d<f32>;
+@group(0) @binding(7) var blueTex: texture_2d<f32>;
+@group(0) @binding(8) var guideTex: texture_2d<f32>;
 
 struct FullOut {
   @builtin(position) pos: vec4f,
@@ -58,6 +73,41 @@ var<private> rngState: u32;
 fn rnd() -> f32 {
   rngState = pcg(rngState);
   return f32(rngState >> 8u) / 16777216.0; // 24 bits, so it never rounds up to 1
+}
+
+// ---- stratified samples for the first bounce --------------------------------------
+// Halton dimensions 0–3 (bases 2, 3, 5, 7), indexed by the sample's number in
+// this pixel's sum and shifted by blue noise. Only the first bounce uses them;
+// deeper bounces stay with plain random numbers, which keeps every dimension
+// independent of the others.
+
+var<private> pixC: vec2u;
+var<private> sIdx: u32;
+
+fn radInv(i: u32, b: u32) -> f32 {
+  var r = 0.0;
+  var f = 1.0 / f32(b);
+  var n = i;
+  for (var k = 0; k < 20; k++) {
+    if (n == 0u) { break; }
+    r += f * f32(n % b);
+    n = n / b;
+    f = f / f32(b);
+  }
+  return r;
+}
+
+fn lds(d: u32) -> f32 {
+  if (TP.opts.x < 0.5) { return rnd(); }
+  let i = sIdx + 1u;
+  var h = 0.0;
+  var o = vec2u(0u, 0u);
+  if (d == 0u) { h = f32(reverseBits(i) >> 8u) / 16777216.0; }
+  else if (d == 1u) { h = radInv(i, 3u); o = vec2u(32u, 0u); }
+  else if (d == 2u) { h = radInv(i, 5u); o = vec2u(0u, 32u); }
+  else { h = radInv(i, 7u); o = vec2u(32u, 32u); }
+  let shift = textureLoad(blueTex, vec2i((pixC + o) & vec2u(63u)), 0).r;
+  return min(fract(h + shift), 0.99999994);
 }
 
 // ---- scene ------------------------------------------------------------------------
@@ -184,8 +234,12 @@ fn lightLe() -> vec3f {
 
 // cosine-weighted hemisphere around n: importance sampling the Lambert lobe
 fn cosineDir(n: vec3f) -> vec3f {
-  let r1 = rnd() * 6.28318530718;
-  let r2 = rnd();
+  return cosineDirU(n, rnd(), rnd());
+}
+
+fn cosineDirU(n: vec3f, u1: f32, u2: f32) -> vec3f {
+  let r1 = u1 * 6.28318530718;
+  let r2 = u2;
   let sr2 = sqrt(r2);
   let u = normalize(cross(n, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(n.y) > 0.9)));
   let v = cross(n, u);
@@ -206,6 +260,7 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
   var radiance = vec3f(0.0);
   // the camera counts as specular: looking straight at the lamp must show it
   var specularLast = true;
+  var diffuseSeen = false;
 
   let bounces = i32(TP.maxBounces);
   for (var b = 0; b < 12; b++) {
@@ -220,7 +275,15 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
       // last diffuse bounce, counting it again would double it; after a
       // mirror, light sampling couldn't see the lamp, so this is the only way
       if (TP.nee < 0.5 || specularLast) {
-        radiance += throughput * lightLe();
+        var add = throughput * lightLe();
+        // diffuse → metal → lamp: the sphere's caustic. Light sampling can't
+        // see through a mirror, so these paths are rare and very bright.
+        let cap = TP.opts.w;
+        if (cap > 0.0 && diffuseSeen && TP.nee > 0.5) {
+          let l = dot(add, vec3f(0.2126, 0.7152, 0.0722));
+          if (l > cap) { add *= cap / l; }
+        }
+        radiance += add;
       }
       break;
     }
@@ -240,11 +303,14 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
     }
 
     // diffuse. Next-event estimation: ask the lamp directly.
+    let first = b == 0;
     if (TP.nee > 0.5) {
+      let u0 = select(rnd(), lds(0u), first);
+      let u1 = select(rnd(), lds(1u), first);
       let lp = vec3f(
-        TP.lightPos.x + (rnd() * 2.0 - 1.0) * TP.lightSize.x,
+        TP.lightPos.x + (u0 * 2.0 - 1.0) * TP.lightSize.x,
         2.0,
-        TP.lightPos.y + (rnd() * 2.0 - 1.0) * TP.lightSize.y,
+        TP.lightPos.y + (u1 * 2.0 - 1.0) * TP.lightSize.y,
       );
       let toL = lp - p;
       let d2 = dot(toL, toL);
@@ -265,8 +331,15 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
     // so the throughput just picks up the surface colour
     throughput *= h.albedo;
     ro = p + h.n * 1e-4;
-    rd = cosineDir(h.n);
+    if (first) {
+      let u2 = lds(2u);
+      let u3 = lds(3u);
+      rd = cosineDirU(h.n, u2, u3);
+    } else {
+      rd = cosineDir(h.n);
+    }
     specularLast = false;
+    diffuseSeen = true;
 
     // russian roulette after a few bounces keeps deep paths cheap and unbiased
     if (b > 2) {
@@ -290,10 +363,38 @@ fn cameraRay(pix: vec2f) -> array<vec3f, 2> {
   return array<vec3f, 2>(eye, normalize(fwd * TP.eye.w + right * px + up * py));
 }
 
+struct TraceOut {
+  @location(0) sum: vec4f,
+  @location(1) guide: vec4f,
+}
+
+// octahedral normal encoding, for the guide buffer
+fn octEncode(n: vec3f) -> vec2f {
+  let p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
+  if (n.z >= 0.0) { return p; }
+  return (1.0 - abs(p.yx)) * select(vec2f(-1.0), vec2f(1.0), p >= vec2f(0.0));
+}
+
+fn octDecode(e: vec2f) -> vec3f {
+  var n = vec3f(e, 1.0 - abs(e.x) - abs(e.y));
+  if (n.z < 0.0) {
+    let xy = (1.0 - abs(n.yx)) * select(vec2f(-1.0), vec2f(1.0), n.xy >= vec2f(0.0));
+    n = vec3f(xy, n.z);
+  }
+  return normalize(n);
+}
+
+// a number that is equal only for the same material and surface colour
+fn surfaceKey(h: Hit) -> f32 {
+  if (h.mat < 0) { return -1.0; }
+  return f32(h.mat) * 10000.0 + round(h.albedo.r * 99.0) * 100.0 + round(h.albedo.g * 99.0);
+}
+
 @fragment
-fn fsTrace(in: FullOut) -> @location(0) vec4f {
+fn fsTrace(in: FullOut) -> TraceOut {
   let pix = vec2u(in.pos.xy);
   rngState = pcg(pix.x + pcg(pix.y + pcg(u32(TP.seed))));
+  pixC = pix;
 
   var prev = vec4f(0.0);
   if (TP.frame > 0.5) {
@@ -305,6 +406,7 @@ fn fsTrace(in: FullOut) -> @location(0) vec4f {
   let n = i32(TP.spp);
   for (var s = 0; s < 16; s++) {
     if (s >= n) { break; }
+    sIdx = u32(TP.opts.z) + u32(s);
     // a random point inside the pixel each time: antialiasing for free
     let ray = cameraRay(vec2f(pix) + vec2f(rnd(), rnd()));
     let L = tracePath(ray[0], ray[1]);
@@ -313,7 +415,77 @@ fn fsTrace(in: FullOut) -> @location(0) vec4f {
     sumSq += lum * lum;
   }
 
-  return vec4f(prev.rgb + sum, prev.a + sumSq);
+  // what the pixel centre sees first, for the filter
+  let c = cameraRay(vec2f(pix) + 0.5);
+  let h = intersect(c[0], c[1]);
+  var out: TraceOut;
+  out.sum = vec4f(prev.rgb + sum, prev.a + sumSq);
+  out.guide = vec4f(octEncode(h.n), h.t, surfaceKey(h));
+  return out;
+}
+
+// ---- the edge-aware filter (young sums only) ---------------------------------------
+
+fn lumOf(c: vec3f) -> f32 {
+  return dot(c, vec3f(0.2126, 0.7152, 0.0722));
+}
+
+@fragment
+fn fsFilter(in: FullOut) -> @location(0) vec4f {
+  let p = vec2i(in.pos.xy);
+  let mx = vec2i(textureDimensions(accumTex)) - 1;
+  let c = textureLoad(accumTex, p, 0);
+  let g = textureLoad(guideTex, p, 0);
+  let strength = TP.opts.y;
+  let mat = floor(g.w / 10000.0);
+  // the lamp and the open front stay as traced
+  if (strength <= 0.0 || g.w < 0.0 || mat > 2.5) { return c; }
+
+  let n = max(TP.count, 1.0);
+  let np = octDecode(g.xy);
+  let rp = cameraRay(vec2f(p) + 0.5);
+  let xp = rp[0] + rp[1] * g.z;
+  // this pixel's own noise: the standard error of its mean luminance
+  let mean = lumOf(c.rgb) / n;
+  let var1 = max(c.a / n - mean * mean, 0.0) * n / max(n - 1.0, 1.0);
+  let se = sqrt(var1 / n);
+  // how different two pixels may be, relative to their brightness, before
+  // the difference counts as real: a few times this pixel's own noise
+  let lumTol = 2.5 * se + 0.03 * mean + 1e-4;
+  let relTol = 2.5 * se / max(mean, 1e-4) + 0.04;
+  let metal = mat > 0.5;
+  let sigma = 2.0 * strength;
+  let planeTol = 0.01 * g.z;
+
+  var acc = c;
+  var wsum = 1.0;
+  for (var dy = -3; dy <= 3; dy++) {
+    for (var dx = -3; dx <= 3; dx++) {
+      if (dx == 0 && dy == 0) { continue; }
+      let d = vec2i(dx, dy);
+      let q = clamp(p + d, vec2i(0), mx);
+      let gq = textureLoad(guideTex, q, 0);
+      if (abs(gq.w - g.w) > 0.5) { continue; }
+      let wn = pow(max(dot(np, octDecode(gq.xy)), 0.0), 32.0);
+      let rq = cameraRay(vec2f(q) + 0.5);
+      let xq = rq[0] + rq[1] * gq.z;
+      let wp = exp(-abs(dot(np, xq - xp)) / planeTol);
+      let cq = textureLoad(accumTex, q, 0);
+      var wl = exp(-abs(lumOf(cq.rgb) / n - mean) / lumTol);
+      if (metal) {
+        // in the metal, compare colour too: the red wall and the green one
+        // it reflects can be equally bright
+        let dc = 2.0 * abs(cq.rgb - c.rgb) / (cq.rgb + c.rgb + 1e-4 * n);
+        wl *= exp(-max(dc.r, max(dc.g, dc.b)) / relTol);
+      }
+      let dd = vec2f(d);
+      let ws = exp(-dot(dd, dd) / (2.0 * sigma * sigma));
+      let w = ws * wn * wp * wl;
+      acc += cq * w;
+      wsum += w;
+    }
+  }
+  return acc / wsum;
 }
 
 // ---- display -------------------------------------------------------------------

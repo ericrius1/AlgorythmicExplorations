@@ -7,7 +7,6 @@ import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { FerroSim, FERRO_KNOBS, SPACING, poolDepth, type FerroKnobs, type Tray } from "../../lib/ferroSim";
 import { Ferro2DRenderer, VIEW_FINAL, VIEW_MESH } from "./ferro2dRenderer";
-import { devKnobs } from "./devKnobs";
 
 const VIEW_NAMES = ["final", "mesh", "field", "particles"];
 
@@ -25,7 +24,7 @@ export async function mountFerro(container: HTMLElement, opts: FerroOptions): Pr
   const tray: Tray = { floorY: -0.5, wallX: 0.8, topY: 0.95 };
   const count = 20000;
   const surfaceY = tray.floorY + poolDepth(count, tray);
-  const knobs: FerroKnobs = devKnobs({ ...FERRO_KNOBS });
+  const knobs: FerroKnobs = { ...FERRO_KNOBS };
   let view = opts.view ?? VIEW_FINAL;
   let time = 0;
 

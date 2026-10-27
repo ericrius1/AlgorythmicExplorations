@@ -340,7 +340,8 @@ export class SynthHost {
   }
 
   private post(m: Msg): void {
-    if (this.node) this.node.port.postMessage(m);
+    if (this.flushing && (m.type === "on" || m.type === "off" || m.type === "pitch")) this.pending.push(m);
+    else if (this.node) this.node.port.postMessage(m);
     else if (m.type !== "patch") this.queue.push(m);
   }
 
@@ -367,6 +368,25 @@ export class SynthHost {
   allOff(): void {
     this.post({ type: "allOff" });
   }
+  /**
+   * Fade out whatever is ringing and stop it (a preset change). Notes that
+   * arrive during the 60 ms fade wait and play right after it.
+   */
+  flush(): void {
+    if (!this.node || this.muted || this.flushing) return;
+    this.flushing = true;
+    this.out?.gain.rampTo(0, 0.05);
+    window.setTimeout(() => {
+      this.node?.port.postMessage({ type: "kill" });
+      this.out?.gain.rampTo(this.level, 0.01);
+      this.flushing = false;
+      const q = this.pending;
+      this.pending = [];
+      for (const m of q) this.post(m);
+    }, 70);
+  }
+  private flushing = false;
+  private pending: Msg[] = [];
   bend(semis: number): void {
     this.post({ type: "bend", value: semis });
   }

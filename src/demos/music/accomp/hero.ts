@@ -66,7 +66,7 @@ export function mountAccompHero(container: HTMLElement): Demo {
     const s = ui(shell.canvas);
     const overlay = window.matchMedia("(min-width: 46rem)").matches;
     // keep clear of the fixed nav on top, and of the overlaid title below
-    const top = 58 * s;
+    const top = (overlay ? 58 : 76) * s; // the nav wraps to two lines on phones
     const bottom = overlay ? H - 205 * s : H - 10 * s;
     const R = Math.max(60 * s, Math.min((bottom - top) / 2, W * (overlay ? 0.3 : 0.46)));
     return { cx: W * 0.5, cy: (top + bottom) / 2, R };

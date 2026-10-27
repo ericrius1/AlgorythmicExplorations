@@ -475,8 +475,8 @@ const SPECS: Record<Exclude<PresetName, "pluck" | "bass">, Spec> = {
       return [vib, trem, tone];
     },
   },
-  marimba: { engine: () => marimba, volume: 0, reverb: 0.2 },
-  sine: { engine: () => sine, volume: 0, reverb: 0.08 },
+  marimba: { engine: () => marimba, volume: -2.5, reverb: 0.2 }, // sharp mallet peaks: a 5-note chord hit +1 dBFS raw
+  sine: { engine: () => sine, volume: -3, reverb: 0.08 }, // sustained, so it read ~6 dB hotter than the decaying presets
 };
 
 class BaseInstrument implements Instrument {
@@ -712,7 +712,11 @@ class PluckInstrument extends BaseInstrument {
   ready(): Promise<void> {
     this.build();
     const p = loadStrings();
-    return p ? p.then(() => this.makeNode()).catch(() => {}) : Promise.resolve();
+    if (!p) return Promise.resolve();
+    // never hang a caller on a worklet that doesn't load (headless Chromium):
+    // after 3 s the synth pluck stays in charge until the module turns up
+    const timeout = new Promise<void>((res) => window.setTimeout(res, 3000));
+    return Promise.race([p.then(() => this.makeNode()), timeout]).catch(() => {});
   }
 
   protected onBuild(): void {

@@ -2,7 +2,7 @@
 // src/lib/audio.ts feeds `masterChain().input`; nothing else needs to change
 // for a demo to get it.
 //
-//   input ─► DC-block high-pass (20 Hz)
+//   input ─► DC-block high-pass (15 Hz Butterworth)
 //         ─► glue compressor (−14 dB, 2:1, 12 dB knee; its automatic makeup
 //            gain is cancelled so quiet material passes at unity)
 //         ─► brickwall look-ahead limiter at −1 dBFS (AudioWorklet; a native
@@ -19,11 +19,40 @@ import * as Tone from "tone";
 export const CEILING_DB = -1;
 
 // The DynamicsCompressorNode (same kernel in Chrome, Firefox and Safari)
-// applies an automatic makeup gain derived from threshold/ratio/knee. These
-// settings measured +3.13 dB of it (OfflineAudioContext, −40 dBFS sine), so
+// applies an automatic makeup gain derived from threshold/ratio/knee.
+// compressorMakeupDb() reproduces that formula (+2.31 dB for these settings,
+// matching an OfflineAudioContext render of a −40 dBFS sine in Chrome 152), so
 // a fixed trim cancels it and quiet material stays at unity.
 const GLUE = { threshold: -14, ratio: 2, knee: 12, attack: 0.02, release: 0.25 } as const;
-const GLUE_MAKEUP_DB = 3.13;
+const GLUE_MAKEUP_DB = compressorMakeupDb(GLUE.threshold, GLUE.knee, GLUE.ratio);
+
+/** How long `ready` waits for the worklet before settling on the native limiter. */
+const WORKLET_TIMEOUT_MS = 3000;
+
+/**
+ * The automatic makeup gain (dB) of a DynamicsCompressorNode, from the
+ * Blink/WebKit kernel: the knee curve x ↦ t + (1 − e^(−k(x − t)))/k is
+ * solved for the k whose dB slope at threshold + knee equals 1/ratio, the
+ * full-scale gain follows, and makeup = 0.6 × its inverse in dB.
+ */
+export function compressorMakeupDb(thresholdDb: number, kneeDb: number, ratio: number): number {
+  const lt = Math.pow(10, thresholdDb / 20);
+  const kt = Math.pow(10, (thresholdDb + kneeDb) / 20);
+  if (kneeDb <= 0) return -0.6 * (thresholdDb - thresholdDb / ratio);
+  const curve = (x: number, k: number): number => lt + (1 - Math.exp(-k * (x - lt))) / k;
+  // dB slope at the knee's top: (x / y) · dy/dx
+  const slope = (k: number): number => (kt * Math.exp(-k * (kt - lt))) / curve(kt, k);
+  let lo = 0.1;
+  let hi = 10000;
+  for (let i = 0; i < 80; i++) {
+    const m = Math.sqrt(lo * hi);
+    if (slope(m) > 1 / ratio) lo = m;
+    else hi = m;
+  }
+  const yKneeDb = 20 * Math.log10(curve(kt, lo));
+  const fullDb = yKneeDb + (0 - (thresholdDb + kneeDb)) / ratio;
+  return -0.6 * fullDb;
+}
 
 export interface MasterChain {
   /** Where sources connect (masterBus() feeds this). */
@@ -32,8 +61,11 @@ export interface MasterChain {
   readonly post: Tone.Gain;
   /** Listener volume / mute stage, connected to the speakers. */
   readonly output: Tone.Gain;
-  readonly compressor: Tone.Compressor;
-  /** Resolves once the worklet limiter is in place (or the native fallback is final). */
+  /** Listener volume / mute gain (native), driven by setMasterVolume() / setMuted(). */
+  readonly volumeParam: AudioParam;
+  /** The glue compressor (a native DynamicsCompressorNode). */
+  readonly compressor: DynamicsCompressorNode;
+  /** Resolves once the worklet limiter is in place, or the native fallback is final (≤ 3 s). Never rejects. */
   readonly ready: Promise<void>;
   limiterKind(): "worklet" | "native";
   /** Bypass the glue compressor (for demos about loudness). The limiter always stays. */
@@ -58,45 +90,91 @@ export function masterChain(): MasterChain {
  * Build a fresh chain on the current Tone context. masterChain() uses this for
  * the page; tests call it inside Tone.Offline() to render through the same
  * processing (`native: true` skips the worklet, to test the fallback).
+ *
+ * The inner stages are plain Web Audio nodes with their values set directly.
+ * Tone's Param wrappers (a Signal summed into the native param) set a few of
+ * them wrong in headless Chromium 140, and in every browser a biquad's
+ * high-pass Q is in dB, which Tone passes through unchanged.
  */
 export function buildMasterChain(
   opts: { toSpeakers?: boolean; reportReduction?: boolean; native?: boolean } = {},
 ): MasterChain {
   const ctx = Tone.getContext();
+  const raw = ctx.rawContext as unknown as BaseAudioContext;
+  const now = (): number => raw.currentTime;
+  const gainNode = (v: number): GainNode => {
+    const g = raw.createGain();
+    g.gain.value = v;
+    return g;
+  };
   const input = new Tone.Gain(1);
-  const hpf = new Tone.Filter({ type: "highpass", frequency: 20, rolloff: -12, Q: 0.5 });
-  const compressor = new Tone.Compressor(GLUE);
-  const trim = new Tone.Gain(Tone.dbToGain(-GLUE_MAKEUP_DB));
-  const glueBypass = new Tone.Gain(0);
-  const limIn = new Tone.Gain(1);
   const post = new Tone.Gain(1);
   const output = new Tone.Gain(1);
 
-  input.chain(hpf, compressor, trim, limIn);
-  hpf.connect(glueBypass);
-  glueBypass.connect(limIn);
+  // DC block: 2nd-order Butterworth high-pass at 15 Hz (Q −3.01 dB = 0.707),
+  // −0.1 dB at 40 Hz
+  const hpf = raw.createBiquadFilter();
+  hpf.type = "highpass";
+  hpf.frequency.value = 15;
+  hpf.Q.value = 20 * Math.log10(Math.SQRT1_2);
+  const compressor = raw.createDynamicsCompressor();
+  setCompressor(compressor, GLUE);
+  const glueGain = Tone.dbToGain(-GLUE_MAKEUP_DB);
+  const trim = gainNode(glueGain);
+  const glueBypass = gainNode(0);
+  const limIn = gainNode(1);
 
-  // native stand-in: compressor-as-limiter, then a soft clipper that can
-  // never exceed the ceiling (WaveShaper clamps inputs beyond ±1 to its ends)
+  Tone.connect(input, hpf);
+  hpf.connect(compressor).connect(trim).connect(limIn);
+  hpf.connect(glueBypass).connect(limIn);
+
+  // native stand-in: compressor-as-limiter (its makeup gain cancelled, so
+  // quiet material passes at unity and it settles ~2.4 dB under the ceiling),
+  // then a soft clipper for the overshoots that can never exceed the ceiling
+  // (a WaveShaper clamps inputs beyond ±1 to its curve's ends)
   const ceil = Tone.dbToGain(CEILING_DB);
-  const nativeLim = new Tone.Compressor({ threshold: CEILING_DB - 2, ratio: 20, knee: 0, attack: 0.001, release: 0.08 });
-  const nativeTrim = new Tone.Gain(Tone.dbToGain(-0.6));
-  const clip = new Tone.WaveShaper((x) => softClip(x, ceil), 4096);
-  clip.oversample = "none"; // exact in the linear region; it only bends past 70 % of the ceiling
-  const nativeGain = new Tone.Gain(1);
-  limIn.chain(nativeLim, nativeTrim, clip, nativeGain, post);
-  post.connect(output);
+  const NATIVE_LIM = { threshold: CEILING_DB - 2.5, ratio: 20, knee: 0, attack: 0.001, release: 0.08 };
+  const nativeLim = raw.createDynamicsCompressor();
+  setCompressor(nativeLim, NATIVE_LIM);
+  const nativeTrim = gainNode(Tone.dbToGain(-compressorMakeupDb(NATIVE_LIM.threshold, NATIVE_LIM.knee, NATIVE_LIM.ratio)));
+  const clip = raw.createWaveShaper();
+  const curve = new Float32Array(4097);
+  for (let i = 0; i < curve.length; i++) curve[i] = softClip((i / 2048) - 1, ceil);
+  clip.curve = curve;
+  clip.oversample = "none"; // exact in the linear region; it only bends past 85 % of the ceiling
+  const nativeGain = gainNode(1);
+  limIn.connect(nativeLim).connect(nativeTrim).connect(clip).connect(nativeGain);
+  Tone.connect(nativeGain, post);
+  const vol = gainNode(1);
+  Tone.connect(post, vol);
+  Tone.connect(vol, output);
   if (opts.toSpeakers) output.toDestination();
 
   let kind: "worklet" | "native" = "native";
   let workletNode: AudioWorkletNode | null = null;
-  let workletGain: Tone.Gain | null = null;
+  let workletGain: GainNode | null = null;
+  let nativeDisposed = false;
+  const disposeNative = (): void => {
+    if (nativeDisposed) return;
+    nativeDisposed = true;
+    for (const n of [nativeLim, nativeTrim, clip, nativeGain]) n.disconnect();
+  };
 
   const ready = (async () => {
-    const raw = ctx.rawContext as unknown as BaseAudioContext;
     if (opts.native || !raw.audioWorklet || typeof AudioWorkletNode === "undefined") return;
     try {
-      await loadLimiterModule(raw);
+      // a worklet module that never loads (seen in headless Chromium) must not
+      // leave callers awaiting `ready` forever: settle on the native limiter
+      const loaded = await Promise.race([
+        loadLimiterModule(raw).then(() => true),
+        new Promise<false>((res) => window.setTimeout(() => res(false), WORKLET_TIMEOUT_MS)),
+      ]);
+      if (!loaded) {
+        console.info("music: worklet limiter did not load in time, keeping the native limiter");
+        return;
+      }
+      // Tone's raw context is a standardized-audio-context wrapper, so build
+      // the node through Tone rather than the native constructor
       const node = ctx.createAudioWorkletNode("music-limiter", {
         numberOfInputs: 1,
         numberOfOutputs: 1,
@@ -111,30 +189,27 @@ export function buildMasterChain(
         node.port.onmessage = (e: MessageEvent<number>) => {
           const db = -Tone.gainToDb(Math.max(e.data, 1e-6));
           // hold the deepest reduction briefly so meters can show it
-          const now = performance.now();
-          if (db >= reductionDb || now - reductionAt > 120) {
+          const t = performance.now();
+          if (db >= reductionDb || t - reductionAt > 120) {
             reductionDb = db;
-            reductionAt = now;
+            reductionAt = t;
           }
         };
       }
-      workletGain = new Tone.Gain(0);
-      Tone.connect(limIn, node as unknown as AudioNode);
-      Tone.connect(node as unknown as AudioNode, workletGain);
-      workletGain.connect(post);
+      const wg = gainNode(0);
+      workletGain = wg;
+      limIn.connect(node).connect(wg);
+      Tone.connect(wg, post);
       // short crossfade in case something is already playing
-      const t = ctx.currentTime;
-      workletGain.gain.setValueAtTime(0, t);
-      workletGain.gain.linearRampToValueAtTime(1, t + 0.03);
+      const t = now();
+      wg.gain.setValueAtTime(0, t);
+      wg.gain.linearRampToValueAtTime(1, t + 0.03);
       nativeGain.gain.setValueAtTime(1, t);
       nativeGain.gain.linearRampToValueAtTime(0, t + 0.03);
       kind = "worklet";
       window.setTimeout(() => {
         limIn.disconnect(nativeLim);
-        nativeLim.dispose();
-        nativeTrim.dispose();
-        clip.dispose();
-        nativeGain.dispose();
+        disposeNative();
       }, 200);
     } catch (err) {
       console.info("music: worklet limiter unavailable, using native limiter", err);
@@ -146,29 +221,36 @@ export function buildMasterChain(
     post,
     output,
     compressor,
+    volumeParam: vol.gain,
     ready,
     limiterKind: () => kind,
     setGlue(on: boolean) {
-      const t = ctx.currentTime;
-      trim.gain.setTargetAtTime(on ? Tone.dbToGain(-GLUE_MAKEUP_DB) : 0, t, 0.02);
+      const t = now();
+      trim.gain.setTargetAtTime(on ? glueGain : 0, t, 0.02);
       glueBypass.gain.setTargetAtTime(on ? 0 : 1, t, 0.02);
     },
     dispose() {
-      for (const n of [input, hpf, compressor, trim, glueBypass, limIn, post, output, workletGain]) n?.dispose();
-      if (!nativeLim.disposed) {
-        nativeLim.dispose();
-        nativeTrim.dispose();
-        clip.dispose();
-        nativeGain.dispose();
-      }
-      workletNode?.disconnect();
+      for (const n of [input, post, output]) n.dispose();
+      for (const n of [hpf, compressor, trim, glueBypass, limIn, vol, workletGain, workletNode]) n?.disconnect();
+      disposeNative();
     },
   };
 }
 
-// tanh-style knee from 70% of the ceiling, flat at the ceiling
+function setCompressor(
+  c: DynamicsCompressorNode,
+  p: { threshold: number; ratio: number; knee: number; attack: number; release: number },
+): void {
+  c.threshold.value = p.threshold;
+  c.ratio.value = p.ratio;
+  c.knee.value = p.knee;
+  c.attack.value = p.attack;
+  c.release.value = p.release;
+}
+
+// tanh-style knee from 85% of the ceiling, flat at the ceiling
 function softClip(x: number, ceil: number): number {
-  const k = ceil * 0.7;
+  const k = ceil * 0.85;
   const a = Math.abs(x);
   if (a <= k) return x;
   const room = ceil - k;
@@ -285,8 +367,8 @@ const listeners = new Set<(s: { muted: boolean; volume: number }) => void>();
 function applyVolume(rampSeconds: number): void {
   if (!chain) return;
   const g = muted ? 0 : volume * volume;
-  const p = chain.output.gain;
-  const t = Tone.getContext().currentTime;
+  const p = chain.volumeParam;
+  const t = (Tone.getContext().rawContext as unknown as BaseAudioContext).currentTime;
   p.cancelScheduledValues(t);
   if (rampSeconds <= 0) p.setValueAtTime(g, t);
   else p.setTargetAtTime(g, t, rampSeconds / 3);

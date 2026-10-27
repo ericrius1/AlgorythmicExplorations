@@ -51,7 +51,8 @@ export interface ScaleRingOpts {
 
 export function mountScaleRing(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.62);
-  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.08 : 0.56));
+  // on a phone the step panel stacks under the ring, so the canvas is taller
+  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.44 : 0.56));
   const sound = new Sound({ level: 1, reverb: 0.15 });
   const badge = tapBadge(container, "tap for sound");
 
@@ -178,10 +179,10 @@ export function mountScaleRing(container: HTMLElement): Demo {
       const { ctx, w, h } = surf;
       surf.clear();
       const narrow = w < 600;
-      const R = narrow ? Math.min(w * 0.36, h * 0.36) : Math.min(w * 0.22, h * 0.36);
-      const cx = narrow ? w / 2 : w * 0.34;
-      const cy = narrow ? h * 0.47 : h * 0.52;
       const fs = narrow ? 11 : 12.5;
+      const R = narrow ? Math.min(w * 0.36, h * 0.27) : Math.min(w * 0.22, h * 0.36);
+      const cx = narrow ? w / 2 : w * 0.34;
+      const cy = narrow ? R + fs * 3.1 + 18 : h * 0.52;
 
       glow(ctx, cx, cy, R * 1.3, [40, 52, 96], 0.2);
       if (drone) glow(ctx, cx, cy, R * 0.45, hex("#ffb86b"), 0.18 + 0.05 * Math.sin(now / 400));
@@ -235,8 +236,8 @@ export function mountScaleRing(container: HTMLElement): Demo {
         ctx.fillRect(px + k * cell + 1, py, cell - 2, 16);
         text(ctx, PC_NAMES[k], px + (k + 0.5) * cell, py + 30, { size: 9.5, color: lit ? COL.text : COL.faint, align: "center" });
       }
-      py += 50;
-      if (!narrow) {
+      py += narrow ? 44 : 50;
+      {
         text(ctx, "steps", px, py, { size: 10.5, color: COL.dim });
         py += 18;
         let x = px;
@@ -248,6 +249,7 @@ export function mountScaleRing(container: HTMLElement): Demo {
           x += wdt;
         });
         py += 40;
+        if (narrow) return;
         const half = g.filter((x) => x === 1).length;
         // smallest rotation that maps the pattern onto itself
         const n = g.length;

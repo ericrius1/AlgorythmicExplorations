@@ -1,5 +1,6 @@
 import "../../styles/music-play.css";
 import { wirePage } from "../../core/wirePage";
+import { mountSoundControl } from "../../lib/music/soundControl";
 import { mountAccompanist } from "../../demos/music/accompanist";
 import { mountAccompHero } from "../../demos/music/accomp/hero";
 import { mountProbeTest } from "../../demos/music/accomp/probe";
@@ -15,3 +16,5 @@ wirePage({
   answer: mountAnswerFig,
   accompanist: mountAccompanist,
 });
+
+mountSoundControl();

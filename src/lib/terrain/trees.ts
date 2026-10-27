@@ -2,9 +2,7 @@
 // attraction points where foliage could live, let branch tips grow toward the
 // ones they can see, kill points as they're reached — branching emerges from
 // competition for space, the way it does outdoors. Radii come from the pipe
-// model (a parent carries the cross-section of its children), and the
-// skeleton stays around after meshing so it can be queried (for perches:
-// branches a bird could stand on).
+// model (a parent carries the cross-section of its children).
 
 import * as THREE from "three/webgpu";
 import type { Node } from "three/webgpu";
@@ -22,6 +20,8 @@ import {
   float,
   dot,
   normalize,
+  fract,
+  instanceIndex,
 } from "three/tsl";
 import { hash2 } from "./noise";
 import type { Look } from "./look";
@@ -197,58 +197,6 @@ export function growTree(params: TreeParams): TreeSkeleton {
   return { nodes, params, iterations };
 }
 
-// ---- the perch ledger ------------------------------------------------------------------
-
-// What a landing bird needs to know about a branch: where, pointing which
-// way, how thick, and how much open air sits above it. Computed from the
-// skeleton, not the mesh — the bird will ask the tree, not the triangles.
-export interface Perch {
-  position: THREE.Vector3;
-  tangent: THREE.Vector3; // along the branch, horizontal-ish
-  radius: number;
-  headroom: number; // clear distance straight up before the next branch
-}
-
-export function findPerches(
-  skel: TreeSkeleton,
-  opts: { minRadius?: number; maxRadius?: number; maxTilt?: number; minHeadroom?: number } = {},
-): Perch[] {
-  const minR = opts.minRadius ?? 0.018;
-  const maxR = opts.maxRadius ?? 0.07;
-  const maxTilt = opts.maxTilt ?? 0.5; // |dir.y| limit: birds don't land on flagpoles
-  const minHead = opts.minHeadroom ?? 0.32;
-  const out: Perch[] = [];
-  const nodes = skel.nodes;
-
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    if (n.parent < 0) continue;
-    if (n.radius < minR || n.radius > maxR) continue;
-    const par = nodes[n.parent];
-    const dx = n.x - par.x, dy = n.y - par.y, dz = n.z - par.z;
-    const len = Math.hypot(dx, dy, dz) || 1;
-    if (Math.abs(dy / len) > maxTilt) continue;
-
-    // headroom: nearest node vertically above, within a small horizontal ring
-    let head = 3;
-    for (let j = 0; j < nodes.length; j++) {
-      if (j === i) continue;
-      const hx = nodes[j].x - n.x, hz = nodes[j].z - n.z;
-      const hy = nodes[j].y - n.y;
-      if (hy > 0.04 && hx * hx + hz * hz < 0.12 * 0.12) head = Math.min(head, hy);
-    }
-    if (head < minHead) continue;
-
-    out.push({
-      position: new THREE.Vector3(n.x, n.y + n.radius, n.z),
-      tangent: new THREE.Vector3(dx / len, dy / len, dz / len),
-      radius: n.radius,
-      headroom: head,
-    });
-  }
-  return out;
-}
-
 // ---- the mesh ---------------------------------------------------------------------------
 
 // Bark is a ring of SIDES vertices around every node, joined to the ring
@@ -261,14 +209,13 @@ export function findPerches(
 
 const C_BARK_LO = new THREE.Color().setHex(0x3e3226, THREE.SRGBColorSpace);
 const C_BARK_HI = new THREE.Color().setHex(0x6b5a46, THREE.SRGBColorSpace);
-const C_LEAF_A = new THREE.Color().setHex(0x3f6b2a, THREE.SRGBColorSpace);
-const C_LEAF_B = new THREE.Color().setHex(0x7d9c3a, THREE.SRGBColorSpace);
-const C_LEAF_C = new THREE.Color().setHex(0x9a9442, THREE.SRGBColorSpace);
+const C_LEAF_A = new THREE.Color().setHex(0x2d5222, THREE.SRGBColorSpace);
+const C_LEAF_B = new THREE.Color().setHex(0x5d8030, THREE.SRGBColorSpace);
+const C_LEAF_C = new THREE.Color().setHex(0x8f8a3c, THREE.SRGBColorSpace);
 
 export interface TreeBuild {
   bark: THREE.BufferGeometry; // non-indexed, in growth order — drawRange animates growth
   leaves: THREE.BufferGeometry;
-  perches: Perch[];
   segmentCount: number;
   leafCount: number;
   crown: { x: number; y: number; z: number; r: number; top: number };
@@ -277,12 +224,24 @@ export interface TreeBuild {
 const SIDES = 6;
 const DEFAULT_SUN = new THREE.Vector3(0.5, 0.45, -0.6).normalize();
 
-export function buildTreeGeometry(skel: TreeSkeleton, opts: { sun?: THREE.Vector3; leafScale?: number } = {}): TreeBuild {
+export interface TreeMeshOptions {
+  sun?: THREE.Vector3;
+  leafScale?: number;
+  // a lighter mesh for trees seen from a distance: keep this fraction of the
+  // leaves (each one scaled up so the crown covers the same area) and drop
+  // twigs thinner than minTwig, which the leaves hide anyway
+  leafKeep?: number;
+  minTwig?: number;
+}
+
+export function buildTreeGeometry(skel: TreeSkeleton, opts: TreeMeshOptions = {}): TreeBuild {
   const nodes = skel.nodes;
   const seed = skel.params.seed;
   const sun = opts.sun ?? DEFAULT_SUN;
+  const keep = Math.min(1, Math.max(0.02, opts.leafKeep ?? 1));
+  const minTwig = opts.minTwig ?? 0;
   const segs: number[] = [];
-  for (let i = 0; i < nodes.length; i++) if (nodes[i].parent >= 0) segs.push(i);
+  for (let i = 0; i < nodes.length; i++) if (nodes[i].parent >= 0 && nodes[i].radius >= minTwig) segs.push(i);
 
   // the crown: centroid and spread of the thin wood, where the leaves go
   let cx = 0, cy = 0, cz = 0, cn = 0, top = 0;
@@ -358,13 +317,15 @@ export function buildTreeGeometry(skel: TreeSkeleton, opts: { sun?: THREE.Vector
   bark.setAttribute("aLight", new THREE.BufferAttribute(bl, 2));
 
   // ---- leaves: diamond cards along the thin twigs ----------------------------------
-  const scale = opts.leafScale ?? 1;
+  const scale = (opts.leafScale ?? 1) / Math.sqrt(keep);
   const leafAt: { i: number; count: number }[] = [];
   let total = 0;
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
     if (n.parent < 0 || n.depth <= 3 || n.radius > 0.032) continue;
-    const count = n.children === 0 ? 10 : 5 + Math.floor(hash2(i, 3, seed) * 4);
+    const full = n.children === 0 ? 10 : 5 + Math.floor(hash2(i, 3, seed) * 4);
+    const count = Math.floor(full * keep + hash2(i, 29, seed));
+    if (count === 0) continue;
     leafAt.push({ i, count });
     total += count;
   }
@@ -422,7 +383,6 @@ export function buildTreeGeometry(skel: TreeSkeleton, opts: { sun?: THREE.Vector
   return {
     bark,
     leaves,
-    perches: findPerches(skel),
     segmentCount: segs.length,
     leafCount,
     crown: { x: cx, y: cy, z: cz, r: cr, top },
@@ -438,17 +398,19 @@ export interface TreeMaterials {
   wind: { value: number };
 }
 
-// The whole tree leans with a slow gust field that travels across the
-// forest (so neighbours sway together and distant trees don't), more at the
-// top than the bottom; leaves add a quick flutter of their own.
+// The whole tree leans with a slow two-sine gust, more at the top than the
+// bottom, and each instance of a variant gets its own phase from its
+// instance index so a planted forest doesn't sway in lockstep; leaves add a
+// quick flutter of their own.
 export function makeTreeMaterials(look: Look): TreeMaterials {
   const time = uniform(0);
   const wind = uniform(1);
   const hy = positionGeometry.y.max(0); // height in the tree's own frame
   const at = positionLocal;
-  const gust = sin(at.x.mul(0.21).add(at.z.mul(0.13)).add(time.mul(0.9)))
+  const own = fract(sin(float(instanceIndex).mul(12.9898)).mul(43758.5453)).mul(6.283);
+  const gust = sin(at.x.mul(0.21).add(at.z.mul(0.13)).add(time.mul(0.9)).add(own))
     .mul(0.6)
-    .add(sin(at.x.mul(0.47).sub(at.z.mul(0.31)).add(time.mul(1.7))).mul(0.4));
+    .add(sin(at.x.mul(0.47).sub(at.z.mul(0.31)).add(time.mul(1.7)).add(own.mul(1.7))).mul(0.4));
   const sway = gust.mul(0.5).add(0.5).mul(hy.mul(hy)).mul(0.006).mul(wind);
   const swayVec = vec3(sway.mul(0.82), float(0), sway.mul(0.57));
 

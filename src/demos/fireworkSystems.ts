@@ -104,7 +104,7 @@ export async function mountHeroFireworks(container: HTMLElement): Promise<Demo> 
   const tick = autoShow(
     world,
     () => view.aspect(),
-    () => ({ sparks: 920, rockets: [1, 3], interval: [1.0, 1.8], collapseEvery: 4 }),
+    () => ({ sparks: 920, rockets: [1, 3], interval: [0.9, 1.5], collapseEvery: 4 }),
   );
   // start mid-show rather than on an empty sky
   if (!world.prewarmed) world.prewarm(2.6, tick);

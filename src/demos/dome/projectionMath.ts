@@ -279,7 +279,7 @@ function polarLayout(w: number, h: number, narrow: boolean) {
     return { s, cx: w * 0.5, cy: h * 0.07 + s + 14, rx: w * 0.1, ry: h * 0.6, rw: w * 0.8, rh: h * 0.22 };
   }
   const s = Math.min(w * 0.2, h * 0.36);
-  return { s, cx: w * 0.27, cy: h * 0.47, rx: w * 0.55, ry: h * 0.15, rw: w * 0.37, rh: h * 0.64 };
+  return { s, cx: w * 0.25, cy: h * 0.47, rx: w * 0.52, ry: h * 0.15, rw: w * 0.33, rh: h * 0.64 };
 }
 
 export function mountPolarCircle(container: HTMLElement): Demo {
@@ -615,7 +615,8 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
   shell.setInfo(() => {
     const m = metrics();
     const law = FISHEYE_LAWS[lawIndex];
-    return `${law.name}: θ = ${(m.th / DEG).toFixed(0)}° lands at ρ = ${m.rho.toFixed(3)} (equidistant would be ${(m.th / m.maxT).toFixed(3)})`;
+    const base = `${law.name}: θ = ${(m.th / DEG).toFixed(0)}° lands at ρ = ${m.rho.toFixed(3)}`;
+    return law.name === "equidistant" ? `${base}, the same share of the radius as of θmax` : `${base} (equidistant would be ${(m.th / m.maxT).toFixed(3)})`;
   });
 
   return {

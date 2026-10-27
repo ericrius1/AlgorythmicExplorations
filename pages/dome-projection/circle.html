@@ -157,7 +157,7 @@ v = clamp(r, 0, 1)   <span class="cm">// centre to edge, 0..1</span></code></pre
   color     = sample(source, uv)</code></pre>
       <p>
         That's how the circle in the figure is filled, and how every image in this series is
-        made, the hero included. Going backwards means every output pixel gets exactly one
+        made, the hero included. Going backwards means every output pixel gets one
         answer. Push source pixels forward instead and some output pixels get none, which
         shows up as holes, and others get several, which shows up as sparkle where they
         fight.
@@ -166,13 +166,13 @@ v = clamp(r, 0, 1)   <span class="cm">// centre to edge, 0..1</span></code></pre
         <summary>The centre is a singular point</summary>
         <div class="fold-body">
           <p>
-            At <em>r</em> = 0 every angle names the same point. That isn't a bug, it's the
-            geometry, but code that depends on <em>θ</em> there misbehaves. Nothing crashes
-            (in JavaScript, <code>Math.atan2(0, 0)</code> quietly returns 0). What goes
+            At <em>r</em> = 0 every angle names the same point. That's the geometry, and
+            code that depends on <em>θ</em> there misbehaves. Nothing crashes
+            (in JavaScript, <code>Math.atan2(0, 0)</code> returns 0). What goes
             wrong is anything that varies with the angle, like a pattern of spokes, which
             pinches into a visible point at the centre. Fade those effects out near
             <em>r</em> = 0, or pick a fixed angle there. On a dome the same point is the
-            zenith, straight overhead, which is where the audience looks most.
+            zenith, straight overhead, where a pinched pattern is hard to miss.
           </p>
         </div>
       </details>

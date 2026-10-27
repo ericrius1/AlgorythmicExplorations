@@ -289,7 +289,8 @@ fn magnetGlyph(world: vec2f, c: vec3f) -> vec3f {
     let nx = clamp(p.x / hw, -1.0, 1.0);
     let n = vec3f(nx, 0.0, sqrt(1.0 - nx * nx));
     let r = reflect(vec3f(0.0, 0.0, -1.0), n);
-    var steel = vec3f(0.03, 0.032, 0.038) + env(r) * 0.32;
+    // brushed steel: the studio's brightness without its colour
+    var steel = vec3f(0.03, 0.032, 0.038) + vec3f(dot(env(r), vec3f(0.3, 0.5, 0.2))) * 0.3;
     let pole = smoothstep(-hh + 0.022, -hh + 0.016, p.y);
     steel = mix(steel, vec3f(1.6, 0.62, 0.2), pole * 0.85);
     col = mix(col, steel, cover);
@@ -369,7 +370,10 @@ fn fsFill(in: FullOut) -> @location(0) vec4f {
       ) * 0.5;
       let gwl = length(gw);
       let outDir = -gw / max(gwl, 1e-6);
-      let tilt = min(0.97, 1.0 - exp(-gwl * RP.tray.w));
+      // only within a bevel's width of the surface: deep inside, the
+      // wide field's ripples would show up as smudges on the black
+      let bevel = exp(-max(d, 0.0) / (0.06 * RP.pxPerWorld));
+      let tilt = min(0.97, 1.0 - exp(-gwl * RP.tray.w)) * bevel;
       let n = vec3f(outDir * tilt, sqrt(1.0 - tilt * tilt));
       let r = reflect(vec3f(0.0, 0.0, -1.0), n);
       let fres = 0.05 + 0.95 * pow(1.0 - n.z, 4.0);
@@ -377,7 +381,7 @@ fn fsFill(in: FullOut) -> @location(0) vec4f {
       // a hard key light for a wet pin highlight
       let h = normalize(normalize(vec3f(-0.55, 0.55, 0.62)) + vec3f(0.0, 0.0, 1.0));
       body += vec3f(3.0, 3.1, 3.3) * pow(max(dot(n, h), 0.0), 90.0);
-      if (RP.view > 3.5) { body *= 0.35; } // moments view: dim the fluid under the arrows
+      if (RP.view > 3.5) { body *= 0.5; } // moments view: dim the fluid under the arrows
     }
     col = mix(col, body, cover);
   }
@@ -530,8 +534,8 @@ fn vsArrows(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
   var dir = vec2f(0.0, 1.0);
   if (ml > 1e-6) { dir = m / ml; }
   let mag = clamp(ml * RP.momentScale, 0.0, 1.0);
-  let len = RP.dotSize * (1.2 + 3.2 * mag);
-  let wd = RP.dotSize * 0.55;
+  let len = RP.dotSize * (0.8 + 1.6 * mag);
+  let wd = RP.dotSize * 0.5;
   let perp = vec2f(-dir.y, dir.x);
   let world = p.pv.xy + dir * corner.x * len + perp * corner.y * wd;
   var out: ArrowOut;

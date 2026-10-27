@@ -1,0 +1,100 @@
+/* Solar Stack: page-specific styles, scoped to the page's body class. */
+
+/* the technology tree's toolbar: a colour legend and zoom buttons */
+.solar-stack .solar-tree-demo {
+  padding: 0.7rem 0.75rem 0.75rem;
+  overflow: hidden;
+}
+
+.solar-stack .solar-tree-toolbar {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0 0.2rem 0.6rem;
+  border-bottom: none;
+}
+
+.solar-stack .solar-tree-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  flex: 1 1 auto;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.solar-stack .solar-tree-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.solar-stack .solar-tree-legend span::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--node-color);
+}
+
+.solar-stack .solar-tree-buttons {
+  display: inline-flex;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.solar-stack .solar-tree-buttons .demo-button {
+  min-width: 2.2rem;
+}
+
+.solar-stack .solar-tree-viewport {
+  height: min(52vh, 27rem);
+  min-height: 20rem;
+  border-radius: 10px;
+  /* vertical swipes scroll the page; horizontal drags pan the tree */
+  touch-action: pan-y;
+}
+
+.solar-stack .solar-tree-year {
+  fill: var(--node-color);
+}
+
+.solar-stack .solar-tree-detail {
+  min-height: 7.2rem;
+  margin-top: 0.6rem;
+  border: 1px solid rgba(122, 162, 255, 0.12);
+  border-radius: 10px;
+}
+
+@media (max-width: 42rem) {
+  .solar-stack .solar-tree-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .solar-stack .solar-tree-viewport {
+    min-height: 18rem;
+    height: 18rem;
+  }
+
+  .solar-stack .solar-tree-detail {
+    min-height: 9.5rem;
+  }
+}
+
+/* segmented buttons that pick one option */
+.solar-stack .demo-button.is-active {
+  background: rgba(122, 162, 255, 0.28);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* the shared toolbar rule stretches every span; only the legend should grow */
+.solar-stack .solar-tree-toolbar span {
+  flex: none;
+}
+
+.solar-stack .solar-tree-toolbar .solar-tree-legend {
+  flex: 1 1 auto;
+}

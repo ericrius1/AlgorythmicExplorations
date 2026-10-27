@@ -57,23 +57,26 @@ export function mountReliefNeighbors(el: HTMLElement): void {
     steps: [
       { at: 0, text: "A 2D grid query is cheap: a particle checks its own cell and the eight around it. Nine cell ranges, then contiguous particle runs." },
       { at: 0.24, text: "In 3D the same one-cell radius becomes a 3×3×3 block. The code shape is identical, but the loop body runs 27 times instead of 9." },
-      { at: 0.52, text: "Magnetics reaches farther than pressure. A three-radius cutoff is 7×7×7 = 343 cells; the old four-radius sweep would be 729." },
+      { at: 0.52, text: "Magnetics reaches farther than pressure. A three-radius cutoff is 7×7×7 = 343 cells; four radii would be 729." },
       { at: 0.78, text: "The expensive magnetic pass runs once per frame. The next three substeps reuse the cached acceleration while pressure, tension, and collisions keep integrating." },
     ],
     draw(ctx, w, h, t) {
-      const pad = 16;
-      const gap = 14;
+      // on a phone the three panels get short titles and the side notes go
+      const narrow = w < 560;
+      const pad = narrow ? 8 : 16;
+      const gap = narrow ? 6 : 14;
       const panelW = (w - pad * 2 - gap * 2) / 3;
-      const panelH = h * 0.68;
+      const panelH = h * (narrow ? 0.6 : 0.68);
       const y = 18;
+      const countY = narrow ? 20 : 28; // count labels, below each block
       const p2 = phase(t, 0, 0.16);
       const p3 = phase(t, 0.24, 0.44);
       const pmag = phase(t, 0.52, 0.72);
       const pcache = phase(t, 0.78, 1);
 
-      drawPanel(ctx, pad, y, panelW, panelH, "2D neighbour query");
-      drawPanel(ctx, pad + panelW + gap, y, panelW, panelH, "3D neighbour query");
-      drawPanel(ctx, pad + (panelW + gap) * 2, y, panelW, panelH, "magnetic cutoff");
+      drawPanel(ctx, pad, y, panelW, panelH, narrow ? "2D" : "2D neighbour query");
+      drawPanel(ctx, pad + panelW + gap, y, panelW, panelH, narrow ? "3D" : "3D neighbour query");
+      drawPanel(ctx, pad + (panelW + gap) * 2, y, panelW, panelH, narrow ? "magnetics" : "magnetic cutoff");
 
       // 2D 3x3 query.
       const x0 = pad + panelW * 0.18;
@@ -95,7 +98,7 @@ export function mountReliefNeighbors(el: HTMLElement): void {
       ctx.beginPath();
       ctx.arc(x0 + cell * 1.5, y0 + cell * 1.5, 5, 0, Math.PI * 2);
       ctx.fill();
-      label(ctx, "9 cells", pad + panelW / 2, y0 + cell * 3 + 28, { align: "center", color: PAL.accent, mono: true });
+      label(ctx, "9 cells", pad + panelW / 2, y0 + cell * 3 + countY, { align: "center", color: PAL.accent, mono: true });
       ctx.restore();
 
       // 3D 3x3x3 block, drawn as three offset layers.
@@ -123,7 +126,7 @@ export function mountReliefNeighbors(el: HTMLElement): void {
       ctx.beginPath();
       ctx.arc(x1 + cell * 1.5 + offX, y1 + cell * 1.5 - offY, 5, 0, Math.PI * 2);
       ctx.fill();
-      label(ctx, "27 cells", pad + panelW + gap + panelW / 2, y0 + cell * 3 + 28, {
+      label(ctx, "27 cells", pad + panelW + gap + panelW / 2, y0 + cell * 3 + countY, {
         align: "center",
         color: PAL.warm,
         mono: true,
@@ -151,44 +154,48 @@ export function mountReliefNeighbors(el: HTMLElement): void {
       ctx.beginPath();
       ctx.arc(x2 + small * 4.5, y2 + small * 4.5, 4.2, 0, Math.PI * 2);
       ctx.fill();
-      label(ctx, "7 layers deep", x2 + small * 9 + 8, y2 + small * 2.2, { color: PAL.muted, size: 10 });
-      label(ctx, "343 cells", pad + (panelW + gap) * 2 + panelW / 2, y0 + cell * 3 + 28, {
+      if (!narrow) label(ctx, "× 7 layers deep", x2, y2 - 9, { color: PAL.muted, size: 10 });
+      label(ctx, "343 cells", pad + (panelW + gap) * 2 + panelW / 2, y0 + cell * 3 + countY, {
         align: "center",
         color: PAL.warm,
         mono: true,
       });
-      label(ctx, "729 at four radii", pad + (panelW + gap) * 2 + panelW / 2, y0 + cell * 3 + 47, {
-        align: "center",
-        color: PAL.muted,
-        size: 10,
-        mono: true,
-      });
+      if (!narrow) {
+        label(ctx, "729 at four radii", pad + (panelW + gap) * 2 + panelW / 2, y0 + cell * 3 + 47, {
+          align: "center",
+          color: PAL.muted,
+          size: 10,
+          mono: true,
+        });
+      }
       ctx.restore();
 
       // Cached force timeline.
-      const ty = y + panelH + h * 0.1;
+      const ty = y + panelH + (narrow ? 10 : h * 0.1);
+      const boxH = narrow ? 38 : 50;
       const tx = pad + Math.max(12, w * 0.05);
       const tw = w - tx * 2;
       ctx.save();
       ctx.globalAlpha = pcache;
-      label(ctx, "one rendered frame", tx, ty - 18, { color: PAL.muted, mono: true });
+      if (!narrow) label(ctx, "one rendered frame", tx, ty - 18, { color: PAL.muted, mono: true });
       const slots = 4;
       const sw = tw / slots;
       for (let i = 0; i < slots; i++) {
         const sx = tx + i * sw;
-        roundedRect(ctx, sx + 4, ty, sw - 8, 50, 8);
+        roundedRect(ctx, sx + 4, ty, sw - 8, boxH, 8);
         ctx.fillStyle = i === 0 ? "rgba(255, 184, 107, 0.14)" : "rgba(122, 162, 255, 0.08)";
         ctx.strokeStyle = i === 0 ? PAL.warm : PAL.grid;
         ctx.fill();
         ctx.stroke();
-        label(ctx, `substep ${i + 1}`, sx + sw / 2, ty + 15, { align: "center", color: PAL.text, size: 11 });
-        label(ctx, i === 0 ? "solve magnetics" : "reuse cached a", sx + sw / 2, ty + 34, {
+        label(ctx, narrow ? `step ${i + 1}` : `substep ${i + 1}`, sx + sw / 2, ty + (narrow ? 12 : 15), { align: "center", color: PAL.text, size: 11 });
+        const note = i === 0 ? (narrow ? "solve" : "solve magnetics") : narrow ? "reuse" : "reuse cached a";
+        label(ctx, note, sx + sw / 2, ty + (narrow ? 27 : 34), {
           align: "center",
           color: i === 0 ? PAL.warm : PAL.accent,
           size: 10,
           mono: true,
         });
-        if (i > 0) arrow(ctx, sx - 6, ty + 25, sx + 5, ty + 25, PAL.muted, 1.4, 5);
+        if (i > 0) arrow(ctx, sx - 6, ty + boxH / 2, sx + 5, ty + boxH / 2, PAL.muted, 1.4, 5);
       }
       ctx.restore();
     },
@@ -206,6 +213,7 @@ export function mountReliefExtractors(el: HTMLElement): void {
       { at: 0.72, text: "Dual contouring keeps the same connectivity but also uses normals. The vertex walks toward the tangent-plane intersection, preserving the spike." },
     ],
     draw(ctx, w, h, t) {
+      const narrow = w < 560; // phone: shorter labels so nothing runs off the canvas
       const mx = Math.max(34, w * 0.08);
       const top = 24;
       const gw = w - mx * 2;
@@ -335,7 +343,7 @@ export function mountReliefExtractors(el: HTMLElement): void {
           ctx.arc(X(a), Y(b), 5, 0, Math.PI * 2);
           ctx.fill();
         }
-        label(ctx, "edge vertices", X(4.9), Y(1.05), { color: PAL.accent, mono: true, alpha: pEdge });
+        label(ctx, "edge vertices", narrow ? X(4.0) : X(4.9), narrow ? Y(1.7) : Y(1.05), { color: PAL.accent, mono: true, alpha: pEdge });
         ctx.restore();
       }
 
@@ -406,7 +414,7 @@ export function mountReliefExtractors(el: HTMLElement): void {
         }
         arrow(ctx, X(2.72), Y(1.18), X(2.95), Y(0.86), PAL.warm, 1.8, 7);
         arrow(ctx, X(3.28), Y(1.18), X(3.05), Y(0.86), PAL.warm, 1.8, 7);
-        label(ctx, "planes meet at the feature", X(3.15), Y(0.42), {
+        label(ctx, narrow ? "planes meet" : "planes meet at the feature", X(3.15), Y(0.42), {
           color: PAL.warm,
           mono: true,
           alpha: pDual,
@@ -418,11 +426,13 @@ export function mountReliefExtractors(el: HTMLElement): void {
       const ly = y0 + gh + 32;
       ctx.save();
       ctx.globalAlpha = Math.max(pEdge, pNet, pDual, 0.35);
-      const items: [string, string][] = [
-        ["marching: edge vertices", PAL.accent],
-        ["surface net: mass point", PAL.good],
-        ["dual contouring: Hermite fit", PAL.warm],
-      ];
+      const items: [string, string][] = narrow
+        ? [["marching", PAL.accent], ["surface net", PAL.good], ["dual contouring", PAL.warm]]
+        : [
+            ["marching: edge vertices", PAL.accent],
+            ["surface net: mass point", PAL.good],
+            ["dual contouring: Hermite fit", PAL.warm],
+          ];
       let lx = mx;
       for (const [txt, color] of items) {
         ctx.fillStyle = color;

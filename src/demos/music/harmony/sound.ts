@@ -4,7 +4,7 @@
 // page bus (→ masterBus(), which carries the series' limiter), with a shared
 // reverb and a tempo-synced delay as send effects.
 
-import { Tone, masterBus, unlockAudio } from "../../../lib/audio";
+import { Tone, audioOn, masterBus, unlockAudio } from "../../../lib/audio";
 
 export { Tone };
 
@@ -15,7 +15,9 @@ export async function startAudio(): Promise<void> {
 // AudioContext time without Tone's 100 ms scheduling look-ahead. Taps use
 // soon() so a chord sounds right under the finger; visuals compare event
 // times against audioTime() so they light up when the sound does.
-export const audioTime = (): number => Tone.immediate();
+// Before the first gesture it returns 0, so drawing code can call it without
+// creating an AudioContext the browser would refuse to start.
+export const audioTime = (): number => (audioOn() ? Tone.immediate() : 0);
 export const soon = (): number => Tone.immediate() + 0.02;
 
 // ---- buses ---------------------------------------------------------------------
@@ -192,12 +194,15 @@ export function epiano(dest: Tone.InputNode, volume = -14): Inst {
   });
   const trem = new Tone.Tremolo({ frequency: 4.2, depth: 0.18, spread: 90 }).start();
   const tone = new Tone.Filter({ type: "lowpass", frequency: 5200, rolloff: -12 });
+  // Tone's FMSynth comes out about 10 dB under a plain Synth and the tremolo
+  // costs another 6 or so; this makeup puts a full-velocity note near `volume` dBFS.
+  const makeup = new Tone.Gain(Tone.dbToGain(16));
   poly.volume.value = volume;
   tine.volume.value = volume - 17;
   poly.connect(trem);
   tine.connect(trem);
-  trem.chain(tone);
-  tone.connect(dest);
+  trem.chain(tone, makeup);
+  makeup.connect(dest);
   const ord = inOrder();
   return {
     play(midi, dur, time, vel = 0.7) {
@@ -211,7 +216,7 @@ export function epiano(dest: Tone.InputNode, volume = -14): Inst {
       safely(() => tine.releaseAll(t));
     },
     dispose() {
-      for (const n of [poly, tine, trem, tone]) n.dispose();
+      for (const n of [poly, tine, trem, tone, makeup]) n.dispose();
     },
   };
 }
@@ -287,25 +292,33 @@ export type LeadKind = "flute" | "square" | "pluck" | "marimba" | "bell";
 // Melody voices. Each is monophonic-friendly but uses a small pool so tails overlap.
 export function lead(kind: LeadKind, dest: Tone.InputNode, volume = -16): Inst {
   if (kind === "pluck") {
-    const voices = [0, 1, 2, 3].map(() => new Tone.PluckSynth({ attackNoise: 0.8, dampening: 3800, resonance: 0.94, release: 0.9 }));
+    // A subtractive pluck: a saw through a low-pass whose cutoff snaps shut,
+    // under an amplitude envelope with no sustain. (Tone's PluckSynth needs an
+    // AudioWorklet module that some browsers never finish loading.)
+    const poly = new Tone.PolySynth({
+      voice: Tone.MonoSynth,
+      maxPolyphony: 10,
+      options: {
+        oscillator: { type: "fatsawtooth", count: 2, spread: 12 },
+        filter: { type: "lowpass", rolloff: -24, Q: 1.5 },
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
+        filterEnvelope: { attack: 0.001, decay: 0.22, sustain: 0.05, release: 0.3, baseFrequency: 260, octaves: 3.4, exponent: 2 },
+      },
+    });
     const body = new Tone.Filter({ type: "lowpass", frequency: 4200, rolloff: -12 });
-    const g = new Tone.Gain(Tone.dbToGain(volume + 6));
-    for (const v of voices) v.connect(body);
-    body.chain(g);
-    g.connect(dest);
-    let rr = 0;
-    const ords = voices.map(() => inOrder());
+    poly.volume.value = volume + 8;
+    poly.connect(body);
+    body.connect(dest);
+    const ord = inOrder();
     return {
       play(midi, dur, time, vel = 0.7) {
-        const k = rr++ % voices.length;
-        voices[k].triggerAttackRelease(hz(midi), Math.max(dur, 0.2), ords[k](time));
-        void vel;
+        poly.triggerAttackRelease(hz(midi), Math.max(dur, 0.2), ord(time), vel);
       },
       release() {
-        voices.forEach((v, k) => safely(() => v.triggerRelease(ords[k](Tone.immediate()))));
+        safely(() => poly.releaseAll(ord(Tone.immediate())));
       },
       dispose() {
-        for (const n of [...voices, body, g]) n.dispose();
+        for (const n of [poly, body]) n.dispose();
       },
     };
   }
@@ -328,8 +341,11 @@ export function lead(kind: LeadKind, dest: Tone.InputNode, volume = -16): Inst {
             modulationEnvelope: { attack: 0.002, decay: 0.9, sustain: 0.05, release: 1.2 },
           },
     });
+    // FMSynth runs about 10 dB under a plain Synth; make that up
+    const makeup = new Tone.Gain(Tone.dbToGain(10));
     poly.volume.value = volume;
-    poly.connect(dest);
+    poly.connect(makeup);
+    makeup.connect(dest);
     const ord = inOrder();
     return {
       play(midi, dur, time, vel = 0.7) {
@@ -340,6 +356,7 @@ export function lead(kind: LeadKind, dest: Tone.InputNode, volume = -16): Inst {
       },
       dispose() {
         poly.dispose();
+        makeup.dispose();
       },
     };
   }

@@ -36,7 +36,7 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
   post.settings.vignette = 0.3;
 
   const modeNum = opts.mode === "halo" ? 1 : opts.mode === "shafts" ? 2 : 0;
-  post.settings.exposure = modeNum === 0 ? 1.1 : 1.5;
+  post.settings.exposure = modeNum === 0 ? 1.2 : 1.5;
   const W = shell.canvas.width;
   const Hpx = shell.canvas.height;
   const aspect = W / Hpx;
@@ -234,8 +234,8 @@ export async function mountFog(container: HTMLElement, opts: FogOptions): Promis
     }
     // the forest: a low morning sun, up and to the left, behind the crowns
     return {
-      zenith: [0.02, 0.035, 0.07], horizon: [0.12, 0.08, 0.045],
-      sunDir: [-0.62, -0.78], sharp: 260, sun: 30, sunColor: [1, 0.74, 0.42],
+      zenith: [0.022, 0.045, 0.1], horizon: [0.1, 0.075, 0.055],
+      sunDir: [-0.62, -0.78], sharp: 260, sun: 46, sunColor: [1, 0.7, 0.36],
       backZenith: [0.025, 0.04, 0.085], backHorizon: [0.2, 0.12, 0.07], backSun: 1.2,
     };
   };

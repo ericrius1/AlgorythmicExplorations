@@ -168,7 +168,7 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
       // ---- the pitch helix ----
       const hx = narrow ? W / 2 : W * 0.26;
       const R = narrow ? Math.min(W * 0.3, 110) : Math.min(W * 0.17, 130);
-      const hTop = 46;
+      const hTop = narrow ? 52 : 60;
       const hBot = narrow ? H * 0.52 : H - 40;
       const turn = (hBot - hTop - R * 0.7) / K; // height per octave
       const P = (oct: number): [number, number, number] => {
@@ -195,7 +195,8 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
       for (let i = 0; i < 12; i++) {
         const th = (2 * Math.PI * i) / 12;
         const x = hx + (R + 16) * Math.sin(th);
-        const y = hTop + R * 0.2 + (R * 0.32 + 8) * Math.cos(th) - 10;
+        // a ring just above the top turn, never closer than 16 px to the edge
+        const y = Math.max(16, hTop + R * 0.2 + (R * 0.32 + 8) * Math.cos(th) - 14);
         const on = Math.round(chroma() * 12) % 12 === i;
         text(g, NOTE[i], x, y, {
           size: on ? 12.5 : 10,

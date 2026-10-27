@@ -48,9 +48,9 @@ struct Particle2 {
 // Cold wax: deep maroon, almost black. Warm: crimson → orange → amber-white.
 fn waxColor(t: f32) -> vec3f {
   let c0 = vec3f(0.05, 0.005, 0.012); // cold, nearly black plum
-  let c1 = vec3f(0.6, 0.05, 0.03);    // crimson
+  let c1 = vec3f(0.78, 0.09, 0.03);   // crimson
   let c2 = vec3f(1.0, 0.36, 0.05);    // orange
-  let c3 = vec3f(1.0, 0.82, 0.42);    // amber-white
+  let c3 = vec3f(1.0, 0.66, 0.22);    // amber (hot wax stays saturated, never white)
   let a = smoothstep(0.05, 0.35, t);
   let b = smoothstep(0.30, 0.65, t);
   let c = smoothstep(0.60, 0.98, t);
@@ -61,7 +61,7 @@ fn waxColor(t: f32) -> vec3f {
 // occluder with a whisper of colour; wax warm enough to rise glows.
 fn waxLuminance(t: f32) -> f32 {
   let g = smoothstep(0.1, 0.85, t);
-  return 0.02 + g * g * 2.2;
+  return 0.02 + g * g * 1.6;
 }
 
 // ---- lamp geometry, shared by the scene and display passes -------------------
@@ -293,7 +293,10 @@ fn fsDisplay(in: FullOut) -> @location(0) vec4f {
     let t = f.y / max(f.x, 1e-4);
     let emit = waxColor(t) * waxLuminance(t) * RP.glow;
     let nOut = -grad / gl;                         // uv-space, pointing out of the blob
-    let depth = max(max(f.x, around * pinhole) - RP.threshold, 0.0) / gl; // texels below the surface
+    // texels below the surface. Taking the larger of the field here and its
+    // ring average keeps shallow dips *inside* a blob (where two clusters of
+    // particles meet) from reading as surface and drawing a bright seam.
+    let depth = max(max(f.x, around) - RP.threshold, 0.0) / gl;
     let outUv = in.uv + nOut * (depth + 3.0) * e;
     let incident = fluenceAt(outUv);
     let albedo = vec3f(0.9, 0.2, 0.1);
@@ -414,4 +417,28 @@ fn fsDots(in: DotOut) -> @location(0) vec4f {
   // background (the canvas is sRGB; these are display colours)
   let col = heatRamp(in.temp) * 1.25 + vec3f(0.04, 0.03, 0.07);
   return vec4f(col * a, a);
+}
+
+// ---- field blur -----------------------------------------------------------------
+// Separable Gaussian over the splatted field, before anything thresholds it.
+// A metaball sum of 9,000 small kernels is lumpy at the particle scale; the
+// threshold turns every lump into a scallop on the wax surface. Blurring the
+// field first melts them into the smooth, rounded blobs a real lamp makes.
+
+struct BlurParams { dir: vec2f, _p0: f32, _p1: f32 }
+@group(0) @binding(7) var<uniform> BP: BlurParams;
+@group(0) @binding(8) var blurSrc: texture_2d<f32>;
+
+@fragment
+fn fsBlur(in: FullOut) -> @location(0) vec4f {
+  let e = BP.dir / vec2f(textureDimensions(blurSrc));
+  // 9 linear taps ≈ a 17-texel Gaussian (σ ≈ 3.2 texels)
+  var w = array<f32, 5>(0.1256, 0.2230, 0.1385, 0.0587, 0.0170);
+  var o = array<f32, 5>(0.0, 1.4634, 3.4154, 5.3689, 7.3247);
+  var sum = textureSampleLevel(blurSrc, linSamp, in.uv, 0.0) * w[0];
+  for (var i = 1; i < 5; i++) {
+    sum += textureSampleLevel(blurSrc, linSamp, in.uv + e * o[i], 0.0) * w[i];
+    sum += textureSampleLevel(blurSrc, linSamp, in.uv - e * o[i], 0.0) * w[i];
+  }
+  return sum;
 }

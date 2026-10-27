@@ -15,6 +15,7 @@ import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
 import { PostFX, HDR_FORMAT } from "../../lib/postfx";
 import { pixelRatio } from "../../lib/palette";
+import { blueNoiseTexture } from "./blueNoise";
 
 export interface PrismOptions {
   mode: "bench" | "spectrum" | "hero" | "caustics" | "full";
@@ -22,8 +23,8 @@ export interface PrismOptions {
 
 // ---- wavelength → linear sRGB (the same fit and scale as prism.wgsl) --------------
 // Wyman, Sloan & Shirley's piecewise-Gaussian fit to the CIE 1931 matching
-// functions, to linear sRGB, clipped at zero, scaled so that a flat spectrum
-// over 380–720 nm averages to (1, 1, 1).
+// functions, to linear sRGB, pulled into gamut by adding white, and scaled so
+// that a flat spectrum over 380–720 nm averages to (1, 1, 1).
 
 const LAMBDA_MIN = 380;
 const LAMBDA_MAX = 720;
@@ -37,11 +38,12 @@ export function wavelengthRGB(l: number): [number, number, number] {
   const x = 1.056 * g2(l, 599.8, 37.9, 31.0) + 0.362 * g2(l, 442.0, 16.0, 26.7) - 0.065 * g2(l, 501.1, 20.4, 26.2);
   const y = 0.821 * g2(l, 568.8, 46.9, 40.5) + 0.286 * g2(l, 530.9, 16.3, 31.1);
   const z = 1.217 * g2(l, 437.0, 11.8, 36.0) + 0.681 * g2(l, 459.0, 26.0, 13.8);
-  return [
-    Math.max(0, 3.2406 * x - 1.5372 * y - 0.4986 * z) * 1.92985,
-    Math.max(0, -0.9689 * x + 1.8758 * y + 0.0415 * z) * 2.94689,
-    Math.max(0, 0.0557 * x - 0.204 * y + 1.057 * z) * 3.11081,
-  ];
+  const r = 3.2406 * x - 1.5372 * y - 0.4986 * z;
+  const g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
+  const b = 0.0557 * x - 0.204 * y + 1.057 * z;
+  // out-of-gamut colours get white added until they fit, instead of clipping
+  const m = Math.min(0, r, g, b);
+  return [(r - m) * 1.72741, (g - m) * 1.99996, (b - m) * 2.05417];
 }
 
 // a displayable swatch colour for one wavelength: brightest channel to 1
@@ -238,9 +240,9 @@ function mountBench(container: HTMLElement): Demo {
         if (out) pts.push([px + dir[0] * W * 1.5, py + dir[1] * W * 1.5]);
         strokes.push({ pts, lambda });
       }
-      // each channel peaks near 6 for the purest wavelengths; scale so the
+      // each channel peaks near 4.6 for the purest wavelengths; scale so the
       // full fan sums back to white
-      const peak = 6;
+      const peak = 4.6;
       for (const [lw, gain] of [[6, 0.25], [1.6, 1]] as const) {
         for (const { pts, lambda } of strokes) {
           const [r, g, b] = wavelengthRGB(lambda);
@@ -285,7 +287,8 @@ function mountBench(container: HTMLElement): Demo {
 // ---- the spectrum: random wavelengths average to white -------------------------------
 
 function mountSpectrum(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.5);
+  // narrow screens stack the swatch under the plot, so they need the height
+  const shell = new Shell(container, (container.clientWidth || 700) < 560 ? 0.95 : 0.5);
   const ctx = shell.canvas.getContext("2d")!;
   const W = shell.canvas.width;
   const H = shell.canvas.height;
@@ -294,12 +297,14 @@ function mountSpectrum(container: HTMLElement): Demo {
   let count = 16;
   let roll = 1;
   let dirty = true;
+  // the log slider moves in steps of 0.01 decades and can't land on 4096 itself
+  const snapCount = (v: number): number => (v >= 4000 ? 4096 : Math.max(1, Math.round(v)));
   shell.slider({
     label: "wavelengths averaged",
     min: 1, max: 4096, step: 1, value: count, log: true,
-    format: (v) => String(Math.round(v)),
+    format: (v) => snapCount(v).toLocaleString(),
     onInput: (v) => {
-      count = Math.max(1, Math.round(v));
+      count = snapCount(v);
       dirty = true;
     },
   });
@@ -337,7 +342,7 @@ function mountSpectrum(container: HTMLElement): Demo {
     const plotT = pad + 8 * pr;
     const plotB = narrow ? H * 0.5 : H - pad - stripH - 30 * pr;
     const X = (l: number): number => plotL + ((l - LAMBDA_MIN) / (LAMBDA_MAX - LAMBDA_MIN)) * (plotR - plotL);
-    const ymax = 6.2;
+    const ymax = 4.9;
     const Y = (v: number): number => plotB - (v / ymax) * (plotB - plotT);
 
     // axes
@@ -357,7 +362,7 @@ function mountSpectrum(container: HTMLElement): Demo {
     }
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    for (const v of [0, 2, 4, 6]) ctx.fillText(String(v), plotL - 6 * pr, Y(v));
+    for (const v of [0, 2, 4]) ctx.fillText(String(v), plotL - 6 * pr, Y(v));
 
     // the matching curves, as linear sRGB weights
     const curves: [number, string][] = [[0, "#ff6b6b"], [1, "#6be38f"], [2, "#6b9bff"]];
@@ -450,7 +455,10 @@ interface Scene {
   aperture: number;
   focus: number;
   lightTracing: boolean;
+  haze: number;                             // scattering coefficient of the air, per unit
 }
+
+const HAZE = 0.5;
 
 function sceneFor(mode: TracerMode, aspect: number): Scene {
   if (mode === "caustics") {
@@ -466,26 +474,29 @@ function sceneFor(mode: TracerMode, aspect: number): Scene {
       eye: [0.1, 2.7, 4.2], look: [0.45, 0.1, 0.45], focal: 2.5,
       aperture: 0, focus: 5,
       lightTracing: false,
+      haze: 0,
     };
   }
   const wide = aspect > 1.5;
-  const q = new URLSearchParams(location.search);
-  const num = (k: string, d: number): number => (q.has(k) ? Number(q.get(k)) : d);
   return {
-    prism: [num("px", -1.2), num("pz", 0.3), num("prot", 0.3), 1.0],
-    sphere: [num("sx", -0.15), 0.45, num("sz", -0.8), mode === "full" || num("sph", 0) > 0 ? 0.45 : 0],
-    aim: [num("px", -1.2), 0.2, num("pz", 0.3)],
-    az: num("az", 0.12), el: num("el", 0.27),
-    slot: [0.05, 0.85],
+    prism: [-1.2, 0.3, 0.3, 1.0],
+    sphere: [-0.15, 0.45, -0.8, mode === "full" ? 0.45 : 0],
+    aim: [-1.2, 0.2, 0.3],
+    az: 0.12, el: 0.27,
+    slot: [0.05, 0.4],
     round: false,
     spreadDeg: 0.27,
-    B: num("B", 0.03),
+    B: 0.03,
+    // the hero frames a little tighter, so the fan crosses more of the screen
     eye: wide ? [0.3, 5.0, 3.0] : [0.3, 5.6, 3.6],
-    look: [0.25, 0.0, -0.75],
-    focal: wide ? 2.2 : 1.8,
+    look: mode === "hero" ? [0.0, 0.0, -0.55] : [0.25, 0.0, -0.75],
+    focal: (wide ? 2.2 : 1.8) * (mode === "hero" ? 1.2 : 1),
     aperture: mode === "full" ? 0.04 : 0,
-    focus: 5.4,
+    // the distance of the prism's top face along the view axis, so the
+    // default focus lands on it (the ball sits about one unit further)
+    focus: wide ? 4.9 : 5.7,
     lightTracing: true,
+    haze: HAZE,
   };
 }
 
@@ -496,7 +507,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
   const post = new PostFX(dev, ctx);
-  post.settings.bloom = 0.12;
+  post.settings.bloom = mode === "caustics" ? 0.12 : 0.18;
   post.settings.radius = 1.2;
   post.settings.vignette = hero ? 0.3 : 0.2;
 
@@ -508,13 +519,6 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
   const th = Math.ceil(shell.canvas.height / k);
 
   const sc = sceneFor(mode, tw / th);
-  const dbg = new URLSearchParams(location.search).get("cam");
-  if (dbg) {
-    const v = dbg.split(",").map(Number);
-    sc.eye = [v[0], v[1], v[2]];
-    sc.look = [v[3], v[4], v[5]];
-    sc.focal = v[6] ?? sc.focal;
-  }
   let frame = 0;
   let samples = 0;
   let seed = 1;
@@ -527,6 +531,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
   let az = sc.az;
   let el = sc.el;
   let lightTracing = sc.lightTracing;
+  let haze = sc.haze;
   const cap = hero ? 16384 : 8192;
   let dirty = true;
 
@@ -538,7 +543,8 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
 
   // ---- GPU ---------------------------------------------------------------------
   const module = dev.createShaderModule({ code: prismShader });
-  const pp = dev.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const pp = dev.createBuffer({ size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const blue = blueNoiseTexture(dev);
   const mkAccum = (): GPUTexture[] =>
     [0, 1].map(() =>
       dev.createTexture({
@@ -552,6 +558,12 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
   const camViews = camAcc.map((t) => t.createView());
   const lightViews = lightAcc.map((t) => t.createView());
   const splat = dev.createBuffer({ size: tw * th * 3 * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  // what the pinhole sees first (for the filter), and the image to show
+  const [guide, shownT] = mkAccum();
+  const [clampedT] = mkAccum();
+  const guideView = guide.createView();
+  const shownView = shownT.createView();
+  const clampedView = clampedT.createView();
 
   const tracePipe = dev.createRenderPipeline({
     layout: "auto",
@@ -566,6 +578,49 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
     fragment: { module, entryPoint: "fsDisplayP", targets: [{ format: HDR_FORMAT }] },
     primitive: { topology: "triangle-list" },
   });
+  const guidePipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullP" },
+    fragment: { module, entryPoint: "fsGuideP", targets: [{ format: "rgba32float" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const clampPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullP" },
+    fragment: { module, entryPoint: "fsClampP", targets: [{ format: "rgba32float" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const clampGroups = [0, 1].map((i) =>
+    dev.createBindGroup({
+      layout: clampPipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: pp } },
+        { binding: 5, resource: camViews[i] },
+        { binding: 6, resource: lightViews[i] },
+      ],
+    }),
+  );
+  const filterPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFullP" },
+    fragment: { module, entryPoint: "fsFilterP", targets: [{ format: "rgba32float" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const guideGroup = dev.createBindGroup({
+    layout: guidePipe.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: pp } }],
+  });
+  const filterGroups = [0, 1].map((i) =>
+    dev.createBindGroup({
+      layout: filterPipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: pp } },
+        { binding: 5, resource: camViews[i] },
+        { binding: 10, resource: guideView },
+        { binding: 12, resource: clampedView },
+      ],
+    }),
+  );
   const traceGroups = [0, 1].map((i) =>
     dev.createBindGroup({
       layout: tracePipe.getBindGroupLayout(0),
@@ -574,6 +629,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
         { binding: 1, resource: camViews[i] },
         { binding: 2, resource: lightViews[i] },
         { binding: 4, resource: { buffer: splat } },
+        { binding: 9, resource: blue.createView() },
       ],
     }),
   );
@@ -584,16 +640,13 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
       { binding: 3, resource: { buffer: splat } },
     ],
   });
-  const displayGroups = [0, 1].map((i) =>
-    dev.createBindGroup({
-      layout: displayPipe.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: pp } },
-        { binding: 5, resource: camViews[i] },
-        { binding: 6, resource: lightViews[i] },
-      ],
-    }),
-  );
+  const displayGroup = dev.createBindGroup({
+    layout: displayPipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: pp } },
+      { binding: 11, resource: shownView },
+    ],
+  });
 
   // ---- interaction ---------------------------------------------------------------
   if (mode === "full") {
@@ -690,7 +743,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
   });
 
   const writePP = (add: number, lightCount: number): void => {
-    const f = new Float32Array(44);
+    const f = new Float32Array(48);
     const dir = [Math.cos(el) * Math.cos(az), -Math.sin(el), Math.cos(el) * Math.sin(az)];
     const half = (spread * Math.PI) / 180;
     const cosMax = Math.cos(half);
@@ -699,7 +752,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
     const pos = [sc.aim[0] - dir[0] * dist, sc.aim[1] - dir[1] * dist, sc.aim[2] - dir[2] * dist];
     f.set([tw, th, frame, add]);
     f.set([...dir, cosMax], 4);
-    f.set([...pos, 6], 8); // irradiance across the beam
+    f.set([...pos, mode === "caustics" ? 6 : 9], 8); // irradiance across the beam
     f.set([sc.slot[0], sc.slot[1], omega, lightTracing ? 1 : 0], 12);
     f.set(sc.prism, 16);
     f.set(sc.sphere, 20);
@@ -707,7 +760,18 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
     f.set([...sc.eye, sc.focal], 28);
     f.set([...sc.look, samples + add], 32);
     f.set([lightTracing ? frame + (add > 0 ? 1 : 0) : 0, seed, lightCount, sc.round ? 1 : 0], 36);
+    f.set([lightTracing ? haze : 0, samples, filterStrength(samples + add), quiet ? 1 : 0], 40);
     dev.queue.writeBuffer(pp, 0, f);
+  };
+
+  // The caustics figure shows its raw sum: its sparks are the point. The
+  // others get the young-sum filter, which shrinks as 1/√samples and stops
+  // at 1,200 samples per pixel.
+  const quiet = mode !== "caustics";
+  const filterStrength = (count: number): number => {
+    if (!quiet || count < 1) return 0;
+    const k = Math.min(1, Math.sqrt(192 / count));
+    return k < 0.4 ? 0 : k;
   };
 
   let dtEma = 16;
@@ -760,13 +824,34 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
         pass.setBindGroup(0, traceGroups[src]);
         pass.draw(3);
         pass.end();
+        const gp = enc.beginRenderPass({
+          colorAttachments: [{ view: guideView, loadOp: "clear", storeOp: "store" }],
+        });
+        gp.setPipeline(guidePipe);
+        gp.setBindGroup(0, guideGroup);
+        gp.draw(3);
+        gp.end();
       }
+      const cp2 = enc.beginRenderPass({
+        colorAttachments: [{ view: clampedView, loadOp: "clear", storeOp: "store" }],
+      });
+      cp2.setPipeline(clampPipe);
+      cp2.setBindGroup(0, clampGroups[dst]);
+      cp2.draw(3);
+      cp2.end();
+      const fp = enc.beginRenderPass({
+        colorAttachments: [{ view: shownView, loadOp: "clear", storeOp: "store" }],
+      });
+      fp.setPipeline(filterPipe);
+      fp.setBindGroup(0, filterGroups[dst]);
+      fp.draw(3);
+      fp.end();
 
       const pass2 = enc.beginRenderPass({
         colorAttachments: [{ view: post.sceneView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
       });
       pass2.setPipeline(displayPipe);
-      pass2.setBindGroup(0, displayGroups[dst]);
+      pass2.setBindGroup(0, displayGroup);
       pass2.draw(3);
       pass2.end();
       post.encodePresent(enc);
@@ -779,7 +864,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
       dirty = false;
     },
     dispose() {
-      for (const t of [...camAcc, ...lightAcc]) t.destroy();
+      for (const t of [...camAcc, ...lightAcc, guide, shownT, clampedT, blue]) t.destroy();
       pp.destroy();
       splat.destroy();
       post.dispose();

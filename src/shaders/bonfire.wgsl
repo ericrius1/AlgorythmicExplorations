@@ -38,6 +38,8 @@ struct BonfireParams {
   probes0: vec2f,   // cascade-0 probe grid, for fluence sampling
   mode: f32,
   emitBoost: f32,   // how much raw emission the display path adds (GI path: 1)
+  skyZenith: vec4f, // display backdrop (mode 0): the sky the camera sees, linear
+  skyHorizon: vec4f,
 }
 
 struct Ember {
@@ -157,13 +159,14 @@ fn solidAt(world: vec2f) -> Solid {
     let inner = 1.0 / BP.viewScale - vec2f(0.2, 0.12);
     let q = abs(world) - inner;
     let box = length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0);
-    var col = vec3f(0.72, 0.7, 0.66);  // white plaster, like the Cornell box
+    var col = vec3f(0.74, 0.72, 0.68);  // white plaster, like the Cornell box
     if (q.x > q.y) {
-      col = select(vec3f(0.07, 0.62, 0.54), vec3f(0.78, 0.08, 0.10), world.x < 0.0);
+      col = select(vec3f(0.04, 0.66, 0.58), vec3f(0.86, 0.06, 0.07), world.x < 0.0);
     }
     s = Solid(-box, col);
-    // a free-standing screen in the middle, so the room has a shadow in it
-    let sd = max(abs(world.x - 0.15) - 0.04, abs(world.y + 0.2) - 0.32);
+    // a free-standing screen in the middle, so the room has a shadow in it;
+    // short enough that the coloured walls can see round it
+    let sd = max(abs(world.x - 0.15) - 0.035, abs(world.y + 0.16) - 0.25);
     if (sd < s.d) { s = Solid(sd, vec3f(0.72, 0.7, 0.66)); }
   }
   return s;
@@ -424,7 +427,7 @@ fn incidentAt(world: vec2f, d: f32) -> vec3f {
 fn soak(world: vec2f, d: f32) -> f32 {
   let mode = u32(BP.mode);
   var depthScale = 0.025;
-  if (mode == 0u && world.y > groundY(world.x) + 0.004) { depthScale = 0.08; }
+  if (mode == 0u) { depthScale = select(0.06, 0.08, world.y > groundY(world.x) + 0.004); }
   if (mode == 2u) { depthScale = 0.3; }
   return exp(min(d, 0.0) / depthScale);
 }
@@ -440,6 +443,58 @@ fn starsAt(world: vec2f) -> vec3f {
   let tw = 0.65 + 0.35 * sin(BP.time * (0.6 + s * 1.3) + s * 900.0);
   let mag = (s - 0.985) / 0.015;
   return vec3f(0.6, 0.7, 1.0) * exp(-r * r) * (0.25 + mag * mag * 2.5) * tw * (BP.night - 0.3) * 1.4;
+}
+
+// ---- the bounce room's extras ---------------------------------------------------------
+
+// A dim window in the top wall, right of centre: cool evening light, so the
+// warm lamp has something to play against and the screen's shadow isn't void.
+fn roomWindow(world: vec2f, aa: f32) -> vec4f {
+  if (u32(BP.mode) != 2u) { return vec4f(0.0); }
+  let inner = 1.0 / BP.viewScale - vec2f(0.2, 0.12);
+  let wx = abs(world.x - inner.x * 0.55) - inner.x * 0.22;
+  let wy = abs(world.y - (inner.y + 0.03)) - 0.03;
+  let cov = smoothstep(aa, -aa, max(wx, wy));
+  return vec4f(vec3f(0.30, 0.48, 0.95) * 1.1, cov);
+}
+
+fn lampCover(world: vec2f, aa: f32) -> f32 {
+  return smoothstep(aa, -aa, length(world - BP.stir) - 0.075);
+}
+
+// Irradiance for the room's floor, smoothed: nine taps over about one
+// cascade-1 probe cell, skipping taps that land inside a solid so the
+// blur never reaches through a wall or the screen. This softens the last
+// of the probe-grid pattern without smearing the shadow edge much.
+fn smoothFluence(world: vec2f, uv: vec2f) -> vec3f {
+  let r = probeSpacing() * 2.2;
+  var sum = fluenceAt(uv) * 2.0;
+  var wsum = 2.0;
+  for (var k = 0; k < 8; k++) {
+    let a = f32(k) * 0.7853981634 + 0.3926990817;
+    let p = world + vec2f(cos(a), sin(a)) * r;
+    if (solidAt(p).d > 0.0) {
+      sum += fluenceAt(worldToUv(p));
+      wsum += 1.0;
+    }
+  }
+  return sum / wsum;
+}
+
+// The floor, seen from above: pale boards with a little grain, so light
+// falling on it reads as light on a surface rather than as fog.
+fn floorAlbedo(world: vec2f) -> vec3f {
+  let boardW = 0.2;
+  let boardL = 1.3;
+  let row = floor(world.y / boardW);
+  let x = world.x + hash21(vec2f(row, 3.0)) * boardL;
+  let seg = floor(x / boardL);
+  let tone = 0.9 + 0.1 * hash21(vec2f(row, seg));
+  let grain = 0.95 + 0.05 * vnoise(vec2f(x * 30.0, world.y * 5.0 + row * 13.0));
+  let fy = fract(world.y / boardW);
+  let fx = fract(x / boardL);
+  let seam = min(smoothstep(0.0, 0.02, fy) * smoothstep(1.0, 0.98, fy), smoothstep(0.0, 0.003, fx) * smoothstep(1.0, 0.997, fx));
+  return vec3f(0.60, 0.54, 0.46) * tone * grain * mix(0.86, 1.0, seam);
 }
 
 // ---- GI path: emission + occlusion for the cascades ------------------------------
@@ -458,7 +513,7 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
     // last frame, plus a whisper of base colour so silhouettes stay readable
     var bounce = s.albedo * 0.004;
     if (BP.bounce > 0.0) {
-      bounce += s.albedo * incidentAt(world, s.d) * soak(world, s.d) * BP.bounce;
+      bounce += 2.0 * s.albedo * incidentAt(world, s.d) * soak(world, s.d) * BP.bounce;
     }
     emission = bounce * cov;
   }
@@ -468,12 +523,13 @@ fn fsScene(in: FullOut) -> @location(0) vec4f {
     occ = max(occ, step(0.5, fl.a));
   } else if (u32(BP.mode) == 2u) {
     // the lamp: one warm disc that follows the cursor
-    let ld = length(world - BP.stir);
-    let lampCov = smoothstep(aa, -aa, ld - 0.075);
+    let lampCov = lampCover(world, aa);
     if (lampCov > 0.0) {
       occ = max(occ, lampCov);
-      emission = mix(emission, vec3f(1.0, 0.82, 0.6) * 7.0 * BP.glow, lampCov);
+      emission = mix(emission, vec3f(1.0, 0.78, 0.5) * 7.0 * BP.glow, lampCov);
     }
+    let win = roomWindow(world, aa);
+    emission = mix(emission, win.rgb, win.a);
   }
   return vec4f(emission, occ);
 }
@@ -507,12 +563,50 @@ fn fsCompositeB(in: FullOut) -> @location(0) vec4f {
     airUv = worldToUv(world + normalAt(world) * (reach - s.d));
   }
   var col = fluenceAt(airUv) * airGain + starsAt(world);
+  if (mode == 2u) {
+    // a diffuse floor under the light: re-emits 2·albedo·fluence (see fsScene)
+    col = floorAlbedo(world) * smoothFluence(world, airUv) * 2.0;
+  }
+  if (mode == 0u) {
+    // Outdoors, the air the camera looks through isn't one flat sheet: the
+    // firelight lives in a layer of haze and smoke near the ground, and
+    // above it you see the sky itself. Drawing all of the air at one gain
+    // turns every tree's shadow into a black wedge reaching for the stars.
+    let h = world.y - groundY(world.x);
+    var haze = 0.1 + 0.9 * exp(-max(h, 0.0) / 0.42);
+    // a column of smoke over the fire, drifting up and leaning with the wind
+    let lean = world.x - 0.12 * BP.wind * h - 0.05 * sin(BP.time * 0.3 + h * 2.0);
+    let width = 0.03 + 0.3 * h;
+    let column = exp(-lean * lean / (width * width)) * smoothstep(0.08, 0.4, h) * exp(-h / 0.8);
+    // billows: noise that rises with the smoke, thresholded into puffs
+    let billow = smoothstep(0.35, 0.8, fbm(vec2f(lean * 5.0 / (0.4 + h), h * 2.6 - BP.time * 0.4)));
+    haze += column * billow * 1.6;
+    let uvy = clamp(in.uv.y, 0.0, 1.0);
+    let backdrop = mix(BP.skyZenith.rgb, BP.skyHorizon.rgb, smoothstep(0.0, 0.85, uvy));
+    col = backdrop + fluenceAt(airUv) * airGain * haze + starsAt(world) * (1.0 - column);
+  }
 
   let cov = smoothstep(aa, -aa, s.d);
   if (cov > 0.0) {
     // solids show albedo × the light reaching their surface (bounce on or
     // off: this is what the eye sees, not what gets re-emitted)
-    let lit = s.albedo * incidentAt(world, s.d) * soak(world, s.d) * 1.6 + s.albedo * 0.006;
+    var albedo = s.albedo;
+    if (mode == 0u && world.y < groundY(world.x) + 0.004) {
+      // soil: a little grain and some scattered stones, so the firelit
+      // ground has something for the light to rake across
+      albedo *= 0.7 + 0.5 * fbm(world * vec2f(26.0, 40.0));
+    }
+    var inc = incidentAt(world, s.d);
+    if (mode == 0u && s.d < -0.01) {
+      // under the soil's surface, average the light above a short stretch of
+      // ground, so the glow under the fire is a pool rather than a pillar
+      let o = vec2f(0.09, 0.0);
+      inc = (inc + incidentAt(world + o, solidAt(world + o).d) + incidentAt(world - o, solidAt(world - o).d)) / 3.0;
+    }
+    // (outdoors the eye adapts to the firelight: surfaces read a bit brighter)
+    var gain = select(1.6, 2.6, mode == 0u);
+    if (mode == 2u) { gain = 2.0; }
+    let lit = albedo * inc * soak(world, s.d) * gain + albedo * 0.006;
     col = mix(col, lit, cov);
   }
   if (mode == 0u) {
@@ -521,9 +615,13 @@ fn fsCompositeB(in: FullOut) -> @location(0) vec4f {
     let fl = flameAt(world);
     col = col * (1.0 - smoothstep(0.2, 0.8, fl.a)) + fl.rgb * BP.emitBoost;
   } else if (mode == 2u) {
-    let ld = length(world - BP.stir);
-    let lampCov = smoothstep(aa, -aa, ld - 0.075);
-    col = mix(col, vec3f(1.0, 0.82, 0.6) * 7.0 * BP.glow * BP.emitBoost, lampCov);
+    let win = roomWindow(world, aa);
+    col = mix(col, win.rgb * 1.6, win.a);
+    // the lamp: a hot white core fading to its warm rim, bright enough in
+    // HDR for the bloom to give it a glow
+    let ld = length(world - BP.stir) / 0.075;
+    let core = mix(vec3f(1.0, 0.95, 0.85) * 26.0, vec3f(1.0, 0.72, 0.42) * 9.0, smoothstep(0.2, 1.0, ld));
+    col = mix(col, core * BP.glow, lampCover(world, aa));
   }
   return vec4f(col, 1.0);
 }

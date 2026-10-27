@@ -115,8 +115,11 @@ export function mountBladeAnatomy(container: HTMLElement): Demo {
     ctx.font = `${Math.round(12 * dpr)}px ui-monospace, Menlo, monospace`;
     ctx.fillStyle = "rgba(150, 168, 210, 0.85)";
     ctx.textBaseline = "top";
-    ctx.fillText("sideways bend ∝ t²: stiff at the root, loose at the tip", 14 * dpr, 12 * dpr);
-    ctx.fillText(`tip height ${(centre(1, gust)[1] / HEIGHT * 100).toFixed(0)}% of the blade's length`, 14 * dpr, 32 * dpr);
+    // narrow canvases (phones) get the short form of each label
+    const narrow = ctx.measureText("sideways bend ∝ t²: stiff at the root, loose at the tip").width > shell.canvas.width - 28 * dpr;
+    const tipPct = (centre(1, gust)[1] / HEIGHT * 100).toFixed(0);
+    ctx.fillText(narrow ? "bend ∝ t²: stiff root, loose tip" : "sideways bend ∝ t²: stiff at the root, loose at the tip", 14 * dpr, 12 * dpr);
+    ctx.fillText(narrow ? `tip height ${tipPct}% of length` : `tip height ${tipPct}% of the blade's length`, 14 * dpr, 32 * dpr);
 
     const verts = segments * 2 + 1, tris = segments * 2 - 1;
     shell.readout.textContent = `${segments} segment${segments > 1 ? "s" : ""} = ${verts} vertices, ${tris} triangle${tris > 1 ? "s" : ""} · dashed line is the ideal curve · width drawn 3× for clarity`;
@@ -238,7 +241,7 @@ export async function mountMeadow(container: HTMLElement): Promise<Demo> {
 
 export async function mountGrassHero(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.5);
-  const stage = await createTerrainStage(shell.canvas, GOLDEN, { fov: 48, near: 0.05, far: 1500 });
+  const stage = await createTerrainStage(shell.canvas, GOLDEN, { orbit: false, fov: 48, near: 0.05, far: 1500 });
   const look = stage.look;
 
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 31, amplitude: 7, frequency: 0.045, octaves: 7 };

@@ -1,6 +1,7 @@
 import "../../styles/music-tuning.css";
 import { initNav } from "../../lib/siteNav";
 import { mountLazy, type Demo } from "../../lib/demoShell";
+import { mountSoundControl } from "../../lib/music/soundControl";
 import { mountHeroRing } from "../../demos/music/tuning/heroRing";
 import { mountScaleRing } from "../../demos/music/scaleRing";
 import { mountModeLadder } from "../../demos/music/tuning/modeLadder";
@@ -10,6 +11,7 @@ import { mountWorldScales } from "../../demos/music/tuning/worldScales";
 import { mountExplorer } from "../../demos/music/tuning/explorer";
 
 initNav();
+mountSoundControl();
 
 const mounts: Record<string, (el: HTMLElement) => Demo | Promise<Demo>> = {
   hero: mountHeroRing,

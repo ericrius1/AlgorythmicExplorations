@@ -1,6 +1,7 @@
 import "../../styles/music-tuning.css";
 import { initNav } from "../../lib/siteNav";
 import { mountLazy, type Demo } from "../../lib/demoShell";
+import { mountSoundControl } from "../../lib/music/soundControl";
 import { mountHeroSpiral } from "../../demos/music/tuning/heroSpiral";
 import { mountSpiralFifths } from "../../demos/music/spiralFifths";
 import { mountCommaLab } from "../../demos/music/commaLab";
@@ -9,6 +10,7 @@ import { mountWhyTwelve } from "../../demos/music/whyTwelve";
 import { mountEdoPlayer } from "../../demos/music/tuning/edoPlayer";
 
 initNav();
+mountSoundControl();
 
 const mounts: Record<string, (el: HTMLElement) => Demo | Promise<Demo>> = {
   hero: mountHeroSpiral,

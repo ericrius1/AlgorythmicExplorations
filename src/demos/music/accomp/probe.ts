@@ -33,7 +33,7 @@ function shuffled(): number[] {
 }
 
 export function mountProbeTest(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.5);
+  const shell = new Shell(container, (window.innerWidth || 1024) < 560 ? 0.85 : 0.5);
   const g = shell.canvas.getContext("2d")!;
   const wrap = stage(shell);
   let voice: ShepardVoice | null = null;

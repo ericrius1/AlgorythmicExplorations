@@ -26,7 +26,12 @@ export function buildVista(
   sun: THREE.Vector3,
   material: THREE.Material,
   rings: Ring[],
-  opts: { core?: number; coreSampler?: HeightSampler; reach?: number } = {},
+  opts: {
+    core?: number;
+    coreSampler?: HeightSampler;
+    reach?: number;
+    tint?: (x: number, z: number, h: number, slope: number) => [number, number, number, number];
+  } = {},
 ): Vista {
   const group = new THREE.Group();
   let outside: HeightSampler = (x, z) => terrainHeight(x, z, tp);
@@ -42,6 +47,7 @@ export function buildVista(
       hole,
       skirt: ring.step * 2,
       light: { sun, reach: opts.reach ?? 36, outside },
+      tint: opts.tint,
     });
     verts += built.vertexCount;
     const mesh = new THREE.Mesh(built.geometry, material);

@@ -318,9 +318,20 @@ fn backdrop(world: vec2f, uv: vec2f, light: vec3f) -> vec3f {
   }
   // open sky: zenith to horizon, with the sun's glow toward its direction
   var sky = mix(FP.horizon.rgb, FP.zenith.rgb, smoothstep(0.92, 0.02, uv.y));
-  let sunAt = normalize(FP.sunDir) * 1.15 / FP.viewScale * FP.viewScale.y;
+  var sunAt = normalize(FP.sunDir) * 1.15 / FP.viewScale * FP.viewScale.y;
+  if (mode == 0u) {
+    // the forest's sun sits low, behind the crowns, back along the shafts
+    // from the middle of the clearing (the light itself is directional)
+    let d = normalize(FP.sunDir);
+    sunAt = vec2f(0.1, -0.1) + d * (0.72 / max(d.y, 0.2));
+  }
   let ds = length((world - sunAt) * vec2f(1.0, 1.0));
   sky += FP.sunColor.rgb * FP.sunColor.w * (exp(-ds * ds * 9.0) * 0.6 + exp(-ds * 2.2) * 0.12);
+  // the disc itself, so the eye has a source for the shafts (bloom does the rest)
+  if (mode == 0u) {
+    // a low, warm disc veiled by haze, with a wide glare around it
+    sky += FP.sunColor.rgb * FP.sunColor.w * (6.0 * smoothstep(0.06, 0.035, ds) + 0.35 * exp(-ds * 3.0));
+  }
   // a far row of pines, lost in the haze: drawn only, never lit or occluding
   // (they stand somewhere behind the plane the light lives in)
   if (mode == 0u) {
@@ -351,12 +362,18 @@ fn fsDisplayF(in: FullOut) -> @location(0) vec4f {
   let dens = fogDensity(world);
   let thick = dens * FP.sigma * 0.35;           // how much fog stands between you and the backdrop
   var col = backdrop(world, in.uv, light) * exp(-thick);
-  col += light * dens * FP.scatter * FP.airGlow;
+  // (the canvas edge is open sky to the rays, so the outermost few pixels of
+  // forest fog would catch sun that the off-screen trees ought to block)
+  let edge = select(1.0, smoothstep(0.0, 0.025, min(in.uv.x, 1.0 - in.uv.x)), u32(FP.mode) == 0u);
+  col += light * dens * FP.scatter * FP.airGlow * edge;
 
   // solids: albedo × the light reaching their surface
   let cov = smoothstep(aa, -aa, s.d);
   if (cov > 0.0) {
-    let lit = s.albedo * incidentAt(world, s.d) * exp(min(s.d, 0.0) / 0.05) * 1.4 + s.albedo * 0.004;
+    // light soaks only a little way under a surface: a sunlit rim on the
+    // crowns, not a lit-up cut-out
+    let soakD = select(0.05, 0.022, u32(FP.mode) == 0u);
+    let lit = s.albedo * incidentAt(world, s.d) * exp(min(s.d, 0.0) / soakD) * 1.4 + s.albedo * 0.004;
     // fog in front of a solid still glows a little
     col = mix(col, lit * exp(-thick * 0.5) + light * dens * FP.scatter * FP.airGlow * 0.3, cov);
   }

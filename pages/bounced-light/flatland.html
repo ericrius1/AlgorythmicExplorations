@@ -10,7 +10,7 @@
     <title>Leaving Flatland — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part four: the third dimension, without a single triangle. The distance field stops being a texture and becomes a function — sphere tracing, smooth-minimum sculpture, soft shadows, and ambient occlusion in one fragment shader."
+      content="Rendering 3D shapes with no triangles: a distance function per shape, smooth-minimum blending, sphere tracing, soft shadows from near misses, and ambient occlusion, all in one fragment shader."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,11 +18,12 @@
     <header class="hero">
       <div data-demo="hero-sculpt"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Bounced Light · Part 4</p>
         <h1>Leaving Flatland</h1>
         <p class="subtitle">
-          Part four: an implicit sculpture with no triangles, vertices,
-          or model file. One function answers "how far is the surface?" and a camera
-          full of rays does the rest. Drag to walk around it.
+          A copper sculpture with no mesh, no vertices and no model file. One function says how
+          far away the nearest surface is, and every pixel marches a ray through it. Drag to
+          walk around it.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -33,185 +34,261 @@
 
     <main>
       <p>
-        Three parts of this series have leaned on one workhorse: the distance
-        field. It was always a <em>texture</em> — a grid where every pixel
-        memorized its distance to the nearest surface, rebuilt every frame by
-        nine jump-flood passes. Adding a third dimension to that plan multiplies
-        every texture by a third axis and the budget collapses. So this part
-        keeps the idea and discards the storage. A distance field is just a
-        function of position; nothing says it has to be <em>sampled and
-        remembered</em> rather than <em>evaluated on demand</em>. For shapes
-        made of mathematics — spheres, boxes, tori — the distance is a one-line
-        formula, exact to machine precision, in any number of dimensions:
+        The first three parts of this series were flat. Light moved around a 2D canvas, and the
+        thing that made it fast was a <em>distance field</em>: a texture where every pixel stores
+        how far it is to the nearest surface, rebuilt every frame with the jump flood. Rays used
+        it to leap across empty space instead of crawling.
       </p>
-      <pre><code>fn sdSphere(p, r)  =  length(p) − r        <span class="cm">// negative inside, zero on the skin, positive outside</span>
-fn sdTorus(p, t)   =  length(vec2(length(p.xz) − t.x, p.y)) − t.y</code></pre>
       <p>
-        The whole scene becomes one function, <code>map(p)</code>: the minimum
-        of every shape's distance, because the nearest surface of a world is
-        the nearest surface of its nearest thing. The renderings on this page
-        contain no stored geometry — no mesh, no triangles — just
-        <code>map</code>, called about a hundred times per pixel.
+        Moving that plan to 3D means a 3D texture, and memory and rebuild time both grow with
+        the cube of the resolution. So for this part I kept the idea and dropped the storage. A
+        distance field is a function of position. For shapes made of math it doesn't need to be
+        sampled and stored, because you can write the distance down directly:
+      </p>
+      <pre><code><span class="cm">// negative inside, zero on the surface, positive outside</span>
+fn sdSphere(p: vec3f, r: f32) -&gt; f32 { return length(p) - r; }
+
+fn sdTorus(p: vec3f, t: vec2f) -&gt; f32 {
+  let q = vec2f(length(p.xz) - t.x, p.y);
+  return length(q) - t.y;
+}</code></pre>
+      <p>
+        A whole scene is one function, <code>map(p)</code>, that returns the smallest of its
+        shapes' distances: the nearest surface in the world is the nearest surface of whichever
+        shape is closest. The sculpture at the top is a pedestal, a tilted torus and three
+        wandering spheres, and that's the entire scene description. There's no geometry stored
+        anywhere. Each pixel calls <code>map</code> a few dozen times to find its surface, then up
+        to fifty more to shade it.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Sculpting</span>Combining distance functions</h2>
+      <h2 id="blending"><span class="kicker">Step 1 · Sculpting</span>Blending shapes together</h2>
       <p>
-        Combining shapes with <code>min()</code> gives the hard weld of machine
-        parts: surfaces intersect in a crease. Replace it with a <em>smooth
-        minimum</em> — a min with a soft elbow — and surfaces within distance k
-        of each other blend smoothly:
+        Combining shapes with <code>min()</code> welds them like machine parts. Where two
+        surfaces overlap they meet in a sharp crease. Swap <code>min</code> for a
+        <em>smooth minimum</em> and any two surfaces within k of each other blend into one:
       </p>
-      <pre><code>h = clamp(0.5 + 0.5·(b − a)/k, 0, 1)
-smin = mix(b, a, h) − k·h·(1 − h)   <span class="cm">// k is the radius of persuasion</span></code></pre>
+      <pre><code><span class="cm">// within k of each other, two surfaces blend instead of creasing</span>
+fn smin(a: f32, b: f32, k: f32) -&gt; f32 {
+  let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}</code></pre>
       <p>
-        This is the third appearance of "two things merging before they touch"
-        in this series — the metaballs of part one and the wax of the lava lamp
-        were the same idea in texture form. Here it is analytic, and it is the
-        entire craft of SDF modeling: artists build characters from dozens of
-        primitives and one well-chosen k per joint.
+        Where one distance is much smaller than the other, <code>h</code> pins to 0 or 1 and
+        this is a plain <code>min</code>. Where they're close, the last term subtracts up to
+        k/4, which pulls the surface outward and fills the corner. The metaballs and lava-lamp
+        wax earlier in the series merged the same way, but through a texture. Here it's one
+        formula, and it's most of what SDF modelling is: build a shape from primitives, then
+        choose a k for every joint.
       </p>
-      <div data-demo="blend"></div>
+
+      <div
+        data-demo="blend"
+        data-title="Smooth minimum"
+        data-hint="Drag the blend radius k"
+      ></div>
+
       <p>
-        Drag k to zero and the three shapes meet with hard intersections —
-        every contact a hard crease. Raise it and the surfaces blend: at
-        0.2 the orbiting sphere pulls a smooth extension from the box; at 0.5
-        the three shapes form one blended surface. Nothing about the shapes changed. Only the
-        definition of "nearest."
+        The sphere and the box sit 0.2 apart, and a small sphere orbits through both of them.
+        At k = 0 it's a plain <code>min</code>, and the small sphere cuts into the others with
+        hard creases. Around 0.2 the creases fill in and the small sphere pulls a smooth neck
+        out of whatever it passes. The big sphere and the box stay apart until k goes past about
+        0.4, because the blend has to pull each surface 0.1 outward to close the gap and the
+        most it can pull is k/4. The shapes never change. Only the rule for combining their
+        distances does.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Sphere tracing</span>Advancing by distance</h2>
+      <h2 id="sphere-tracing"><span class="kicker">Step 2 · Sphere tracing</span>Stepping by the distance</h2>
       <p>
-        A camera makes one ray per pixel, and each ray must find the first
-        surface in its way. The brute force is to inch forward in fixed steps —
-        thousands of evaluations, and still no guarantee against stepping
-        clean through a thin wall. The distance function provides a better bound,
-        the same one the jump-flood texture offered the cascades in part one:
-        <code>map(p)</code> is a <em>certificate</em>. If the nearest surface
-        is d away, a sphere of radius d around you touches nothing, and you may
-        leap exactly d with perfect safety.
+        Every pixel gets a ray, and each ray has to find the first surface in its way. The brute
+        force is to step forward a fixed amount and check whether you're inside something yet.
+        That takes thousands of steps, and it can still step clean through a thin wall.
+      </p>
+      <p>
+        The distance function gives you something better. If <code>map(p)</code> says the
+        nearest surface is d away, then a sphere of radius d around p is empty, and the ray can
+        move d forward without missing anything. Then it asks again.
       </p>
 
       <div data-scrolly="sphere-march"></div>
 
       <p>
-        That algorithm is <em>sphere tracing</em>, named by John Hart in 1996.
-        Far from everything it leaps in great bounds; near a surface it brakes,
-        geometrically, to a stop on the surface. Its cost is visible, because it is the first cost in this
-        series that depends on <em>where you look</em>:
+        This is <em>sphere tracing</em>. John Hart named it and worked out when it's safe in a
+        1996 paper. The whole loop in the shader is a few lines:
       </p>
-      <div data-demo="steps"></div>
+      <pre><code>for (var i = 0; i &lt; MAX_STEPS; i++) {
+  let h = map(ro + rd * tt);
+  if (h.x &lt; 0.001 * (1.0 + tt)) { hit = true; break; }  <span class="cm">// close enough: a hit</span>
+  tt += h.x;                                            <span class="cm">// the safe step</span>
+  if (tt &gt; TMAX) { break; }                             <span class="cm">// nothing out there</span>
+}</code></pre>
       <p>
-        This is the same scene as the hero, colored by how many steps each
-        pixel's ray needed. Faces that meet rays head-on are cheap violet;
-        every silhouette burns white-hot, because rays that <em>graze</em> a
-        surface receive only tiny certificates, step after step. Now drag the
-        budget down: the marcher gives up early, and surfaces erode from their
-        own silhouettes inward — the most expensive pixels are the first to
-        fail. Every production sphere tracer ships with exactly this
-        compromise tuned into it.
+        The tolerance grows with distance, so far-away surfaces don't need sub-pixel precision.
+        Out in the open the ray takes big steps, and near a surface it slows down until it's
+        within tolerance. That means the cost depends on what each pixel is looking at, and
+        you can see it:
+      </p>
+
+      <div
+        data-demo="steps"
+        data-title="What each pixel costs"
+        data-hint="Drag the step budget down"
+      ></div>
+
+      <p>
+        This is the hero scene again, coloured by how many steps each pixel's ray took. Surfaces
+        that face the camera are cheap and dark. Silhouettes run warmer, because a ray that
+        skims past an edge keeps getting small answers. The most expensive part of the image is
+        the floor near the horizon, where rays run almost parallel to it. At the default budget
+        of 48 steps, those rays give up before reaching anything and show up teal. Drag the
+        budget down and the teal spreads inward from the horizon and the silhouettes; push it to
+        128 and almost everything finishes. Every sphere tracer has a budget like this and some
+        policy for what to draw when a ray runs out.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Demoscene provenance</span>
+        <span class="note-label">Aside · Demoscene roots</span>
         <p>
-          The technique's modern form was honed in the demoscene, where an
-          entire animated world had to fit in four kilobytes — no room for
-          meshes, but plenty for formulas. Íñigo Quílez's catalogue of distance
-          functions and his smooth-minimum note are the de facto textbook, and
-          the reason half the shaders on Shadertoy open with
-          <code>fn map(p)</code>.
+          Sphere tracing caught on in the demoscene, where whole animated films have to fit in
+          4 or 64 kilobytes of code. There's no room for meshes, but a distance function is a
+          few lines. Íñigo Quílez's 2008 talk "Rendering Worlds with Two Triangles" made the
+          approach popular, and his articles on distance functions, smooth minimum and soft
+          shadows are where most people learn it. They're why so many Shadertoy shaders start
+          with a function called <code>map</code>.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Surface shading</span>Normals from the gradient</h2>
+      <h2 id="shading"><span class="kicker">Step 3 · Shading</span>Normals, shadows and occlusion</h2>
       <p>
-        Shading needs surface normals, and the distance function hands them
-        over too: the <em>gradient</em> of a distance field — which way
-        "farther" points — is exactly the surface normal, sampled with four
-        extra calls to <code>map</code>. But the striking gift is shadows.
-        March a second ray from the surface toward the light: if it reaches
-        the light, lit; if it hits something, shadow. That much is free. The
-        insight is in the <em>near misses</em>:
+        Shading needs a surface normal, and the distance function provides that too. The
+        gradient of a distance field points in the direction distance grows fastest, which is
+        straight out of the surface. Four extra calls to <code>map</code>, at the corners of a
+        tiny tetrahedron, estimate it.
       </p>
-      <pre><code>penumbra = min(penumbra, k · d / t)   <span class="cm">// d: how close the ray came; t: how far along it was</span></code></pre>
       <p>
-        A shadow ray that squeaked past an edge at close range was nearly
-        blocked, so it should be nearly dark. The smallest <code>d/t</code>
-        along the march measures exactly that near-miss angle, and one
-        multiply turns it into a soft penumbra — no area light sampled, no
-        blur pass, just the certificates the march was already collecting,
-        read a second way. Ambient occlusion plays the same game in miniature:
-        probe <code>map</code> a few times along the normal, and wherever the
-        answers come back smaller than the distance probed, something
-        overhangs and the crevice darkens.
+        Shadows come next. March a second ray from the surface toward the light, and if it hits
+        anything the point is in shadow. That gives hard shadows. For soft ones, look at how
+        close the shadow ray came to hitting something on the way:
       </p>
-      <div data-demo="shade"></div>
+      <pre><code><span class="cm">// h: distance to the nearest surface here · t: how far along the shadow ray</span>
+res = min(res, k * h / t);
+t += clamp(h, 0.012, 0.3);</code></pre>
       <p>
-        Both controls are approximations. Shadow sharpness k approximates an area
-        light, while ambient occlusion approximates a uniform sky that crevices see
-        less of. Toggle AO to zero and the sculpture's folds lose contrast; five
-        additional distance calls restore much of that depth cue.
+        A shadow ray that passed close to an edge was nearly blocked, so it should be nearly
+        dark. The ratio h/t is roughly the angle by which it missed, as seen from the shaded
+        point, and the smallest one along the march sets how much light gets through. k is
+        sharpness: a big k only darkens very near misses, so the shadow edge is hard, and a
+        small k darkens wide misses too. It behaves a lot like a bigger or smaller light, though
+        no light is ever sampled.
+      </p>
+      <p>
+        Ambient occlusion uses the distance function the same way. Step out along the normal
+        five times. If a probe 0.27 units out finds the nearest surface only 0.1 away,
+        something is hanging over this point, and it should get less light from the sky:
+      </p>
+      <pre><code>for (var i = 1; i &lt;= 5; i++) {
+  let h = 0.03 + 0.12 * f32(i);            <span class="cm">// how far out this probe is</span>
+  occ += (h - map(p + n * h).x) * sca;     <span class="cm">// how much less room there is than that</span>
+  sca *= 0.7;                              <span class="cm">// nearer probes count more</span>
+}
+return clamp(1.0 - 1.6 * occ, 0.0, 1.0);</code></pre>
+
+      <div
+        data-demo="shade"
+        data-title="Soft shadows and occlusion"
+        data-hint="Drag both sliders"
+      ></div>
+
+      <p>
+        Drag shadow sharpness down to 2 and the sculpture's shadow spreads into a broad smudge;
+        push it to 64 and the edge goes crisp. Then turn ambient occlusion off. The light and
+        shadows stay the same, but the inside of the torus, the joins between the blobs and the
+        foot of the pedestal all lighten, and the sculpture looks pasted onto the floor. Five
+        calls to <code>map</code> per pixel put that contact back.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The complete scene</h2>
+      <h2 id="assembly"><span class="kicker">Step 4 · Assembly</span>The whole scene</h2>
       <p>
-        Everything at once, with the light handed to you: move your cursor and
-        the key light orbits with it, dragging penumbras across the pedestal.
-        The debug views are the chapter in two pictures — <em>normals</em> is
-        the gradient field wearing its direction as color, and <em>step
-        count</em> is the cost landscape, silhouettes ablaze.
+        Here's everything together, with the light under your control. Move the cursor across
+        the figure and the key light follows it: left and right swings it around the
+        sculpture, up and down raises and lowers it. Drag to orbit the camera. The view button
+        switches between the final image, the normals (the gradient, with its xyz shown as
+        rgb) and the step count from Step 2.
       </p>
-      <div data-demo="full"></div>
+
+      <div
+        data-demo="full"
+        data-title="The full sculpture"
+        data-hint="Move the cursor to carry the light"
+      ></div>
+
       <p>
-        Notice what is missing, too. The copper blob hangs centimeters above a
-        warm stone pedestal, and the pedestal does not blush — no bounced
-        light, anywhere. The fog in the distance is a blend with the
-        background color, not the scattering medium part three built; the sky
-        lights nothing but the haze. Each of those was <em>solved</em> in
-        flatland, where light genuinely traveled. Here in three dimensions we
-        use point lights and local approximations, because full light transport
-        got left behind with the textures.
+        Look at what isn't there. The copper hangs right over a pale stone pedestal, and the
+        pedestal never turns warm from it. The only bounce light in the scene is a constant
+        warm fill I added on downward-facing surfaces. The copper reflects a made-up studio of
+        two softboxes and a flat-coloured floor, not the floor it's actually standing over. The
+        haze in the distance is a blend toward the sky colour, with none of the scattering part
+        three built. Each of those was handled for real in 2D, where light actually moved
+        around the scene. Here every one is a local stand-in.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>What the approximations omit</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What got left behind</h2>
       <p>
-        This part adds the third dimension by trading away the feature parts
-        one through three computed. Radiance cascades answered "what
-        does every point see?" — light arrived, bounced, scattered. Sphere
-        tracing answers only "what does the camera see?", and every query about
-        bouncing photons was replaced by a heuristic: shadows from near
-        misses, skylight from a dot product, and contact darkness from five probes
-        up the normal.
+        Going to 3D cost the thing parts one to three were about. Radiance cascades answered
+        "what does every point see?", so light really arrived, bounced and scattered. Sphere
+        tracing only answers "what does the camera see?", and everything else became a
+        heuristic: shadows from near misses, skylight from a dot product, contact darkness
+        from five probes up the normal.
+      </p>
+      <ul>
+        <li>
+          <strong>A distance is a safe step.</strong> Knowing how far the nearest surface is
+          turns ray marching from a guess into a guarantee.
+        </li>
+        <li>
+          <strong>Cost follows the picture.</strong> Silhouettes and grazing floors are where a
+          sphere tracer spends its time, so that's where it fails first.
+        </li>
+        <li>
+          <strong>One function can answer many questions.</strong> The same <code>map</code>
+          gives the hit, the normal, the soft shadow and the occlusion.
+        </li>
+        <li>
+          <strong>Local stand-ins add up to less than the real thing.</strong> Each
+          approximation looks fine alone. Put them in one scene and the missing bounce light
+          shows.
+        </li>
+      </ul>
+      <p>
+        Things I'd try next: domain repetition, which tiles a shape across space for the cost of
+        a <code>mod</code>; cone tracing, so one ray serves a few pixels at once; and
+        over-relaxed stepping (Keinert and others, 2014), which steps a bit further than the
+        distance allows and backs up when it overshoots, to save steps on grazing rays.
       </p>
       <p>
-        There is an equation that states exactly what these approximations are
-        approximating: the light leaving any point is what it emits plus the
-        integral, over every direction, of the light arriving — the rendering
-        equation, written down by James Kajiya in 1986. Two parts of this
-        series solved it in 2D by brute hierarchy. In 3D there is no such
-        equivalent hierarchy, but Monte Carlo integration provides another approach.
-        The next part builds a path tracer and aims it at
-        the most photographed cardboard box in computer science.
+        There's an equation for what all these heuristics are approximating. James Kajiya
+        published it in 1986 as the rendering equation: the light leaving a point is what it
+        emits, plus the light arriving from every direction, scattered by the surface. There's
+        no cascade for it in 3D, but you can estimate it with random sampling.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/bounced-light/cornell.html">Part 5, The Cornell Box</a>.</strong>
+        A path tracer, pointed at the most photographed box in computer graphics.
       </p>
     </main>
 
     <footer>
       <p>
-        Bounced Light, part four ·
-        <a href="/pages/bounced-light/lava.html">part one: The Lava Lamp</a> ·
-        <a href="/pages/bounced-light/bonfire.html">part two: The Bonfire</a> ·
-        <a href="/pages/bounced-light/fog.html">part three: The Fog</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
-        <a href="https://doi.org/10.1007/s003710050084">Hart, "Sphere Tracing: A Geometric Method for the Antialiased Ray Tracing of Implicit Surfaces" (1996)</a> ·
-        <a href="https://iquilezles.org/articles/distfunctions/">Quílez, "Distance Functions" &amp; "Smooth Minimum" (2008–)</a> ·
-        <a href="https://doi.org/10.1111/1467-8659.00240">Zhukov, Iones &amp; Kronin, "An Ambient Light Illumination Model" (1998)</a> ·
-        <a href="https://www.gutenberg.org/ebooks/97">Abbott, "Flatland: A Romance of Many Dimensions" (1884)</a>
+        References:
+        <a href="https://doi.org/10.1007/s003710050084">Hart, "Sphere Tracing" (1996)</a> ·
+        <a href="https://iquilezles.org/articles/distfunctions/">Quílez, "Distance Functions"</a> ·
+        <a href="https://iquilezles.org/articles/smin/">Quílez, "Smooth Minimum"</a> ·
+        <a href="https://iquilezles.org/articles/rmshadows/">Quílez, "Soft Shadows in Raymarched SDFs"</a> ·
+        <a href="https://doi.org/10.1007/978-3-7091-6453-2_5">Zhukov, Iones &amp; Kronin, "An Ambient Light Illumination Model" (1998)</a> ·
+        <a href="https://www.gutenberg.org/ebooks/97">Abbott, "Flatland" (1884)</a>
       </p>
     </footer>
 

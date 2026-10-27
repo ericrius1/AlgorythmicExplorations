@@ -64,7 +64,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
   const post = new PostFX(dev, ctx);
-  post.settings.exposure = 1.45;
+  post.settings.exposure = opts.mode === "room" ? 1.1 : 1.45;
   post.settings.bloom = 0.2;
   post.settings.vignette = 0.3;
 
@@ -81,12 +81,21 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
 
   // GI at a fraction of the canvas — light is low-frequency, and the display
   // path re-evaluates the geometry per canvas pixel (fsCompositeB), so edges
-  // stay sharp however coarse the light is. The temporal average (0.25)
-  // smooths ember flicker and bounce-feedback boil, and lets each frame
-  // rotate the cascades' rays so small lights don't bead.
+  // stay sharp however coarse the light is. The temporal average (0.25;
+  // 0.2 in the bounce room, where nothing flickers and a longer history
+  // averages more ray rotations) smooths ember flicker and bounce-feedback
+  // boil, and lets each frame rotate the cascades' rays so small lights
+  // don't bead.
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const rcDiv = Math.max(2.5, 2 * dpr);
-  const rc = new RadianceCascades(dev, Math.floor(W / rcDiv), Math.floor(Hpx / rcDiv), 4, modeNum === 2 ? 0.35 : 0.25);
+  // The bounce room is the one scene here with nothing but smooth light in
+  // it, so every flaw in the light shows; it gets a light grid twice as
+  // dense. If a GPU can't hold 60 fps at that, the frame loop below steps
+  // the grid down (coarser light, same frame rate) rather than dropping frames.
+  const rcDivs = modeNum === 2 ? [1.25, 1.6, 2.0, 2.5].map((d) => d * Math.max(dpr, 1)) : [Math.max(2.5, 2 * dpr)];
+  let rcLevel = 0;
+  const makeRc = (): RadianceCascades =>
+    new RadianceCascades(dev, Math.floor(W / rcDivs[rcLevel]), Math.floor(Hpx / rcDivs[rcLevel]), 4, modeNum === 2 ? 0.2 : 0.25);
+  let rc = makeRc();
 
   // ---- state ---------------------------------------------------------------------
   let count = opts.mode === "sparks" ? 256 : opts.mode === "room" ? 0 : opts.mode === "hero" ? 380 : 500;
@@ -95,7 +104,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   let bounce = modeNum === 2 ? 1.0 : modeNum === 1 ? 0.4 : 0.7;
   let bounceOn = true;
   let glow = 1.0;
-  let fireScale = 1.0;
+  let fireScale = opts.mode === "hero" ? 1.3 : 1.0;
   let timeOfDay = opts.mode === "dusk" ? 0.5 : 0.07;
   let debugMode = 0;
   let time = 0;
@@ -106,8 +115,8 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   // two copies of the uniforms: bp drives the GI path (res = scene texture,
   // raw emission), bp2 the display path (res = canvas, emitBoost dims raw
   // emission the way the old composite did)
-  const bp = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  const bp2 = dev.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bp = dev.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bp2 = dev.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const linSamp = dev.createSampler({ magFilter: "linear", minFilter: "linear" });
 
   const embers = dev.createBuffer({ size: MAX * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
@@ -171,7 +180,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       { binding: 4, resource: { buffer: embers } },
     ],
   });
-  const sceneGroup = dev.createBindGroup({
+  let sceneGroup = dev.createBindGroup({
     layout: scenePipe.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: bp } },
@@ -186,7 +195,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       { binding: 4, resource: { buffer: embers } },
     ],
   });
-  const compositeGroup = dev.createBindGroup({
+  let compositeGroup = dev.createBindGroup({
     layout: compositePipe.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: bp2 } },
@@ -194,6 +203,50 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       { binding: 3, resource: linSamp },
     ],
   });
+  const rebindRc = (): void => {
+    sceneGroup = dev.createBindGroup({
+      layout: scenePipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: bp } },
+        { binding: 2, resource: rc.fluence.view },
+        { binding: 3, resource: linSamp },
+      ],
+    });
+    compositeGroup = dev.createBindGroup({
+      layout: compositePipe.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: bp2 } },
+        { binding: 2, resource: rc.fluence.view },
+        { binding: 3, resource: linSamp },
+      ],
+    });
+  };
+  // adaptive resolution: average frame time over a window; if it's well over
+  // a 60 Hz frame, rebuild the light grid one step coarser
+  let perfStart = 0;
+  let perfFrames = 0;
+  let warmup = 30; // skip the first frames: shader compiles make them slow
+  const watchPerf = (now: number): void => {
+    if (rcLevel >= rcDivs.length - 1 || document.hidden) return;
+    if (warmup > 0) {
+      warmup--;
+      return;
+    }
+    if (perfFrames === 0) perfStart = now;
+    perfFrames++;
+    if (perfFrames < 90) return;
+    const ms = (now - perfStart) / (perfFrames - 1);
+    perfFrames = 0;
+    if (ms > 19.5) {
+      rcLevel++;
+      rc.dispose();
+      rc = makeRc();
+      rebindRc();
+      writeSky();
+      warmup = 30;
+    }
+  };
+
   // ---- stirring: cursor, idle ghost, hands -------------------------------------------
   let stir: [number, number] = [99, 99];
   let stirVel: [number, number] = [0, 0];
@@ -333,12 +386,12 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
   }
   shell.setInfo(() => {
     if (opts.mode === "sparks") return `${count.toLocaleString()} lights · one render cost · drag to stir`;
-    if (opts.mode === "room") return `1 light · ${rc.cascadeCount} cascades · move the lamp with your cursor`;
+    if (opts.mode === "room") return `1 lamp · 1 window · ${rc.cascadeCount} cascades on a ${rc.width}×${rc.height} light grid`;
     return `${count.toLocaleString()} embers · ${rc.cascadeCount} cascades · stir with your cursor`;
   });
 
   const writeBP = (dt: number): void => {
-    const f = new Float32Array(28);
+    const f = new Float32Array(36);
     f.set([viewScale[0], viewScale[1], rc.width, rc.height]);
     const u = new Uint32Array(f.buffer);
     u[4] = count;
@@ -350,6 +403,11 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     f.set([0.28, 4.0, bounceOn ? bounce : 0, Math.max(0, 1 - timeOfDay * 2.2)], 16); // stirRadius, stirStrength, bounce, night
     f.set([emit2[0], emit2[1], emit2On, glow], 20);
     f.set([rc.fluence.probes[0], rc.fluence.probes[1], modeNum, 1], 24); // emitBoost 1: rays see raw emission
+    // the backdrop the display draws behind the air (fire scene): the sky's
+    // colours, dimmed — the air glow and the stars sit on top of it
+    const k = skyAt(timeOfDay);
+    f.set([...k.zenith.map((c) => c * 0.55), 0], 28);
+    f.set([...k.horizon.map((c) => c * 0.55), 0], 32);
     dev.queue.writeBuffer(bp, 0, f);
     f.set([viewScale[0], viewScale[1], W, Hpx]); // display path: canvas res
     f[27] = 0.42; // emitBoost: how bright the flame itself looks
@@ -382,6 +440,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       last = now;
       time += dt;
       pollHands(dt);
+      if (modeNum === 2) watchPerf(now);
 
       // the bounce room's lamp wanders when nobody is holding it
       if (modeNum === 2 && (lastPointer === 0 || now - lastPointer > 2500)) {

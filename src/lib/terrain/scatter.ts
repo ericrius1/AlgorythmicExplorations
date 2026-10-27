@@ -24,7 +24,7 @@ export const SCATTER_DEFAULTS: ScatterParams = {
   seed: 7,
   moistureFreq: 0.035,
   moistureOffset: 0,
-  treeLine: 0.45,
+  treeLine: 0.5,
   treeCell: 2.6,
   rockCell: 5.0,
 };
@@ -59,8 +59,8 @@ export function classify(h01: number, slope: number, m: number, p: ScatterParams
   if (slope > 0.55) return "cliff";
   if (h01 > p.treeLine + 0.17) return "alpine";
   if (h01 > p.treeLine) return m > 0.5 ? "meadow" : "scree";
-  if (m > 0.52) return "forest";
-  if (m > 0.3) return "meadow";
+  if (m > 0.5) return "forest";
+  if (m > 0.36) return "meadow";
   return "scrub";
 }
 
@@ -207,9 +207,20 @@ export function grassBlades(
   region: { minX: number; minZ: number; maxX: number; maxZ: number },
   candidates: number,
   seed: number,
-  opts: { scale?: number; sun?: (x: number, z: number) => number } = {},
+  opts: { scale?: number; sun?: (x: number, z: number) => number; heightAt?: (x: number, z: number) => number } = {},
 ): GrassBlade[] {
   const scale = opts.scale ?? 1;
+  // with a height grid at hand (a chunk's own), read height and slope from it
+  // instead of paying for five evaluations of the height function per blade
+  const hAt = opts.heightAt;
+  const ground = hAt
+    ? (x: number, z: number): { h: number; m: number; biome: Biome } => {
+        const h = hAt(x, z), e = 0.35;
+        const slope = Math.hypot(hAt(x + e, z) - hAt(x - e, z), hAt(x, z + e) - hAt(x, z - e)) / (2 * e);
+        const m = moisture(x, z, sp);
+        return { h, m, biome: classify(h / tp.amplitude, slope, m, sp) };
+      }
+    : (x: number, z: number) => groundAt(x, z, tp, sp);
   const blades: GrassBlade[] = [];
   const c = new THREE.Color();
   const w = region.maxX - region.minX, d = region.maxZ - region.minZ;
@@ -217,7 +228,7 @@ export function grassBlades(
   for (let k = 0; k < candidates; k++) {
     const x = region.minX + hash2(k, 3, seed) * w;
     const z = region.minZ + hash2(k, 71, seed) * d;
-    const g = groundAt(x, z, tp, sp);
+    const g = ground(x, z);
     let p = 0;
     if (g.biome === "meadow") p = 0.9;
     else if (g.biome === "forest") p = 0.45;

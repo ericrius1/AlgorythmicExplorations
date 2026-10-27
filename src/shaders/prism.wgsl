@@ -8,6 +8,14 @@
 //   · light tracing: a compute pass follows paths from the beam through the
 //     glass to the floor and splats them straight onto the camera's pixels.
 //     Camera paths can't find a narrow beam through glass; the beam can.
+//   · a thin haze in the air (hero and full figure): each light path also
+//     scatters once toward the camera from a random point on every straight
+//     piece of its flight, which draws the beams themselves. Single
+//     scattering, no attenuation: it only adds light.
+//
+// Wavelengths are stratified: camera samples step through the spectrum by
+// the golden ratio from a blue-noise start per pixel, and each frame's light
+// paths do the same across the batch, so colour noise averages out fast.
 //
 // The camera tracer (fsTraceP) and the light tracer (lightTrace) split the
 // work so nothing is counted twice. Light tracing owns paths that leave the
@@ -27,6 +35,7 @@ struct PrismParams {
   eye: vec4f,        // camera position · w: focal length
   look: vec4f,       // look-at point · w: camera samples per pixel in the sum
   misc: vec4f,       // x: frames of light tracing in the sum · y: seed · z: light paths this frame
+  extra: vec4f,      // x: haze scattering coefficient · y: camera samples before this frame · z: filter strength · w: 1 = clamp lone bright pixels while young
 }
 
 @group(0) @binding(0) var<uniform> PP: PrismParams;
@@ -36,6 +45,10 @@ struct PrismParams {
 @group(0) @binding(4) var<storage, read> splatR: array<u32>;
 @group(0) @binding(5) var camTex: texture_2d<f32>;
 @group(0) @binding(6) var lightTex: texture_2d<f32>;
+@group(0) @binding(9) var blueTex: texture_2d<f32>;
+@group(0) @binding(10) var guideTex: texture_2d<f32>;
+@group(0) @binding(11) var shownTex: texture_2d<f32>;
+@group(0) @binding(12) var clampedTex: texture_2d<f32>;
 
 const SPLAT_SCALE: f32 = 4096.0;
 const PI: f32 = 3.14159265;
@@ -73,8 +86,8 @@ fn rnd() -> f32 {
 
 // ---- colour: one wavelength → linear sRGB --------------------------------------
 // The CIE 1931 matching functions as Wyman, Sloan & Shirley's piecewise
-// Gaussian fits, converted to linear sRGB, clipped at zero, and scaled so a
-// flat spectrum from 380 to 720 nm averages to exactly (1, 1, 1).
+// Gaussian fits, converted to linear sRGB, pulled into gamut by adding white,
+// and scaled so a flat spectrum from 380 to 720 nm averages to (1, 1, 1).
 
 fn g2(x: f32, mu: f32, s1: f32, s2: f32) -> f32 {
   let d = (x - mu) / select(s2, s1, x < mu);
@@ -90,7 +103,10 @@ fn wavelengthRGB(l: f32) -> vec3f {
     -0.9689 * x + 1.8758 * y + 0.0415 * z,
     0.0557 * x - 0.2040 * y + 1.0570 * z,
   );
-  return max(rgb, vec3f(0.0)) * vec3f(1.92985, 2.94689, 3.11081);
+  // colours outside sRGB get white added until they fit, instead of being
+  // clipped, so the rainbow keeps its cyan and yellow
+  let m = min(0.0, min(rgb.r, min(rgb.g, rgb.b)));
+  return (rgb - vec3f(m)) * vec3f(1.72741, 1.99996, 2.05417);
 }
 
 // Cauchy's empirical law (1836): n(λ) = A + B/λ², λ in micrometres.
@@ -222,12 +238,12 @@ const SOFT_AXIS: vec3f = vec3f(-0.29, 0.79, -0.53);
 const SOFT_COS: f32 = 0.982;
 
 fn softbox(rd: vec3f) -> f32 {
-  return smoothstep(SOFT_COS, 0.99, dot(rd, SOFT_AXIS)) * 1.6;
+  return smoothstep(SOFT_COS, 0.99, dot(rd, SOFT_AXIS)) * 1.1;
 }
 
 fn envRest(rd: vec3f) -> f32 {
   let strip = smoothstep(-0.55, -0.75, rd.z) * smoothstep(0.04, 0.1, rd.y) * smoothstep(0.42, 0.3, rd.y) * 0.3;
-  return 0.018 + 0.015 * max(rd.y, 0.0) + strip;
+  return 0.005 + 0.01 * max(rd.y, 0.0) + strip;
 }
 
 // radiance of the slot along a direction: it only shines inside its cone
@@ -264,6 +280,7 @@ fn cosineDir(n: vec3f) -> vec3f {
 struct Spectral {
   locked: bool, // false: the path still carries the whole (white) spectrum
   lambda: f32,
+  u: f32,       // the stratified number that picks λ when the path locks
   weight: f32,
 }
 
@@ -302,7 +319,7 @@ fn glass(rd: vec3f, nOut: vec3f, sp: ptr<function, Spectral>, camPath: bool) -> 
   var ior = iorDecide;
   if (!(*sp).locked && PP.optics.x > 0.0) {
     (*sp).locked = true;
-    (*sp).lambda = 380.0 + rnd() * 340.0;
+    (*sp).lambda = 380.0 + (*sp).u * 340.0;
     ior = iorAt((*sp).lambda);
     let eta = select(ior, 1.0 / ior, entering);
     // re-weight from the mean-index odds to this wavelength's own
@@ -354,13 +371,27 @@ fn lensPoint(c: Cam) -> vec3f {
 
 // ---- camera paths ---------------------------------------------------------------------
 
-fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
+// A cap for rare single-wavelength contributions (the studio lights seen
+// through dispersive glass). It grows with the square root of the samples
+// already in the sum, so it bites hard on the first frames and lets go as the
+// image converges; the average still converges to the uncapped one.
+fn youngCap(lum0: f32) -> f32 {
+  return lum0 * sqrt(1.0 + PP.look.w / 16.0);
+}
+
+fn capLum(c: vec3f, cap: f32) -> vec3f {
+  let l = dot(c, vec3f(0.2126, 0.7152, 0.0722));
+  return select(c, c * (cap / l), l > cap);
+}
+
+fn tracePath(ro0: vec3f, rd0: vec3f, lamU: f32) -> vec3f {
   var ro = ro0;
   var rd = rd0;
   var throughput = 1.0;
   var sp: Spectral;
   sp.locked = false;
   sp.lambda = 550.0;
+  sp.u = lamU;
   sp.weight = 1.0;
   var radiance = vec3f(0.0);
   var specularLast = true;
@@ -375,7 +406,9 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
     if (h.mat < 0) {
       // after a diffuse bounce the softbox was already sampled directly
       let env = envRest(rd) + select(0.0, softbox(rd), specularLast);
-      radiance += throughput * env * spectralColor(sp);
+      var c = throughput * env * spectralColor(sp);
+      if (sp.locked && PP.extra.w > 0.5) { c = capLum(c, youngCap(0.8)); }
+      radiance += c;
       break;
     }
     let p = ro + rd * h.t;
@@ -391,7 +424,10 @@ fn tracePath(ro0: vec3f, rd0: vec3f) -> vec3f {
         // are found only by luck from this side. Clamp them so they settle
         // in seconds; that dims them a little. Floor caustics stay exact
         // (light tracing does them, or with it off, nothing is clamped).
-        if (!caustic) { c = min(c, vec3f(40.0)); }
+        if (!caustic) {
+          c = min(c, vec3f(8.0));
+          if (PP.extra.w > 0.5) { c = capLum(c, youngCap(0.8)); }
+        }
         radiance += c;
       }
       break;
@@ -465,6 +501,7 @@ fn fsTraceP(in: FullOut) -> TraceOut {
   let c = camera();
 
   var sum = vec3f(0.0);
+  var sumSq = 0.0;
   let n = i32(PP.spp);
   for (var s = 0; s < 16; s++) {
     if (s >= n) { break; }
@@ -479,11 +516,19 @@ fn fsTraceP(in: FullOut) -> TraceOut {
       ro = lensPoint(c);
       rd = normalize(focus - ro);
     }
-    sum += tracePath(ro, rd);
+    // this sample's wavelength number: a golden-ratio step per sample from
+    // a blue-noise start, so a pixel's samples sweep the spectrum evenly
+    let k = u32(PP.extra.y) + u32(s);
+    let shift = textureLoad(blueTex, vec2i(pix & vec2u(63u)), 0).r;
+    let lamU = min(fract(shift + f32((k * 2654435769u) >> 8u) / 16777216.0), 0.99999994);
+    let L = tracePath(ro, rd, lamU);
+    sum += L;
+    let l = dot(L, vec3f(0.2126, 0.7152, 0.0722));
+    sumSq += l * l;
   }
 
   var out: TraceOut;
-  out.cam = vec4f(sum, 0.0);
+  out.cam = vec4f(sum, sumSq);
   // this frame's light-tracing splats for this pixel, back to float
   let i = (pix.y * u32(PP.res.x) + pix.x) * 3u;
   out.light = vec4f(f32(splatR[i]), f32(splatR[i + 1u]), f32(splatR[i + 2u]), 0.0) / SPLAT_SCALE;
@@ -518,14 +563,25 @@ fn lightTrace(@builtin(global_invocation_id) id: vec3u) {
   sp.locked = false;
   sp.lambda = 550.0;
   sp.weight = 1.0;
+  // this batch sweeps the spectrum: a golden-ratio step per path, from a
+  // random start each frame
+  let start = pcg(u32(PP.misc.y) * 2654435761u + 12345u);
+  sp.u = min(f32((id.x * 2654435769u + start) >> 8u) / 16777216.0, 0.99999994);
   var through = false; // has it been through glass yet
 
   let c = camera();
-  let aImg = 4.0 * c.aspect / (c.focal * c.focal); // image plane area at distance 1
-  let npix = PP.res.x * PP.res.y;
+  let flux0 = power / f32(count);
+  let haze = PP.extra.x;
 
   for (var b = 0; b < 14; b++) {
     let h = intersect(ro, rd, false);
+    let seg = select(9.0, h.t, h.mat >= 0);
+    // the haze: one scattering event somewhere along this straight piece,
+    // pdf 1/seg, isotropic phase 1/4π
+    if (haze > 0.0) {
+      let x = ro + rd * (rnd() * seg);
+      camSplat(x, c, false, spectralColor(sp) * (flux0 * haze * seg / (4.0 * PI)));
+    }
     if (h.mat < 0) { return; }
     let p = ro + rd * h.t;
     if (h.mat == 1) {
@@ -538,59 +594,199 @@ fn lightTrace(@builtin(global_invocation_id) id: vec3u) {
     // the floor. Direct light is the camera's job; this path only counts
     // if it came through glass
     if (!through) { return; }
-
-    let lens = lensPoint(c);
-    let toCam = lens - p;
-    let dist = length(toCam);
-    let dc = toCam / dist;
-    let cosX = dc.y; // floor normal is +y
-    let cosC = dot(-dc, c.fwd);
-    if (cosX <= 0.0 || cosC <= 0.0) { return; }
-    let occ = intersect(p + vec3f(0.0, 1e-4, 0.0), dc, false);
-    if (occ.mat >= 0 && occ.t < dist) { return; }
-
-    // which pixel: where the lens ray through p crosses the focal plane,
-    // seen from the lens centre
-    var f = p;
-    if (PP.optics.y > 0.0) {
-      f = lens + (p - lens) * (PP.optics.z / dot(p - lens, c.fwd));
-    }
-    let q = f - c.eye;
-    let zc = dot(q, c.fwd);
-    let sx = c.focal * dot(q, c.right) / zc;
-    let sy = c.focal * dot(q, c.up) / zc;
-    let uv = vec2f((sx / c.aspect + 1.0) * 0.5, (1.0 - sy) * 0.5);
-    if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) { return; }
-    let px = vec2u(uv * PP.res);
-
-    // the camera's importance for this point, per pixel, per light path
-    let We = npix / (aImg * cosC * cosC * cosC * dist * dist);
-    let value = power * (FLOOR_ALBEDO / PI) * cosX * We / f32(count);
-    let col = min(spectralColor(sp) * value, vec3f(256.0)) * SPLAT_SCALE + 0.5;
-    let i = (px.y * u32(PP.res.x) + px.x) * 3u;
-    atomicAdd(&splatW[i], u32(col.r));
-    atomicAdd(&splatW[i + 1u], u32(col.g));
-    atomicAdd(&splatW[i + 2u], u32(col.b));
+    camSplat(p, c, true, spectralColor(sp) * (flux0 * FLOOR_ALBEDO / PI));
     return;
   }
 }
 
+// Send light leaving point x toward the camera onto the pixel that sees x.
+// `flux` is what reaches x per unit of the camera's importance; floor points
+// add their cosine.
+fn camSplat(x: vec3f, c: Cam, onFloor: bool, flux: vec3f) {
+  let lens = lensPoint(c);
+  let toCam = lens - x;
+  let dist = length(toCam);
+  let dc = toCam / dist;
+  let cosX = select(1.0, dc.y, onFloor); // floor normal is +y
+  let cosC = dot(-dc, c.fwd);
+  if (cosX <= 0.0 || cosC <= 0.0) { return; }
+  let lift = select(vec3f(0.0), vec3f(0.0, 1e-4, 0.0), onFloor);
+  let occ = intersect(x + lift, dc, false);
+  if (occ.mat >= 0 && occ.t < dist) { return; }
+
+  // which pixel: where the lens ray through x crosses the focal plane,
+  // seen from the lens centre
+  var f = x;
+  if (PP.optics.y > 0.0) {
+    f = lens + (x - lens) * (PP.optics.z / dot(x - lens, c.fwd));
+  }
+  let q = f - c.eye;
+  let zc = dot(q, c.fwd);
+  if (zc <= 0.0) { return; }
+  let sx = c.focal * dot(q, c.right) / zc;
+  let sy = c.focal * dot(q, c.up) / zc;
+  let uv = vec2f((sx / c.aspect + 1.0) * 0.5, (1.0 - sy) * 0.5);
+  if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) { return; }
+  let px = vec2u(uv * PP.res);
+
+  // the camera's importance for this point, per pixel
+  let aImg = 4.0 * c.aspect / (c.focal * c.focal); // image plane area at distance 1
+  let We = PP.res.x * PP.res.y / (aImg * cosC * cosC * cosC * dist * dist);
+  // fixed point with random rounding, so faint splats still average right
+  let col = min(flux * cosX * We, vec3f(256.0)) * SPLAT_SCALE + vec3f(rnd(), rnd(), rnd());
+  let i = (px.y * u32(PP.res.x) + px.x) * 3u;
+  atomicAdd(&splatW[i], u32(col.r));
+  atomicAdd(&splatW[i + 1u], u32(col.g));
+  atomicAdd(&splatW[i + 2u], u32(col.b));
+}
+
 // ---- display ---------------------------------------------------------------------------
 
-fn texelP(p: vec2i) -> vec3f {
-  let mx = vec2i(textureDimensions(camTex)) - 1;
-  let q = clamp(p, vec2i(0), mx);
+fn rawTexel(q: vec2i) -> vec3f {
   let cam = textureLoad(camTex, q, 0).rgb / max(PP.look.w, 1.0);
   let light = textureLoad(lightTex, q, 0).rgb / max(PP.misc.x, 1.0);
   return cam + light;
 }
 
+fn toYCoCg(c: vec3f) -> vec3f {
+  return vec3f(0.25 * c.r + 0.5 * c.g + 0.25 * c.b, 0.5 * c.r - 0.5 * c.b, -0.25 * c.r + 0.5 * c.g - 0.25 * c.b);
+}
+
+fn fromYCoCg(y: vec3f) -> vec3f {
+  return vec3f(y.x + y.y - y.z, y.x + y.z, y.x - y.y - y.z);
+}
+
+// While the sum is young, a pixel that sits outside the range of all eight
+// of its neighbours is a lucky (or unlucky) path that hasn't been averaged
+// down yet: a glint of the beam through the glass, or one wavelength's worth
+// of colour. Clamp it into the box its neighbours span, in YCoCg, so
+// brightness and hue are clamped separately and a lone red or green pixel
+// takes its neighbours' colour. A line or an edge always has neighbours on
+// its own side, so it survives. The clamp fades out between 64 and 1,024
+// samples per pixel.
+@fragment
+fn fsClampP(in: FullOut) -> @location(0) vec4f {
+  let mx = vec2i(textureDimensions(camTex)) - 1;
+  let q = vec2i(in.pos.xy);
+  let c = rawTexel(q);
+  let fade = select(1.0, smoothstep(64.0, 1024.0, PP.look.w), PP.extra.w > 0.5);
+  if (fade >= 1.0) { return vec4f(c, 1.0); }
+  var lo = vec3f(1e9);
+  var hi = vec3f(-1e9);
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      if (dx == 0 && dy == 0) { continue; }
+      let y = toYCoCg(rawTexel(clamp(q + vec2i(dx, dy), vec2i(0), mx)));
+      lo = min(lo, y);
+      hi = max(hi, y);
+    }
+  }
+  let clamped = max(fromYCoCg(clamp(toYCoCg(c), lo, hi)), vec3f(0.0));
+  return vec4f(mix(clamped, c, fade), 1.0);
+}
+
+// ---- the young-sum filter (hero and full figure) ---------------------------------
+// The same edge-aware blur as part five: it only mixes pixels whose first hit
+// is the same kind of surface, facing the same way, at the same depth, and
+// whose brightness agrees to within their noise. Its radius shrinks as
+// 1/√samples and it switches off once the sum has settled.
+
+fn octEncodeP(n: vec3f) -> vec2f {
+  let p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
+  if (n.z >= 0.0) { return p; }
+  return (1.0 - abs(p.yx)) * select(vec2f(-1.0), vec2f(1.0), p >= vec2f(0.0));
+}
+
+fn octDecodeP(e: vec2f) -> vec3f {
+  var n = vec3f(e, 1.0 - abs(e.x) - abs(e.y));
+  if (n.z < 0.0) {
+    let xy = (1.0 - abs(n.yx)) * select(vec2f(-1.0), vec2f(1.0), n.xy >= vec2f(0.0));
+    n = vec3f(xy, n.z);
+  }
+  return normalize(n);
+}
+
+fn pinholeDir(c: Cam, pix: vec2f) -> vec3f {
+  let uv = pix / PP.res;
+  let px = (uv.x * 2.0 - 1.0) * c.aspect;
+  let py = 1.0 - uv.y * 2.0;
+  return normalize(c.fwd * c.focal + c.right * px + c.up * py);
+}
+
+@fragment
+fn fsGuideP(in: FullOut) -> @location(0) vec4f {
+  let c = camera();
+  let rd = pinholeDir(c, in.pos.xy);
+  let h = intersect(c.eye, rd, false);
+  if (h.mat < 0) { return vec4f(0.0, 0.0, 0.0, -1.0); }
+  return vec4f(octEncodeP(h.n), h.t, f32(h.mat));
+}
+
+fn lumP(c: vec3f) -> f32 {
+  return dot(c, vec3f(0.2126, 0.7152, 0.0722));
+}
+
+@fragment
+fn fsFilterP(in: FullOut) -> @location(0) vec4f {
+  let p = vec2i(in.pos.xy);
+  let mx = vec2i(textureDimensions(camTex)) - 1;
+  let col = textureLoad(clampedTex, p, 0).rgb;
+  let strength = PP.extra.z;
+  let g = textureLoad(guideTex, p, 0);
+  if (strength <= 0.0 || g.w < 0.0) { return vec4f(col, 1.0); }
+
+  let c = camera();
+  let n = max(PP.look.w, 1.0);
+  let cs = textureLoad(camTex, p, 0);
+  let m = lumP(cs.rgb) / n;
+  let var1 = max(cs.a / n - m * m, 0.0) * n / max(n - 1.0, 1.0);
+  let se = sqrt(var1 / n);
+  let lp = lumP(col);
+  let lumTol = 2.5 * se + 0.03 * lp + 1e-4;
+  let yp = toYCoCg(col);
+  let np = octDecodeP(g.xy);
+  let xp = c.eye + pinholeDir(c, vec2f(p) + 0.5) * g.z;
+  let planeTol = 0.01 * g.z;
+  let sigma = 2.0 * strength;
+
+  var acc = col;
+  var wsum = 1.0;
+  for (var dy = -3; dy <= 3; dy++) {
+    for (var dx = -3; dx <= 3; dx++) {
+      if (dx == 0 && dy == 0) { continue; }
+      let q = clamp(p + vec2i(dx, dy), vec2i(0), mx);
+      let gq = textureLoad(guideTex, q, 0);
+      if (abs(gq.w - g.w) > 0.5) { continue; }
+      let wn = pow(max(dot(np, octDecodeP(gq.xy)), 0.0), 32.0);
+      let xq = c.eye + pinholeDir(c, vec2f(q) + 0.5) * gq.z;
+      let wp = exp(-abs(dot(np, xq - xp)) / planeTol);
+      let cq = textureLoad(clampedTex, q, 0).rgb;
+      var wl = exp(-abs(lumP(cq) - lp) / lumTol);
+      // and a loose test on hue, so neighbouring bands of the rainbow
+      // never blend, while leftover colour noise still averages out
+      let yq = toYCoCg(cq);
+      let dchroma = (abs(yq.y - yp.y) + abs(yq.z - yp.z)) / (0.5 * (yq.x + yp.x) + 1e-4);
+      wl *= exp(-dchroma / 0.3);
+      let dd = vec2f(f32(dx), f32(dy));
+      let w = exp(-dot(dd, dd) / (2.0 * sigma * sigma)) * wn * wp * wl;
+      acc += cq * w;
+      wsum += w;
+    }
+  }
+  return vec4f(acc / wsum, 1.0);
+}
+
+fn shown(p: vec2i) -> vec3f {
+  let mx = vec2i(textureDimensions(shownTex)) - 1;
+  return textureLoad(shownTex, clamp(p, vec2i(0), mx), 0).rgb;
+}
+
 @fragment
 fn fsDisplayP(in: FullOut) -> @location(0) vec4f {
-  let f = in.uv * vec2f(textureDimensions(camTex)) - 0.5;
+  let f = in.uv * vec2f(textureDimensions(shownTex)) - 0.5;
   let i = vec2i(floor(f));
   let w = fract(f);
-  let top = mix(texelP(i), texelP(i + vec2i(1, 0)), w.x);
-  let bot = mix(texelP(i + vec2i(0, 1)), texelP(i + vec2i(1, 1)), w.x);
+  let top = mix(shown(i), shown(i + vec2i(1, 0)), w.x);
+  let bot = mix(shown(i + vec2i(0, 1)), shown(i + vec2i(1, 1)), w.x);
   return vec4f(mix(top, bot, w.y) * PP.optics.w, 1.0);
 }

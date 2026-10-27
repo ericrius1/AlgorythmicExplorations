@@ -38,7 +38,7 @@ const EXAMPLES: { label: string; notes: number[] }[] = [
 ];
 
 export function mountChordFinder(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.46);
+  const shell = new Shell(container, (window.innerWidth || 1024) < 560 ? 0.9 : 0.46);
   const g = shell.canvas.getContext("2d")!;
   const wrap = stage(shell);
   const ear = new KeyEar();

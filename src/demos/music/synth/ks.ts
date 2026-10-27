@@ -34,7 +34,7 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
 
   const ksPatch = () => ({ stretch: st.stretch, decay: st.decay, bright: st.bright, pick: st.pick, blend: st.blend, frac: st.frac });
   const fig = await makeFigure(container, {
-    aspect: narrow ? 1.25 : 0.56,
+    aspect: narrow ? 1.5 : 0.56,
     patch: { mode: 2, poly: 8, velAmt: 0.4, gain: 0.85, e1: { a: 0.001, d: 0.1, s: 1, r: 0.25 }, ks: ksPatch() },
     host: { fft: 2048, smoothing: 0, ks: true, reverb: 0.12 },
     base: 36,
@@ -167,7 +167,7 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
     const n = data.length;
 
     // ---- layout ----
-    const ringBox: Box = narrow ? { x: 16, y: 26, w: W - 32, h: H * 0.42 } : { x: 18, y: 26, w: W * 0.44, h: H - 26 - 22 };
+    const ringBox: Box = narrow ? { x: 16, y: 26, w: W - 32, h: H * 0.38 } : { x: 18, y: 26, w: W * 0.44, h: H - 26 - 22 };
     const right = narrow ? 16 : ringBox.x + ringBox.w + 36;
     const rw = W - right - 18;
     const barBox: Box = narrow
@@ -207,7 +207,7 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
     // read/write head
     g.seg(cx, cy - R0 - amp * 2.6, cx, cy - R0 + amp * 2.6, 1.2, [1.2, 0.75, 0.35], 0.8);
     g.dot(cx, cy - R0, 3, [1.6, 1, 0.5], 1);
-    g.text("read → filter → write", cx, cy - R0 - amp * 2.6 - 6, { size: 9.5, align: "center", color: TEXT.warm });
+    g.text("read → filter → write", cx, Math.max(ringBox.y + 14, cy - R0 - amp * 2.6 - 6), { size: 9.5, align: "center", color: TEXT.warm });
     g.text(`${noteName(note)}`, cx, cy + 4, { size: 15, align: "center", color: TEXT.hi, weight: 600 });
     g.text(fmtHz(f0), cx, cy + 20, { size: 10, align: "center", color: TEXT.dim, mono: true });
 
@@ -235,7 +235,7 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
       }
       // predicted ring time for this harmonic
       const t60 = st.blend >= 0.999 ? stringT60(f0, k, sr, st.stretch, tune.rho) : NaN;
-      if (Number.isFinite(t60) && (k <= 8 || k % 2 === 0)) {
+      if (Number.isFinite(t60) && (narrow ? k % 2 === 1 : k <= 8 || k % 2 === 0)) {
         g.text(t60 >= 10 ? t60.toFixed(0) : t60.toFixed(1), x, barBox.y + 13, { size: 9, align: "center", color: TEXT.dim, mono: true });
       }
       if (k <= 10 || k % 2 === 0) g.text(`${k}`, x, bb + 13, { size: 9.5, align: "center", color: TEXT.dim, mono: true });

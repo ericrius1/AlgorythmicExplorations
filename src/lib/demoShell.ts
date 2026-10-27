@@ -97,7 +97,12 @@ export class Shell {
     sync(spec.value);
     input.addEventListener("input", () => {
       let v = dec(Number(input.value));
-      if (spec.log) v = Math.round(v / spec.step) * spec.step;
+      if (spec.log) {
+        v = Math.round(v / spec.step) * spec.step;
+        // the 0.01-decade track can't land on an off-grid endpoint, so snap to it
+        if (Number(input.value) + 0.01 > Number(input.max)) v = spec.max;
+        else if (Number(input.value) - 0.01 < Number(input.min)) v = spec.min;
+      }
       sync(v);
       spec.onInput(v);
     });

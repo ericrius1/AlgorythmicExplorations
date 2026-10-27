@@ -97,6 +97,14 @@ export function initNav(): void {
   nav.appendChild(right);
 
   const menu = buildMenu(post);
+  // phones hide the Contact / GitHub buttons, so the menu carries them too
+  const extras = el("div", "site-nav-menu-links");
+  for (const src of [contact, github]) {
+    const a = src.cloneNode(true) as HTMLAnchorElement;
+    a.className = "site-nav-item";
+    extras.appendChild(a);
+  }
+  menu.appendChild(extras);
   nav.appendChild(menu);
   toggle.addEventListener("click", (e) => {
     e.stopPropagation();

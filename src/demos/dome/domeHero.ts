@@ -84,14 +84,14 @@ export function domeHero(mode: DomeHeroMode): (container: HTMLElement) => Promis
       format: HDR_FORMAT,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
-    const ubuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const bakeBuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const ubuf = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const bakeBuf = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const bakeGroup = device.createBindGroup({
       layout: bakePipeline.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer: bakeBuf } }],
     });
     for (let face = 0; face < 6; face++) {
-      device.queue.writeBuffer(bakeBuf, 0, new Float32Array([BAKE_SIZE, BAKE_SIZE, 0, face, 0, 0, 0, 0]));
+      device.queue.writeBuffer(bakeBuf, 0, new Float32Array([BAKE_SIZE, BAKE_SIZE, 0, face, 0, 0, 0, 0, 0, 0, 0, 0]));
       const enc = device.createCommandEncoder();
       const pass = enc.beginRenderPass({
         colorAttachments: [
@@ -121,8 +121,28 @@ export function domeHero(mode: DomeHeroMode): (container: HTMLElement) => Promis
 
     const modeIndex = MODE_INDEX[mode];
     const pitch = mode === "circle" ? 1.0 : mode === "show" ? 0.85 : 0.5;
-    const uniforms = new Float32Array(8);
+    const uniforms = new Float32Array(12);
     const t0 = performance.now();
+
+    // The part of the hero not covered by the site nav (top) or an overlaid
+    // title (bottom), in the shader's -1..1 vertical units. The fisheye page
+    // fits its master circle inside it.
+    const band: [number, number] = [1, -1];
+    let frameCount = 0;
+    const measureBand = (): void => {
+      const c = canvas.getBoundingClientRect();
+      if (!c.height) return;
+      const nav = document.querySelector<HTMLElement>(".site-nav");
+      // the nav sits at the top of the page; measured this way it doesn't
+      // change as the page scrolls
+      const navCover = nav ? Math.max(0, nav.offsetHeight - (c.top + window.scrollY)) : 0;
+      const title = canvas.closest("header.hero")?.querySelector<HTMLElement>(".hero-title");
+      const first = title?.firstElementChild as HTMLElement | null;
+      const overlaid = title && first && getComputedStyle(title).position === "absolute";
+      const titleCover = overlaid ? Math.max(0, c.bottom - first.getBoundingClientRect().top) : 0;
+      band[0] = 1 - (2 * navCover) / c.height;
+      band[1] = -1 + (2 * titleCover) / c.height;
+    };
 
     const resize = (): void => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -151,6 +171,10 @@ export function domeHero(mode: DomeHeroMode): (container: HTMLElement) => Promis
         uniforms[5] = mode === "show" ? holdCycle(t, 5, 2.5, 6) : 0;
         uniforms[6] = 0.16 * Math.sin((t / 90) * Math.PI * 2);
         uniforms[7] = pitch;
+        // re-measured now and then: the nav and title settle after the first frames
+        if (mode === "fisheye" && frameCount++ % 30 === 0) measureBand();
+        uniforms[8] = band[0];
+        uniforms[9] = band[1];
         device.queue.writeBuffer(ubuf, 0, uniforms);
         const enc = device.createCommandEncoder();
         const pass = enc.beginRenderPass({

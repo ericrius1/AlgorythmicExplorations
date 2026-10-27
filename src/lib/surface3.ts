@@ -4,9 +4,9 @@
 // the same finalize pass that turns atomic counters into indirect-draw args.
 
 import surfShader from "../shaders/surface3.wgsl?raw";
-import { FIELD_N, FIELD_SCALE } from "./ferroSim3";
+import { FIELD_N, FIELD_SCALE, FIELD_MIN, FIELD_VOXEL } from "./ferroSim3";
 
-export const MAX_VERTS = 600_000;
+export const MAX_VERTS = 2_000_000;
 export const MAX_IDX = 2_400_000;
 const CELLS = FIELD_N - 1;
 const COUNT_SAMPLE_EVERY = 15;
@@ -32,7 +32,7 @@ export class Surface3 {
 
   constructor(dev: GPUDevice, field: GPUBuffer) {
     this.dev = dev;
-    this.params = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.params = dev.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.verts = dev.createBuffer({ size: MAX_VERTS * 32, usage: GPUBufferUsage.STORAGE });
     this.indices = dev.createBuffer({ size: MAX_IDX * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDEX });
     this.cellVert = dev.createBuffer({ size: CELLS * CELLS * CELLS * 4, usage: GPUBufferUsage.STORAGE });
@@ -76,7 +76,7 @@ export class Surface3 {
   }
 
   writeParams(threshold: number, sharp: number): void {
-    const dv = new DataView(new ArrayBuffer(32));
+    const dv = new DataView(new ArrayBuffer(48));
     dv.setUint32(0, FIELD_N, true);
     dv.setUint32(4, CELLS, true);
     dv.setUint32(8, MAX_VERTS, true);
@@ -85,6 +85,10 @@ export class Surface3 {
     dv.setFloat32(20, FIELD_SCALE, true);
     dv.setFloat32(24, sharp, true);
     dv.setUint32(28, 10, true); // relax iterations
+    dv.setFloat32(32, FIELD_MIN[0], true);
+    dv.setFloat32(36, FIELD_MIN[1], true);
+    dv.setFloat32(40, FIELD_MIN[2], true);
+    dv.setFloat32(44, FIELD_VOXEL, true);
     this.dev.queue.writeBuffer(this.params, 0, dv.buffer);
   }
 

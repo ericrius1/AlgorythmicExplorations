@@ -30,6 +30,8 @@ struct SurfParams {
   fieldScale: f32,
   sharp: f32,     // 0 = surface nets, 1 = full plane-chasing
   iters: u32,     // relax iterations when sharp > 0
+  fieldMin: vec3f,// world position of voxel (0,0,0)
+  voxel: f32,     // voxel size, world units
 }
 
 struct MeshVert {
@@ -64,8 +66,7 @@ fn gradAt(v: vec3i) -> vec3f {
 }
 
 fn worldOf(v: vec3i) -> vec3f {
-  let voxel = 2.0 / f32(SP.fieldN);
-  return -1.0 + (vec3f(v) + 0.5) * voxel;
+  return SP.fieldMin + (vec3f(v) + 0.5) * SP.voxel;
 }
 
 // cube corner offsets, the usual order

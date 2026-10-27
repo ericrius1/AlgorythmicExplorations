@@ -15,7 +15,7 @@ import { keyName } from "./accomp/theory";
 import { playGate, segmented, smallButton, stage } from "./accomp/ui";
 
 export function mountAccompanist(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.56);
+  const shell = new Shell(container, (window.innerWidth || 1024) < 560 ? 0.95 : 0.56);
   const g = shell.canvas.getContext("2d")!;
   const wrap = stage(shell);
   const band = new Accompanist(96);

@@ -1,93 +1,97 @@
 # Algorythmic Explorations
 
-[Source on GitHub](https://github.com/ericrius1/AlgorythmicExplorations)
+[Source on GitHub](https://github.com/ericrius1/AlgorythmicExplorations) ·
+[Live site](https://www.ericlevin.dev/algorythmicexplorations/)
 
-Three interactive series of articles with live WebGPU demos.
+Interactive essays where every figure is a live simulation, mostly WebGPU. 10 series, 39 essays.
 
-**Particle Worlds** — a six-part series that builds particle simulators step by step,
-one data structure per article. Part one (`index.html`) goes from two falling
-dots to a GPU-resident Barnes–Hut pyramid running half a million bodies live
-in the page. Part two (`part2.html`) promotes the solver to 3D — quadtree to
-octree — and bends a galaxy over a hemispheric dome. Part three (`part3.html`)
-switches from gravity to contact forces: GPU counting sort, parallel prefix
-sums, and interactive SPH water. Part four (`part4.html`) runs part one's
-pyramid and part three's grid over the same buffer — dust attracts, collides,
-sticks, and grows moons. Part five (`part5.html`) solves gravity in frequency
-space: a WGSL Stockham FFT, Poisson's equation as one division per wave,
-Zel'dovich initial conditions, and the cosmic web condensing in an expanding
-periodic box. Part six (`part6.html`) turns the whole series into a toy: a 64³
-stable-fluids solver (semi-Lagrangian advection + Jacobi-projected pressure),
-curl-noise wind, half a million stylized paint particles with HDR trails, and
-optional webcam hand tracking (`@svenflow/micro-handpose`) so you conduct the
-fluid with your hands. Companion piece to the `nbody` WebGPU lab (sibling
-folder).
+**Particle Worlds**: A step-by-step n-body simulation, from two falling dots to 300,000 gravitating bodies.
 
-**Bounced Light** — a new series about simulating light itself.
-Part one (`lava.html`) is a lava lamp: the SPH stack from part three grows a
-per-particle temperature (heated by a coil, cooled at the top, conducted
-between neighbours) that drives rest density and buoyancy; metaballs turn
-particles into wax whose emission follows its temperature; and the scene is
-lit by 2D **radiance cascades** (Sannikov) — jump-flood distance field,
-hierarchical probe cascades, real bounced light with shadows. Includes a
-paint-with-light sandbox demo of the bare algorithm.
-Part two (`bonfire.html`) spends what part one built: thousands of ember
-particles on curl-noise wind, each a true light source at no added cost;
-multi-bounce color bleeding from a one-frame temporal feedback loop
-(albedo × last frame's fluence); the sky as the top cascade's merge; and
-optional hand tracking so your fingertip sheds embers.
-Part three (`fog.html`) adds **participating media** to the cascades:
-Beer–Lambert extinction integrated along every cascade ray, fog whose glow
-is last frame's fluence (multiple scattering via the same one-frame time
-loop), and god rays that emerge as lit fog standing next to shadowed fog.
-Part four (`flatland.html`) leaves 2D by making the distance field a
-*function* instead of a texture: sphere-traced analytic SDFs, smooth-minimum
-sculpture, penumbras from near misses, ambient occlusion, and a step-count
-heatmap that makes the cost visible. Part five (`cornell.html`) pays part
-four's debts honestly: a progressive WebGPU path tracer aimed at the Cornell
-box — Monte Carlo, next-event estimation toggled live, bounce-depth slider,
-movable area light, mirror/glossy materials. Part six (`prism.html`) is the
-toy finale: a 2D Newton's-prism optics bench, then a **spectral** path
-tracer (one random wavelength per sample, Cauchy dispersion, Fresnel coin
-flips) producing real caustics, rainbow caustics, and thin-lens depth of
-field.
+1. [Two Falling Dots](pages/particle-worlds/part1.html)
+2. [Gravity on a Dome](pages/particle-worlds/part2.html)
+3. [Sorting Water](pages/particle-worlds/part3.html)
+4. [Worlds from Dust](pages/particle-worlds/part4.html)
+5. [Gravity in Frequency Space](pages/particle-worlds/part5.html)
+6. [The Fluid Instrument](pages/particle-worlds/part6.html)
 
-**Living Music** — a seven-part music theory series where every figure
-makes real sound (Tone.js) and every visual is a WebGPU fragment shader fed by
-live analyser data. Part one (`vibration.html`) dissects a single note: an
-oscilloscope you can play, a wave-equation string you pluck (audio synthesized
-from its modal decomposition), and additive-synthesis drawbars. Part two
-(`harmony.html`) derives consonance: beats, Lissajous figures of interval
-ratios, and the Plomp–Levelt dissonance curve computed live over two 8-partial
-tones. Part three (`twelve.html`) stacks fifths into a spiral that misses by
-the Pythagorean comma, lets you temper it shut, A/Bs just vs equal-tempered
-chords with beat-rate lights, and charts why 12-TET wins. Part four
-(`scales.html`) treats scales as rotating ring patterns (modes, with a drone)
-and the circle of fifths as a map of key distance. Part five (`chords.html`)
-puts triads under a harmonic-alignment microscope (with a clickable piano) and
-runs four-chord loops through a minimal-motion voice-leading search with a
-live tension lane. Part six (`jukebox.html`) assembles the series into a
-generative band: Euclidean drums, a gravity-guided random-walk melody, a
-seeded progression grammar, and an FFT-driven nebula. Part seven
-(`accompanist.html`) turns the theory around: play notes and a live
-accompanist infers key, harmony, restraint, and response.
+**Firework Systems**: A WebGPU fireworks renderer designed around GPU-owned particles, compact emit commands, and live-list drawing.
 
-**Acoustic Spaces** — a spatial-audio series about rooms as instruments. Part
-one (`acoustic-space.html`) builds a probe-based acoustic system with direct
-audibility, sparse routed paths, material transmittance, media loss, and
-band-limited control buses. Part two (`room-instrument.html`) turns the same
-ideas into a shareable music toy: drag sound stones, a listener, a wall, and
-water to compose a room, then copy a link that restores the creation.
+1. [Fireworks at GPU Scale](pages/firework-systems/gpu-fireworks.html)
 
-Music-series plumbing: `src/lib/audio.ts` (shared Tone.js master bus +
-analysers, lookahead StepClock, music math), `src/lib/shaderCanvas.ts`
-(fullscreen-shader ShaderView — each figure supplies one WGSL `scene()`
-colocated in its demo file), `src/lib/piano.ts` (DOM keyboard widget).
+**Dome Projection**: Fulldome projection math from polar coordinates to fisheye maps, projector cameras, calibrated blends, and realtime render paths.
 
-Site navigation (top bar, post menu, read-next cards) is injected by
-`src/lib/siteNav.ts` from the registry in `src/lib/posts.ts` — adding a post
-means: write the `*.html`, add a `src/<name>.ts` entry that calls `initNav()`,
-and register it in `posts.ts`. Vite collects every HTML file under `pages/`
-automatically.
+1. [The Circle Under the Dome](pages/dome-projection/circle.html)
+2. [The Fisheye Map](pages/dome-projection/fisheye.html)
+3. [Six Square Cameras](pages/dome-projection/cubemap.html)
+4. [The Dome Show](pages/dome-projection/show.html)
+5. [Dome-Native Three.js](pages/dome-projection/realtime.html)
+
+**Bounced Light**: Light transport through radiance cascades, participating media, sphere tracing, path tracing, and spectral refraction.
+
+1. [The Lava Lamp](pages/bounced-light/lava.html)
+2. [The Bonfire](pages/bounced-light/bonfire.html)
+3. [The Fog](pages/bounced-light/fog.html)
+4. [Leaving Flatland](pages/bounced-light/flatland.html)
+5. [The Cornell Box](pages/bounced-light/cornell.html)
+6. [The Prism](pages/bounced-light/prism.html)
+
+**Strange Matter**: A magnetic liquid that grows spikes — its surface remeshed every frame, its particles taught to magnetize each other.
+
+1. [The Ferrofluid](pages/strange-matter/ferro.html)
+2. [The Crown](pages/strange-matter/crown.html)
+3. [Sharp Relief](pages/strange-matter/relief.html)
+
+**Living Music**: Interactive explanations of sound, tuning, scales, chords, rhythm, and generative accompaniment.
+
+1. [The Anatomy of a Note](pages/living-music/vibration.html)
+2. [The Synthesizer](pages/living-music/synth.html)
+3. [Consonance and Roughness](pages/living-music/harmony.html)
+4. [Twelve Imperfect Notes](pages/living-music/twelve.html)
+5. [Seven of Twelve](pages/living-music/scales.html)
+6. [Major and Minor](pages/living-music/chords.html)
+7. [The Infinite Jukebox](pages/living-music/jukebox.html)
+8. [The Accompanist](pages/living-music/accompanist.html)
+
+**Acoustic Spaces**: Rooms as instruments: echoes, reverberation, materials, room modes, binaural hearing, and a room that plays music.
+
+1. [Rooms That Play Back](pages/acoustic-spaces/acoustic-space.html)
+2. [The Room Instrument](pages/acoustic-spaces/room-instrument.html)
+
+**Ground Truth**: Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.
+
+1. [The Heightfield](pages/ground-truth/heightfield.html)
+2. [The Rain](pages/ground-truth/erosion.html)
+3. [The Grass](pages/ground-truth/grass.html)
+4. [The Trees](pages/ground-truth/trees.html)
+5. [The Biomes](pages/ground-truth/biomes.html)
+6. [The Horizon](pages/ground-truth/horizon.html)
+
+**Solar Stack**: Perovskite-on-silicon tandem solar cells, worked through with live detailed-balance models: bandgaps, current matching, contacts, texture, yield, lifetime and cost.
+
+1. [The Tandem Tree](pages/solar-stack/tandem-tree.html)
+
+**Spark & Signal**: Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.
+
+1. [How Neurons Signal](pages/spark-signal/signaling.html)
+
+## How it's built
+
+Each essay is a plain HTML file under `pages/<series>/` with a TypeScript entry
+under `src/pages/<series>/` that mounts its figures. Figures live in
+`src/demos/` (by subject), shared code in `src/lib/`, WGSL in `src/shaders/`,
+and per-series styles in `src/styles/`.
+
+- Site navigation (top bar, post menu, read-next cards) is injected by
+  `src/lib/siteNav.ts` from the registry in `src/lib/posts.ts`. Adding a post
+  means writing the HTML, adding its entry TS that calls `initNav()` (or `wirePage()`), and
+  registering it in `posts.ts`. Vite collects every HTML file under `pages/`.
+- Rendering: `src/lib/postfx.ts` (HDR, bloom, filmic tone mapping) is shared
+  by the particle, path-tracing and radiance-cascade renderers.
+- Music: `src/lib/music/` is the shared audio toolkit (safe master chain with
+  a limiter, instrument presets, QWERTY/MIDI input, scope/spectrum/spectrogram
+  views); see its README. `src/lib/audio.ts` exports Tone.js and the master bus.
+- `tools/shot.mjs` takes headless screenshots of a page's figures (muted,
+  WebGPU on) for checking work without a visible browser.
 
 ```bash
 npm install
@@ -95,31 +99,11 @@ npm run dev        # http://localhost:5173 (or --port of your choice)
 npm run build      # typecheck + production build
 ```
 
-Structure:
+The site is served under `/algorythmicexplorations/` on www.ericlevin.dev;
+links in the HTML stay root-relative and the build prefixes them.
 
-- `index.html` / `part2.html` / `part3.html` / `part4.html` / `part5.html` /
-  `part6.html` — the articles. All prose lives there.
-- `src/demos/` — the figures, named by what they teach: part one's
-  `slingshot` → `naiveCpu` → `naiveGpu` → `barnesHut` → `pyramidLevels` →
-  `pyramidGpu`; part three's `contactsCpu` → `gridNeighbors` → `scanViz` →
-  `hashNeighbors` → `fluidGpu`; part four's `accretionGpu`; part five's
-  `fourierDraw` → `poissonPaint` → `fftButterfly` → `cicDeposit` → `cosmoGpu`;
-  part six's `flowField` (curl noise) → `handViz` (webcam landmarks) →
-  `playground` (the stable-fluids toy, also the hero).
-- `src/demos3d/` — part-two figures: `naive3dGpu` (brute force with an orbit
-  camera) and `pyramid3dGpu` (octree pyramid; also drives the dome-morph and
-  hero demos via options).
-- `src/lib/` — shared shell (lazy mount, sliders, fps), CPU physics, WebGPU
-  device/renderers, orbit camera, the 2D/3D pyramid solvers, the counting-sort
-  pipelines, the particle-mesh/FFT solver, Zel'dovich seeding, and the
-  micro-handpose wrapper (`hands.ts`: webcam, smoothing, pinch/spread).
-- `src/shaders/` — WGSL: tiled naive kernels (2D/3D), particle renderers,
-  the implicit pyramid pipelines, counting-sort and SPH kernels, the Stockham
-  FFT, the particle-mesh pipeline, and part six's stable-fluids grid +
-  trail renderer (`playground.wgsl`, `render6.wgsl`).
-
-GPU demos need a WebGPU browser (Chrome/Edge 113+, recent Safari); CPU demos
-work everywhere. Demos only run while scrolled into view.
+GPU figures need a WebGPU browser (Chrome/Edge 113+, recent Safari). Figures
+only run while scrolled into view, and audio starts only after a tap.
 
 ## License
 

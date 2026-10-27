@@ -10,7 +10,7 @@
     <title>The Prism — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Glass, rainbows, caustics, and focus. Sampling one wavelength per ray adds dispersion and spectral color to the path tracer."
+      content="Adding glass to a path tracer: Snell's law and Cauchy dispersion, Fresnel-weighted reflect-or-refract, one random wavelength per path, caustics traced from the light, and depth of field from a thin lens."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,11 +18,12 @@
     <header class="hero">
       <div data-demo="hero-prism"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Bounced Light · Part 6</p>
         <h1>The Prism</h1>
         <p class="subtitle">
-          Part six: a glass prism, a glass sphere, one small lamp — and no
-          color anywhere in the scene description. Every hue you see was
-          produced by dispersion as white light passes through the geometry.
+          A slit of white light through a glass prism. Nothing in the scene has a colour. The
+          rainbow on the floor comes from tracing each path at one random wavelength and
+          bending it by that wavelength's index.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -33,162 +34,299 @@
 
     <main>
       <p>
-        Every scene in this series has been opaque. Light bounced; it never
-        <em>entered</em>. Rainbows, the bright patterns at the bottom of a swimming pool,
-        the way a lens gathers the sun to a point — all live inside
-        transparent things. The finale adds exactly one physical event to the
-        path tracer, refraction, and then models a quantity simplified since part
-        one: the wavelength of the light being bent.
+        Everything in this series so far has been opaque. Light bounced off things, but it
+        never went into them. Rainbows, the bright wobbling lines on the bottom of a pool and a
+        magnifying glass focusing the sun all happen inside transparent material. This last
+        part adds one new event to part five's path tracer, refraction, and then deals with
+        something every earlier part simplified away: light has a wavelength, and glass bends
+        each wavelength by a different amount.
+      </p>
+      <p>
+        The scene at the top is a prism standing on a dark floor, with a narrow slot of white
+        light aimed at it. The beam's direction spreads by 0.27°, about the angular radius of
+        the sun. The air has a thin haze in it, so you can see the white beam coming in from
+        the left and the fan of colour leaving the prism, and where the fan comes down it
+        paints a rainbow on the floor. Every colour in the image comes out of the glass.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Bending</span>Snell's law on a tabletop</h2>
+      <h2 id="snell"><span class="kicker">Step 1 · Bending</span>Snell's law, per wavelength</h2>
       <p>
-        Light crossing into glass slows down, and the slowing turns it: the
-        ratio of speeds is the refractive index n, and the turn is Snell's law,
-        <code>n₁·sin θ₁ = n₂·sin θ₂</code>. One wrinkle hides the entire
-        finale: n is not a constant of the glass. It depends on the
-        wavelength — blue, the shorter wave, drags more and bends harder. The
-        empirical curve is Cauchy's, from 1836: <code>n(λ) ≈ A + B/λ²</code>.
-        White light contains many wavelengths; a prism separates them because
-        each wavelength refracts at a slightly different angle.
+        Light slows down in glass, and when it crosses the surface at an angle it turns. The
+        ratio of speeds is the refractive index n, and the turn follows Snell's law,
+        <code>n₁ sin θ₁ = n₂ sin θ₂</code>. For the rest of this page the important part is
+        that n isn't one number. It's larger for short wavelengths, so blue bends more than
+        red. A simple fit for that is Cauchy's from 1836, with λ in micrometres:
       </p>
-      <div data-demo="bench"></div>
+      <pre><code>n(λ) = A + B / λ²      <span class="cm">// A = 1.5 here · B sets how much the colours separate</span></code></pre>
       <p>
-        Newton's tabletop, in your browser tab. With dispersion at zero the
-        prism bends the white beam — one n, one turn, no color. Raise
-        it and the beam separates into a fan. Now
-        rotate the prism until a face catches the inner beam too shallowly:
-        the fan vanishes and the beam ricochets inside instead — total
-        internal reflection, the same trapping that makes optical fiber
-        possible. Every color in this figure is one number, λ, passed through
-        two equations.
+        Real crown glass has B around 0.004 µm², and dense flint glass, the kind used for
+        prisms, around 0.013 to 0.016. White light is every visible wavelength at once, so a
+        prism sends each one off at a slightly different angle. The figure below traces 64
+        wavelengths from 380 to 720 nm through a 2D prism, each with its own n.
+      </p>
+
+      <div
+        data-demo="bench"
+        data-title="A prism on the bench"
+        data-hint="Rotate the prism, move the beam"
+      ></div>
+
+      <p>
+        Move the pointer over the figure, or touch it, to move the beam: up and down shifts it, left and
+        right tilts it. Drag dispersion to zero and the prism still bends the beam, but every
+        wavelength bends alike and it stays white. Raise it and the beam opens into a fan. The
+        readout measures both from the traced rays: how far the middle of the fan turned, and
+        the angle between its red and violet edges.
+      </p>
+      <p>
+        Now rotate the prism toward negative angles. The light inside starts meeting the
+        second face at a steeper angle, and past a limit it can't get out. Snell's law has no
+        solution there, so the light reflects back into the glass instead. That's <em>total
+        internal reflection</em>, the same effect that keeps light inside an optical fibre.
+        The violet end goes first, since it has the highest index: at −2° the readout says 11%
+        of the beam is trapped, at −6° it's 75%, and by −7° nothing gets out of the second
+        face at all.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The crucial experiment</span>
+        <span class="note-label">Aside · Two prisms</span>
         <p>
-          Newton's crucial 1666 experiment was not splitting white light; it used
-          a <em>second</em> prism. A red beam picked
-          out of the first fan and sent through another prism bends but does
-          not split further. Color is not added by the glass; it was in the
-          light all along, and the prism separates it. He published in
-          <em>Opticks</em> in 1704, and the rendering equation's λ subscript
-          is that result, still load-bearing.
+          Newton's famous prism experiment used a second prism. He let the fan from the first
+          one fall on a board with a small hole, so only one colour got through, and sent that
+          colour through another prism. It bent again but didn't spread or change colour. So
+          the glass wasn't adding colour to white light. The colours were already in it, and
+          the prism only separated them. He described this in a 1672 letter to the Royal
+          Society and again in <em>Opticks</em> in 1704.
+        </p>
+        <p>
+          The law of refraction is usually credited to Willebrord Snellius in 1621, and
+          Descartes published it in 1637. The earliest known statement of it is older: the
+          Persian mathematician Ibn Sahl described it around 984 in a treatise on burning
+          mirrors and lenses.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Glass in the tracer</span>Reflection or refraction</h2>
+      <h2 id="glass"><span class="kicker">Step 2 · Glass in the tracer</span>Reflect or refract</h2>
       <p>
-        In the path tracer, glass is a fork: part of the light reflects off
-        the surface, part refracts through, in proportions given by the
-        Fresnel equations (graphics uses Schlick's 1994 shortcut). A
-        deterministic renderer would split the path and trace both — and
-        double its work at every interface. Monte Carlo samples one branch:
-        reflect with probability F, refract otherwise;
-        across thousands of samples the average honors the exact proportions,
-        because that is what averages do. The dice that integrated the
-        rendering equation in part five absorb a new physical law without a
-        new mechanism.
+        At a glass surface some light reflects and the rest goes through. The split comes from
+        the Fresnel equations. Graphics usually uses Christophe Schlick's 1994 approximation,
+        which is about 4% reflected head-on, rising to all of it at grazing angles. A renderer
+        that traced both branches every time would double its work at every surface. A Monte
+        Carlo path tracer picks one branch at random and weights the result so the average
+        comes out right:
       </p>
-      <div data-demo="caustics"></div>
+      <pre><code>let F = schlick(cosI, etaDecide, iorDecide);          <span class="cm">// the fraction that reflects</span>
+let P = select(F, clamp(F, 0.25, 0.75), camPath &amp;&amp; F &lt; 1.0);
+if (rnd() &lt; P) {
+  (*sp).weight *= F / P;                              <span class="cm">// picked reflection</span>
+  return reflect(rd, n);
+}
+(*sp).weight *= (1.0 - F) / (1.0 - P);                <span class="cm">// picked refraction</span></code></pre>
       <p>
-        And the floor lights up. That bright-edged figure under the sphere is
-        a <em>caustic</em> — the sphere is a lens, and the pattern is the
-        lamp's image, focused and folded. Nothing draws it; camera paths that
-        happen to pass through the glass on their way to the lamp simply
-        deposit more light where the lens concentrates them. Shrink the lamp
-        toward a point and the caustic sharpens to a burning filigree — and
-        gets noisier, because ever fewer random paths thread the needle.
-        Caustics are famously the path tracer's slowest meal, and you are
-        watching exactly why.
+        The obvious choice is to reflect with probability F. Camera paths reflect at least a
+        quarter of the time instead, and the weights correct for it. The faint reflection of
+        the studio lights in the glass is only 4% of the light, and picked 4% of the time it
+        stayed grainy for thousands of samples.
+      </p>
+      <p>
+        A glass ball in a beam of light makes a <em>caustic</em>: the ball acts as a lens and
+        focuses the beam into a bright spot on the floor. Part five's tracer can find it in
+        principle. A camera path has to land on the floor, happen to bounce up into the ball,
+        refract twice, and come out pointing back along the beam to within its spread.
+        That's rare, so the caustic shows up as scattered sparks that take a very long time to
+        average out.
+      </p>
+
+      <div
+        data-demo="caustics"
+        data-title="A caustic, from both ends"
+        data-hint="Turn light tracing on"
+      ></div>
+
+      <p>
+        The bright ellipse is the beam landing on the floor, the dark hole in it is the ball's
+        shadow, and the sparks inside the shadow are the camera paths that found the caustic.
+        Turn on <em>light tracing</em> and a compute pass starts paths from the light instead,
+        from 65,000 to a million per frame depending on how fast your GPU is. Each one goes through the ball, lands on the
+        floor and is projected straight into the pixel that sees that spot. From that end the
+        caustic is easy, and it fills in within a second or two. This figure shows the raw
+        average with no filtering, so you're seeing both methods as they are. The camera keeps everything
+        else, so no light is counted twice.
+      </p>
+      <p>
+        Beam spread works like the lamp size in part five. A wider beam blurs the caustic,
+        because the ball is focusing an image of a bigger source. With light tracing off, a
+        wider beam is also easier for camera paths to find, so the sparks get denser. Raising
+        the dispersion only adds a faint coloured fringe. Each wavelength focuses at a slightly
+        different depth, but on the floor the colours still overlap almost everywhere.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Tracing from the light</span>
+        <p>
+          James Arvo proposed tracing rays from the light to catch caustics in 1986, calling it
+          backward ray tracing. Bidirectional path tracing (Eric Lafortune and Yves Willems in
+          1993, Eric Veach and Leonidas Guibas in 1994) connects paths started from both ends,
+          and Henrik Wann Jensen's photon mapping (1996) stores light paths in a map that
+          the camera looks up later. The light tracing here is the simplest version: light paths
+          that end on the floor connect straight to the camera.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="spectral"><span class="kicker">Step 3 · One wavelength per path</span>Spectral sampling</h2>
+      <p>
+        Every renderer in this series has carried colour as three numbers, red, green and blue.
+        Glass with dispersion breaks that. A path carrying "white" has no single direction to
+        refract in, since every wavelength in it wants to go a different way.
+      </p>
+      <p>
+        The fix is more Monte Carlo. A pixel's colour is an integral over wavelengths as well
+        as over paths, so sample that dimension too. When a path first refracts through
+        dispersive glass, it picks one wavelength, bends by that wavelength's index from then
+        on, and at the end it's turned into a colour by the eye's response to that
+        wavelength:
+      </p>
+      <pre><code>if (!(*sp).locked &amp;&amp; PP.optics.x &gt; 0.0) {     <span class="cm">// the first dispersive refraction</span>
+  (*sp).locked = true;
+  (*sp).lambda = 380.0 + (*sp).u * 340.0;       <span class="cm">// one wavelength, 380–720 nm</span>
+  ior = iorAt((*sp).lambda);                    <span class="cm">// Cauchy, for this wavelength</span>
+}
+...
+return wavelengthRGB(sp.lambda) * sp.weight;    <span class="cm">// the eye's response to it</span></code></pre>
+      <p>
+        <code>wavelengthRGB</code> is the CIE 1931 colour matching functions, using the
+        piecewise Gaussian fits Chris Wyman, Peter-Pike Sloan and Peter Shirley published in
+        2013, converted to linear sRGB. Pure spectral colours are more saturated than a screen
+        can show, so where a channel comes out negative I add white until it doesn't, instead of
+        cutting it off at zero; that keeps the cyan and yellow in the rainbow. Then I scaled it
+        so a flat spectrum from 380 to 720 nm averages to white. Paths that never touch
+        dispersive glass skip all this and stay white. That means floors and walls cost
+        nothing extra, and only light that went through the glass picks up colour.
+      </p>
+      <p>
+        <code>u</code> is the random number that picks the wavelength, and it isn't fully
+        random. A pixel's samples step through the spectrum by the golden ratio, starting from
+        a blue-noise value for that pixel, so even its first dozen samples cover red to
+        violet fairly evenly. Each frame's batch of light paths sweeps the spectrum the same
+        way. Colour noise is the slowest kind to average out in a spectral renderer, and this
+        removes most of it.
+      </p>
+
+      <div
+        data-demo="spectrum"
+        data-title="Random wavelengths, averaged"
+        data-hint="Slide up the count"
+      ></div>
+
+      <p>
+        The curves are how much red, green and blue each wavelength contributes. Each vertical
+        line is one random wavelength, and the swatch is their average. With a handful of
+        samples the swatch is some random tint. At a hundred it's still visibly off, and at 4,096
+        the readout is within a few hundredths of 1 · 1 · 1 on every channel. It's the same
+        1/√N convergence as part five's noise figure. That's what every pixel in the hero is
+        doing, except each sample also took its own path
+        through the glass. Where all the wavelengths land in the same place they average back
+        to white. Where the prism has sent them to different places, each spot only gets some
+        of the wavelengths, and you see colour.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · One λ per ray</span>Spectral sampling</h2>
+      <h2 id="assembly"><span class="kicker">Step 4 · Assembly</span>Prism, ball and lens</h2>
       <p>
-        Every renderer so far in this series carried color as RGB — three
-        floats along every ray. But n(λ) makes that approximation insufficient: a "white" ray
-        entering glass has no single direction to bend. The spectral fix is
-        pure Monte Carlo doctrine. The pixel's color is an integral over
-        wavelengths? Then <em>sample</em> it: give each path one random λ,
-        bend it by n(λ), and weight its contribution by how the eye responds
-        to that wavelength (the CIE curves, here as little Gaussian fits).
-        One more dimension folded into the same dice.
+        The last figure puts the prism and a glass ball in one beam and adds a camera lens. A
+        pinhole camera sends every ray from one point. A real lens has an area: rays start from
+        random points on the lens and are aimed so they all meet at the focus distance. Things
+        at that distance come out sharp and everything nearer or farther blurs. It's the same
+        move that turned a point light into an area light in part five, applied to the camera.
+        Rob Cook, Thomas Porter and Loren Carpenter added soft shadows, glossy blur and depth of
+        field to ray tracing this way in 1984.
       </p>
-      <pre><code>λ = 380 + rand()·340            <span class="cm">// each sample is one wavelength of one path</span>
-trace(ray, n(λ)) · eye_response(λ)   <span class="cm">// Snell told the truth; the average makes the rainbow</span></code></pre>
+
+      <div
+        data-demo="full"
+        data-title="Prism, ball and lens"
+        data-hint="Drag to swing the beam"
+      ></div>
+
       <p>
-        At zero dispersion the spectral sampling produces the same result as RGB: every λ
-        bends alike, the weights sum to white, and you could never tell. The
-        moment n spreads, the caustics fringe into rainbows: red and violet
-        rays left the same lamp, hit the same prism face, and landed in
-        different places. The renderer never contains the concept "rainbow."
-        It contains Snell, Cauchy, and an unbiased average.
+        Drag sideways to swing the beam around the prism, and up and down to steepen or
+        flatten it. The fan swings across the floor, and where it passes through the ball you
+        get a coloured caustic. The default focus is on the top of the prism. Open the aperture
+        wider and the ball and the rainbow behind it blur. Push the focus about one unit
+        further and the ball sharpens while the prism blurs. The floor caustic sits at its own
+        depth, so it comes into focus at its own setting. Beam spread blurs the rainbow from
+        the other end, the same way it blurred the caustic.
+      </p>
+      <p>
+        Every blur in this image is an average over something with a size: the beam's spread,
+        the lens's area, the range of wavelengths. Part five made the same point about lamps
+        and rough mirrors.
+      </p>
+      <p>
+        Two more things are going on here and in the hero. The haze is drawn by the light
+        tracer: every straight piece of a light path also scatters a little light toward the
+        camera from one random point along it, with no dimming, which is a single-scattering
+        version of part three's fog. And while the sum is young, three things keep the glass
+        from sparkling. Light from the studio or the beam that reaches the camera through
+        dispersive glass arrives at one wavelength, so a single sample can be a bright pure
+        red or green; those samples are capped, and the cap grows with the square root of the
+        samples already in the sum, so it lets go as the image converges. Then any pixel that
+        falls outside the range of its eight neighbours is clamped into that range, with
+        brightness and hue (in YCoCg) clamped separately, so a lone coloured pixel takes its
+        neighbours' colour. Last comes the same edge-aware filter as part five's hero, with a
+        loose hue test so neighbouring bands of the rainbow never blend. The clamp fades out
+        by about 1,000 samples per pixel and the filter switches off at 1,200.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The complete optics renderer</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Six ways of moving light</h2>
+      <ul>
+        <li>
+          <strong>Random choices can replace branching.</strong> Reflect or refract, which
+          wavelength, where on the lens: each is one random number and a weight.
+        </li>
+        <li>
+          <strong>Some light is easy from one end and hard from the other.</strong> The caustic
+          that a camera path almost never finds is easy for a path that starts at the light.
+        </li>
+        <li>
+          <strong>Colour is an integral too.</strong> Treating wavelength as one more sampled
+          dimension costs almost nothing for paths that never meet dispersive glass.
+        </li>
+      </ul>
       <p>
-        The full instrument. Drag the lamp and watch caustics crawl across
-        the floor; push dispersion past anything real glass could do; then
-        open the <em>aperture</em>. Depth of field is the last rhyme of the
-        series: a pinhole camera is one eye-point, a lens is an <em>area</em>
-        of them — the same step that turned hard shadows soft in part five,
-        applied to the camera itself. Rays start from random points on the
-        lens disk, agree only at the focus distance, and everything elsewhere
-        smears into bokeh. One more integral, the same dice.
-      </p>
-      <div data-demo="full"></div>
-      <p>
-        Set focus on the sphere and the prism melts into colored fog; rack it
-        back and the caustic on the floor — which lives at a different depth
-        than the glass that cast it — drifts through sharpness on its own
-        schedule. Every blur in this image is the size of some region the
-        dice are averaging over: the lamp's area, the lens's disk, the
-        spectrum's width. By now you can read a photograph as a stack of
-        integrals.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>What spectral rendering adds</h2>
-      <p>
-        Six parts ago this series asked its question for the first time: not
-        <em>where do things go</em>, which the gravity series spent six parts
-        answering, but <em>what do things see?</em> It has now been answered
-        three ways. Hierarchically — the cascades, which made every pixel see
-        everything by being principled about what not to resolve.
-        Heuristically — the distance field's certificates, spent on shadows
-        and crevices at a fixed frame budget. And statistically — the dice,
-        which answer any question you can phrase as an average, in exchange
-        for patience measured in noise.
+        Things I'd try next: more than one wavelength per path (hero wavelength sampling,
+        which traces a few at once and only splits them at the glass), Sellmeier's dispersion
+        formula with real glass data instead of Cauchy's, and water with a moving surface for
+        the pool-floor caustics.
       </p>
       <p>
-        The lava lamp's glow, the bonfire's thousand embers, the fog's
-        slanting shafts, the sculpture that exists nowhere, the box that
-        converges out of static, the rainbow assembled from dice rolls — all
-        of it ran live in this browser. The series moved from approximate
-        two-dimensional transport to a spectral path tracer while keeping every
-        stage interactive enough to inspect directly.
+        That's the end of Bounced Light. It started with a lava lamp in 2D, lit by radiance
+        cascades: a hierarchy of probes that let every pixel see the whole scene by being
+        careful about what it didn't need to resolve. The bonfire and the fog pushed that
+        hierarchy to thousands of lights and to light scattering through a medium. Part four
+        left 2D and traded the hierarchy for distance-field heuristics, which made 3D cheap but
+        gave up bounced light. Part five brought bounced light back with random sampling, paid
+        for in noise and patience, and this part added glass and wavelength to the same loop.
+        Each of them is a different way of answering "what does this point see?", and all of
+        them ran in this browser tab.
+      </p>
+      <p class="continue">
+        <strong>Back to the start: <a href="/pages/bounced-light/lava.html">Part 1, The Lava Lamp</a>.</strong>
+        Where the series began, with wax, heat and light in two dimensions.
       </p>
     </main>
 
     <footer>
       <p>
-        Bounced Light, part six ·
-        <a href="/pages/bounced-light/lava.html">part one: The Lava Lamp</a> ·
-        <a href="/pages/bounced-light/bonfire.html">part two: The Bonfire</a> ·
-        <a href="/pages/bounced-light/fog.html">part three: The Fog</a> ·
-        <a href="/pages/bounced-light/flatland.html">part four: Leaving Flatland</a> ·
-        <a href="/pages/bounced-light/cornell.html">part five: The Cornell Box</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
+        References:
         <a href="https://www.gutenberg.org/ebooks/33504">Newton, "Opticks" (1704)</a> ·
         <a href="https://gallica.bnf.fr/ark:/12148/bpt6k90181x">Cauchy, "Mémoire sur la dispersion de la lumière" (1836)</a> ·
-        <a href="https://doi.org/10.1080/10867651.1994.10390071">Schlick, "An Inexpensive BRDF Model for Physically-based Rendering" (1994)</a> ·
+        <a href="https://doi.org/10.1111/1467-8659.1330233">Schlick, "An Inexpensive BRDF Model for Physically-based Rendering" (1994)</a> ·
         <a href="https://jcgt.org/published/0002/02/01/">Wyman, Sloan &amp; Shirley, "Simple Analytic Approximations to the CIE XYZ Color Matching Functions" (2013)</a> ·
-        <a href="https://www.pbr-book.org/">Pharr, Jakob &amp; Humphreys, "Physically Based Rendering" (2004–)</a>
+        <a href="https://doi.org/10.1145/964965.808590">Cook, Porter &amp; Carpenter, "Distributed Ray Tracing" (1984)</a> ·
+        <a href="https://www.pbr-book.org/">Pharr, Jakob &amp; Humphreys, "Physically Based Rendering"</a>
       </p>
     </footer>
 

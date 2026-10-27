@@ -63,7 +63,10 @@ export class RadianceCascades {
   private jfaGroups: GPUBindGroup[] = []; // one per jump-flood pass
   private jfaOffsets: number[] = [];
   private distGroup: GPUBindGroup;
-  private cascGroups: { main: GPUBindGroup; top: GPUBindGroup; region: [number, number] }[] = [];
+  private cascGroups: {
+    main: GPUBindGroup; top: GPUBindGroup; region: [number, number];
+    bufs: [GPUBuffer, GPUBuffer]; data: [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>]; spacing: [number, number];
+  }[] = [];
   private compositeGroup: GPUBindGroup;
   private compositeBuf: GPUBuffer;
   private skyBuf: GPUBuffer;
@@ -236,12 +239,14 @@ export class RadianceCascades {
       const blocks = 2 << n;
       const start = (interval0 * (Math.pow(4, n) - 1)) / 3;
       const len = interval0 * Math.pow(4, n);
+      const datas: Float32Array<ArrayBuffer>[] = [];
+      const bufs: GPUBuffer[] = [];
       const mkBuf = (isTop: number): GPUBuffer => {
-        const b = dev.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-        dev.queue.writeBuffer(
-          b, 0,
-          new Float32Array([probes[0], probes[1], upProbes[0], upProbes[1], blocks, blocks * 2, start, len, isTop, 0, 0, 0]),
-        );
+        const b = dev.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const d = new Float32Array([probes[0], probes[1], upProbes[0], upProbes[1], blocks, blocks * 2, start, len, isTop, 0, 0, 0, 0, 0, 0, 0]);
+        dev.queue.writeBuffer(b, 0, d);
+        datas.push(d);
+        bufs.push(b);
         return b;
       };
       const mkGroup = (buf: GPUBuffer): GPUBindGroup =>
@@ -258,10 +263,14 @@ export class RadianceCascades {
             { binding: 14, resource: { buffer: this.mediaBuf } },
           ],
         });
+      const main = mkGroup(mkBuf(0));
+      const top = mkGroup(mkBuf(1));
       this.cascGroups.push({
-        main: mkGroup(mkBuf(0)),
-        top: mkGroup(mkBuf(1)),
+        main, top,
         region: [probes[0] * blocks, probes[1] * blocks],
+        bufs: [bufs[0], bufs[1]],
+        data: [datas[0], datas[1]],
+        spacing: [width / probes[0], height / probes[1]],
       });
     }
 
@@ -385,6 +394,31 @@ export class RadianceCascades {
     pass.end();
 
     const nc = Math.min(Math.max(cascades ?? this.cascadeCount, 1), this.cascadeCount);
+    // probe-grid jitter (with the temporal average on): every level above 0
+    // shifts by a fresh offset inside its own probe cell, from an R2
+    // low-discrepancy sequence so a few frames cover the cell evenly
+    const offs: [number, number][] = [];
+    for (let n = 0; n < this.cascadeCount; n++) {
+      const g = this.cascGroups[n];
+      if (!this.jitter || n === 0) {
+        offs.push([0, 0]);
+        continue;
+      }
+      const k = this.frameIndex + n * 17;
+      const u = (0.5 + k * 0.7548776662) % 1;
+      const v = (0.5 + k * 0.569840291) % 1;
+      offs.push([(u - 0.5) * g.spacing[0], (v - 0.5) * g.spacing[1]]);
+    }
+    if (this.jitter) {
+      for (let n = 0; n < this.cascadeCount; n++) {
+        const g = this.cascGroups[n];
+        const up = offs[n + 1] ?? [0, 0];
+        for (let b = 0; b < 2; b++) {
+          g.data[b].set([offs[n][0], offs[n][1], up[0], up[1]], 12);
+          this.dev.queue.writeBuffer(g.bufs[b], 0, g.data[b]);
+        }
+      }
+    }
     for (let n = nc - 1; n >= 0; n--) {
       const g = this.cascGroups[n];
       pass = target(this.casc[n % 2].createView());
@@ -424,6 +458,7 @@ export class RadianceCascades {
     this.dist.destroy();
     for (const t of this.jfa) t.destroy();
     for (const t of this.casc) t.destroy();
+    for (const g of this.cascGroups) for (const b of g.bufs) b.destroy();
     for (const b of this.brushBufs) b.destroy();
     this.compositeBuf.destroy();
     this.skyBuf.destroy();

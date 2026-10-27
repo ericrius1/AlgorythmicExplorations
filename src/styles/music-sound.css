@@ -116,7 +116,7 @@
   gap: 0.4rem;
 }
 
-.demo-button.is-on {
+.ms-choice .demo-button.is-on {
   border-color: var(--accent-warm);
   color: #ffe1bd;
   background: rgba(255, 184, 107, 0.13);

@@ -210,7 +210,7 @@ for each projector:
       <p>
         With a perfect model, a projector camera and a mathematical dome would be enough.
         Real domes aren't perfect, lenses distort, mounts shift, and projectors rarely sit
-        exactly where the drawings say. So direct rendering still needs part four's
+        where the drawings say. So direct rendering still needs part four's
         calibration data:
       </p>
       <pre><code>projector pose    → where the projector is
@@ -239,10 +239,13 @@ colour correction → matched brightness and white point</code></pre>
   }
 
   renderer.setRenderTarget(null);          <span class="cm">// the real outputs</span>
+  renderer.setScissorTest(true);           <span class="cm">// so each clear stays in its own viewport</span>
   for (const p of projectors) {
     renderer.setViewport(p.viewport);      <span class="cm">// its part of the output canvas</span>
+    renderer.setScissor(p.viewport);
     renderer.render(p.warpScene, orthoCamera);  <span class="cm">// warp mesh textured with p.target</span>
   }
+  renderer.setScissorTest(false);
 }</code></pre>
       <p>
         Each <code>p.camera</code> is a <code>PerspectiveCamera</code> whose projection matrix

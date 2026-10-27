@@ -10,20 +10,19 @@
     <title>The Biomes — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="What grows where: a moisture field, a pocket Whittaker diagram, and a jittered grid that places every tree, rock, and blade of grass — deterministically, so an infinite world can agree with itself."
+      content="Procedural terrain, part five: a moisture field and altitude classify the ground into biomes, and a jittered grid in world coordinates places every tree and rock so any region can be rebuilt identically."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <!-- demos mount via src/biomes.ts -->
+  <body class="essay">
     <header class="hero">
       <div data-demo="hero-biomes"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Ground Truth · Part 5</p>
         <h1>The Biomes</h1>
         <p class="subtitle">
-          Forests hold the wet ground, meadows take the middle, scree and
-          snow divide the heights. Two noise fields and a slope test determine
-          the distribution under this camera.
+          Forest in the wet hollows, meadow in between, scree on the dry heights. Nobody
+          placed any of the 243 trees in this valley.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -34,173 +33,192 @@
 
     <main>
       <p>
-        The series has parts now — <a href="/pages/ground-truth/heightfield.html">mountains</a>,
+        The series has its pieces now:
+        <a href="/pages/ground-truth/heightfield.html">mountains</a>,
         <a href="/pages/ground-truth/erosion.html">drainage</a>,
-        <a href="/pages/ground-truth/grass.html">grass</a>, <a href="/pages/ground-truth/trees.html">trees</a> —
-        but so far every demo has assembled them by hand: this grove here,
-        that meadow there. In a real landscape, the
-        pattern <em>is</em> information: where trees stop indicates the
-        temperature, where green turns tan tells you the rainfall, and a
-        glance at a hillside reveals its climate. Uniform placement, by contrast,
-        makes procedural terrain visibly artificial.
+        <a href="/pages/ground-truth/grass.html">grass</a> and
+        <a href="/pages/ground-truth/trees.html">trees</a>. But every scene so far was put
+        together by hand: this grove here, that meadow there. In a real landscape the
+        pattern carries information. Where the trees stop tells you how cold it gets, and
+        where green turns to tan tells you how much rain falls. Plants spread evenly over
+        everything are one of the quickest ways to make generated terrain look fake.
       </p>
       <p>
-        Ecologists compressed the real rules into one famous picture.
-        Whittaker's biome diagram plots temperature against precipitation
-        and carves the plane into regions: tundra here, grassland there,
-        forest where both are generous. This article builds the pocket
-        version — altitude stands in for temperature, a noise field stands
-        in for rainfall — and then spends its real effort on a quieter
-        problem: <em>placing</em> a million plants in a way that an
-        infinite world will be able to reproduce, chunk by chunk, without
-        any two chunks ever comparing notes. That second problem decides
-        the design of everything.
+        This part does two things. First it decides what grows where, from altitude, slope
+        and a climate field. Then it places the individual trees and rocks in a way that
+        any region of an endless world could reproduce on its own, without knowing about
+        its neighbours. The second problem shapes the design more than the first, because
+        <a href="/pages/ground-truth/horizon.html">part six</a> builds the world in chunks.
+      </p>
+      <p>
+        The valley at the top is 96 units across, and everything in it comes from those
+        rules: 243 trees, 89 rocks and about 126,000 grass blades. Past the valley the
+        ground keeps going out to the haze, painted by the same rules, so far-off woods
+        still read as forest even where no trees are drawn.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Climate</span>The moisture field</h2>
+      <h2 id="climate"><span class="kicker">Step 1 · Climate</span>A moisture field</h2>
       <p>
-        The terrain already gives us altitude and slope at any point — both
-        pure functions. For the missing moisture axis, we use the
-        same method that made the mountains: fractal noise, but much
-        <em>broader</em> — climate varies over kilometers, not meters. Three
-        octaves at a fiftieth of the terrain's frequency produce wet
-        regions and rain shadows that sprawl across many hills, which is
-        what makes the pattern read as weather rather than camouflage:
+        Ecologists summarize where biomes occur with Whittaker's diagram, which plots mean
+        temperature against rainfall and divides the plane into tundra, grassland, desert,
+        forest and so on. I built a small version. Altitude stands in for temperature, and
+        slope gets a veto, since nothing much grows on a cliff. Rainfall needs a field of its
+        own, so I used the same fractal noise that made the mountains, at a broader scale:
+        three octaves at 0.035 cycles per unit, about 29 units per wave against the
+        terrain's 11. Weather patterns are bigger than hills, and a moisture field as busy
+        as the terrain looks like camouflage.
       </p>
-      <pre><code>moisture(x, z) = fbm(x · k, z · k) + offset      <span class="cm">// k broad; offset is the climate dial</span>
-biome(h, slope, m): slope &gt; 0.55 → cliff
-                    h &gt; treeline + ε → alpine
-                    h &gt; treeline     → m wet ? meadow : scree
-                    else             → m wet ? forest : m mild ? meadow : scrub</code></pre>
-      <div data-demo="map"></div>
+      <pre><code>m = clamp(0.5 · fbm(x · k, z · k) + 0.5 + offset, 0, 1)    <span class="cm">// offset is the wet/dry dial</span>
+
+if (slope &gt; 0.55)            return cliff;
+if (h01 &gt; treeLine + 0.17)   return alpine;
+if (h01 &gt; treeLine)          return m &gt; 0.5 ? meadow : scree;
+if (m &gt; 0.5)                 return forest;
+if (m &gt; 0.36)                return meadow;
+return scrub;</code></pre>
+
+      <div
+        data-demo="map"
+        data-title="The biome map"
+        data-hint="Shift the climate and the tree line"
+      ></div>
+
       <p>
-        The classification painted over the terrain. Flip to the moisture
-        view to see the underlying field — note how much broader its
-        features are than the hills'. Then play the two dials:
-        <strong>wet ↔ dry</strong> shifts the whole world's climate (slide
-        toward dry and watch forests retreat to the dampest hollows, like
-        a time-lapse of a drying century); <strong>tree line</strong> moves
-        the altitude where trees surrender. Real tree lines do exactly
-        this — they're a temperature contour made visible in vegetation.
+        This is a 64-unit stretch of the part-one terrain, coloured by class and lightly
+        hillshaded so the relief shows through. The readout tallies how much of the map
+        each biome covers. <strong>Show moisture</strong> swaps in the raw field, and its
+        blobs are clearly broader than the hills. <strong>Wet ↔ dry</strong> shifts every
+        point's moisture by the same amount: slide toward dry and the forests shrink back to
+        the wettest patches, then disappear. <strong>Tree line</strong> moves the altitude,
+        as a fraction of peak height, above which forest gives way to meadow and scree.
+        Real tree lines work this way, a temperature contour you can see from a distance.
+        <strong>Climate scale</strong> changes the moisture field's wavelength, and a short
+        one shows why it has to be broad.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The missing river</span>
         <p>
-          A more physically grounded moisture model would use drainage.
-          Water flows downhill and collects, so valley floors are wet
-          because of the <em>shape of the terrain</em>, and part two
-          computed precisely that. But erosion's output is a stored grid,
-          and this article needs moisture to be a pure function for the
-          infinite world's sake. So the noise is a stand-in, and the
-          compromise is visible if you look: this climate doesn't quite
-          follow the valleys. The final article will spend real effort on
-          exactly this tension — what must be a function, and what's
-          allowed to be history.
+          A more physical moisture model would use drainage. Water runs downhill and
+          collects, so valley floors are wet because of the shape of the land, and part two
+          computed that. But erosion's output is a grid built by a long simulation,
+          and here moisture has to be a function of position so that part six can evaluate
+          it anywhere. The noise is a stand-in, and the compromise shows if you look for
+          it: this climate doesn't follow the valleys.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Placement</span>Deterministic placement</h2>
+      <h2 id="placement"><span class="kicker">Step 2 · Placement</span>A grid in world coordinates</h2>
       <p>
-        Knowing forest-or-meadow at a point is not the same as knowing
-        where each individual tree stands. Tree spacing has texture —
-        natural but not uniform, scattered but never clumped into
-        absurdity — and graphics' favorite answer is Poisson-disk
-        sampling: points placed randomly but never closer than a minimum
-        distance. It looks superb. It is also a <em>process</em>: each new
-        sample must check the samples placed before it, which means a
-        chunk can't place its trees without knowing its neighbors' trees —
-        and that dependency is poison for a streaming world (the same
-        poison as erosion, in a smaller bottle).
+        Knowing that a point is forest doesn't say where each tree stands. Natural spacing
+        is scattered but never clumped, and the usual answer in graphics is Poisson-disk
+        sampling: random points, none closer than a minimum distance. The grove in part
+        four used the simplest version, throwing darts and rejecting any that land too
+        close to an earlier tree. The trouble is that it's a process. Whether a tree
+        survives depends on the trees placed before it, so a chunk can't place its trees
+        without knowing its neighbour's, and their neighbours', and so on.
       </p>
       <p>
-        The chunk-proof alternative is the <strong>jittered grid</strong>.
-        Divide the world into cells in <em>global</em> coordinates — cell
-        indices from floor(x / cellSize), not from any chunk origin. Each
-        cell hosts at most one candidate, jittered inside the cell by the
-        cell's own hash. Any region query now reproduces the identical
-        trees, because a tree's existence and position depend only on its
-        cell's integers:
+        The alternative that works in pieces is a jittered grid. Divide the world into
+        cells of 2.6 units, numbered from the world origin with floor(x / cell), not from
+        any chunk's corner. Each cell holds at most one candidate tree, moved somewhere in
+        the middle 76% of the cell by the cell's own hash. Then the climate gets a vote and
+        the hash decides:
       </p>
-      <pre><code>candidate(ci, cj) = ((ci + jitter(hash)) · cell, (cj + jitter(hash)) · cell)
-keep if: hash(ci, cj) &lt; P(biome at candidate)     <span class="cm">// the climate votes, the hash decides</span></code></pre>
+      <pre><code>x = (ci + 0.12 + 0.76 · hash(ci, cj)) · cell          <span class="cm">// same for z with another hash</span>
+p = forest ? 0.92 : meadow ? 0.1 : scrub ? 0.05 : 0
+p *= 1 − smooth((h01 − (treeLine − 0.12)) / 0.12)       <span class="cm">// thin out below the tree line</span>
+keep the tree if hash(ci, cj, salt) &lt; p</code></pre>
       <p>
-        Spacing comes free (two candidates can't share a cell), and the
-        slight regularity that makes jittered grids inferior to Poisson
-        for sampling theory is invisible once trees land on hilly ground
-        with hashed scales and rotations. The acceptance probability is
-        where ecology re-enters: near-certain in forest, a stray pioneer
-        in meadows, zero above the tree line — with a fade band below it
-        where acceptance drops <em>and the trees themselves shrink</em>,
-        because real tree lines end in stunted krummholz, not a fence.
+        A tree's existence and position depend only on its cell's two integers, so any
+        query over any region returns the same trees. Spacing comes for free,
+        since two candidates can't share a cell. The grid is a little more regular than
+        true Poisson-disk sampling, but on hilly ground with hashed sizes and rotations
+        I can't see it. Near the tree line the odds fade out, and the trees that survive
+        are scaled down by up to 45%. Real tree lines end in stunted trees, not a fence.
       </p>
-      <div data-demo="patch"></div>
+
+      <div
+        data-demo="patch"
+        data-title="A populated patch"
+        data-hint="Drag to orbit, then change the climate"
+      ></div>
+
       <p>
-        Every tree, rock, and grass blade here was accepted or rejected by
-        the rules — slide the climate and watch whole forests migrate
-        downhill into the hollows. The rocks follow their own grid
-        (scree fields above the tree line, boulders thinning to pebbles by
-        a squared hash, because nature stocks many more small rocks than
-        large). The readout's tally is the article's thesis: nobody placed
-        any of them, and yet none of them is anywhere twice.
+        Every tree, rock and grass blade on this 40-unit block was accepted or rejected by
+        those rules, and the readout counts them. Slide toward dry and the forest retreats
+        into the wettest hollow; slide toward wet and it spreads over the shoulders of the
+        hill. Raise the tree line and trees climb higher. Rocks use their own grid, with
+        5-unit cells: they're likely on scree, less likely on alpine ground and cliffs,
+        occasional in scrub and rare elsewhere, and their size is the square of a hash, so there are many more small
+        ones than large. Grass is planted from hashed candidate points with odds by biome:
+        thick in meadows, half as dense under trees, sparse in scrub, nearly absent on
+        scree. The ground itself is tinted toward each biome's colour, with forest pulled
+        hardest toward a dark canopy green.
       </p>
       <details class="fold">
-        <summary>Deep dive: four trees playing a forest</summary>
+        <summary>Deep dive: six trees playing a forest</summary>
         <div class="fold-body">
           <p>
-            The patch above contains hundreds of trees but only four tree
-            <em>geometries</em> — grown once by <a href="/pages/ground-truth/trees.html">part
-            four's</a> space colonization, then instanced with hashed yaw
-            and scale. The eye identifies a tree by silhouette, and a
-            rotated, rescaled skeleton on different ground reads as a
-            different individual; meshes are expensive, silhouettes are
-            free. The same economy stretches further in big games — LOD
-            imposters, billboard crowds — but the principle is already
-            fully present here: <strong>uniqueness is a property of
-            placement, not of geometry</strong>.
+            The valley at the top has 243 trees but only six tree meshes, the same six
+            skeletons the part-four grove uses, each instanced with hashed rotation and
+            scale. At this distance I use a lighter mesh per tree: a third of the leaf
+            cards, each one scaled up so the crown covers the same area, and no twigs
+            thinner than 0.022 units, since the leaves hide them anyway. That takes a tree
+            from about 1,800 leaves to about 600.
           </p>
           <p>
-            One subtlety worth stealing: each instanced variant is one
-            draw call <em>per variant</em>, not per tree, so the whole
-            forest costs about a dozen draw calls regardless of count. The
-            grass takes the part-three route instead (one merged buffer)
-            because blades are too small to be worth a matrix each. Two
-            scales of the same problem, two different answers — the
-            boundary between them is roughly "does one instance have more
-            vertices than its matrix has floats."
+            Each variant is one instanced draw call for bark and one for leaves, so the
+            trees cost twelve draw calls however many there are. The grass goes the
+            part-three way instead, one merged buffer, because a seven-vertex blade isn't
+            worth a 16-float matrix of its own. Roughly: instance when one copy has more
+            data than its matrix, merge when it has less.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Preparing for streaming</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
+      <ul>
+        <li>
+          <strong>Let the pattern carry information.</strong> Altitude, slope and moisture
+          are enough to make a landscape that reads as a climate.
+        </li>
+        <li>
+          <strong>Number things from the world, not the region.</strong> Cells indexed in
+          world coordinates make any query reproducible.
+        </li>
+        <li>
+          <strong>Prefer rules that don't need neighbours.</strong> A jittered grid looks
+          almost as good as Poisson-disk sampling and works in pieces.
+        </li>
+        <li>
+          <strong>Paint the ground with the same rules.</strong> Where the plants stop being
+          drawn, the tint still says forest or scree.
+        </li>
+      </ul>
       <p>
-        Stand back and audit what the series now owns. Ground:
-        h(x, z), a pure function. Climate: moisture(x, z), a pure
-        function. Population: scatter(region), a pure function of cell
-        integers. Everything the eye sees is now computable from
-        coordinates alone — no stored maps, no history, no assembly steps
-        — except for rain, which still uses a grid, and the streaming system.
-        The next article builds that system:
-        chunks, rings of level-of-detail, a build budget measured in
-        milliseconds, and a camera that can fly in one direction for as
-        long as you care to hold the key. The world is already infinite on
-        paper. Part six makes it infinite in person.
+        Things I'd try next: add a temperature field so north-facing slopes get a lower
+        tree line; vary the tree species by biome instead of using one kind everywhere; and
+        replace the moisture noise with a cheap function-of-position stand-in for drainage,
+        such as how far below its surroundings a point sits, so the wet ground follows the
+        valleys.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/ground-truth/horizon.html">Part 6, The Horizon</a>.</strong>
+        Chunks, level of detail and a millisecond budget turn these rules into a world
+        that never ends.
       </p>
     </main>
 
     <footer>
       <p>
-        Ground Truth, part five ·
-        placing <a href="/pages/ground-truth/trees.html">part four's</a> trees on
-        <a href="/pages/ground-truth/heightfield.html">part one's</a> ground
-      </p>
-      <p>
-        Standing on the shoulders of:
-        <a href="https://www.jstor.org/stable/1948435">Whittaker, "Vegetation of the Siskiyou Mountains" (1960)</a> ·
+        References:
+        <a href="https://doi.org/10.1145/7529.8927">Cook, "Stochastic Sampling in Computer Graphics" (1986)</a> ·
         <a href="https://doi.org/10.1145/1278780.1278807">Bridson, "Fast Poisson Disk Sampling in Arbitrary Dimensions" (2007)</a> ·
-        <a href="https://doi.org/10.1111/j.1467-8659.2007.01051.x">Lagae &amp; Dutré, "A Comparison of Methods for Generating Poisson Disk Distributions" (2008)</a>
+        <a href="https://doi.org/10.1111/j.1467-8659.2007.01100.x">Lagae &amp; Dutré, "A Comparison of Methods for Generating Poisson Disk Distributions" (2008)</a> ·
+        Whittaker, <em>Communities and Ecosystems</em> (1975)
       </p>
     </footer>
 

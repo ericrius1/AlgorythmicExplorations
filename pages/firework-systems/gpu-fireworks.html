@@ -291,8 +291,8 @@ drawIndirect     <span class="cm">// the particle list, with finishFrame's insta
       <p>
         None of this makes the particles look simple. Each one has a kind (rocket, spark,
         ember or smoke) and each kind gets its own acceleration, drag, size, colour and
-        lifetime. Rockets feel 13% of normal gravity and reach their target in 0.7 to 0.9
-        seconds. Sparks fall and swirl. Embers start out slower, drop, and last 1.1 to 2.7
+        lifetime. Rockets feel 13% of the gravity the sparks do and reach their target in 0.6
+        to 0.9 seconds, depending on how high it is. Sparks fall and swirl. Embers start out slower, drop, and last 1.1 to 2.7
         seconds. Smoke drifts upward.
       </p>
       <p>
@@ -383,7 +383,7 @@ device.popErrorScope().then((error) =&gt; {
         the sky to launch; while you hold, it fires eight launches every half second. Then
         turn sparks per shell up to 100,000, set twelve rockets per launch, and hold again.
         Within a second or two the live count runs into the capacity, and the overflow total
-        starts climbing by tens of millions a second. Let go and the live count drains back
+        starts climbing by millions a second. Let go and the live count drains back
         down as the sparks burn out (switch <em>auto</em> off to watch it reach zero).
       </p>
 

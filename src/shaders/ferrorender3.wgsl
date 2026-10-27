@@ -1,4 +1,5 @@
-// Rendering for the 3D ferrofluid: the extracted mesh shaded as glossy ink,
+// Rendering for the 3D ferrofluid (Strange Matter part three), in linear HDR
+// for PostFX: the extracted mesh shaded as glossy black liquid,
 // a dish to keep it from floating in the void, particle billboards for the
 // teaching view (brightness = magnetization), and a small glyph for the
 // cursor magnet. No culling anywhere — extractors emit unwound triangles and
@@ -47,32 +48,68 @@ fn vsMesh(@builtin(vertex_index) vi: u32) -> MeshOut {
   return out;
 }
 
+// A small studio for the fluid to reflect, the 3D twin of part one's: a
+// crisp softbox overhead, a warm strip on the viewer's left, a cool one on
+// the right, a dim horizon and a dark floor. Up is world z; left and right
+// are taken from the camera so the strips stay put while you orbit.
+fn env(r: vec3f) -> vec3f {
+  let up = r.z;
+  let side = dot(r, RP.right.xyz);
+  let fwd = dot(r, normalize(cross(RP.right.xyz, vec3f(0.0, 0.0, 1.0))));
+  var c = vec3f(0.002, 0.0025, 0.004);
+  c += vec3f(0.03, 0.038, 0.06) * exp(-abs(up - 0.04) * 6.0);
+  // overhead softbox: a hard-edged rectangle, so highlights read as wet
+  let box = smoothstep(0.72, 0.76, up)
+          * (1.0 - smoothstep(0.36, 0.40, abs(side + 0.06)))
+          * (1.0 - smoothstep(0.48, 0.53, abs(fwd)));
+  c += vec3f(2.6, 2.7, 2.9) * box;
+  c += vec3f(0.05, 0.06, 0.09) * smoothstep(0.1, 0.9, up);
+  let band = smoothstep(0.14, 0.04, abs(up - 0.2));
+  c += vec3f(1.5, 1.0, 0.62) * smoothstep(0.74, 0.82, -side) * band;
+  c += vec3f(0.5, 0.68, 1.3) * smoothstep(0.74, 0.82, side) * band;
+  return c;
+}
+
 @fragment
 fn fsMesh(in: MeshOut) -> @location(0) vec4f {
   let V = normalize(RP.eye.xyz - in.wp);
   var n = normalize(in.nrm);
   if (dot(n, V) < 0.0) { n = -n; }
+  let ndv = max(dot(n, V), 0.0);
 
-  let base = vec3f(0.016, 0.019, 0.028); // ferrofluid: very nearly black
-
-  let l1 = normalize(vec3f(-0.45, 0.30, 0.83));
-  let h1 = normalize(l1 + V);
-  let spec1 = pow(max(dot(n, h1), 0.0), 70.0);
-
-  let l2 = normalize(vec3f(0.60, -0.50, 0.35));
-  let h2 = normalize(l2 + V);
-  let spec2 = pow(max(dot(n, h2), 0.0), 22.0);
-
-  let fres = pow(1.0 - max(dot(n, V), 0.0), 3.0);
-  let refl = reflect(-V, n);
-  let sky = smoothstep(-0.3, 1.0, refl.z);
-
-  let col = base
-          + vec3f(0.85, 0.92, 1.00) * spec1 * 1.15
-          + vec3f(0.95, 0.80, 0.62) * spec2 * 0.16
-          + vec3f(0.11, 0.14, 0.22) * fres * 1.55
-          + vec3f(0.05, 0.065, 0.095) * sky * 0.95;
+  // ferrofluid is an oil full of soot-black magnetite: the body absorbs
+  // nearly everything, so what you see is the surface reflecting the room
+  let fres = 0.06 + 0.94 * pow(1.0 - ndv, 5.0);
+  let r = reflect(-V, n);
+  var col = vec3f(0.0015, 0.0017, 0.0024) + env(r) * fres;
+  // a hard key light for the pin highlight on every tip
+  let l1 = normalize(vec3f(-0.35, 0.25, 0.9));
+  col += vec3f(3.2, 3.3, 3.5) * pow(max(dot(n, normalize(l1 + V)), 0.0), 160.0);
   return vec4f(col, 1.0);
+}
+
+// ---- backdrop: a dark studio wall with a soft pool of light behind the dish ---
+
+struct BackOut {
+  @builtin(position) clip: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn vsBack(@builtin(vertex_index) vi: u32) -> BackOut {
+  var pts = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var out: BackOut;
+  out.clip = vec4f(pts[vi], 1.0, 1.0);
+  out.uv = pts[vi];
+  return out;
+}
+
+@fragment
+fn fsBack(in: BackOut) -> @location(0) vec4f {
+  var c = mix(vec3f(0.002, 0.0024, 0.004), vec3f(0.006, 0.007, 0.011), smoothstep(-1.0, 1.0, in.uv.y));
+  let q = (in.uv - vec2f(0.0, 0.25)) * vec2f(0.8, 1.3);
+  c += vec3f(0.020, 0.024, 0.038) * exp(-dot(q, q) * 1.6);
+  return vec4f(c, 1.0);
 }
 
 // ---- the dish: an opaque floor slab and four translucent walls -------------------
@@ -115,13 +152,14 @@ fn fsDish(in: DishOut) -> @location(0) vec4f {
   if (in.face < 0.5) {
     // floor: dark slab, faint vignette toward the rim
     let r = max(abs(in.local.x), abs(in.local.y));
-    let col = mix(vec3f(0.052, 0.058, 0.082), vec3f(0.030, 0.034, 0.050), smoothstep(0.4, 1.0, r));
+    let col = mix(vec3f(0.010, 0.012, 0.018), vec3f(0.004, 0.0045, 0.007), smoothstep(0.3, 1.0, r));
     return vec4f(col, 1.0);
   }
   // walls: a breath of glass — brighter along the rim
-  let rim = smoothstep(0.72, 1.0, in.local.y);
-  let a = 0.035 + rim * 0.05;
-  return vec4f(vec3f(0.35, 0.45, 0.65) * a, a);
+  let rim = smoothstep(0.9, 1.0, in.local.y);
+  let edge = smoothstep(0.94, 1.0, abs(in.local.x));
+  let a = 0.025 + rim * 0.06 + edge * 0.03;
+  return vec4f(vec3f(0.30, 0.38, 0.55) * a, a);
 }
 
 // ---- particle billboards (brightness = |moment|) ------------------------------------

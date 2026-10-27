@@ -8,7 +8,6 @@ import { getDevice, configureContext } from "../../lib/gpu";
 import { Ferro2Sim, FERRO2_KNOBS, type Ferro2Knobs } from "../../lib/ferroSim2";
 import { SPACING, poolDepth, type Tray } from "../../lib/ferroSim";
 import { Ferro2DRenderer, VIEW_FINAL, VIEW_MOMENTS } from "./ferro2dRenderer";
-import { devKnobs } from "./devKnobs";
 
 const VIEW_NAMES = ["final", "mesh", "field", "particles", "moments"];
 const POLE_TO_DIPOLE = 0.05; // the cursor magnet's dipole sits inside its bar
@@ -28,7 +27,7 @@ export async function mountCrown(container: HTMLElement, opts: CrownOptions): Pr
   const ctx = configureContext(shell.canvas, dev);
 
   const tray: Tray = opts.hero ? { floorY: -0.5, wallX: 0.97, topY: 0.95 } : { floorY: -0.5, wallX: 0.8, topY: 0.95 };
-  const knobs: Ferro2Knobs = devKnobs({ ...FERRO2_KNOBS });
+  const knobs: Ferro2Knobs = { ...FERRO2_KNOBS };
   const count = opts.hero ? 24000 : 20000;
   const surfaceY = tray.floorY + poolDepth(count, tray);
   let view = opts.view ?? VIEW_FINAL;
@@ -98,7 +97,7 @@ export async function mountCrown(container: HTMLElement, opts: CrownOptions): Pr
   shell.setInfo(() => {
     if (opts.hero) return `${count.toLocaleString()} particles, each one a magnet · uniform field · cursor adds a magnet`;
     if (opts.duel) return `${modelName()} model · ${count.toLocaleString()} particles`;
-    if (view === VIEW_MOMENTS) return `${count.toLocaleString()} moments, one relaxation sweep per frame · every 5th drawn`;
+    if (view === VIEW_MOMENTS) return `${count.toLocaleString()} moments, one relaxation sweep per frame · every 6th drawn`;
     return `${modelName()} · ${rnd.segsDrawn.toLocaleString()} segments · ${count.toLocaleString()} particles`;
   });
 
@@ -147,7 +146,7 @@ export async function mountCrown(container: HTMLElement, opts: CrownOptions): Pr
         mag: pointer ?? [0, 5],
         magOn: pointer !== null,
         time,
-        momentScale: 0.15,
+        momentScale: 0.06,
       });
       dev.queue.submit([enc.finish()]);
       rnd.afterSubmit();

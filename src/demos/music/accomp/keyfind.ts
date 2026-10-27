@@ -88,7 +88,7 @@ function simulate(ear: KeyEar, tune: Tune): void {
 }
 
 export function mountKeyFinder(container: HTMLElement): Demo {
-  const shell = new Shell(container, 0.52);
+  const shell = new Shell(container, (window.innerWidth || 1024) < 560 ? 1.32 : 0.52);
   const g = shell.canvas.getContext("2d")!;
   const wrap = stage(shell);
   const ear = new KeyEar();
@@ -240,7 +240,7 @@ export function mountKeyFinder(container: HTMLElement): Demo {
       const lx = 16 * s;
       const ly = 40 * s;
       const lw = narrow ? W - 32 * s : W * 0.5;
-      const lh = narrow ? H * 0.46 : H - ly - 30 * s;
+      const lh = narrow ? H * 0.42 : H - ly - 30 * s;
       const mid = ly + lh * 0.55;
       const colW = lw / 12;
       const best = ear.keyIdx >= 0 ? keyOf(ear.keyIdx) : null;
@@ -310,7 +310,7 @@ export function mountKeyFinder(container: HTMLElement): Demo {
 
       // ---- right: all 24 keys ----
       const rx = narrow ? 16 * s : W * 0.56;
-      const ry = narrow ? ly + lh + 40 * s : 40 * s;
+      const ry = narrow ? ly + lh + 58 * s : 40 * s;
       const rw = narrow ? W - 32 * s : W - rx - 16 * s;
       const cell = rw / 12;
       const rowH = Math.min(cell * 1.15, 44 * s);

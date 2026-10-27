@@ -3,7 +3,6 @@
 // dimensions on a patch of meadow, and a hero grove on a hillside.
 
 import * as THREE from "three/webgpu";
-import { vec4 } from "three/tsl";
 import { Shell, type Demo } from "../../lib/demoShell";
 import { pixelRatio } from "../../lib/palette";
 import { hash2 } from "../../lib/terrain/noise";
@@ -13,7 +12,7 @@ import { scatterOnGrid, buildGrassGeometry, makeGrassMaterial, sampleGrid, grass
 import { growTree, buildTreeGeometry, makeTreeMaterials, TREE_DEFAULTS, type TreeParams, type TreeBuild } from "../../lib/terrain/trees";
 import { plantForest, stampTreeShadows, type TreeSpot } from "../../lib/terrain/forest";
 import { gridSampler } from "../../lib/terrain/light";
-import { createTerrainStage, terrainMaterial, lin, MORNING, GOLDEN, Smooth } from "../../lib/terrain/look";
+import { createTerrainStage, terrainMaterial, MORNING, GOLDEN, Smooth } from "../../lib/terrain/look";
 import { buildVista } from "../../lib/terrain/vista";
 
 // ---- space colonization, flat ----------------------------------------------------------
@@ -186,6 +185,7 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
     far: 200,
   });
   const look = stage.look;
+  look.uHaze.value = 0.003; // a block on a table: keep the air clear
 
   // a small block of meadow to stand on
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 5, amplitude: 0.5, frequency: 0.12 };
@@ -211,22 +211,16 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
   mats.wind.value = 0.6;
   let bark: THREE.Mesh | null = null;
   let leaves: THREE.Mesh | null = null;
-  let perchGroup: THREE.Group | null = null;
-  let segs = 0, leafCount = 0, perchCount = 0, iters = 0;
+  let segs = 0, leafCount = 0, iters = 0;
   let growT = 0; // 0..1 reveal of the bark buffer
-  let showPerches = false;
   let timer = 0;
   const leafScale = { value: 0 };
-
-  const perchMat = new THREE.MeshBasicNodeMaterial();
-  perchMat.colorNode = vec4(lin(0x67e8f9).mul(3), 1);
 
   const regrow = (): void => {
     const skel = growTree(params);
     const built = buildTreeGeometry(skel, { sun: look.sunDir });
     segs = built.segmentCount;
     leafCount = built.leafCount;
-    perchCount = built.perches.length;
     iters = skel.iterations;
 
     if (bark) { bark.geometry.dispose(); bark.geometry = built.bark; }
@@ -235,17 +229,6 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
     else { leaves = new THREE.Mesh(built.leaves, mats.leaves); stage.scene.add(leaves); }
     bark.position.y = leaves.position.y = groundY - 0.05;
 
-    if (perchGroup) stage.scene.remove(perchGroup);
-    perchGroup = new THREE.Group();
-    const marker = new THREE.SphereGeometry(0.035, 10, 8);
-    for (const p of built.perches) {
-      const m = new THREE.Mesh(marker, perchMat);
-      m.position.copy(p.position);
-      perchGroup.add(m);
-    }
-    perchGroup.position.y = groundY - 0.05;
-    perchGroup.visible = showPerches;
-    stage.scene.add(perchGroup);
 
     growT = 0;
     leafScale.value = 0;
@@ -261,13 +244,8 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
   shell.slider({ label: "influence", min: 0.5, max: 2.5, step: 0.05, value: params.influence, onInput: (v) => { params.influence = v; queue(); } });
   shell.slider({ label: "kill radius", min: 0.18, max: 0.7, step: 0.02, value: params.kill, onInput: (v) => { params.kill = v; queue(); } });
   shell.button("replay growth", () => { growT = 0; leafScale.value = 0; });
-  const perchBtn = shell.button("show perches", () => {
-    showPerches = !showPerches;
-    perchBtn.textContent = showPerches ? "hide perches" : "show perches";
-    if (perchGroup) perchGroup.visible = showPerches;
-  });
   shell.button("new tree", () => { params.seed = (Math.random() * 1e6) | 0; regrow(); });
-  shell.setInfo(() => `${segs} segments · ${leafCount.toLocaleString()} leaves · ${perchCount} perches · grew in ${iters} rounds`);
+  shell.setInfo(() => `${segs} segments · ${leafCount.toLocaleString()} leaves · grew in ${iters} rounds`);
 
   let last = performance.now();
   return {
@@ -302,7 +280,7 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
 
 export async function mountGroveHero(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.5);
-  const stage = await createTerrainStage(shell.canvas, GOLDEN, { fov: 50, near: 0.05, far: 1500 });
+  const stage = await createTerrainStage(shell.canvas, GOLDEN, { orbit: false, fov: 50, near: 0.05, far: 1500 });
   const look = stage.look;
 
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 31, amplitude: 7, frequency: 0.045, octaves: 7 };
@@ -333,7 +311,7 @@ export async function mountGroveHero(container: HTMLElement): Promise<Demo> {
     const g = sampleGrid(grid, x, z);
     const h01 = g.h / tp.amplitude;
     if (h01 < 0.08 || h01 > 0.5 || g.slope > 0.7) continue;
-    if (Math.abs(Math.hypot(x, z) - R) < 4.5) continue; // the camera's path stays clear
+    if (Math.abs(Math.hypot(x, z) - R) < 5) continue; // the camera's path stays clear
     const grove = Math.sin(x * 0.13 + 1.3) * Math.cos(z * 0.11 - 0.4);
     if (hash2(k, 5, 9) > 0.15 + 0.85 * Math.max(0, grove)) continue;
     if (spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 2.6 * 2.6)) continue;
@@ -346,7 +324,7 @@ export async function mountGroveHero(container: HTMLElement): Promise<Demo> {
     sun: look.sunDir,
     reach: 60,
     outside: vista.heightAt,
-    groundTint: grassGroundTint(grid, tp.amplitude, {}, 0.8),
+    groundTint: grassGroundTint(grid, tp.amplitude, { maxH01: 0.8 }, 0.8),
   });
   const light = core.userData.state.light as Float32Array;
   stampTreeShadows(light, W, W, -SIZE / 2, -SIZE / 2, SIZE / (W - 1), spots, variants, look.sunDir);
@@ -362,7 +340,7 @@ export async function mountGroveHero(container: HTMLElement): Promise<Demo> {
   const sunAt = gridSampler(light.filter((_, i) => i % 2 === 0), W, W, -SIZE / 2, -SIZE / 2, SIZE / (W - 1));
   const grassMat = makeGrassMaterial(look);
   grassMat.strength.value = 0.5;
-  const blades = scatterOnGrid(grid, tp.amplitude, { count: 260_000, seed: 77, scale: 1.3, sun: sunAt });
+  const blades = scatterOnGrid(grid, tp.amplitude, { count: 340_000, seed: 77, scale: 1.8, maxH01: 0.8, sun: sunAt });
   const grass = new THREE.Mesh(buildGrassGeometry(blades).geometry, grassMat.material);
   grass.frustumCulled = false;
   stage.scene.add(grass);
@@ -393,12 +371,12 @@ export async function mountGroveHero(container: HTMLElement): Promise<Demo> {
       mats.time.value = time;
 
       const cx = Math.cos(theta) * R, cz = Math.sin(theta) * R;
-      const cy = alt.step(envelope(theta) + 3.2, dt);
+      const cy = alt.step(envelope(theta) + 5, dt);
       stage.camera.position.set(cx, cy, cz);
       // look ahead along the clearing and a little outward, across the groves
-      const la = theta + 0.6;
-      const lx = Math.cos(la) * R * 1.25, lz = Math.sin(la) * R * 1.25;
-      stage.camera.lookAt(lx, lookY.step(cy - 1.2, dt), lz);
+      const la = theta + 0.65;
+      const lx = Math.cos(la) * R * 1.2, lz = Math.sin(la) * R * 1.2;
+      stage.camera.lookAt(lx, lookY.step(cy - 2.8, dt), lz);
       stage.draw();
     },
     dispose: () => stage.dispose(),

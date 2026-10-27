@@ -44,8 +44,11 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   post.settings.radius = 1.0
   post.settings.vignette = 0.3
 
-  const viewScaleY = 1.05
-  const viewY = -0.02
+  // a phone-width hero sits under a taller nav bar: pull back a little and
+  // frame the lamp lower so the cap isn't hidden behind it
+  const phoneHero = !!opts.hero && narrow
+  const viewScaleY = phoneHero ? 0.74 : 1.05
+  const viewY = phoneHero ? 0.2 : -0.02
   const viewScale: [number, number] = [1, viewScaleY]
 
   // Light transport runs at a fraction of the canvas: light is smooth, and
@@ -59,9 +62,8 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   const steps = 4
   let glow = 1.0
   let view = 0
-  let dbg = -1
-  let splatR = H * 8.5
-  let thresh = 1.8
+  const splatR = H * 8.5
+  const thresh = 1.5
   let time = 0
 
   const sim = new LavaSim(dev, count)
@@ -88,6 +90,17 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
     fragment: { module, entryPoint: "fsScene", targets: [{ format: "rgba16float" }] },
     primitive: { topology: "triangle-list" },
   })
+  const blurPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vsFull" },
+    fragment: { module, entryPoint: "fsBlur", targets: [{ format: "rgba16float" }] },
+    primitive: { topology: "triangle-list" },
+  })
+  const blurBufs = [[1, 0], [0, 1]].map((d) => {
+    const b = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    dev.queue.writeBuffer(b, 0, new Float32Array([d[0], d[1], 0, 0]))
+    return b
+  })
   const displayPipe = dev.createRenderPipeline({
     layout: "auto",
     vertex: { module, entryPoint: "vsFull" },
@@ -99,6 +112,10 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   let rc: RadianceCascades = null!
   let fieldTex: GPUTexture = null!
   let fieldView: GPUTextureView = null!
+  let blurTex: [GPUTexture, GPUTexture] = [null!, null!]
+  let blurGroups: [GPUBindGroup, GPUBindGroup] = [null!, null!]
+  let smoothView: GPUTextureView = null!
+  let blurTmpView: GPUTextureView = null!
   let sceneGroup: GPUBindGroup = null!
   let displayGroup: GPUBindGroup = null!
 
@@ -110,6 +127,8 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   const buildTargets = (): void => {
     rc?.dispose()
     fieldTex?.destroy()
+    blurTex[0]?.destroy()
+    blurTex[1]?.destroy()
     const w = shell.canvas.width
     const h = shell.canvas.height
     updateViewScale(w, h)
@@ -121,11 +140,40 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
     fieldView = fieldTex.createView()
+    // splat → horizontal blur → vertical blur; everything downstream reads
+    // the smoothed field
+    const mkField = (): GPUTexture =>
+      dev.createTexture({
+        size: [rc.width, rc.height],
+        format: "rgba16float",
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      })
+    blurTex = [mkField(), mkField()]
+    blurTmpView = blurTex[0].createView()
+    smoothView = blurTex[1].createView()
+    blurGroups = [
+      dev.createBindGroup({
+        layout: blurPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 3, resource: linSamp },
+          { binding: 7, resource: { buffer: blurBufs[0] } },
+          { binding: 8, resource: fieldView },
+        ],
+      }),
+      dev.createBindGroup({
+        layout: blurPipe.getBindGroupLayout(0),
+        entries: [
+          { binding: 3, resource: linSamp },
+          { binding: 7, resource: { buffer: blurBufs[1] } },
+          { binding: 8, resource: blurTmpView },
+        ],
+      }),
+    ]
     sceneGroup = dev.createBindGroup({
       layout: scenePipe.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: rp } },
-        { binding: 2, resource: fieldView },
+        { binding: 2, resource: smoothView },
         { binding: 3, resource: linSamp },
       ],
     })
@@ -133,7 +181,7 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       layout: displayPipe.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: rp } },
-        { binding: 2, resource: fieldView },
+        { binding: 2, resource: smoothView },
         { binding: 3, resource: linSamp },
         { binding: 5, resource: rc.fluence.view },
         { binding: 6, resource: { buffer: dp } },
@@ -308,24 +356,6 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
   await dev.queue.onSubmittedWorkDone()
   bindSplat()
 
-  ;(window as unknown as { __lava?: unknown[] }).__lava ??= []
-  ;(window as unknown as { __lava: unknown[] }).__lava.push({
-    knobs,
-    post,
-    setView: (v: number) => (dbg = v),
-    setSplat: (r: number, t: number) => { splatR = H * r; thresh = t },
-    remelt: (warm: number) => {
-      sim.rebuild(count)
-      sim.writeParams(knobs, 0.0016, mouse, mouseVel)
-      for (let c = 0; c < warm; c++) {
-        const enc = dev.createCommandEncoder()
-        sim.encodeSteps(enc, 250)
-        dev.queue.submit([enc.finish()])
-      }
-      bindSplat()
-    },
-  })
-
   return {
     frame() {
       shell.tick()
@@ -345,6 +375,16 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       pass.draw(6, sim.count)
       pass.end()
 
+      for (let b = 0; b < 2; b++) {
+        pass = enc.beginRenderPass({
+          colorAttachments: [{ view: b === 0 ? blurTmpView : smoothView, loadOp: "clear", storeOp: "store" }],
+        })
+        pass.setPipeline(blurPipe)
+        pass.setBindGroup(0, blurGroups[b])
+        pass.draw(3)
+        pass.end()
+      }
+
       // field → emission + occlusion (plus coil, base, cap, table)
       pass = enc.beginRenderPass({
         colorAttachments: [{ view: rc.sceneView, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store" }],
@@ -356,9 +396,7 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
 
       rc.encodeGI(enc)
 
-      if (dbg >= 0) {
-        rc.encodeComposite(enc, ctx.getCurrentTexture().createView(), { exposure: 1.4, debugMode: dbg, emitBoost: 0.55 })
-      } else if (view === 0) {
+      if (view === 0) {
         pass = enc.beginRenderPass({
           colorAttachments: [{ view: post.sceneView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
         })
@@ -387,6 +425,9 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       sim.dispose()
       rc.dispose()
       fieldTex.destroy()
+      blurTex[0].destroy()
+      blurTex[1].destroy()
+      for (const b of blurBufs) b.destroy()
       rp.destroy()
       dp.destroy()
       post.dispose()

@@ -10,25 +10,199 @@
     <title>The Room Instrument — Acoustic Spaces</title>
     <meta
       name="description"
-      content="A shareable spatial-audio music toy: drag sound stones, a listener, acoustic materials, and water to compose with room simulation."
+      content="A room that plays music: a drum's echoes off the walls set the rhythm, the wall materials set the accents, and every note is heard through a binaural impulse response of the room. Build one and share it as a link."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="essay">
+    <header class="hero hero-title-below">
+      <div data-demo="instrument"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Acoustic Spaces · Part 2</p>
+        <h1>The Room Instrument</h1>
+        <p class="subtitle">
+          A room that writes its own music. The echoes of a drum set the rhythm, the walls set
+          the accents, and you hear every note from where the head is standing.
+        </p>
+      </div>
+    </header>
+
     <main>
-      <h1>Playground</h1>
-     
-      <div class="demo-slot" data-demo="instrument"></div>
+      <p>
+        The plan at the top is an instrument. Tap it to start. The orange ring is a drum that
+        sends a pulse into the room once a bar. The pulse spreads, bounces off the walls, and
+        every time a wavefront passes one of the coloured stones, that stone rings. Higher up
+        the plan means a higher note. Drag the stones, the drum or the head. Tap the floor to
+        add a stone (up to seven), and drag one out through a wall to take it away. Tap a wall
+        to change what it's made of: tile, brick, wood, glass, curtains, acoustic tiles. When
+        you have something you like, copy the link. The whole room is in it.
+      </p>
+      <p>
+        <a href="/pages/acoustic-spaces/acoustic-space.html">Part one</a> built the pieces: image
+        sources for the reflections, Sabine's reverberation per octave band, and a two-eared
+        head. Here they run as one system, and the room stops being the place music is played
+        in and starts deciding what gets played.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="sequencer"><span class="kicker">Step 1 · Rhythm</span>The room is the sequencer</h2>
+      <p>
+        Every path from the drum to a stone is an image source, the same as in part one: the
+        direct path, one for each wall, and (with "up to second" on) one for each pair of walls.
+        Each path has a length and a loss. For the sequencer I give the pulse its own slow speed
+        of sound, set so the room's diagonal takes 12 sixteenth notes whatever the size of the
+        room. A path's length then becomes a time in steps, rounded to the nearest sixteenth
+        and wrapped around the 16-step bar, so a path that takes 20 steps lands on step 4 of
+        the next bar. Its loudness is the reflection loss at 1 kHz with a gentle fall-off with
+        distance. Anything quieter than 0.12 is dropped.
+      </p>
+      <pre><code>for (const im of ims) {
+  const steps = im.dist / mPerStep();
+  <span class="cm">// reflection loss at 1 kHz (spreading removed), plus a gentle fall with distance</span>
+  const refl = im.gain[3] * im.dist;
+  const vel = refl * Math.min(1, 1.3 / (1 + steps / 8));
+  if (vel &lt; 0.12) continue;
+  const step = Math.round(steps) % STEPS;
+  <span class="cm">// …keep the loudest hit on each step</span>
+}</code></pre>
+      <p>
+        Here's a single stone in an 8 × 5 metre room with tiled walls, counting first
+        reflections only. That makes five hits a bar at most: the direct path and one off each
+        wall. The grid underneath is the bar the room wrote. Drag the stone and the hits slide
+        around; put it near a wall and the direct hit and that wall's echo land close
+        together. Then hang curtains.
+      </p>
+
+      <div
+        data-demo="onestone"
+        data-title="One stone"
+        data-hint="Drag the stone, change the walls"
+      ></div>
+
+      <p>
+        With tile, each bounce keeps 99% of the energy, so the echoes are nearly as loud as the
+        direct hit. Curtains absorb 72% at 1 kHz, which leaves about half the pressure after one
+        bounce, and the echoes turn into ghost notes. With "up to second" on, eight more paths
+        arrive, off two walls each, and the pattern gets busier. That's the design: hard rooms
+        play dense patterns with even accents, soft rooms play sparse ones where the direct hit
+        dominates.
+      </p>
+      <p>
+        I scaled the sequencer speed to the room because the real speed is useless for rhythm.
+        At 343 metres per second a pulse crosses a living room in about 20 milliseconds, which
+        would make every pattern a flam. Tying it to the diagonal means a bathroom and a church
+        with the same proportions play the same rhythm, and what tells them apart is how they
+        sound.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="two-speeds"><span class="kicker">Step 2 · Sound</span>Two speeds of sound</h2>
+      <p>
+        The rings you see travel at the sequencer speed. What you hear travels at the real one.
+        Each stone has its own convolver holding a binaural impulse response from the stone to
+        the head, built the way part one built them: image sources up to the mixing time, each
+        with its own delay and shadow for each ear, then a noise tail that decays at each
+        band's reverberation time, with a separate noise per ear. A stone to your left sounds
+        from the left, a far one sounds far, and a stone in the church rings for seconds.
+      </p>
+      <p>
+        Moving anything means new responses. A stone rebuilds only its own; the head, the room
+        or a wall rebuilds all of them. The builds run at most one every 60 milliseconds so
+        dragging stays smooth, and each new response fades in on a second convolver while the
+        old one fades out, which takes under a tenth of a second and doesn't click. The notes
+        are synthesized: a marimba-like bar with its fundamental and overtones at 4 and about
+        10 times the fundamental, each dying away faster than the last. The drum is a short
+        thump whose pitch falls from about 140 Hz to 52 Hz. The stones' height on the plan
+        picks a note from two octaves of the chosen scale, starting at A3.
+      </p>
+      <p>
+        The presets are worth a tour. The studio is mixed, with curtains and acoustic tiles on
+        two walls, so its echoes come from one side. The bathroom rings in every direction.
+        The concert hall is 40 metres long, so the first reflections reach the head tens of
+        milliseconds after each note. In the stone church the notes pile up into a chord. The
+        water tank is a 9-metre concrete cube with water for a floor, about as hard as a room
+        gets.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="build"><span class="kicker">Step 3 · Building</span>Build a room</h2>
+      <p>
+        Here is the instrument again with every control. Pick a room to start from, a scale,
+        a tempo, how many bounces count, and what the floor and ceiling are made of; tap the
+        walls for the rest. Changing the preset keeps your stones, head and drum where they
+        are, as fractions of the room, so you can hear the same layout in a bathroom and in a
+        church. Whatever you build here is what the share link carries.
+      </p>
+
+      <div
+        data-demo="builder"
+        data-title="Build a room"
+        data-hint="Tap the floor, tap the walls"
+      ></div>
+
+      <!-- ================================================================ -->
+      <h2 id="link"><span class="kicker">Step 4 · Sharing</span>A room in a link</h2>
+      <p>
+        The share link holds the whole state in the query string, with no server: the preset,
+        the room's size to a tenth of a metre, the six materials as positions in the material
+        table, the head and drum as percentages of the room, the scale, tempo and echo setting,
+        then two numbers per stone. They're written in base 36 and joined with dots, which
+        keeps a room with five stones to about 70 characters. The address bar is updated as you
+        play, so copying it from there works as well as the button. Opening a link builds the
+        room before the first note, and if the link is damaged you get the studio instead.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="lessons"><span class="kicker">Epilogue</span>Rooms as instruments</h2>
+      <p>A few lessons from this part:</p>
+      <ul>
+        <li>
+          <strong>One model, two uses.</strong> The same image sources give the rhythm (their
+          lengths) and the sound (their filters).
+        </li>
+        <li>
+          <strong>Slow the clock, keep the physics.</strong> Rhythm needs a slowed pulse, but
+          the echoes you hear stay at the real speed of sound.
+        </li>
+        <li>
+          <strong>Materials are dynamics.</strong> A wall's absorption becomes the accent of
+          its echo.
+        </li>
+        <li>
+          <strong>Crossfade everything that moves.</strong> A new impulse response fades in
+          on a second convolver, so dragging never clicks.
+        </li>
+      </ul>
+      <p>
+        Things I'd try next: a third dimension for the sequencer, so the floor and ceiling join
+        in; stones that are also sources, so a ringing stone sends its own pulse and the room
+        starts to answer itself; moving stones, which would bring in Doppler shift; and rooms
+        that aren't rectangles, where mirror images stop being exact and need ray tracing.
+      </p>
+      <p>
+        That's the end of Acoustic Spaces. It started with a clap in an empty hall, and the
+        image-source method that turns echoes into geometry. Then Sabine's stopwatch and the
+        noise tail it justifies, materials that colour each octave differently, the room's own
+        notes below the Schroeder frequency, two ears and a head, and Lucier's room singing
+        itself. This part puts all of it into one toy where the room writes the rhythm and
+        plays it back to you.
+      </p>
+      <p class="continue">
+        <strong>Back to the start: <a href="/pages/acoustic-spaces/acoustic-space.html">Part 1, Rooms That Play Back</a>.</strong>
+        Or go further back, to <a href="/pages/living-music/vibration.html">Living Music</a>, for
+        what makes the note in the first place.
+      </p>
     </main>
 
     <footer>
       <p>
-        <a href="/pages/acoustic-spaces/acoustic-space.html">← Part one: Rooms That Play Back</a> ·
-        <a href="/pages/living-music/vibration.html">Living Music: The Anatomy of a Note</a>
-      </p>
-      <p>
-        Built with Web Audio and live canvas interaction. Shared rooms are
-        encoded in the link; no server storage is needed.
+        References:
+        <a href="https://doi.org/10.1121/1.382599">Allen &amp; Berkley, Image method for efficiently simulating small-room acoustics (1979)</a> ·
+        <a href="https://archive.org/details/collectedpaperso00sabi">Sabine, Collected Papers on Acoustics (1922)</a> ·
+        <a href="https://doi.org/10.1109/89.709673">Brown &amp; Duda, A structural model for binaural sound synthesis (1998)</a> ·
+        <a href="https://doi.org/10.1201/9781315372150">Kuttruff, Room Acoustics</a> ·
+        <a href="https://www.w3.org/TR/webaudio/#ConvolverNode">Web Audio API, ConvolverNode</a> ·
+        <a href="https://www.sengpielaudio.com/calculator-RT60Coeff.htm">Absorption coefficients of common materials (sengpielaudio)</a>
       </p>
     </footer>
 

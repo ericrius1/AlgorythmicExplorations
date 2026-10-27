@@ -10,7 +10,7 @@
     <title>The Cornell Box — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Part five: path tracing in a browser tab. The rendering equation, Monte Carlo integration, next-event estimation, and the most photographed box in computer science — converging live, with every knob exposed."
+      content="A progressive path tracer in the browser, aimed at the Cornell box: the rendering equation, Monte Carlo integration and its 1/√N noise, next-event estimation, bounce-by-bounce indirect light, and glossy reflections."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -18,12 +18,12 @@
     <header class="hero">
       <div data-demo="hero-box"></div>
       <div class="hero-title">
+        <p class="hero-kicker">Bounced Light · Part 5</p>
         <h1>The Cornell Box</h1>
         <p class="subtitle">
-          Part five: the picture above is being estimated with random sampling. Every
-          pixel fires random rays into the room and averages what they find;
-          the static you see at first is the variance of an
-          estimate that has not yet converged.
+          Every pixel above is an average of random light paths, and it gets more accurate
+          with every frame you leave it running. This is a path tracer, aimed at the most
+          famous box in computer graphics.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -34,166 +34,265 @@
 
     <main>
       <p>
-        Part four approximated soft shadows, skylight, and contact darkness with
-        local heuristics. The rendering equation, formalized by James Kajiya in
-        1986, describes the full problem in one line:
+        The box at the top is being rendered as you read. Each frame, every pixel sends a few
+        random paths into the room, follows each one through its bounces, and adds what it
+        found to a running sum. The counter in the corner is how many paths each pixel has
+        averaged so far. It stops at 16,384. The hero also uses a better way of picking its
+        random numbers and a light filter for its first second or so; Step 4 explains both,
+        and the figures about noise below use neither.
       </p>
-      <pre><code>L(x, ω) = Le(x, ω) + ∫ f·L(x', ω')·cosθ dω'   <span class="cm">// leaving = emitted + arriving, over all directions</span></code></pre>
       <p>
-        The light leaving any point is what it emits plus the integral, over
-        every incoming direction, of the light arriving — which is itself light
-        <em>leaving</em> somewhere else. The equation contains itself. Unrolled,
-        it is an integral over every path light could possibly take through the
-        scene: every bounce count, every route, every detour off the red wall.
-        Two parts of this series solved it in 2D by hierarchy. In 3D, the
-        integral's dimensionality explodes — and the tool that survives the
-        explosion is Monte Carlo integration.
+        Part four faked its soft shadows, skylight and contact darkness with local approximations built on
+        the distance function. Those were all stand-ins for one equation, which James Kajiya
+        wrote down in 1986:
+      </p>
+      <pre><code>L(x, ω) = Le(x, ω) + ∫ f(x, ω', ω) · L(x', −ω') · cos θ' dω'
+<span class="cm">// light leaving x = light it emits + light arriving from every direction ω', scattered by the surface</span></code></pre>
+      <p>
+        The light arriving at x from some direction is the light <em>leaving</em> whatever
+        point x' it came from, so the equation contains itself. Unroll it and it becomes an
+        integral over every path light could take through the scene: every number of bounces,
+        every route, every detour off the red wall. Parts one to three solved the 2D version
+        with a hierarchy of probes. In 3D the integral has too many dimensions for that, and
+        the tool that still works is Monte Carlo integration.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 1 · Monte Carlo</span>Random-sample integration</h2>
+      <h2 id="monte-carlo"><span class="kicker">Step 1 · Monte Carlo</span>Integrating with random samples</h2>
       <p>
-        To integrate a function you cannot afford to evaluate everywhere,
-        evaluate it <em>somewhere, at random</em> and weight the answer
-        appropriately. The average of many random evaluations converges to the true
-        integral by the law of large numbers. For the
-        rendering equation, "evaluate at random" means: follow one random path
-        of light, all the way through its bounces, and report what it found.
+        To integrate a function you can't afford to evaluate everywhere, evaluate it at random
+        points, weight each answer by how likely that point was to be picked, and average. The
+        average converges to the true integral. For the rendering equation, one random
+        evaluation means following one random path of light through all its bounces and
+        reporting what it brought back.
       </p>
 
       <div data-scrolly="photon-walk"></div>
 
       <p>
-        The estimate's error has a famous, infuriating shape: variance falls
-        as 1/N, so the <em>noise</em> falls as 1/√N. Four times the samples
-        buys half the grain. You can watch that law in person:
+        In the shader, a diffuse bounce is three lines. The new direction is picked with
+        probability proportional to cos θ, which is the same shape as the Lambert surface's
+        own weighting, so the two cancel and the throughput only picks up the surface colour:
       </p>
-      <div data-demo="noise"></div>
+      <pre><code>throughput *= h.albedo;         <span class="cm">// 0.73 for the white walls</span>
+ro = p + h.n * 1e-4;
+rd = cosineDir(h.n);            <span class="cm">// random, weighted toward the normal</span></code></pre>
       <p>
-        Hit <em>pause</em> early, while the room is still a blizzard. That
-        frozen frame is an estimate from a small number of random samples —
-        some pixels got lucky paths, most didn't. Resume and the law grinds
-        forward: smooth at 64 samples, refined at 256, and the last subtle
-        gradients still creeping in past 4,000. Nothing about the algorithm
-        changes from first sample to last. It is the same gamble, repeated,
-        averaged.
+        After three bounces, Russian roulette starts ending paths at random, with the survivors
+        boosted to make up for the ones it kills. That keeps long paths cheap without biasing
+        the average.
+      </p>
+      <p>
+        The catch is the noise. The variance of a Monte Carlo average falls as 1/N, so the
+        error, its square root, falls as 1/√N. Four times the samples buys half the grain. The
+        figure below lets you watch that happen, and it measures the noise as it goes: the
+        readout is the estimated standard error of the average, relative to its brightness,
+        over a grid of pixels.
+      </p>
+
+      <div
+        data-demo="noise"
+        data-title="Noise against samples"
+        data-hint="Pause it early, then let it run"
+      ></div>
+
+      <p>
+        It starts at one sample per pixel per frame, so you can catch it early. On my machine
+        the readout says about 12% at 16 samples, 3% at 250 and 1.5% at 1,000: every factor of
+        four in samples halves it. Pause in the first second to see what a handful of random
+        paths looks like. Nothing about the algorithm changes from the first sample to the
+        ten-thousandth. It's the same random walk, averaged more times. This figure and the
+        next one use plain random numbers and show the raw average, so the readout means what
+        it says.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The box itself</span>
         <p>
-          The Cornell box is a real object — built at Cornell in 1984 to test
-          whether rendered images could match a photograph of the same scene,
-          radiometer readings and all. Red left wall, green right wall, white
-          everything else: chosen so that bounced color would be unmistakable.
-          It worked, and the geometry became the test pattern of global
-          illumination. The aside in part two about radiosity? Same lab, same
-          box, same year.
+          The Cornell box comes from Cornell's Program of Computer Graphics. Cindy Goral,
+          Kenneth Torrance, Donald Greenberg and Bennett Battaile used it in their 1984 radiosity
+          paper, and they built a physical box to compare the rendering against. Coloured
+          side walls and white everywhere else make the light bounced off the walls easy to
+          see, and the lab kept measuring and publishing data for it. It became the standard
+          test scene for global illumination.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 2 · Directed sampling</span>Next-event estimation</h2>
+      <h2 id="nee"><span class="kicker">Step 2 · Light sampling</span>Next-event estimation</h2>
       <p>
-        Pure random bouncing has a weakness you can compute in your head: if
-        the lamp covers a thousandth of the directions a bounce could take,
-        only a thousandth of paths ever find it, and every other path returns
-        zero. The fix is not more samples — it is <em>better questions</em>. At
-        every diffuse bounce, additionally send one deliberate ray straight at
-        the lamp and ask "are you visible from here?", weighting the answer by
-        the lamp's solid angle. The random walk continues as before; it just
-        stops being the only source of information.
+        Plain random bouncing has a problem you can work out on paper. The lamp in the next
+        figure is 0.24 units across, in a box two units on a side. From the middle of the floor,
+        a cosine-weighted bounce points at it about one time in 220. The other 219 paths keep
+        wandering, and most of them leave through the open front or die in roulette with
+        nothing. The image is a few bright speckles from the lucky paths and darkness
+        everywhere else, and it takes a very long time to average out.
       </p>
-      <pre><code>at every bounce:  radiance += throughput · Le · (visibility · geometry / pdf)
-<span class="cm">// one shadow ray per bounce — the same dice, loaded toward where the light is</span></code></pre>
-      <div data-demo="nee"></div>
       <p>
-        The lamp here is deliberately small, making the comparison clear. With
-        light sampling <em>off</em>, the room at one second contains bright
-        speckles from the few random paths that reached the lamp.
-        With it <em>on</em>, the same one second of work produces a smooth,
-        plausible room. Same scene, same number of rays, same unbiased
-        average — the variance went into a different variable. The general
-        principle is called <em>importance sampling</em>, and the modern
-        renderer is mostly a tower of it.
+        The fix is to ask the lamp directly. At every diffuse bounce, pick a random point on
+        the lamp, send a shadow ray toward it, and if nothing is in the way, add its
+        contribution, weighted by how big the lamp looks from here:
+      </p>
+      <pre><code><span class="cm">// a random point on the lamp, seen from p: pdf is 1/area, so convert to solid angle</span>
+let sh = intersect(p + h.n * 1e-4, ld);
+if (sh.mat == 3) {
+  radiance += throughput * (h.albedo / PI) * lightLe() * (cosS * cosL * area / d2);
+}</code></pre>
+      <p>
+        The random walk carries on as before. When a later bounce happens to hit the lamp, that
+        hit is thrown away, because the shadow ray already counted it. Otherwise the light would
+        be counted twice.
+      </p>
+
+      <div
+        data-demo="nee"
+        data-title="Light sampling off and on"
+        data-hint="Toggle light sampling"
+      ></div>
+
+      <p>
+        It starts with light sampling off. After about 900 samples per pixel the readout is
+        still around 45%, and the room is grainy. Switch it on and it's under 5% within about
+        150 samples. Same scene, same lamp, same average in the end. Only the way the samples
+        are chosen changed. The general idea is called <em>importance sampling</em>: spend
+        samples where the integrand is large. Most of what makes a production path tracer fast
+        is more of it.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 3 · Indirect light</span>Bounce by bounce</h2>
+      <h2 id="bounces"><span class="kicker">Step 3 · Indirect light</span>One bounce at a time</h2>
       <p>
-        Part four approximated soft shadows, ambient light, and contact
-        darkness. Here they emerge from additional light bounces:
+        In part four, soft fill light and dark corners were each their own approximation. Here
+        they come out of the same loop, one bounce at a time. The slider caps how many surfaces
+        a path can touch.
       </p>
-      <div data-demo="bounces"></div>
+
+      <div
+        data-demo="bounces"
+        data-title="Bounce by bounce"
+        data-hint="Slide from 1 to 8"
+      ></div>
+
       <p>
-        At one bounce the box is direct light only — hard geometry of lit and
-        unlit, the ceiling black because no lamp shines up. Two bounces and the
-        indirect effects appear: the red wall <em>bleeds onto the white sphere</em>,
-        the ceiling glows with floor-light, shadows fill with ambience that
-        comes from somewhere instead of a constant. By six, the corners hold
-        that soft contact darkness AO could only impersonate — emerging here as
-        a statistical fact about how little light survives into a crevice.
-        Every phenomenon parts one through four built a separate mechanism for
-        is present in this one loop, as a consequence.
+        At one bounce you only see direct light. Everything the lamp can't see is black,
+        including the whole ceiling, because the lamp only shines downward. At two, which is
+        where the figure starts, the ceiling lights up from the floor, the shadows fill in, and
+        the walls start to tint their neighbours: pink on the left side of the tall sphere,
+        green on the right side of the small one. By four or five the corners settle into the
+        soft contact darkness that ambient occlusion was imitating, here because little light
+        makes it into a crevice and back out. Past that the image barely changes, since a path
+        that has bounced six times off 73% white walls carries less than a sixth of its
+        original weight.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Step 4 · Assembly</span>The complete renderer</h2>
+      <h2 id="assembly"><span class="kicker">Step 4 · Assembly</span>The full renderer</h2>
       <p>
-        The complete demo. Drag to carry the lamp. The moment anything moves,
-        the accumulated samples no longer match the scene, so the image restarts
-        from static. Shrink the light to a point and
-        shadows go knife-edged; stretch it wide and they melt, the soft shadow
-        part four approximated with one clever multiply now arising from
-        actual area, actually sampled. Set the sphere to <em>mirror</em> and
-        check its reflection: the red wall, the lamp, the other sphere — a
-        complete reflected view because a mirror bounce is deterministic.
+        Here's the whole thing with the knobs exposed. Press and drag on the image to move the
+        lamp across the ceiling. Anything you change makes the accumulated samples wrong for
+        the new scene, so the sum restarts.
       </p>
-      <div data-demo="full"></div>
       <p>
-        <em>Glossy</em> is the knob worth lingering on. At roughness zero it is
-        the mirror; nudge it and the reflection blurs exactly the way the
-        shadow blurred when the lamp grew — and for exactly the same reason.
-        A rough surface is an area light's worth of mirror directions. By the
-        end of this series every blur in an image has been the same object:
-        an integral, seen from a different chair.
+        This figure, the bounce figure and the hero do three things the noise figures don't,
+        so that a restart doesn't look like a snowstorm:
+      </p>
+      <ul>
+        <li>
+          <strong>Better random numbers for the first bounce.</strong> The point on the lamp
+          and the bounce direction come from a Halton sequence, which spreads a pixel's samples
+          evenly instead of letting them clump. Each pixel shifts that sequence by a value from
+          a 64×64 blue-noise tile, so neighbouring pixels make different mistakes and the
+          leftover grain is fine and even.
+        </li>
+        <li>
+          <strong>A cap on one kind of path.</strong> Light that bounces off a wall, then off
+          the metal sphere, then reaches the lamp can't be found by light sampling, because a
+          shadow ray can't aim through a mirror. Those paths are rare and very bright, so
+          they're capped. That trims the faint caustic the sphere throws on the floor.
+        </li>
+        <li>
+          <strong>An edge-aware filter, only while the sum is young.</strong> Each pixel is
+          averaged with neighbours that see the same surface, facing the same way, at the same
+          depth, and whose brightness agrees to within the pixel's own measured noise. Its
+          radius shrinks as 1/√N and it switches off at about 1,200 samples, so the image it
+          settles on is the plain average. The <em>denoise</em> button turns it off if you want
+          to see the raw sum.
+        </li>
+      </ul>
+
+      <div
+        data-demo="full"
+        data-title="The full path tracer"
+        data-hint="Drag to move the lamp"
+      ></div>
+
+      <p>
+        Lamp size changes the shadows and nothing else. The lamp's total power stays the
+        same as it grows, so the room keeps its brightness. Shrink it to 0.08 wide and the
+        shadows go sharp; stretch it to 1.4 and they spread out. That's the soft shadow part
+        four approximated with <code>k · h / t</code>, now coming from a real area light.
+      </p>
+      <p>
+        The front sphere starts as a gold mirror. Its reflection shows the red wall, the lamp
+        and the other sphere, plus a black hole where it sees out through the open front of
+        the box. A mirror bounce is deterministic, so the reflection is as sharp as the camera
+        can resolve. Switch it to <em>glossy</em> and roughness scatters each reflected ray
+        inside a small sphere around the mirror direction. Raise the roughness and the
+        reflection blurs the same way the shadow blurred when the lamp grew, for the same
+        reason: the pixel is now averaging over a spread of directions instead of one.
       </p>
 
       <!-- ================================================================ -->
-      <h2><span class="kicker">Coda</span>Remaining limitations</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>What the box teaches</h2>
       <p>
-        This is the algorithm behind every film frame rendered this century —
-        Kajiya's equation, Monte Carlo, and forty years of increasingly loaded
-        dice. What the browser tab version lacks is mostly patience:
-        production tracers denoise, reuse, and importance-sample their way to
-        the same average faster, but the average they estimate is this one.
+        This is the algorithm behind most film rendering today: Kajiya's equation, estimated
+        with random paths, plus decades of better ways to choose them. Production renderers
+        add denoisers, sample reuse and much smarter importance sampling, but they're estimating
+        the same average this tab is.
+      </p>
+      <ul>
+        <li>
+          <strong>Random sampling handles high dimensions.</strong> A path with eight bounces
+          is a point in a space with over a dozen dimensions, and Monte Carlo doesn't care.
+        </li>
+        <li>
+          <strong>Noise falls slowly.</strong> 1/√N means each halving of the grain costs four
+          times the work, so better samples beat more samples.
+        </li>
+        <li>
+          <strong>Count every path once.</strong> Light sampling and the random walk can both
+          find the lamp. Getting the bookkeeping right is most of the work.
+        </li>
+        <li>
+          <strong>Every blur is an average.</strong> Soft shadows, glossy reflections and
+          colour bleeding are all the same integral over a wider set of directions.
+        </li>
+      </ul>
+      <p>
+        Things I'd try next: multiple importance sampling (Eric Veach's 1995 method for mixing
+        light sampling and BRDF sampling), so a tiny lamp seen in a glossy sphere stops being
+        noisy; temporal reprojection, so dragging the lamp could reuse the old samples instead
+        of restarting; and a BVH so the box could hold a real mesh instead of two spheres.
       </p>
       <p>
-        One absence is conspicuous. Everything in this box is opaque. No
-        glass, no water, no lens — nothing that <em>bends</em> light rather
-        than bouncing it. Refraction is where the path tracer starts producing
-        the phenomena that made people fall in love with optics in the first
-        place: caustics, focus, and the fact — concealed so far by every
-        white-ish light in this series — that the bending depends on
-        wavelength. The last part hands the renderer a prism, and color stops
-        being three numbers.
+        Everything in this box is opaque. Nothing in it bends light: no glass, no water, no
+        lens. Refraction is where path tracing produces caustics and focus, and it's where
+        colour stops being three numbers, because how much glass bends light depends on the
+        wavelength.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/bounced-light/prism.html">Part 6, The Prism</a>.</strong>
+        Glass, caustics and a rainbow, traced one wavelength at a time.
       </p>
     </main>
 
     <footer>
       <p>
-        Bounced Light, part five ·
-        <a href="/pages/bounced-light/lava.html">part one: The Lava Lamp</a> ·
-        <a href="/pages/bounced-light/bonfire.html">part two: The Bonfire</a> ·
-        <a href="/pages/bounced-light/fog.html">part three: The Fog</a> ·
-        <a href="/pages/bounced-light/flatland.html">part four: Leaving Flatland</a>
-      </p>
-      <p>
-        Standing on the shoulders of:
+        References:
         <a href="https://doi.org/10.1145/15922.15902">Kajiya, "The Rendering Equation" (1986)</a> ·
-        <a href="https://doi.org/10.1145/964965.808601">Goral, Torrance, Greenberg &amp; Battaile (1984) — the box</a> ·
-        <a href="https://doi.org/10.1145/357290.357293">Cook, Porter &amp; Carpenter, "Distributed Ray Tracing" (1984)</a> ·
-        <a href="http://graphics.stanford.edu/papers/veach_thesis/">Veach, "Robust Monte Carlo Methods for Light Transport Simulation" (1997)</a> ·
-        <a href="https://www.pbr-book.org/">Pharr, Jakob &amp; Humphreys, "Physically Based Rendering" (2004–)</a>
+        <a href="https://doi.org/10.1145/964965.808601">Goral, Torrance, Greenberg &amp; Battaile (1984)</a> ·
+        <a href="https://doi.org/10.1145/964965.808590">Cook, Porter &amp; Carpenter, "Distributed Ray Tracing" (1984)</a> ·
+        <a href="http://graphics.stanford.edu/papers/veach_thesis/">Veach, PhD thesis (1997)</a> ·
+        <a href="https://www.pbr-book.org/">Pharr, Jakob &amp; Humphreys, "Physically Based Rendering"</a>
       </p>
     </footer>
 

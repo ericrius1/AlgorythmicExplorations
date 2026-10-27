@@ -6,6 +6,7 @@
 import renderShader from "../../shaders/ferrorender3.wgsl?raw";
 import { Shell, gpuMissing, type Demo } from "../../lib/demoShell";
 import { getDevice, configureContext } from "../../lib/gpu";
+import { PostFX, HDR_FORMAT } from "../../lib/postfx";
 import { OrbitCamera } from "../../lib/camera3d";
 import { Ferro3Sim, FERRO3_KNOBS, DISH, H3, type Ferro3Knobs } from "../../lib/ferroSim3";
 import { Surface3, type Extractor } from "../../lib/surface3";
@@ -31,7 +32,9 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
   const shell = new Shell(container, opts.hero ? 0.52 : 0.62);
   if (!dev) return gpuMissing(container);
   const ctx = configureContext(shell.canvas, dev);
-  const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+  const post = new PostFX(dev, ctx);
+  post.settings.bloom = 0.12;
+  post.settings.vignette = 0.3;
   const W = shell.canvas.width;
   const Hpx = shell.canvas.height;
   const aspect = W / Hpx;
@@ -50,7 +53,7 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
   const camera = new OrbitCamera();
   camera.zoomEnabled = !opts.hero;
   camera.attach(shell.canvas);
-  camera.distance = opts.hero ? 2.0 : 1.9;
+  camera.distance = opts.hero ? 1.6 : 1.5;
   camera.elevation = opts.hero ? 0.42 : 0.52;
   camera.azimuth = 0.65;
 
@@ -80,11 +83,12 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
     dev.createRenderPipeline({
       layout: "auto",
       vertex: { module, entryPoint: vs },
-      fragment: { module, entryPoint: fs, targets: [{ format: canvasFormat, blend }] },
+      fragment: { module, entryPoint: fs, targets: [{ format: HDR_FORMAT, blend }] },
       primitive: { topology: "triangle-list", cullMode: "none" },
       depthStencil: depth,
     });
 
+  const backPipe = pipe("vsBack", "fsBack", { format: "depth24plus", depthWriteEnabled: false, depthCompare: "always" });
   const meshPipe = pipe("vsMesh", "fsMesh", depthOn);
   const floorPipe = pipe("vsDish", "fsDish", depthOn);
   const wallPipe = pipe("vsDish", "fsDish", depthRead, alphaBlend);
@@ -232,7 +236,7 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
     f[31] = mag ? 1 : 0;
     f[32] = DISH.wallXY;
     f[33] = DISH.floorZ;
-    f[34] = DISH.floorZ + 0.3;
+    f[34] = DISH.floorZ + 0.36; // rim height
     f[35] = 0;
     dev.queue.writeBuffer(rp, 0, f);
   };
@@ -245,6 +249,15 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
       sim.encodeSteps(enc, 80, false);
       dev.queue.submit([enc.finish()]);
     }
+    // the hero opens on a crown that has already grown
+    if (opts.hero) {
+      sim.writeParams({ ...knobs, magMoment: 0 }, 0.0016, [0, 0, 5], false);
+      for (let chunk = 0; chunk < 12; chunk++) {
+        const enc = dev.createCommandEncoder();
+        for (let f = 0; f < 16; f++) sim.encodeSteps(enc, 4); // magnetics run on each call's first step
+        dev.queue.submit([enc.finish()]);
+      }
+    }
   }
 
   return {
@@ -252,7 +265,8 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
       shell.tick();
       time += 1 / 60;
 
-      const fieldGain = opts.hero ? 0.62 + 0.38 * Math.sin(time * 0.32 - 0.9) : 1.0;
+      // the hero's field breathes a little, slowly, so the crown stays alive
+      const fieldGain = opts.hero ? 0.96 + 0.06 * Math.sin(time * 0.25) : 1.0;
       const { viewProj, right, up } = camera.matrices(aspect);
       const eye = eyeOf();
       const mag = magnetPos(eye, right, up);
@@ -272,8 +286,8 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
 
       const pass = enc.beginRenderPass({
         colorAttachments: [{
-          view: ctx.getCurrentTexture().createView(),
-          clearValue: { r: 0.016, g: 0.018, b: 0.03, a: 1 },
+          view: post.sceneView(),
+          clearValue: { r: 0.0025, g: 0.003, b: 0.005, a: 1 },
           loadOp: "clear",
           storeOp: "store",
         }],
@@ -284,6 +298,8 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
           depthStoreOp: "store",
         },
       });
+      pass.setPipeline(backPipe);
+      pass.draw(3);
       pass.setPipeline(floorPipe);
       pass.setBindGroup(0, floorBind);
       pass.draw(6);
@@ -310,12 +326,14 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
         pass.draw(6);
       }
       pass.end();
+      post.encodePresent(enc);
       dev.queue.submit([enc.finish()]);
       surface.readCounts(extractor);
     },
     dispose() {
       sim.dispose();
       surface.dispose();
+      post.dispose();
       rp.destroy();
       depthTex.destroy();
     },

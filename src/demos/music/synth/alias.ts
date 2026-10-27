@@ -60,9 +60,12 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
   const precomputed = new Map<string, Uint8ClampedArray>();
   const colBuf = new Uint8ClampedArray(ROWS * 4);
 
-  const colour = (t: number, out: Uint8ClampedArray, o: number): void => {
+  // 0 → 80 dB below full scale; gamma keeps the faint floor dark so the
+  // lines stand out
+  const colour = (t0: number, out: Uint8ClampedArray, o: number): void => {
+    const t = Math.pow(t0, 1.8);
     const [r, gg, b] = heatRgb(t);
-    const k = Math.min(1, t * 3);
+    const k = Math.min(1, t * 2.5);
     out[o] = r * k;
     out[o + 1] = gg * k;
     out[o + 2] = b * k;
@@ -86,7 +89,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
         magSpectrum(sig, Math.floor(c * hop), N, mag);
         for (let r = 0; r < ROWS; r++) {
           const m = Math.max(mag[r * 2], mag[r * 2 + 1]);
-          const t = clamp((db(m) + 100) / 95, 0, 1);
+          const t = clamp((db(m) + 76) / 74, 0, 1);
           // row 0 is the top of the image = Nyquist
           colour(t, data, ((ROWS - 1 - r) * COLS + c) * 4);
         }
@@ -209,7 +212,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
       agc = Math.max(mx, agc - 0.15);
       for (let r = 0; r < ROWS; r++) {
         const d = Math.max(fbuf[r * 4], fbuf[r * 4 + 1], fbuf[r * 4 + 2], fbuf[r * 4 + 3]);
-        colour(clamp((d - (agc - 95)) / 95, 0, 1), colBuf, (ROWS - 1 - r) * 4);
+        colour(clamp((d - (agc - 80)) / 80, 0, 1), colBuf, (ROWS - 1 - r) * 4);
       }
       img.push(colBuf);
     }

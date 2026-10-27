@@ -89,10 +89,10 @@ export async function mountEnv(container: HTMLElement): Promise<Demo> {
     const H = g.h;
     const top = 24;
     const strip = H * (narrow ? 0.16 : 0.18);
-    const gap = 30;
+    const gap = 42;
     const eh = (H - top - strip - gap * 2 - 8) / 2;
     const y = k === "e1" ? top : top + eh + gap;
-    const box = { x: 40, y, w: W - 40 - 16, h: eh };
+    const box = { x: 16, y, w: W - 32, h: eh };
     const Zs = box.w * 0.14;
     const Z = (box.w - Zs - 8) / 3;
     return { box, x0: box.x + 4, Z, Zs };
@@ -101,7 +101,7 @@ export async function mountEnv(container: HTMLElement): Promise<Demo> {
     const W = g.w;
     const H = g.h;
     const strip = H * (narrow ? 0.16 : 0.18);
-    return { x: 40, y: H - strip - 8, w: W - 40 - 16, h: strip };
+    return { x: 16, y: H - strip - 8, w: W - 32, h: strip };
   };
   const xs = (k: Key): { xa: number; xd: number; xs: number; xr: number } => {
     const G = geo(k);
@@ -203,12 +203,20 @@ export async function mountEnv(container: HTMLElement): Promise<Demo> {
       g.area(pts, ly(G, 0), [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.28, col, 0.02);
       g.glowLine(pts, 2, col, 1, 0.4);
       // segment labels
-      const lab = (txt: string, x: number): void => g.text(txt, x, G.box.y + G.box.h + 13, { size: 9.5, align: "center", color: TEXT.dim, mono: true });
-      lab(`A ${fmtTime(e.a)}`, Math.max((G.x0 + X.xa) / 2, G.x0 + 24));
-      lab(`D ${fmtTime(e.d)}`, Math.max((X.xa + X.xd) / 2, X.xa + 30));
-      lab(`S ${Math.round(e.s * 100)}%`, (X.xd + X.xs) / 2);
-      lab(`R ${fmtTime(e.r)}`, Math.max((X.xs + X.xr) / 2, X.xs + 28));
-      g.text("key down", G.x0, G.box.y + 12, { size: 9.5, color: TEXT.dim });
+      // segment labels, centred under their segment but never overlapping
+      let right = G.box.x;
+      const labs: [string, number][] = [
+        [`A ${fmtTime(e.a)}`, (G.x0 + X.xa) / 2],
+        [`D ${fmtTime(e.d)}`, (X.xa + X.xd) / 2],
+        [`S ${Math.round(e.s * 100)}%`, (X.xd + X.xs) / 2],
+        [`R ${fmtTime(e.r)}`, (X.xs + X.xr) / 2],
+      ];
+      for (const [txt, want] of labs) {
+        const w = txt.length * 5.8;
+        const x = Math.max(want, right + 8 + w / 2);
+        g.text(txt, x, G.box.y + G.box.h + 14, { size: 9.5, align: "center", color: TEXT.dim, mono: true });
+        right = x + w / 2;
+      }
       g.text("key up", X.xs + 3, G.box.y + 12, { size: 9.5, color: TEXT.dim });
       g.seg(X.xs, G.box.y + 4, X.xs, G.box.y + G.box.h, 1, C.grid, 0.6);
       // handles

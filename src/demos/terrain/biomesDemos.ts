@@ -4,31 +4,26 @@
 
 import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../../lib/demoShell";
-import { createStage3D } from "../../lib/stage3d";
-import { hash2 } from "../../lib/terrain/noise";
 import { TERRAIN_DEFAULTS, buildTerrainGeometry, terrainHeight, type TerrainParams } from "../../lib/terrain/heightmap";
 import { buildGrassGeometry, makeGrassMaterial } from "../../lib/terrain/grass";
-import { growTree, buildTreeGeometry, TREE_DEFAULTS } from "../../lib/terrain/trees";
+import { gridSampler } from "../../lib/terrain/light";
+import { stampTreeShadows } from "../../lib/terrain/forest";
+import { makePlantKit, plantItems, disposePlanting, type PlantKit } from "../../lib/terrain/populate";
+import { buildVista } from "../../lib/terrain/vista";
+import { createTerrainStage, terrainMaterial, MORNING, Smooth, type Look } from "../../lib/terrain/look";
 import {
   SCATTER_DEFAULTS,
-  groundAt,
   moistureRaw,
   classify,
   scatterItems,
   grassBlades,
-  buildRockGeometry,
+  biomeTint,
   BIOME_COLORS,
   type Biome,
   type ScatterParams,
 } from "../../lib/terrain/scatter";
 
-const MORNING_STAGE = {
-  skyTop: [0.09, 0.13, 0.22] as [number, number, number],
-  skyBottom: [0.23, 0.21, 0.22] as [number, number, number],
-  hemi: { sky: 0xa8c0e0, ground: 0x46503a, intensity: 0.9 },
-  key: { color: 0xfff0c8, intensity: 2.2, position: [5, 6, 2] as [number, number, number] },
-  rim: { color: 0x88a8e8, intensity: 0.45, position: [-5, 3, -4] as [number, number, number] },
-};
+const BIOMES: Biome[] = ["forest", "meadow", "scrub", "scree", "alpine", "cliff"];
 
 // ---- the map ------------------------------------------------------------------------------
 
@@ -36,7 +31,7 @@ export function mountBiomeMap(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.62);
   const ctx = shell.canvas.getContext("2d")!;
 
-  const RW = 300, RH = 188;
+  const RW = 320, RH = Math.round(320 * 0.62);
   const off = document.createElement("canvas");
   off.width = RW;
   off.height = RH;
@@ -44,23 +39,23 @@ export function mountBiomeMap(container: HTMLElement): Demo {
   const img = octx.createImageData(RW, RH);
 
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 23 };
-  const sp: ScatterParams = { ...SCATTER_DEFAULTS };
+  const sp: ScatterParams = { ...SCATTER_DEFAULTS, seed: 23 };
   let showMoisture = false;
   let dirty = true;
 
-  const palette: Record<Biome, [number, number, number]> = Object.fromEntries(
-    Object.entries(BIOME_COLORS).map(([k, hex]) => {
-      const c = new THREE.Color(hex);
-      return [k, [c.r * 255, c.g * 255, c.b * 255]];
-    }),
-  ) as Record<Biome, [number, number, number]>;
+  // the palette straight from the hex values, as sRGB bytes
+  const palette = {} as Record<Biome, [number, number, number]>;
+  for (const b of BIOMES) {
+    const hex = BIOME_COLORS[b];
+    palette[b] = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+  }
 
-  // The expensive noise is paid into cached grids — heights once per seed,
-  // raw moisture once per seed/climate-scale — a few rows per frame so the
-  // page never freezes. The view toggle and the other dials then redraw from
-  // the arrays in a millisecond or two, because classification is cheap;
-  // it was only ever the noise that cost anything.
+  // The expensive noise is paid into cached grids (heights once per seed,
+  // raw moisture once per seed and climate scale), a few rows per frame so
+  // the page never freezes. The dials then redraw from the arrays in a
+  // millisecond or two, because classifying is cheap; only the noise costs.
   const SPAN = 64;
+  const cell = SPAN / RW;
   const xAt = (i: number): number => (i / RW - 0.5) * SPAN;
   const zAt = (j: number): number => (j / RH - 0.5) * SPAN * (RH / RW);
   const h01g = new Float32Array(RW * RH);
@@ -74,8 +69,7 @@ export function mountBiomeMap(container: HTMLElement): Demo {
       const j = hRow++;
       for (let i = 0; i < RW; i++) h01g[i + j * RW] = terrainHeight(xAt(i), zAt(j), tp) / tp.amplitude;
       if (hRow === RH) {
-        // slope straight off the height grid — array math, no more noise
-        const cell = SPAN / RW;
+        // slope straight off the height grid: array math, no more noise
         for (let j2 = 0; j2 < RH; j2++) {
           for (let i = 0; i < RW; i++) {
             const i0 = Math.max(0, i - 1), i1 = Math.min(RW - 1, i + 1);
@@ -95,44 +89,70 @@ export function mountBiomeMap(container: HTMLElement): Demo {
 
   const draw = (): void => {
     const data = img.data;
+    const counts: Record<Biome, number> = { forest: 0, meadow: 0, scrub: 0, scree: 0, alpine: 0, cliff: 0 };
     let p = 0;
-    for (let q = 0; q < RW * RH; q++) {
-      const m = Math.min(1, Math.max(0, mrawg[q] * 0.5 + 0.5 + sp.moistureOffset));
-      if (showMoisture) {
-        data[p++] = 30 + m * 60;
-        data[p++] = 60 + m * 120;
-        data[p++] = 80 + m * 175;
-        data[p++] = 255;
-      } else {
-        const [r, gg, b] = palette[classify(h01g[q], slopeg[q], m, sp)];
-        const shade = 0.55 + 0.45 * h01g[q]; // relief whispers through the classes
-        data[p++] = r * shade;
-        data[p++] = gg * shade;
-        data[p++] = b * shade;
+    for (let j = 0; j < RH; j++) {
+      for (let i = 0; i < RW; i++) {
+        const q = i + j * RW;
+        const m = Math.min(1, Math.max(0, mrawg[q] * 0.5 + 0.5 + sp.moistureOffset));
+        // a little hillshade from the height grid so the relief shows through
+        const e = h01g[Math.min(RW - 1, i + 1) + j * RW] - h01g[Math.max(0, i - 1) + j * RW];
+        const n = h01g[i + Math.min(RH - 1, j + 1) * RW] - h01g[i + Math.max(0, j - 1) * RW];
+        const shade = Math.min(1.25, Math.max(0.55, 0.92 + ((-e - n) * tp.amplitude) / (cell * 2) * 0.35));
+        if (showMoisture) {
+          data[p++] = (24 + m * 40) * shade;
+          data[p++] = (44 + m * 110) * shade;
+          data[p++] = (70 + m * 170) * shade;
+        } else {
+          const b = classify(h01g[q], slopeg[q], m, sp);
+          counts[b]++;
+          const [r, g, bb] = palette[b];
+          data[p++] = r * shade;
+          data[p++] = g * shade;
+          data[p++] = bb * shade;
+        }
         data[p++] = 255;
       }
     }
     octx.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(off, 0, 0, shell.canvas.width, shell.canvas.height);
-    shell.readout.textContent = showMoisture
-      ? "the rainfall field alone — brighter is wetter"
-      : "dark green forest · light green meadow · tan scrub · gray scree · white alpine";
+    if (showMoisture) {
+      shell.readout.textContent = "moisture alone: darker is drier, brighter blue is wetter";
+    } else {
+      const total = RW * RH;
+      shell.readout.textContent = BIOMES.map((b) => `${b} ${Math.round((counts[b] / total) * 100)}%`).join(" · ");
+    }
   };
 
-  shell.slider({ label: "wet ↔ dry", min: -0.35, max: 0.35, step: 0.01, value: -sp.moistureOffset, format: (v) => (v >= 0 ? `dry +${v.toFixed(2)}` : `wet ${(-v).toFixed(2)}`), onInput: (v) => { sp.moistureOffset = -v; dirty = true; } });
-  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, onInput: (v) => { sp.treeLine = v; dirty = true; } });
+  shell.slider({
+    label: "wet ↔ dry",
+    min: -0.35,
+    max: 0.35,
+    step: 0.01,
+    value: -sp.moistureOffset,
+    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `drier by ${v.toFixed(2)}` : `wetter by ${(-v).toFixed(2)}`),
+    onInput: (v) => { sp.moistureOffset = -v; dirty = true; },
+  });
+  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}% of peak`, onInput: (v) => { sp.treeLine = v; dirty = true; } });
   shell.slider({ label: "climate scale", min: 0.015, max: 0.09, step: 0.002, value: sp.moistureFreq, format: (v) => `${(1 / v).toFixed(0)} u`, onInput: (v) => { sp.moistureFreq = v; mRow = 0; } });
-  shell.button("moisture / biomes", () => { showMoisture = !showMoisture; dirty = true; });
-  shell.button("reroll", () => { tp.seed = (Math.random() * 1e6) | 0; sp.seed = tp.seed; hRow = 0; mRow = 0; });
+  const viewBtn = shell.button("show moisture", () => {
+    showMoisture = !showMoisture;
+    viewBtn.textContent = showMoisture ? "show biomes" : "show moisture";
+    dirty = true;
+  });
+  shell.button("new terrain", () => { tp.seed = (Math.random() * 1e6) | 0; sp.seed = tp.seed; hRow = 0; mRow = 0; });
 
   return {
     frame() {
       if (hRow < RH || mRow < RH) {
         computeRows(10);
-        shell.readout.textContent = `surveying the climate… ${(((hRow + mRow) / (2 * RH)) * 100) | 0}%`;
+        // draw what's there so far, so the map fills in instead of popping
         if (hRow === RH && mRow === RH) dirty = true;
-        return;
+        else {
+          shell.readout.textContent = `computing the climate… ${(((hRow + mRow) / (2 * RH)) * 100) | 0}%`;
+          return;
+        }
       }
       if (dirty) {
         dirty = false;
@@ -142,7 +162,46 @@ export function mountBiomeMap(container: HTMLElement): Demo {
   };
 }
 
-// ---- shared: populate a scene from the scatter rules ---------------------------------------
+// ---- shared: a populated piece of ground -------------------------------------------------------
+
+interface Ground {
+  mesh: THREE.Mesh;
+  heights: Float32Array;
+  W: number;
+  x0: number;
+  step: number;
+}
+
+function buildGround(tp: TerrainParams, sp: ScatterParams, look: Look, size: number, segments: number, material: THREE.Material, skirt?: number): Ground {
+  const built = buildTerrainGeometry(tp, {
+    size,
+    segments,
+    skirt,
+    skirtTint: skirt ? [0.05, 0.04, 0.035, 1] : undefined,
+    light: { sun: look.sunDir, reach: 30 },
+    tint: biomeTint(tp, sp),
+  });
+  const mesh = new THREE.Mesh(built.geometry, material);
+  mesh.frustumCulled = false;
+  return { mesh, heights: built.heights, W: segments + 1, x0: -size / 2, step: size / segments };
+}
+
+// Re-paint an existing ground by biome after a climate change: height and
+// slope from the geometry, the class from the scatter rules.
+function repaint(g: Ground, tp: TerrainParams, sp: ScatterParams, keepRim: boolean): void {
+  const tintFn = biomeTint(tp, sp);
+  const pos = g.mesh.geometry.getAttribute("position");
+  const nor = g.mesh.geometry.getAttribute("normal");
+  const tint = g.mesh.geometry.getAttribute("aTint") as THREE.BufferAttribute;
+  const n = g.W * g.W;
+  for (let v = 0; v < n; v++) {
+    if (keepRim && tint.getW(v) === 1) continue; // the painted cut at the block's edge
+    const slope = Math.hypot(nor.getX(v), nor.getZ(v)) / Math.max(0.05, nor.getY(v));
+    const [r, gg, b, w] = tintFn(pos.getX(v), pos.getZ(v), pos.getY(v), slope);
+    tint.setXYZW(v, r, gg, b, w);
+  }
+  tint.needsUpdate = true;
+}
 
 interface Population {
   group: THREE.Group;
@@ -151,172 +210,124 @@ interface Population {
   blades: number;
 }
 
-const treeVariantCache: ReturnType<typeof buildTreeGeometry>[] = [];
-function treeVariants(): ReturnType<typeof buildTreeGeometry>[] {
-  if (treeVariantCache.length === 0) {
-    for (let k = 0; k < 4; k++) treeVariantCache.push(buildTreeGeometry(growTree({ ...TREE_DEFAULTS, seed: 100 + k * 17 })));
-  }
-  return treeVariantCache;
-}
-const rockVariantCache: THREE.BufferGeometry[] = [];
-function rockVariants(): THREE.BufferGeometry[] {
-  if (rockVariantCache.length === 0) {
-    for (let k = 0; k < 3; k++) rockVariantCache.push(buildRockGeometry(k));
-  }
-  return rockVariantCache;
-}
-
-const barkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
-const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
-const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 });
-
 function populate(
+  kit: PlantKit,
+  g: Ground,
   tp: TerrainParams,
   sp: ScatterParams,
-  region: { minX: number; minZ: number; maxX: number; maxZ: number },
+  look: Look,
   grassMat: ReturnType<typeof makeGrassMaterial>,
   grassCandidates: number,
+  treeLod: number,
 ): Population {
-  const group = new THREE.Group();
+  const half = ((g.W - 1) * g.step) / 2;
+  const region = { minX: -half, minZ: -half, maxX: half, maxZ: half };
   const items = scatterItems(tp, sp, region);
-  const m4 = new THREE.Matrix4();
-  const sc = new THREE.Vector3();
+  const planted = plantItems(kit, items, treeLod);
 
-  const tv = treeVariants(), rv = rockVariants();
-  let trees = 0, rocks = 0;
-  for (let v = 0; v < tv.length; v++) {
-    const mine = items.filter((it) => it.kind === "tree" && it.variant === v);
-    if (mine.length === 0) continue;
-    trees += mine.length;
-    const bark = new THREE.InstancedMesh(tv[v].bark, barkMat, mine.length);
-    const leaf = new THREE.InstancedMesh(tv[v].leaves, leafMat, mine.length);
-    mine.forEach((it, i) => {
-      sc.setScalar(it.scale);
-      m4.makeRotationY(it.yaw).scale(sc).setPosition(it.x, it.y, it.z);
-      bark.setMatrixAt(i, m4);
-      leaf.setMatrixAt(i, m4);
-    });
-    group.add(bark, leaf);
-  }
-  for (let v = 0; v < rv.length; v++) {
-    const mine = items.filter((it) => it.kind === "rock" && it.variant === v);
-    if (mine.length === 0) continue;
-    rocks += mine.length;
-    const rock = new THREE.InstancedMesh(rv[v], rockMat, mine.length);
-    mine.forEach((it, i) => {
-      sc.setScalar(it.scale);
-      m4.makeRotationY(it.yaw).scale(sc).setPosition(it.x, it.y, it.z);
-      rock.setMatrixAt(i, m4);
-    });
-    group.add(rock);
-  }
+  // crown shadows into the ground's light, then grass that knows where the shade is
+  const light = g.mesh.geometry.getAttribute("aLight") as THREE.BufferAttribute;
+  const arr = light.array as Float32Array;
+  const n = g.W * g.W;
+  // start from the clean bake each time (stored on first use)
+  const clean = (g.mesh.userData.cleanLight as Float32Array | undefined) ?? arr.slice(0, n * 2);
+  g.mesh.userData.cleanLight = clean;
+  arr.set(clean);
+  stampTreeShadows(arr, g.W, g.W, g.x0, g.x0, g.step, planted.spots, kit.variants[treeLod], look.sunDir);
+  light.needsUpdate = true;
+  const sunGrid = new Float32Array(n);
+  for (let v = 0; v < n; v++) sunGrid[v] = arr[v * 2];
+  const sun = gridSampler(sunGrid, g.W, g.W, g.x0, g.x0, g.step);
+  const heightAt = gridSampler(g.heights, g.W, g.W, g.x0, g.x0, g.step);
 
-  const blades = grassBlades(tp, sp, region, grassCandidates, sp.seed + 5);
-  group.add(new THREE.Mesh(buildGrassGeometry(blades).geometry, grassMat.material));
-
-  return { group, trees, rocks, blades: blades.length };
+  const blades = grassBlades(tp, sp, region, grassCandidates, sp.seed + 5, { scale: 1.4, sun, heightAt });
+  const grass = new THREE.Mesh(buildGrassGeometry(blades).geometry, grassMat.material);
+  grass.frustumCulled = false;
+  planted.group.add(grass);
+  return { group: planted.group, trees: planted.trees, rocks: planted.rocks, blades: blades.length };
 }
 
-// Re-tint an existing terrain geometry by biome, so the ground itself admits
-// which climate it's in (the part-1 palette only knew height and slope).
-// Height and slope come straight off the geometry (position.y, the normal),
-// raw moisture is cached per vertex, and the tint always starts from a
-// pristine copy of the original colors — re-tinting a tinted mesh would
-// otherwise compound toward the biome colors a little more per slider move.
-interface TintCache {
-  base: Float32Array;
-  mraw: Float32Array;
-}
-
-function biomeTint(geometry: THREE.BufferGeometry, tp: TerrainParams, sp: ScatterParams, cache?: TintCache): TintCache {
-  const pos = geometry.getAttribute("position");
-  const nor = geometry.getAttribute("normal");
-  const col = geometry.getAttribute("color");
-  if (!cache) {
-    const mraw = new Float32Array(pos.count);
-    for (let i = 0; i < pos.count; i++) mraw[i] = moistureRaw(pos.getX(i), pos.getZ(i), sp);
-    cache = { base: (col.array as Float32Array).slice(), mraw };
-  }
-  const c = new THREE.Color(), b = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const h01 = pos.getY(i) / tp.amplitude;
-    const slope = Math.hypot(nor.getX(i), nor.getZ(i)) / Math.max(0.05, nor.getY(i)); // |∇h| from the normal
-    const m = Math.min(1, Math.max(0, cache.mraw[i] * 0.5 + 0.5 + sp.moistureOffset));
-    c.setRGB(cache.base[i * 3], cache.base[i * 3 + 1], cache.base[i * 3 + 2]);
-    b.setHex(BIOME_COLORS[classify(h01, slope, m, sp)]);
-    const mottle = 0.9 + 0.2 * hash2(i, 5, sp.seed);
-    c.lerp(b, 0.42).multiplyScalar(mottle);
-    col.setXYZ(i, c.r, c.g, c.b);
-  }
-  col.needsUpdate = true;
-  return cache;
+function dropPopulation(pop: Population): void {
+  disposePlanting(pop.group);
+  pop.group.traverse((o) => {
+    if (o instanceof THREE.Mesh && !(o instanceof THREE.InstancedMesh)) o.geometry.dispose();
+  });
 }
 
 // ---- the populated patch ---------------------------------------------------------------------
 
 export async function mountBiomePatch(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container);
-  const stage = await createStage3D(shell.canvas, {
-    ...MORNING_STAGE,
-    target: [0, 1.6, 0],
-    distance: 22,
-    minDistance: 5,
-    maxDistance: 50,
-    elevation: 0.5,
+  const stage = await createTerrainStage(shell.canvas, MORNING, {
+    target: [0, 1.2, 0],
+    distance: 34,
+    minDistance: 8,
+    maxDistance: 60,
+    elevation: 0.55,
     azimuth: 0.8,
-    fov: 45,
-    far: 300,
+    fov: 42,
+    far: 400,
   });
+  const look = stage.look;
+  look.uHaze.value = 0.003; // a block on a table, not a view: keep the air clear
 
-  const SIZE = 40;
-  const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 23, frequency: 0.05, amplitude: 5 };
-  const sp: ScatterParams = { ...SCATTER_DEFAULTS, seed: 23 };
-  const region = { minX: -SIZE / 2, minZ: -SIZE / 2, maxX: SIZE / 2, maxZ: SIZE / 2 };
+  const SIZE = 40, SEG = 200;
+  const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 17, frequency: 0.05, amplitude: 5 };
+  const sp: ScatterParams = { ...SCATTER_DEFAULTS, seed: 17 };
+  const kit = makePlantKit(look, [1]);
+  kit.treeMats.wind.value = 0.6;
+  // snow only where the rules say alpine, so the paint and the plants agree
+  const ground = terrainMaterial(look, { amplitude: tp.amplitude, snowLine: [sp.treeLine + 0.17, sp.treeLine + 0.27] });
 
-  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
-  const ground = new THREE.Mesh(buildTerrainGeometry(tp, { size: SIZE, segments: 256 }).geometry, groundMat);
-  let tintCache = biomeTint(ground.geometry, tp, sp);
-  stage.scene.add(ground);
-
-  const grassMat = makeGrassMaterial();
-  grassMat.strength.value = 0.5;
-  let pop = populate(tp, sp, region, grassMat, 110_000);
+  let g = buildGround(tp, sp, look, SIZE, SEG, ground.material, 1.5);
+  stage.scene.add(g.mesh);
+  const grassMat = makeGrassMaterial(look);
+  grassMat.strength.value = 0.45;
+  let pop = populate(kit, g, tp, sp, look, grassMat, 120_000, 1);
   stage.scene.add(pop.group);
 
   let timer = 0;
   const rebuild = (newTerrain: boolean): void => {
     if (newTerrain) {
-      ground.geometry.dispose();
-      ground.geometry = buildTerrainGeometry(tp, { size: SIZE, segments: 256 }).geometry;
-      tintCache = biomeTint(ground.geometry, tp, sp); // new seed: fresh base colors and moisture
+      stage.scene.remove(g.mesh);
+      g.mesh.geometry.dispose();
+      g = buildGround(tp, sp, look, SIZE, SEG, ground.material, 1.5);
+      stage.scene.add(g.mesh);
     } else {
-      biomeTint(ground.geometry, tp, sp, tintCache);
+      repaint(g, tp, sp, true);
     }
     stage.scene.remove(pop.group);
-    pop.group.traverse((o) => {
-      if (o instanceof THREE.InstancedMesh) o.dispose();
-      else if (o instanceof THREE.Mesh) o.geometry.dispose();
-    });
-    pop = populate(tp, sp, region, grassMat, 110_000);
+    dropPopulation(pop);
+    pop = populate(kit, g, tp, sp, look, grassMat, 120_000, 1);
     stage.scene.add(pop.group);
   };
   const queue = (newTerrain: boolean): void => {
     clearTimeout(timer);
-    timer = window.setTimeout(() => rebuild(newTerrain), 300);
+    timer = window.setTimeout(() => rebuild(newTerrain), 250);
   };
 
-  shell.slider({ label: "wet ↔ dry", min: -0.35, max: 0.35, step: 0.01, value: -sp.moistureOffset, format: (v) => (v >= 0 ? `dry +${v.toFixed(2)}` : `wet ${(-v).toFixed(2)}`), onInput: (v) => { sp.moistureOffset = -v; queue(false); } });
-  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, onInput: (v) => { sp.treeLine = v; queue(false); } });
-  shell.button("reroll", () => {
+  shell.slider({
+    label: "wet ↔ dry",
+    min: -0.35,
+    max: 0.35,
+    step: 0.01,
+    value: -sp.moistureOffset,
+    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `drier by ${v.toFixed(2)}` : `wetter by ${(-v).toFixed(2)}`),
+    onInput: (v) => { sp.moistureOffset = -v; queue(false); },
+  });
+  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}% of peak`, onInput: (v) => { sp.treeLine = v; queue(false); } });
+  shell.button("new terrain", () => {
     tp.seed = (Math.random() * 1e6) | 0;
     sp.seed = tp.seed;
     queue(true);
   });
-  shell.setInfo(() => `${pop.trees} trees · ${pop.rocks} rocks · ${pop.blades.toLocaleString()} blades — nobody placed any of them`);
+  shell.setInfo(() => `${pop.trees} trees · ${pop.rocks} rocks · ${pop.blades.toLocaleString()} blades, all placed by the rules`);
 
   return {
     frame() {
-      grassMat.time.value = (performance.now() / 1000) % 10000;
+      const time = (performance.now() / 1000) % 10000;
+      grassMat.time.value = time;
+      kit.treeMats.time.value = time;
       stage.render();
       shell.tick();
     },
@@ -328,53 +339,62 @@ export async function mountBiomePatch(container: HTMLElement): Promise<Demo> {
 
 export async function mountBiomesHero(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.5);
-  const stage = await createStage3D(shell.canvas, {
-    ...MORNING_STAGE,
-    fog: { color: 0x151a24, near: 14, far: 70 },
-    fov: 55,
-    far: 300,
-  });
+  const stage = await createTerrainStage(shell.canvas, MORNING, { orbit: false, fov: 46, near: 0.1, far: 1500 });
+  const look = stage.look;
+  look.uHaze.value = 0.0055;
 
-  const SIZE = 96;
-  const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 12, frequency: 0.05, amplitude: 6 };
-  const sp: ScatterParams = { ...SCATTER_DEFAULTS, seed: 12 };
-  const region = { minX: -SIZE / 2, minZ: -SIZE / 2, maxX: SIZE / 2, maxZ: SIZE / 2 };
+  const SIZE = 96, SEG = 384;
+  const tp: TerrainParams = { ...TERRAIN_DEFAULTS, seed: 23, frequency: 0.04, amplitude: 9 };
+  const sp: ScatterParams = { ...SCATTER_DEFAULTS, seed: 23 };
+  const terrain = terrainMaterial(look, { amplitude: tp.amplitude, snowLine: [sp.treeLine + 0.17, sp.treeLine + 0.27] });
+  const kit = makePlantKit(look, [1]);
+  kit.treeMats.wind.value = 0.6;
 
-  const ground = new THREE.Mesh(
-    buildTerrainGeometry(tp, { size: SIZE, segments: 340 }).geometry,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
-  );
-  biomeTint(ground.geometry, tp, sp);
-  stage.scene.add(ground);
+  // the populated valley, and plain land beyond it out to the haze (tinted
+  // by the same biome rules, so far forests still read as forest)
+  const g = buildGround(tp, sp, look, SIZE, SEG, terrain.material);
+  stage.scene.add(g.mesh);
+  const vista = buildVista(tp, look.sunDir, terrain.material, [
+    { half: 192, step: 1.5 },
+    { half: 800, step: 8 },
+  ], { core: SIZE / 2, reach: 60, tint: biomeTint(tp, sp) });
+  stage.scene.add(vista.group);
 
-  const grassMat = makeGrassMaterial();
-  grassMat.strength.value = 0.55;
-  stage.scene.add(populate(tp, sp, region, grassMat, 220_000).group);
+  const grassMat = makeGrassMaterial(look);
+  grassMat.strength.value = 0.5;
+  stage.scene.add(populate(kit, g, tp, sp, look, grassMat, 260_000, 1).group);
 
-  let theta = 0;
-  let camY = 8;
+  // a slow circle over the valley, high enough to see the pattern
+  const R = 30;
+  let theta = 0.4;
   let last = performance.now();
-  const R = 22;
+  const alt = new Smooth(3);
+  const aim = new Smooth(3);
+  const heightAt = (x: number, z: number): number => terrainHeight(x, z, tp);
+  const envelope = (th: number): number => {
+    let m = -Infinity;
+    for (let k = -1; k <= 4; k++) m = Math.max(m, heightAt(Math.cos(th + k * 0.06) * R, Math.sin(th + k * 0.06) * R));
+    return m;
+  };
 
   return {
     frame() {
       const now = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      theta += dt * 0.024;
-      grassMat.time.value = (now / 1000) % 10000;
+      theta += dt * 0.02;
+      const time = (now / 1000) % 10000;
+      grassMat.time.value = time;
+      kit.treeMats.time.value = time;
 
-      const cx = Math.cos(theta) * R;
-      const cz = Math.sin(theta) * R;
-      camY += (Math.max(groundAt(cx, cz, tp, sp).h + 2.6, 4.5) - camY) * Math.min(1, dt * 1.5);
-      stage.camera.position.set(cx, camY, cz);
-
-      const la = theta + 0.6;
-      const lx = Math.cos(la) * R * 0.8;
-      const lz = Math.sin(la) * R * 0.8;
-      stage.camera.lookAt(lx, groundAt(lx, lz, tp, sp).h + 1.2, lz);
-
-      stage.renderer.render(stage.scene, stage.camera);
+      const cx = Math.cos(theta) * R, cz = Math.sin(theta) * R;
+      const cy = alt.step(envelope(theta) + 13, dt);
+      stage.camera.position.set(cx, cy, cz);
+      // look across the valley to its far side, a little down
+      const la = theta + Math.PI * 0.8;
+      const lx = Math.cos(la) * R * 0.7, lz = Math.sin(la) * R * 0.7;
+      stage.camera.lookAt(lx, aim.step(heightAt(lx, lz) - 1, dt), lz);
+      stage.draw();
     },
     dispose: () => stage.dispose(),
   };

@@ -226,7 +226,7 @@ export async function mountRelief(container: HTMLElement): Promise<Demo> {
 
 export async function mountTerrainHero(container: HTMLElement): Promise<Demo> {
   const shell = new Shell(container, 0.5);
-  const stage = await createTerrainStage(shell.canvas, GOLDEN, { fov: 50, near: 0.1, far: 1200 });
+  const stage = await createTerrainStage(shell.canvas, GOLDEN, { orbit: false, fov: 50, near: 0.1, far: 1200 });
 
   const tp: TerrainParams = { ...TERRAIN_DEFAULTS, frequency: 0.035, amplitude: 15, ridge: 0.65, seed: 12, octaves: 7 };
   const terrain = terrainMaterial(stage.look, { amplitude: tp.amplitude, snowLine: [0.64, 0.76] });
