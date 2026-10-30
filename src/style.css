@@ -984,6 +984,50 @@ footer {
   border-color: var(--accent);
 }
 
+/* the controls' toggle (lib/controls.ts, the same in every project on ericlevin.dev), at the end of the bar in its
+   buttons' shape; folded, the figures keep only their canvases */
+.site-nav .ctl-toggle {
+  height: 1.75rem;
+  gap: 0.4rem;
+  padding: 0 0.4rem 0 0.5rem;
+  border-radius: 6px;
+  box-shadow: none;
+  font: 0.7rem ui-monospace, Menlo, monospace;
+  --ctl-ink: var(--muted);
+  --ctl-bg: transparent;
+  --ctl-edge: var(--border);
+  --ctl-on-ink: var(--text);
+  --ctl-on-bg: #1a1e2c;
+  --ctl-on-edge: var(--border);
+}
+
+.site-nav .ctl-toggle:hover {
+  border-color: var(--accent);
+}
+
+.site-nav .ctl-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.site-nav .ctl-toggle kbd {
+  min-width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+body.ui-off .demo-controls,
+body.ui-off .demo-readout {
+  display: none;
+}
+
+/* (a phone: the bar runs off its right edge, so the toggle leads the group where it can be reached) */
+@media (max-width: 42rem) {
+  .site-nav .ctl-toggle {
+    order: -1;
+  }
+}
+
 .site-nav-menu {
   display: none;
   position: absolute;

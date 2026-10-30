@@ -21,17 +21,6 @@ const DEBUG_NAMES = [
   "light only"
 ]
 
-function inputFocused(): boolean {
-  const el = document.activeElement
-  if (!el) return false
-  const tag = el.tagName
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    (el as HTMLElement).isContentEditable
-  )
-}
-
 export interface LavaLampOptions {
   hero?: boolean
   full?: boolean // sliders + debug views
@@ -250,7 +239,8 @@ export async function mountLavaLamp(
   })
 
   // ---- fullscreen + ui chrome (final lamp only) -----------------------------------
-  let uiVisible = true
+  // (the site's controls toggle folds the sliders away: the button in the nav, or /)
+  let uiVisible = !document.body.classList.contains("ui-off")
   const readoutBar = shell.readout.parentElement as HTMLDivElement
   let fullscreenBtn: HTMLButtonElement | null = null
 
@@ -279,13 +269,9 @@ export async function mountLavaLamp(
     requestAnimationFrame(() => fitCanvas())
   }
 
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (!opts.full || inputFocused()) return
-    if (e.key === "/" || e.code === "Slash") {
-      e.preventDefault()
-      uiVisible = !uiVisible
-      applyUiVisible()
-    }
+  const onUiToggle = (e: Event): void => {
+    uiVisible = (e as CustomEvent<boolean>).detail
+    applyUiVisible()
   }
 
   const onResize = (): void => {
@@ -351,7 +337,8 @@ export async function mountLavaLamp(
       void toggleFullscreen()
     })
     fullscreenBtn = shell.controls.querySelectorAll("button")[2] ?? null
-    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("ui-toggle", onUiToggle)
+    applyUiVisible()
     document.addEventListener("fullscreenchange", onFullscreenChange)
     window.addEventListener("resize", onResize)
     readoutBar.style.display = "none"
@@ -426,7 +413,7 @@ export async function mountLavaLamp(
     },
     dispose() {
       if (opts.full) {
-        window.removeEventListener("keydown", onKeyDown)
+        window.removeEventListener("ui-toggle", onUiToggle)
         document.removeEventListener("fullscreenchange", onFullscreenChange)
         window.removeEventListener("resize", onResize)
         if (document.fullscreenElement === container)

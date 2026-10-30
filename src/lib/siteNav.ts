@@ -5,6 +5,7 @@
 // All generated from posts.ts, so adding a post is a one-line change.
 
 import { POSTS, SITE_NAME, SITE_REPO, currentPost, type Post } from "./posts";
+import { controls } from "./controls";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -90,6 +91,21 @@ export function initNav(): void {
   const toggle = el("button", "site-nav-toggle", "all posts ▾");
   right.appendChild(toggle);
   nav.appendChild(right);
+
+  // the figures' controls and readouts, shown unless folded away: the sliders button at the end of the bar (and / anywhere),
+  // as in every project on ericlevin.dev. A figure with more to fold (the lava lamp, in fullscreen) listens for "ui-toggle".
+  if (document.querySelector("[data-demo]")) {
+    controls({
+      name: "explorations",
+      label: "the figures' controls",
+      phone: true,
+      mount: right,
+      onChange: (open) => {
+        document.body.classList.toggle("ui-off", !open);
+        window.dispatchEvent(new CustomEvent("ui-toggle", { detail: open }));
+      },
+    });
+  }
 
   const menu = buildMenu(post);
   nav.appendChild(menu);
