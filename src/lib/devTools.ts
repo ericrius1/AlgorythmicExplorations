@@ -1,9 +1,11 @@
-// Dev HUD for Three.js / raw WebGPU sketches: Tweakpane + fps/ms readout,
-// persisted params, keyboard shortcuts. Params and pane metadata live together
-// in a single schema object — bump schemaVersion when that shape changes.
+// Dev HUD for Three.js / raw WebGPU sketches: a params panel (lib/kit.ts, the
+// interface kit every project on ericlevin.dev shares) fixed top right, with
+// an fps/ms readout in its foot, persisted params, keyboard shortcuts. Params
+// and panel metadata live together in a single schema object — bump
+// schemaVersion when that shape changes.
 
-import { Pane, type FolderApi } from "tweakpane";
-import Stats from "stats.js";
+import { Group, Panel, kit } from "./kit";
+import { KIT_HUE } from "./demoShell";
 
 export interface NumberSpec {
   value: number;
@@ -37,14 +39,16 @@ export interface DevToolsOptions<S extends ParamSchema> {
   /** Bump whenever folders/keys change — stale localStorage is discarded. */
   schemaVersion: string;
   storageKey: string;
+  /** The panel's name (its title, in the kit's serif); "Params" without. */
+  title?: string;
   onChange?: (values: ParamValues<S>, path: string) => void;
-  /** Called when debug.landmarks (or landmarks) toggles via pane or "m". */
+  /** Called when debug.landmarks (or landmarks) toggles via panel or "m". */
   onLandmarksChange?: (visible: boolean) => void;
 }
 
 export interface DevTools<S extends ParamSchema> {
   values: ParamValues<S>;
-  pane: Pane;
+  panel: Panel;
   visible: boolean;
   landmarksVisible: boolean;
   setVisible(visible: boolean): void;
@@ -152,8 +156,10 @@ function findLandmarks(values: Record<string, unknown>): boolean | undefined {
   return undefined;
 }
 
+// One leaf, bound straight to its slot in the values object: a slider for a
+// number between min and max, a select for a choice, a switch for a boolean.
 function bindLeaf(
-  host: FolderApi,
+  host: Group,
   key: string,
   spec: LeafSpec,
   target: Record<string, unknown>,
@@ -161,23 +167,26 @@ function bindLeaf(
 ): void {
   const label = spec.label ?? key;
   if (isNumberSpec(spec)) {
-    host.addBinding(target, key, {
+    host.bind(target, key, {
       label,
       min: spec.min,
       max: spec.max,
       step: spec.step ?? (Number.isInteger(spec.value) ? 1 : 0.001),
-    }).on("change", notify);
+    }).on(notify);
     return;
   }
   if (isSelectSpec(spec)) {
-    host.addBinding(target, key, { label, options: spec.options }).on("change", notify);
+    host.bind(target, key, { label, options: spec.options }).on(notify);
     return;
   }
-  host.addBinding(target, key, { label }).on("change", notify);
+  host.bind(target, key, { label }).on(notify);
 }
 
-function buildPane<S extends ParamSchema>(
-  host: FolderApi,
+// The schema's folders become the panel's sections (a folder inside a folder,
+// a card). The substance and the particles start open; the rest folded, until
+// a hand unfolds them (the kit keeps which, under the panel's name).
+function buildPanel<S extends ParamSchema>(
+  host: Group,
   schema: S,
   values: ParamValues<S>,
   onLeafChange: (path: string) => void,
@@ -189,8 +198,8 @@ function buildPane<S extends ParamSchema>(
     if (isLeaf(spec)) {
       bindLeaf(host, key, spec, values as Record<string, unknown>, () => onLeafChange(path));
     } else {
-      const folder = host.addFolder({ title: key, expanded: key === "particles" || key === "substance" });
-      buildPane(folder, spec, branch as ParamValues<ParamSchema>, onLeafChange, path);
+      const section = host.section(key, key === "particles" || key === "substance");
+      buildPanel(section, spec, branch as ParamValues<ParamSchema>, onLeafChange, path);
     }
   }
 }
@@ -202,43 +211,16 @@ function inputFocused(): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement).isContentEditable;
 }
 
-function mountPane(): Pane {
-  const pane = new Pane({ title: "params", expanded: true });
-  pane.element.style.position = "fixed";
-  pane.element.style.top = "8px";
-  pane.element.style.right = "8px";
-  pane.element.style.zIndex = "10000";
-  pane.element.style.maxHeight = "calc(100vh - 16px)";
-  pane.element.style.overflow = "auto";
-  return pane;
-}
-
 export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>): DevTools<S> {
+  kit({ hue: KIT_HUE });
   const values = loadValues(opts.schema, opts.schemaVersion, opts.storageKey);
   let landmarksVisible = findLandmarks(values as Record<string, unknown>) ?? false;
 
-  const hud = document.createElement("div");
-  hud.className = "dev-hud";
-  hud.style.cssText =
-    "position:fixed;top:0;left:0;z-index:10000;pointer-events:none;display:flex;flex-direction:column;gap:0;";
+  // the panel keeps its folded sections under the params' storage key
+  const panel = new Panel({ title: opts.title ?? "Params", name: opts.storageKey });
+  const foot = document.createElement("span");
+  panel.foot.append(Object.assign(document.createElement("i"), { className: "k-dot" }), foot);
 
-  const statsFps = new Stats();
-  statsFps.showPanel(0);
-  statsFps.dom.style.position = "relative";
-  statsFps.dom.style.pointerEvents = "none";
-
-  const statsMs = new Stats();
-  statsMs.showPanel(1);
-  statsMs.dom.style.position = "relative";
-  statsMs.dom.style.pointerEvents = "none";
-
-  const statsWrap = document.createElement("div");
-  statsWrap.className = "dev-hud-stats";
-  statsWrap.style.cssText = "display:flex;flex-direction:column;gap:0;pointer-events:none;";
-  statsWrap.append(statsFps.dom, statsMs.dom);
-  hud.appendChild(statsWrap);
-
-  let pane = mountPane();
   let lastPath = "";
 
   const persist = (path: string): void => {
@@ -252,25 +234,21 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
     opts.onChange?.(values, path);
   };
 
-  const rebuildPane = (): void => {
-    pane.dispose();
-    pane = mountPane();
-    pane.element.style.display = visible ? "" : "none";
-    buildPane(pane as FolderApi, opts.schema, values, persist);
-  };
+  buildPanel(panel, opts.schema, values, persist);
 
-  buildPane(pane as FolderApi, opts.schema, values, persist);
-
-  let visible = true;
+  // Shown unless the site's controls toggle (siteNav's, in the bar: /) has the
+  // figures' interface folded away; it follows that toggle after. Without one
+  // on the page, / is the panel's own.
+  const siteToggle = document.querySelector(".ctl-toggle") !== null;
+  let visible = !document.body.classList.contains("ui-off");
   const applyVisible = (): void => {
-    hud.style.display = visible ? "flex" : "none";
-    pane.element.style.display = visible ? "" : "none";
+    panel.show(visible);
   };
 
   const reset = (): void => {
     deepAssign(values as Record<string, unknown>, extractDefaults(opts.schema) as Record<string, unknown>);
     localStorage.removeItem(opts.storageKey);
-    rebuildPane();
+    panel.refresh();
     landmarksVisible = findLandmarks(values as Record<string, unknown>) ?? false;
     opts.onLandmarksChange?.(landmarksVisible);
     opts.onChange?.(values, "reset");
@@ -278,7 +256,7 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if (inputFocused()) return;
-    if (e.key === "/" || e.code === "Slash") {
+    if (!siteToggle && (e.key === "/" || e.code === "Slash")) {
       e.preventDefault();
       visible = !visible;
       applyVisible();
@@ -289,14 +267,22 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
       reset();
     }
   };
+  const onUiToggle = (e: Event): void => {
+    visible = (e as CustomEvent<boolean>).detail;
+    applyVisible();
+  };
 
-  document.body.append(hud);
   window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("ui-toggle", onUiToggle);
+
+  // the foot: frame rate and frame time, smoothed, told a few times a second
+  let fpsEma = 60;
+  let msEma = 16;
+  let last = performance.now();
+  let lastFoot = 0;
 
   const devTools: DevTools<S> = {
-    get pane() {
-      return pane;
-    },
+    panel,
     values,
     get visible() {
       return visible;
@@ -311,13 +297,20 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
     reset,
     persist: () => saveValues(values, opts.schemaVersion, opts.storageKey),
     tick() {
-      statsFps.update();
-      statsMs.update();
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      fpsEma += (1000 / Math.max(dt, 0.01) - fpsEma) * 0.05;
+      msEma += (dt - msEma) * 0.05;
+      if (panel.open && now - lastFoot > 250) {
+        lastFoot = now;
+        foot.textContent = `${fpsEma.toFixed(0)} fps · ${msEma.toFixed(1)} ms · . resets`;
+      }
     },
     dispose() {
       window.removeEventListener("keydown", onKeyDown);
-      hud.remove();
-      pane.dispose();
+      window.removeEventListener("ui-toggle", onUiToggle);
+      panel.root.remove();
     },
   };
 

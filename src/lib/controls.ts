@@ -2,7 +2,8 @@
 // hides the page's interface (its panel, or the whole HUD), and / anywhere does the same. It shows by default (a panel
 // that would cover the piece on a phone starts folded away there); folded, the button stays, dimmed, to bring it back.
 // Whichever way it's left is kept, project by project. Self-contained (it brings its own CSS) so each project carries a
-// copy: the canonical one is PortfolioII/src/shared/controls.ts. A page themes it with --ctl-* on the button or above.
+// copy: the canonical one is PortfolioII/src/shared/controls.ts. It wears the kit's glass and accent (kit.ts's --k-*, with
+// their values to fall back on where a page has no kit); a page themes it further with --ctl-* on the button or above.
 
 const ICON = `<svg viewBox="0 0 20 20" aria-hidden="true">
   <path d="M3 5h14M3 10h14M3 15h14" />
@@ -13,14 +14,14 @@ const ICON = `<svg viewBox="0 0 20 20" aria-hidden="true">
 // for every button, being less specific, doesn't)
 const CSS = `
 .ctl-toggle {
-  --ctl-ink: #f3eef5; --ctl-bg: rgba(14, 11, 20, 0.5); --ctl-edge: rgba(243, 238, 245, 0.16);
-  --ctl-on-ink: #0b0910; --ctl-on-bg: rgba(243, 238, 245, 0.9); --ctl-on-edge: transparent;
+  --ctl-ink: var(--k-text, #e9ecf8); --ctl-bg: rgba(10, 12, 20, 0.5); --ctl-edge: var(--k-line-2, rgba(160, 180, 255, 0.18));
+  --ctl-on-ink: var(--k-text, #e9ecf8); --ctl-on-bg: var(--k-accent-soft, hsl(210 90% 68% / 0.16)); --ctl-on-edge: var(--k-accent-edge, hsl(210 90% 70% / 0.45));
   position: fixed; z-index: 60; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));
   display: inline-flex; flex: none; align-items: center; gap: 7px; box-sizing: border-box; height: 38px; margin: 0; padding: 0 9px 0 11px;
   border-radius: 999px; border: 1px solid var(--ctl-edge); background: var(--ctl-bg); color: var(--ctl-ink);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3);
   box-shadow: 0 6px 24px -10px rgba(0, 0, 0, 0.55);
-  font: 500 11px/1 "Space Mono", ui-monospace, monospace; cursor: pointer; opacity: 0.5;
+  font: 500 11px/1 var(--k-mono, "JetBrains Mono"), ui-monospace, monospace; cursor: pointer; opacity: 0.55;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: opacity 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }

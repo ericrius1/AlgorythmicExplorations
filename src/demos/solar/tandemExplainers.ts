@@ -334,7 +334,7 @@ export function mountTandemTechTree(container: HTMLElement): Demo {
   toolbar.appendChild(hint);
 
   const fitButton = document.createElement("button");
-  fitButton.className = "demo-button";
+  fitButton.className = "demo-button k-b";
   fitButton.textContent = "fit";
   toolbar.appendChild(fitButton);
   container.appendChild(toolbar);

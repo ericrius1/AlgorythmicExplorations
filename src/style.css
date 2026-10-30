@@ -566,45 +566,45 @@ header.hero .demo {
   touch-action: pan-y; /* vertical swipe scrolls the page; horizontal drag orbits */
 }
 
+/* the figures' interface is the kit's (lib/kit.ts, shared by every project on ericlevin.dev): a wrapping row of its
+   sliders (label and value over a thin track) in ~11rem columns, its panel buttons between them, and the readout in
+   its mono. The essay around them keeps its Georgia. */
 .demo-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem 1.4rem;
+  gap: 0.35rem 1.2rem;
   align-items: center;
-  padding: 0.7rem 0.3rem 0.1rem;
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  padding: 0.5rem 0.3rem 0;
+  font: 400 12px/1.4 var(--k-ui, ui-sans-serif, system-ui, sans-serif);
+  color: var(--k-text, var(--text));
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(.demo-controls) :where(button, select, input) {
+  font: inherit;
+  color: inherit;
+  margin: 0;
 }
 
 .demo-slider {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.78rem;
-  color: var(--muted);
+  display: block;
+  flex: 1 1 11rem;
   min-width: 11rem;
+  max-width: 17rem;
 }
 
-.demo-slider input {
-  accent-color: var(--accent);
+.demo-slider .k-ctl {
+  padding: 2px 0;
 }
 
 .demo-button {
-  font: 600 0.78rem ui-sans-serif, system-ui, sans-serif;
-  color: var(--text);
-  background: #1a1e2c;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.35rem 0.8rem;
-  cursor: pointer;
-}
-
-.demo-button:hover {
-  border-color: var(--accent);
+  font-family: var(--k-ui, ui-sans-serif, system-ui, sans-serif);
 }
 
 .demo-readout {
-  font: 0.74rem ui-monospace, Menlo, monospace;
-  color: var(--accent-warm);
+  font: 11px/1.5 var(--k-mono, ui-monospace, Menlo, monospace);
+  color: var(--k-muted, var(--muted));
+  letter-spacing: 0.01em;
   padding: 0.45rem 0.3rem 0;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -826,7 +826,9 @@ header.hero .demo-controls {
 }
 
 .demo-slider-narrow {
+  flex-basis: 6.5rem;
   min-width: 6.5rem;
+  max-width: 9rem;
 }
 
 .piano {
