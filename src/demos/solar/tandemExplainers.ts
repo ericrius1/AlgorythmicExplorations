@@ -244,7 +244,7 @@ export function mountTandemTechTree(container: HTMLElement): Demo {
   buttons.className = "solar-tree-buttons";
   const mk = (label: string, aria: string): HTMLButtonElement => {
     const b = document.createElement("button");
-    b.className = "demo-button";
+    b.className = "demo-button k-b";
     b.textContent = label;
     b.setAttribute("aria-label", aria);
     buttons.appendChild(b);

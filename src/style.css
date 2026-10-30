@@ -566,45 +566,45 @@ header.hero .demo {
   touch-action: pan-y; /* vertical swipe scrolls the page; horizontal drag orbits */
 }
 
+/* the figures' interface is the kit's (lib/kit.ts, shared by every project on ericlevin.dev): a wrapping row of its
+   sliders (label and value over a thin track) in ~11rem columns, its panel buttons between them, and the readout in
+   its mono. The essay around them keeps its Georgia. */
 .demo-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem 1.4rem;
+  gap: 0.35rem 1.2rem;
   align-items: center;
-  padding: 0.7rem 0.3rem 0.1rem;
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  padding: 0.5rem 0.3rem 0;
+  font: 400 12px/1.4 var(--k-ui, ui-sans-serif, system-ui, sans-serif);
+  color: var(--k-text, var(--text));
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(.demo-controls) :where(button, select, input) {
+  font: inherit;
+  color: inherit;
+  margin: 0;
 }
 
 .demo-slider {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.78rem;
-  color: var(--muted);
+  display: block;
+  flex: 1 1 11rem;
   min-width: 11rem;
+  max-width: 17rem;
 }
 
-.demo-slider input {
-  accent-color: var(--accent);
+.demo-slider .k-ctl {
+  padding: 2px 0;
 }
 
 .demo-button {
-  font: 600 0.78rem ui-sans-serif, system-ui, sans-serif;
-  color: var(--text);
-  background: #1a1e2c;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.35rem 0.8rem;
-  cursor: pointer;
-}
-
-.demo-button:hover {
-  border-color: var(--accent);
+  font-family: var(--k-ui, ui-sans-serif, system-ui, sans-serif);
 }
 
 .demo-readout {
-  font: 0.74rem ui-monospace, Menlo, monospace;
-  color: var(--accent-warm);
+  font: 11px/1.5 var(--k-mono, ui-monospace, Menlo, monospace);
+  color: var(--k-muted, var(--muted));
+  letter-spacing: 0.01em;
   padding: 0.45rem 0.3rem 0;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -826,7 +826,9 @@ header.hero .demo-controls {
 }
 
 .demo-slider-narrow {
+  flex-basis: 6.5rem;
   min-width: 6.5rem;
+  max-width: 9rem;
 }
 
 .piano {
@@ -982,6 +984,50 @@ footer {
 
 .site-nav-toggle:hover {
   border-color: var(--accent);
+}
+
+/* the controls' toggle (lib/controls.ts, the same in every project on ericlevin.dev), at the end of the bar in its
+   buttons' shape; folded, the figures keep only their canvases */
+.site-nav .ctl-toggle {
+  height: 1.75rem;
+  gap: 0.4rem;
+  padding: 0 0.4rem 0 0.5rem;
+  border-radius: 6px;
+  box-shadow: none;
+  font: 0.7rem ui-monospace, Menlo, monospace;
+  --ctl-ink: var(--muted);
+  --ctl-bg: transparent;
+  --ctl-edge: var(--border);
+  --ctl-on-ink: var(--text);
+  --ctl-on-bg: #1a1e2c;
+  --ctl-on-edge: var(--border);
+}
+
+.site-nav .ctl-toggle:hover {
+  border-color: var(--accent);
+}
+
+.site-nav .ctl-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.site-nav .ctl-toggle kbd {
+  min-width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+body.ui-off .demo-controls,
+body.ui-off .demo-readout {
+  display: none;
+}
+
+/* (a phone: the bar runs off its right edge, so the toggle leads the group where it can be reached) */
+@media (max-width: 42rem) {
+  .site-nav .ctl-toggle {
+    order: -1;
+  }
 }
 
 .site-nav-menu {
@@ -1910,11 +1956,7 @@ body {
   }
 }
 
-/* ---- slider + readout text parts (all series) ---- */
-
-.demo-slider-name::after {
-  content: ": ";
-}
+/* ---- readout text parts (all series) ---- */
 
 .demo-info:not(:empty)::before {
   content: " · ";
@@ -2092,99 +2134,7 @@ body {
   gap: 0.3rem;
 }
 
-.essay .demo-slider-text {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  font-size: 0.74rem;
-}
-
-.essay .demo-slider-name::after {
-  content: none;
-}
-
-.essay .demo-slider-value {
-  color: #e6e9f2;
-  font: 500 0.72rem ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.essay .demo-slider input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 18px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.essay .demo-slider input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent) var(--fill, 50%), #272c3f var(--fill, 50%));
-}
-
-.essay .demo-slider input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
-  border-radius: 50%;
-  background: #f4f6fc;
-  box-shadow:
-    0 0 0 3px rgba(122, 162, 255, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.15s ease;
-}
-
-.essay .demo-slider input[type="range"]:hover::-webkit-slider-thumb,
-.essay .demo-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 5px rgba(122, 162, 255, 0.35),
-    0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.essay .demo-slider input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 4px;
-  background: #272c3f;
-}
-
-.essay .demo-slider input[type="range"]::-moz-range-progress {
-  height: 4px;
-  border-radius: 4px;
-  background: var(--accent);
-}
-
-.essay .demo-slider input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 50%;
-  background: #f4f6fc;
-  box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.3);
-}
-
-.essay .demo-button {
-  border-radius: 999px;
-  padding: 0.38rem 0.95rem;
-  font-weight: 600;
-  color: #dfe5f7;
-  background: rgba(122, 162, 255, 0.08);
-  border: 1px solid rgba(122, 162, 255, 0.24);
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.essay .demo-button:hover {
-  background: rgba(122, 162, 255, 0.16);
-  border-color: var(--accent);
-}
-
-.essay .demo-button:active {
-  transform: translateY(1px);
-}
+/* (the sliders and buttons are the kit's: lib/kit.ts, via demoShell) */
 
 .essay .demo-readout {
   display: flex;

@@ -6,6 +6,9 @@
 
 import { POSTS, SITE_NAME, SITE_REPO, currentPost, siteUrl, type Post } from "./posts";
 import { initSeriesChrome } from "./seriesChrome";
+import { controls } from "./controls";
+import { kit } from "./kit";
+import { KIT_HUE } from "./demoShell";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -95,6 +98,23 @@ export function initNav(): void {
   const toggle = el("button", "site-nav-toggle", "all posts ▾");
   right.appendChild(toggle);
   nav.appendChild(right);
+
+  // the figures' controls and readouts, shown unless folded away: the sliders button at the end of the bar (and / anywhere),
+  // as in every project on ericlevin.dev. A figure with more to fold (the lava lamp, in fullscreen) listens for "ui-toggle".
+  // The figures' interface is the kit's (lib/kit.ts): its CSS and fonts go in here, before the first figure builds.
+  if (document.querySelector("[data-demo]")) {
+    kit({ hue: KIT_HUE });
+    controls({
+      name: "explorations",
+      label: "the figures' controls",
+      phone: true,
+      mount: right,
+      onChange: (open) => {
+        document.body.classList.toggle("ui-off", !open);
+        window.dispatchEvent(new CustomEvent("ui-toggle", { detail: open }));
+      },
+    });
+  }
 
   const menu = buildMenu(post);
   // phones hide the Contact / GitHub buttons, so the menu carries them too

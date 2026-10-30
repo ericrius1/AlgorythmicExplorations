@@ -12,13 +12,6 @@ import { RadianceCascades } from "../../lib/radianceCascades"
 const VIEWS = ["final", "scene (what the rays see)", "distance field", "light only"]
 const VIEW_MODES = [0, 1, 3, 4] // RadianceCascades composite debug modes
 
-function inputFocused(): boolean {
-  const el = document.activeElement
-  if (!el) return false
-  const tag = el.tagName
-  return tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement).isContentEditable
-}
-
 export interface LavaLampOptions {
   hero?: boolean
   full?: boolean // sliders + debug views
@@ -271,8 +264,9 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
     mouseVel = [0, 0]
   })
 
-  // ---- fullscreen + ui chrome (sandbox only) ----------------------------------------
-  let uiVisible = true
+  // ---- fullscreen + ui chrome (final lamp only) -----------------------------------
+  // (the site's controls toggle folds the sliders away: the button in the nav, or /)
+  let uiVisible = !document.body.classList.contains("ui-off")
   let fullscreenBtn: HTMLButtonElement | null = null
 
   const applyUiVisible = (): void => {
@@ -294,13 +288,10 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
     if (fullscreenBtn) fullscreenBtn.textContent = fs ? "exit fullscreen" : "fullscreen"
     requestAnimationFrame(() => fitCanvas())
   }
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (!opts.full || inputFocused()) return
-    if (e.key === "/" || e.code === "Slash") {
-      e.preventDefault()
-      uiVisible = !uiVisible
-      applyUiVisible()
-    }
+
+  const onUiToggle = (e: Event): void => {
+    uiVisible = (e as CustomEvent<boolean>).detail
+    applyUiVisible()
   }
   const onResize = (): void => {
     if (document.fullscreenElement === container) fitCanvas()
@@ -337,7 +328,8 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
       bindSplat()
     })
     fullscreenBtn = shell.button("fullscreen", () => void toggleFullscreen())
-    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("ui-toggle", onUiToggle)
+    applyUiVisible()
     document.addEventListener("fullscreenchange", onFullscreenChange)
     window.addEventListener("resize", onResize)
     shell.setInfo(() => `${count.toLocaleString()} particles · ${rc.cascadeCount} cascades over ${rc.width}×${rc.height}`)
@@ -417,7 +409,7 @@ export async function mountLavaLamp(container: HTMLElement, opts: LavaLampOption
     },
     dispose() {
       if (opts.full) {
-        window.removeEventListener("keydown", onKeyDown)
+        window.removeEventListener("ui-toggle", onUiToggle)
         document.removeEventListener("fullscreenchange", onFullscreenChange)
         window.removeEventListener("resize", onResize)
         if (document.fullscreenElement === container) void document.exitFullscreen()

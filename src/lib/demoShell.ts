@@ -1,5 +1,14 @@
 // Shared chrome for every interactive figure: a canvas, a control strip, an
 // fps/info readout, and lazy lifecycle — demos only run while on screen.
+// The controls are built from the interface kit (lib/kit.ts, the one every
+// project on ericlevin.dev shares): its sliders, its buttons, its mono for the
+// readout. The essays keep their own type; only the figures' interface is the
+// site's.
+
+import { Group, kit } from "./kit";
+
+// the kit's accent, turned to the site's blue (#7aa2ff)
+export const KIT_HUE = 222;
 
 export interface Demo {
   // Called every animation frame while the demo is visible.
@@ -18,6 +27,8 @@ export interface SliderSpec {
   onInput: (v: number) => void;
 }
 
+const clamp = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v));
+
 export class Shell {
   readonly canvas: HTMLCanvasElement;
   readonly controls: HTMLDivElement;
@@ -30,6 +41,7 @@ export class Shell {
   private infoEl = document.createElement("span");
 
   constructor(container: HTMLElement, aspect = 0.62) {
+    kit({ hue: KIT_HUE });
     container.classList.add("demo");
     this.canvas = document.createElement("canvas");
     this.canvas.className = "demo-canvas";
@@ -67,54 +79,83 @@ export class Shell {
     container.appendChild(bar);
   }
 
+  // A kit slider in the strip. What comes back is a native range input, hidden
+  // inside the slider's label: figures move a slider from code by setting its
+  // .value (and firing "input" to have it take effect), as they always did, and
+  // the kit's knob follows. The kit slider itself walks the range's steps by
+  // index, so it lands exactly where the native one did (counted from min).
   slider(spec: SliderSpec): HTMLInputElement {
     const wrap = document.createElement("label");
     wrap.className = "demo-slider";
-    const text = document.createElement("span");
-    text.className = "demo-slider-text";
-    const name = document.createElement("span");
-    name.className = "demo-slider-name";
-    name.textContent = spec.label;
-    const value = document.createElement("span");
-    value.className = "demo-slider-value";
-    text.append(name, value);
     const input = document.createElement("input");
     input.type = "range";
+    input.hidden = true;
+    input.tabIndex = -1;
     const enc = (v: number): number => (spec.log ? Math.log10(v) : v);
     const dec = (v: number): number => (spec.log ? Math.pow(10, v) : v);
     input.min = String(enc(spec.min));
     input.max = String(enc(spec.max));
     input.step = spec.log ? "0.01" : String(spec.step);
     input.value = String(enc(spec.value));
-    const fmt = spec.format ?? ((v: number) => String(Math.round(v * 1000) / 1000));
-    const sync = (v: number): void => {
-      value.textContent = fmt(v);
-      // how far along the track the thumb is, for the filled-track style
-      const lo = Number(input.min);
-      const hi = Number(input.max);
-      input.style.setProperty("--fill", `${((Number(input.value) - lo) / (hi - lo || 1)) * 100}%`);
+    wrap.appendChild(input);
+
+    // the grid the slider walks: the range's own steps, or hundredths of a decade when logarithmic
+    const lo = enc(spec.min);
+    const fine = spec.log ? 0.01 : spec.step;
+    const n = Math.max(1, Math.round((enc(spec.max) - lo) / fine));
+    const places = decimals(fine);
+    const toIndex = (v: number): number => clamp(Math.round((enc(v) - lo) / fine), 0, n);
+    const fromIndex = (i: number): number => {
+      const v = dec(+(lo + i * fine).toFixed(places));
+      return spec.log ? Math.round(v / spec.step) * spec.step : v;
     };
-    sync(spec.value);
-    input.addEventListener("input", () => {
-      let v = dec(Number(input.value));
-      if (spec.log) {
-        v = Math.round(v / spec.step) * spec.step;
-        // the 0.01-decade track can't land on an off-grid endpoint, so snap to it
-        if (Number(input.value) + 0.01 > Number(input.max)) v = spec.max;
-        else if (Number(input.value) - 0.01 < Number(input.min)) v = spec.min;
-      }
-      sync(v);
+    // a programmatic value, read back from the native input (which snaps it to its steps)
+    const fromInput = (): number => {
+      const v = dec(Number(input.value));
+      return spec.log ? Math.round(v / spec.step) * spec.step : v;
+    };
+
+    const fmt = spec.format ?? ((v: number) => String(Math.round(v * 1000) / 1000));
+    const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!;
+    const state = { i: toIndex(spec.value) };
+    const ctl = new Group(wrap).bind(state, "i", { label: spec.label, min: 0, max: n, step: 1, format: (i) => fmt(fromIndex(i)) });
+    ctl.on((i) => {
+      const v = fromIndex(i);
+      native.set!.call(input, String(enc(v)));
       spec.onInput(v);
     });
-    wrap.appendChild(text);
-    wrap.appendChild(input);
+    // (the value reads in whatever units the figure formats it, so it isn't typed into)
+    const val = wrap.querySelector<HTMLInputElement>(".k-val");
+    if (val) {
+      val.readOnly = true;
+      val.tabIndex = -1;
+    }
+
+    // setting .value moves the knob at once, with or without an "input" to follow
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      get: () => native.get!.call(input) as string,
+      set: (v: string) => {
+        native.set!.call(input, v);
+        state.i = toIndex(fromInput());
+        ctl.refresh();
+      },
+    });
+    input.addEventListener("input", () => {
+      const v = fromInput();
+      state.i = toIndex(v);
+      ctl.refresh();
+      spec.onInput(v);
+    });
+
     this.controls.appendChild(wrap);
     return input;
   }
 
   button(label: string, onClick: () => void): HTMLButtonElement {
     const b = document.createElement("button");
-    b.className = "demo-button";
+    b.type = "button";
+    b.className = "demo-button k-b";
     b.textContent = label;
     b.addEventListener("click", onClick);
     this.controls.appendChild(b);
@@ -135,6 +176,13 @@ export class Shell {
     this.fpsEl.textContent = `${this.fpsEma.toFixed(0)} fps`;
     this.infoEl.textContent = this.info ? this.info() : "";
   }
+}
+
+// how many decimal places a step has (0.002 → 3), to keep stepped values tidy
+function decimals(step: number): number {
+  const s = String(step);
+  if (s.includes("e")) return Math.max(0, -Math.floor(Math.log10(step)));
+  return (s.split(".")[1] ?? "").length;
 }
 
 // Runs a demo only while its container is near the viewport. Demos are built
