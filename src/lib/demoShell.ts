@@ -197,6 +197,11 @@ export function mountLazy(container: HTMLElement, build: () => Demo | Promise<De
   let timer = 0;
   let building = false;
   let lastFrame = 0;
+  // How long a figure takes to come in, as marks a load is timed by (build:hero,
+  // built:hero, drawn:hero …, named by its data-demo): drawn once its first
+  // frame has run and the browser has shown a frame after it.
+  const name = container.dataset.demo ?? "figure";
+  let drawn = false;
 
   // rAF-driven when the browser delivers frames; a timer takes over when it
   // doesn't (hidden embeds and aggressive webview throttling suspend rAF).
@@ -204,6 +209,10 @@ export function mountLazy(container: HTMLElement, build: () => Demo | Promise<De
     if (!running || !demo) return;
     lastFrame = performance.now();
     demo.frame();
+    if (!drawn) {
+      drawn = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => performance.mark(`drawn:${name}`)));
+    }
     raf = requestAnimationFrame(loop);
   };
 
@@ -234,8 +243,10 @@ export function mountLazy(container: HTMLElement, build: () => Demo | Promise<De
   const setVisible = (visible: boolean): void => {
     if (visible && !demo && !building) {
       building = true;
+      performance.mark(`build:${name}`);
       Promise.resolve(build())
         .then((d) => {
+          performance.mark(`built:${name}`);
           demo = d;
           building = false;
           if (!running) start();

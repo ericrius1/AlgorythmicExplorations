@@ -113,7 +113,11 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
         n = Math.min(warmup, 40);
         warmup -= n;
         solver.dt = 0.016;
-        if (warmup <= 0) shell.canvas.style.opacity = "1";
+        if (warmup <= 0) {
+          shell.canvas.style.opacity = "1";
+          // (the first view of a page with this hero: what its load is timed to)
+          performance.mark("shown:hero");
+        }
       } else if (opts.hero) {
         // Slow motion, paced by the clock rather than the frame count: one
         // step per frame sized to elapsed time, so it turns at the same
