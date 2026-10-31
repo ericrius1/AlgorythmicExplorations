@@ -66,7 +66,7 @@ Interactive essays where every figure is a live simulation, mostly WebGPU. 10 se
 5. [The Biomes](pages/ground-truth/biomes.html)
 6. [The Horizon](pages/ground-truth/horizon.html)
 
-**Solar Stack**: Perovskite-on-silicon tandem solar cells, worked through with live detailed-balance models: bandgaps, current matching, contacts, texture, yield, lifetime and cost.
+**Solar Stack**: Perovskite-on-silicon tandem solar cells, worked through photon by photon in live GPU simulations: bandgaps, current matching, silicon surfaces, contacts, texture, yield, lifetime and cost.
 
 1. [The Tandem Tree](pages/solar-stack/tandem-tree.html)
 
@@ -89,6 +89,11 @@ and per-series styles in `src/styles/`.
   registering it in `posts.ts`. Vite collects every HTML file under `pages/`.
 - Rendering: `src/lib/postfx.ts` (HDR, bloom, filmic tone mapping) is shared
   by the particle, path-tracing and radiance-cascade renderers.
+- Solar Stack's GPU figures run on Spark & Signal's stage (`src/lib/neuron/stage.ts`) and share
+  `src/lib/solar/`: a photon-and-carrier engine (photons drawn from the sun's spectrum, stopped at
+  Beer–Lambert depths, electron–hole pairs collected or recombined) whose readouts are tallies,
+  checked against the detailed-balance model in `src/demos/solar/physics.ts`. Without WebGPU each
+  falls back to the 2D model figure it replaced.
 - Music: `src/lib/music/` is the shared audio toolkit (safe master chain with
   a limiter, instrument presets, QWERTY/MIDI input, scope/spectrum/spectrogram
   views); see its README. `src/lib/audio.ts` exports Tone.js and the master bus.

@@ -10,7 +10,7 @@
     <title>The Tandem Tree — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Why a thin perovskite film on a silicon cell can pass silicon's own efficiency limit, worked through with live detailed-balance models: bandgaps, current matching, contacts, texture, yield, lifetime and cost per watt."
+      content="Why a thin perovskite film on a silicon cell can pass silicon's own efficiency limit, worked through photon by photon in live GPU simulations: bandgaps, current matching, surfaces, contacts, texture, yield, lifetime and cost per watt."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -36,11 +36,20 @@
       <p>
         The picture at the top of this page is a solar cell in cross-section, with sunlight
         falling into it. Each streak is one photon, drawn in its own colour, with its energy
-        picked at random from the sun's spectrum. The thin green layer is a lead-halide
-        perovskite. It stops most of the blue and green photons. The thick blue layer under
-        it is an ordinary silicon cell, which catches the red and near-infrared light that
-        gets through. The dim streaks that come out the bottom are infrared photons with too
-        little energy for either layer.
+        picked at random from the sun's spectrum, and each one stops at a depth picked at
+        random from how strongly the layer it's in absorbs that colour. The thin layer on top
+        is a lead-halide perovskite, half a micron thick. It stops most of the blue and green
+        photons. The thick layer under it is an ordinary silicon cell, 160 µm thick and drawn
+        on a log scale so its first few microns aren't crushed, and it catches the red and
+        near-infrared light that gets through. The streaks that fall out the bottom are
+        infrared photons with too little energy for either layer.
+      </p>
+      <p>
+        Where a photon stops it frees an electron (cyan, rising toward the top contact) and a
+        hole (pink, sinking toward the bottom one). The orange sparks are the photon's energy
+        above the layer's gap, lost as heat in the first picosecond. Every figure on this page
+        works this way: it simulates the particles on your GPU and counts what they do, and
+        the readouts are those counts. The numbers in the text are what the counts settle to.
       </p>
       <p>
         That stack is a perovskite-on-silicon <em>tandem</em>, and it's the most promising
@@ -94,22 +103,27 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// its volt
         deliver.
       </p>
       <p>
-        Below, the curve is sunlight's power spread over photon energy. Drag the gap line (or
-        use the slider) and the area under the curve splits into four colours: what passes
-        through, what becomes heat, what's lost to the cell's own voltage and glow, and the
-        part that comes out as electrical power.
+        Below is one absorber with a gap you choose, under the same sunlight. Photons below
+        the gap fall straight through it. Photons above it stop, and each one throws off its
+        excess energy as a burst of orange sparks: a blue photon makes a big burst, one just
+        above the gap almost none. The histogram in the corner adds up every photon's energy
+        by what became of it, against the sun's spectrum (dashed). The counts give what passes
+        through, what becomes heat and how much current the absorber makes; the diode
+        equation above then splits the rest between the cell's voltage loss and the part that
+        comes out as electrical power.
       </p>
 
       <div
         data-demo="bandgap-loss-map"
         data-title="One gap against the sun"
-        data-hint="Drag the gap line"
+        data-hint="Slide the gap"
       ></div>
 
       <p>
-        Silicon's gap is 1.12 eV. In this model it keeps 30.3% of the sunlight. 32.4% turns
-        into heat, 22.9% passes through without being absorbed, and the remaining 14.4% is
-        the price of the cell's voltage sitting below its gap. The best single gap, near
+        Silicon's gap is 1.12 eV. Counted, it keeps 30.3% of the sunlight (the count settles
+        within a few tenths of a percent of the model's answer). 32.4% turns into heat, 22.9%
+        passes through without being absorbed, and the remaining 14.4% is the price of the
+        cell's voltage sitting below its gap. The best single gap, near
         1.26 eV here, does only half a point better. The curve is flat on top, and silicon is
         already near the top of it.
       </p>
@@ -144,16 +158,17 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// its volt
         grown one atomic layer at a time and cost far too much for a roof.
       </p>
       <p>
-        For a tandem on silicon, the question is what gap the top cell should have. Move it
-        below and watch the two currents. The green area is photons the top cell takes, the
-        blue area is photons left for the silicon, and the efficiency curve shows what the
-        pair can do at each top gap.
+        For a tandem on silicon, the question is what gap the top cell should have. Below, two
+        ideal absorbers are stacked: a top cell with the gap you choose, which takes every
+        photon above it, and silicon underneath, which gets what's left above 1.12 eV. The bars
+        are each cell's current, counted photon by photon, and the efficiency comes from those
+        two currents. The curve in the corner is what the pair can do at every top gap.
       </p>
 
       <div
         data-demo="spectrum-splitter"
         data-title="Two gaps, one sun"
-        data-hint="Drag the top gap"
+        data-hint="Slide the top gap"
       ></div>
 
       <p>
@@ -211,11 +226,14 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// its volt
         wafer.
       </p>
       <p>
-        Each generation of factory cell is mostly a better answer to that one problem. In
-        the figure the blue dots are carriers diffusing through the wafer. The coloured
-        strips along the top and bottom show what each stretch of surface does to a carrier
-        that reaches it, green for passivated and red for bare metal. A red flash is a
-        carrier lost at a surface.
+        Each generation of factory cell is mostly a better answer to that one problem. The
+        figure is a piece of wafer in real units: 160 µm thick, a little over a millimetre
+        across, with two silver fingers on top. Each blue dot is a carrier freed by sunlight,
+        at a depth drawn from silicon's absorption, and it random-walks with silicon's
+        diffusion constant until it recombines. In the bulk that happens at the wafer's own
+        rate. At a surface, each bounce off the face has a small chance of being the last, set
+        by that stretch of surface's recombination velocity: green for passivated, red for
+        bare or metal. A red flash is a carrier lost at a surface, violet one lost in the bulk.
       </p>
 
       <div
@@ -225,14 +243,21 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// its volt
       ></div>
 
       <p>
-        The animation is only a picture of the idea, but the trend is real. Aluminium
-        back-surface-field cells alloyed the whole rear with aluminium. PERC covered the rear
+        Nothing is collected here, which is how a cell sits at its open-circuit voltage.
+        Carriers pile up until they recombine as fast as light makes them, and the figure
+        measures how long one lasts on average. That lifetime is what sets the voltage: the
+        longer carriers last, the more of them there are, and the voltage is
+        (kT/q)·ln(Δn·(N + Δn)/ni²), with Δn the extra carriers and N the doping. Pick each
+        generation in turn and the counted voltages come out 0.64, 0.68, 0.71 and 0.74 V.
+        Aluminium back-surface-field cells alloyed the whole rear with aluminium. PERC covered the rear
         with a thin dielectric and let the metal through small openings. TOPCon covered the
         rear with a 1.5 nm oxide and a layer of doped polysilicon, which passivates the whole
         surface and still conducts. Heterojunction (HJT) cells cover both faces with a few
         nanometres of amorphous silicon, so the metal never touches the wafer at all. Typical
-        open-circuit voltages went from about 0.64 V to 0.74 V along the way, and almost
-        all of that is less recombination at the surfaces.
+        open-circuit voltages went from about 0.64 V to 0.74 V along the way, the same climb
+        as in the figure, and almost all of it is less recombination at the surfaces. By HJT,
+        carriers last about a millisecond, and half of the ones lost are lost inside the
+        wafer, partly to Auger recombination, which no surface can fix.
       </p>
       <p>
         Most record tandems sit on heterojunction bottom cells. Their high voltage adds
@@ -324,8 +349,17 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// its volt
         perovskite's valence band, holes drop into it and the
         energy they drop by is lost from the cell's voltage. If it sits below, holes have to
         climb a step to get out. Only a share of them, falling off as e<sup>−step/kT</sup>,
-        make it over, and the rest pile up and recombine. The figure uses that Boltzmann
-        factor for the barrier and a straight voltage loss for the drop.
+        make it over, and the rest pile up and recombine.
+      </p>
+      <p>
+        The figure is that band diagram in 3D, with height as a hole's energy. Every hole the
+        light frees walks across the perovskite's band toward the contact. It takes a step up
+        only with the Boltzmann chance of having that much thermal energy at that moment (the
+        same rule the ion channels follow in <a href="/pages/spark-signal/signaling.html">How
+        Neurons Signal</a>), and a drop it always falls down, giving up the energy. Holes that
+        wait recombine, and more of them do where they crowd. The curve in the corner is the
+        simple formula for the same thing; the dots are what the holes did at each level
+        you've tried.
       </p>
 
       <div
@@ -371,17 +405,28 @@ P = max over J of  J × V_stack(J)</code></pre>
         thickness sets how the light is split: a thicker film takes more of the photons
         near its gap and leaves less for the silicon.
       </p>
+      <p>
+        In the figure the split is counted: photons fall into a real perovskite film over a
+        light-trapping silicon wafer, and each cell's current is the share it catches. Then
+        watch the junction between the cells. Every hole coming down out of the perovskite
+        has to meet an electron coming up out of the silicon there, and they recombine in
+        pairs; that is how one current passes through both. When one cell makes more, some of
+        its carriers find no partner, wait at the junction and recombine. That's the
+        flickering pink band, and the readout counts what share of carriers it takes.
+      </p>
 
       <div
         data-demo="tandem-jv"
-        data-title="The series J–V curve"
+        data-title="Two cells, one current"
         data-hint="Change the top cell"
       ></div>
 
       <p>
-        At the default 500 nm the perovskite makes 21.0 mA/cm² and the silicon only 19.0, so
-        the stack runs at the silicon's current: 1.97 V, 33.0%. Thin the film to about
-        330 nm and the currents match, which gets it to 33.7%. A mismatch of 2 mA/cm²
+        At the default 500 nm the perovskite catches about 20.9 mA/cm² and the silicon only
+        18.8, so the stack runs at the silicon's current: 1.97 V open-circuit, 32.6%, and about
+        one carrier in twenty waits at the junction for a partner that never comes. Thin the
+        film to about 330 nm and the currents nearly match (20.1 and 19.7), the pink band all
+        but empties, and the stack gets to 33.5%. A mismatch of 2 mA/cm²
         costs less than a point here, because the cell with spare current runs closer to
         its open-circuit voltage and makes up some of the difference. Voltage losses are worse. Every
         100 mV the top cell loses comes straight off the stack, and raising the series
@@ -421,8 +466,15 @@ P = max over J of  J × V_stack(J)</code></pre>
       ></div>
 
       <p>
-        With 2 µm pyramids and a 600 nm solution film, about a fifth of the surface is left
-        bare. Making the film thicker helps slowly, because it mostly fills the valleys. The
+        The figure is a patch of textured wafer 20 µm across, under sunlight. Each photon meets
+        a facet with silicon's real reflectance, and one that bounces off flies on to the next
+        pyramid for another try, so the readout counts how many get away: about 34% from a
+        flat wafer (the textbook figure is 35%) and about 11% from pyramids of any size. The film is
+        modelled as what a liquid does, filling the valleys up to the height that holds its
+        volume. With 2 µm pyramids and a 600 nm solution film it settles about 1.3 µm deep,
+        and the tallest tips poke through: about 8% of the surface is left bare, and every
+        bare tip is a shunt. At 4 µm, nearly a third is. Making the film thicker helps slowly, because it mostly fills the
+        valleys. The
         first tandems avoided the problem by polishing the front of the wafer flat, and lost
         the optical benefit. In 2018 a group at EPFL and CSEM evaporated the inorganic part
         of the perovskite first, which coats every facet evenly, and then converted it with

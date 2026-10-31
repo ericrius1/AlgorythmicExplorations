@@ -40,7 +40,7 @@ export const SERIES_TAGLINES: Record<string, string> = {
   "Ground Truth":
     "Procedural terrain built from noise, erosion, instanced grass, trees, biomes, and streamed chunks.",
   "Solar Stack":
-    "Perovskite-on-silicon tandem solar cells, worked through with live detailed-balance models: bandgaps, current matching, contacts, texture, yield, lifetime and cost.",
+    "Perovskite-on-silicon tandem solar cells, worked through photon by photon in live GPU simulations: bandgaps, current matching, silicon surfaces, contacts, texture, yield, lifetime and cost.",
   "Spark & Signal":
     "Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.",
 };
