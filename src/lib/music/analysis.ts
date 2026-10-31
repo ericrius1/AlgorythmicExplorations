@@ -6,7 +6,7 @@
 // earlier would create the AudioContext before a user gesture (and Chrome
 // warns about every such context). Until then a probe returns silence.
 
-import * as Tone from "tone";
+import * as Tone from "../tone";
 import { audioOn } from "../audio";
 import { masterChain } from "./master";
 

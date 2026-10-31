@@ -14,7 +14,7 @@
 // This module only imports Tone, never ../audio, so audio.ts can import it
 // without a cycle.
 
-import * as Tone from "tone";
+import * as Tone from "../tone";
 
 export const CEILING_DB = -1;
 

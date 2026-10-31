@@ -2,7 +2,7 @@
 // gesture anywhere on the page, fade and stop things cleanly, silence a
 // figure when it scrolls away, and a global panic list.
 
-import * as Tone from "tone";
+import * as Tone from "../tone";
 import { unlockAudio } from "../audio";
 
 let unlockInstalled = false;

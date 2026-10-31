@@ -97,6 +97,9 @@ and per-series styles in `src/styles/`.
 - Music: `src/lib/music/` is the shared audio toolkit (safe master chain with
   a limiter, instrument presets, QWERTY/MIDI input, scope/spectrum/spectrogram
   views); see its README. `src/lib/audio.ts` exports Tone.js and the master bus.
+  Tone comes from `src/lib/tone.ts`, never `"tone"` itself: Tone's index opens
+  the audio device as it loads, which held each music page's first figure up
+  a quarter second.
 - `tools/shot.mjs` takes headless screenshots of a page's figures (muted,
   WebGPU on) for checking work without a visible browser.
 

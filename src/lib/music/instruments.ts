@@ -10,7 +10,7 @@
 //   ep.noteOn(60, 0.8);  ep.noteOff(60);
 //   ep.play([60, 64, 67], 1.5, time);       // `time` = AudioContext seconds
 
-import * as Tone from "tone";
+import * as Tone from "../tone";
 import { masterBus, midiToFreq } from "../audio";
 import { connectOut } from "./master";
 import { registerVoice } from "./lifecycle";

@@ -5,7 +5,7 @@
 // Browsers refuse to start audio without a user gesture, so every demo calls
 // unlockAudio() from a pointer/button handler before making sound.
 
-import * as Tone from "tone";
+import * as Tone from "./tone";
 import { masterChain, _registerBus } from "./music/master";
 
 export { Tone };
@@ -32,6 +32,11 @@ export function masterBus(): Tone.Gain {
   return master;
 }
 _registerBus(masterBus);
+
+// Tone's context isn't made as the page loads (lib/tone.ts): it's made half a
+// second in, once the first figures are up, and waits there (suspended, as it
+// always did) so the first tap still sounds at once.
+window.setTimeout(() => void Tone.getContext(), 500);
 
 export async function unlockAudio(): Promise<void> {
   if (!unlocked) {

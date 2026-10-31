@@ -5,7 +5,7 @@
 //   mountSoundControl();
 
 import "../../styles/music.css";
-import * as Tone from "tone";
+import * as Tone from "../tone";
 import { installUnlock } from "./lifecycle";
 import { isMuted, masterVolume, onSoundChange, setMasterVolume, setMuted } from "./master";
 import { masterProbe } from "./analysis";
