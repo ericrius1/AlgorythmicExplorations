@@ -921,7 +921,32 @@ footer {
   font-size: 0.82rem;
 }
 
+/* the way home to ericlevin.dev (lib/home.ts, the same in every project on it), at the start of the bar like a logo:
+   its pill at the height of the bar's controls toggle, in the bar's ink and edge, as bright as the bar's other buttons */
+.site-nav .home-link {
+  height: 1.75rem;
+  min-width: 1.75rem;
+  gap: 0.4rem;
+  padding: 0 0.6rem 0 0.3rem;
+  box-shadow: none;
+  font-size: 0.7rem;
+  opacity: 1;
+  --home-ink: var(--muted);
+  --home-bg: transparent;
+  --home-edge: var(--border);
+}
+
+.site-nav .home-link:hover {
+  border-color: var(--accent);
+}
+
+.site-nav .home-link svg {
+  width: 18px;
+  height: 18px;
+}
+
 .site-nav-home {
+  margin-right: auto;
   color: var(--text);
   text-decoration: none;
   font-weight: 600;
@@ -979,6 +1004,7 @@ footer {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.3rem 0.7rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -1056,14 +1082,33 @@ body.ui-off .demo-readout {
   padding-top: 0.4rem;
 }
 
+/* (where the bar's buttons need the room: the way home is just its mark, and the masthead may wrap, within the
+   bar's height) */
+@media (max-width: 56rem) {
+  .site-nav .home-link {
+    width: 1.75rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .site-nav .home-link span {
+    display: none;
+  }
+
+  .site-nav-home {
+    line-height: 1.1;
+  }
+}
+
 @media (max-width: 40rem) {
   .site-nav {
     gap: 0.5rem;
     padding-inline: 0.75rem;
   }
 
+  /* (the masthead on two lines, beside the mark) */
   .site-nav-home {
-    white-space: nowrap;
+    width: min-content;
     letter-spacing: 0.02em;
   }
 
@@ -1080,7 +1125,8 @@ body.ui-off .demo-readout {
   }
 }
 
-@media (max-width: 27rem) {
+/* (short of room, the series' place gives way first: the essay's own kicker names it) */
+@media (max-width: 44rem) {
   .site-nav-where {
     display: none;
   }
@@ -1573,6 +1619,22 @@ body {
 .solar-punk-back:hover,
 .solar-punk-back:focus-visible {
   color: var(--solar-mint);
+}
+
+/* the way home to ericlevin.dev (lib/home.ts), its mark on the back link's line */
+.solar-punk-copy .home-link {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 0;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+  pointer-events: auto;
+  --home-edge: rgba(119, 255, 212, 0.2);
+}
+
+.solar-punk-copy .home-link svg {
+  width: 18px;
+  height: 18px;
 }
 
 .solar-punk-hud {

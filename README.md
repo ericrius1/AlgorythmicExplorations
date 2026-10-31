@@ -82,7 +82,9 @@ under `src/pages/<series>/` that mounts its figures. Figures live in
 and per-series styles in `src/styles/`.
 
 - Site navigation (top bar, post menu, read-next cards) is injected by
-  `src/lib/siteNav.ts` from the registry in `src/lib/posts.ts`. Adding a post
+  `src/lib/siteNav.ts` from the registry in `src/lib/posts.ts`. The bar opens
+  with the way home to ericlevin.dev, the portfolio's mark (`src/lib/home.ts`,
+  a copy of the one every project there shares). Adding a post
   means writing the HTML, adding its entry TS that calls `initNav()` (or `wirePage()`), and
   registering it in `posts.ts`. Vite collects every HTML file under `pages/`.
 - Rendering: `src/lib/postfx.ts` (HDR, bloom, filmic tone mapping) is shared

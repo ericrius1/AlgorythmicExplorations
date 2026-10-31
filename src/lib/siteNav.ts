@@ -1,12 +1,13 @@
 // Site-wide navigation, injected by every page's entry module:
-//   · a slim fixed bar — masthead, prev/next within the series, an
-//     "all posts" menu grouped by series
+//   · a slim fixed bar — the way home to ericlevin.dev, masthead, prev/next
+//     within the series, an "all posts" menu grouped by series
 //   · "read next" cards above the footer
 // All generated from posts.ts, so adding a post is a one-line change.
 
 import { POSTS, SITE_NAME, SITE_REPO, currentPost, siteUrl, type Post } from "./posts";
 import { initSeriesChrome } from "./seriesChrome";
 import { controls } from "./controls";
+import { home } from "./home";
 import { kit } from "./kit";
 import { KIT_HUE } from "./demoShell";
 
@@ -62,9 +63,12 @@ export function initNav(): void {
 
   // ---- top bar ---------------------------------------------------------------
   const nav = el("nav", "site-nav");
-  const home = el("a", "site-nav-home", SITE_NAME);
-  home.href = siteUrl("index.html");
-  nav.appendChild(home);
+  // the way home to ericlevin.dev (lib/home.ts, the same in every project on it): the portfolio's mark at the start of
+  // the bar, like a logo, with its name beside it where there's room; the masthead stays this site's own home link
+  home({ mount: nav });
+  const masthead = el("a", "site-nav-home", SITE_NAME);
+  masthead.href = siteUrl("index.html");
+  nav.appendChild(masthead);
 
   const right = el("div", "site-nav-right");
   if (post) {

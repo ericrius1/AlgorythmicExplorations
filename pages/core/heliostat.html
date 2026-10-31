@@ -73,6 +73,17 @@
         opacity: 0.85;
       }
       .heliostat-back:hover { opacity: 1; text-decoration: underline; }
+      /* the way home to ericlevin.dev (lib/home.ts), its mark on the back link's line */
+      .heliostat-copy .home-link {
+        width: 1.75rem;
+        height: 1.75rem;
+        min-width: 0;
+        margin-right: 0.45rem;
+        vertical-align: middle;
+        pointer-events: auto;
+        --home-edge: rgba(120, 255, 210, 0.18);
+      }
+      .heliostat-copy .home-link svg { width: 18px; height: 18px; }
       .heliostat-canvas .demo-controls {
         position: absolute;
         right: clamp(1rem, 3vw, 2.5rem);
