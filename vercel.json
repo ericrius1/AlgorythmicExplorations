@@ -5,6 +5,10 @@
     {
       "source": "/algorythmicexplorations",
       "destination": "/algorythmicexplorations/index.html"
+    },
+    {
+      "source": "/algorythmicexplorations/footage",
+      "destination": "/algorythmicexplorations/footage/index.html"
     }
   ],
   "redirects": [

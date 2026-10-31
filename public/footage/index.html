@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Algorythmic Explorations · Footage</title>
+<meta name="description" content="Films of the live figures from Algorythmic Explorations: fire, fog and a lava lamp lit by radiance cascades, water and dust and a growing cosmic web, terrain from noise, each played with the way a visitor would.">
+<meta name="theme-color" content="#0a0b10">
+<meta property="og:title" content="Algorythmic Explorations · Footage">
+<meta property="og:description" content="Films of the essays' live figures, each played with the way a visitor would.">
+<meta property="og:image" content="https://footage.ericrius1.workers.dev/algorythmicexplorations/be6fa71cb514d422/bounced-light-card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/algorythmicexplorations/favicon.png" sizes="512x512" type="image/png">
+<link rel="icon" href="/algorythmicexplorations/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/algorythmicexplorations/apple-touch-icon.png">
+<!-- The essays' footage page (the footage pages' kit, ~/codeprojects/footage/kit/index.html, in the essays' own look).
+     The films come from footage.json beside it (~/codeprojects/footage/publish.mjs adds to it); everything else about
+     them (playing, Save to Photos, downloads, links) from footage.js, the same on every project's page. It lives in
+     public/ so the build copies it as it is: its paths are written out in full (/algorythmicexplorations/…), since the
+     portfolio may hand it over without its closing slash. -->
+<style>
+  /* the essays' colours and type: night blue-black, the figures' blue, Georgia to read and the system sans to head */
+  :root {
+    --bg: #0a0b10; --panel: #11131c; --fg: #d7dbe6; --muted: #8a91a5; --line: #232636;
+    --accent: #7aa2ff; --accent-warm: #ffb86b;
+    /* (the films' layout, from the shared footage.js, reads these) */
+    --font-title: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; --radius: 10px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 18px/1.7 Georgia, "Times New Roman", serif; -webkit-font-smoothing: antialiased; }
+  header, main, footer { max-width: 1100px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left)); }
+  header { padding-top: clamp(32px, 7vw, 64px); padding-bottom: 20px; }
+  .kicker { font: 600 0.72rem/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+  h1 {
+    font: 700 clamp(2rem, 5vw, 3.2rem)/1.12 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: -0.02em; color: #f2f4fa; margin: 12px 0 0;
+  }
+  header p { color: var(--muted); font-style: italic; margin: 14px 0 0; max-width: 46rem; text-wrap: pretty; }
+  a { color: var(--accent); text-decoration-color: rgba(122, 162, 255, 0.4); }
+  /* the way back, over the title: ericlevin.dev (its mark, a gold world in two rings, as on every project there) › the essays */
+  .trail {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; margin: 0 0 28px;
+    font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; color: var(--muted);
+  }
+  .trail a { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; }
+  .trail a:hover { color: var(--fg); }
+  .trail svg { flex: none; width: 18px; height: 18px; }
+  /* the films' titles as the essays' headings; their words in the essays' serif */
+  #films h2 { font-weight: 600; letter-spacing: -0.01em; color: #eef1f8; }
+  #films .sub { font-size: 17px; line-height: 1.65; }
+  video { box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.85); }
+  footer {
+    color: var(--muted); font: 0.9rem/1.6 ui-sans-serif, system-ui, sans-serif;
+    padding-top: 1.4rem; padding-bottom: max(48px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<header>
+  <nav class="trail" aria-label="Where this is">
+    <a href="https://www.ericlevin.dev/" title="ericlevin.dev: all the worlds"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="none" stroke="#B98CFF" stroke-width="1.6" opacity=".6"/><circle cx="16" cy="16" r="11" fill="none" stroke="#6FE3F0" stroke-width="1.8" opacity=".8"/><circle cx="16" cy="16" r="7" fill="#E8C15A"/></svg>ericlevin.dev</a>
+    <span aria-hidden="true">›</span><a href="/algorythmicexplorations/">Algorythmic Explorations</a>
+  </nav>
+  <div class="kicker">Footage</div>
+  <h1>Algorythmic Explorations</h1>
+  <p>Films of the <a href="/algorythmicexplorations/">essays'</a> live figures, run frame by frame in the browser on an RTX 5090, with a cursor stirring, carrying, painting and dragging them the way a visitor would. Scored in D.</p>
+</header>
+<main id="films"><p class="empty">Loading…</p></main>
+<footer>720p, H.264, sized to send from a phone. <a href="/algorythmicexplorations/">Read the essays</a> and play with every figure yourself, in a browser with WebGPU.</footer>
+<!-- the films (footage.json) and all they do: the footage pages' shared script -->
+<script src="https://footage.ericrius1.workers.dev/footage.js" data-list="/algorythmicexplorations/footage/footage.json" onerror="document.getElementById('films').innerHTML = '<p>The films didn’t load. Try again in a moment.</p>'"></script>
+</body>
+</html>

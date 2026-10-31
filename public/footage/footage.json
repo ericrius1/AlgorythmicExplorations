@@ -1,0 +1,58 @@
+[
+ {
+  "id": "bounced-light",
+  "title": "Bounced Light",
+  "sub": "Five of the light figures, played with: embers stirred over the bonfire, a lamp carried from the red wall to the green one so the room takes each colour, the lava lamp warming, light painted in ember and cyan with a wall drawn to throw shadows, and smoke blown into two shafts of sun. Every figure live on the GPU, lit by radiance cascades.",
+  "date": "2026-10-31",
+  "seconds": 55,
+  "width": 1280,
+  "height": 720,
+  "mb": 8.8,
+  "video": "https://footage.ericrius1.workers.dev/algorythmicexplorations/27bd7b8449c75222/bounced-light.mp4",
+  "small": null,
+  "poster": "https://footage.ericrius1.workers.dev/algorythmicexplorations/8bd4f6fae765e605/bounced-light.jpg",
+  "card": "https://footage.ericrius1.workers.dev/algorythmicexplorations/be6fa71cb514d422/bounced-light-card.jpg"
+ },
+ {
+  "id": "particle-worlds",
+  "title": "Particle Worlds",
+  "sub": "A tank of 45,000 water particles splashed with the cursor; a ring of dust falling under its own gravity into galaxies that find each other; then about 590,000 particles growing a cosmic web from small ripples, stirred while it is all filaments and left to gather into halos.",
+  "date": "2026-10-31",
+  "seconds": 36,
+  "width": 1280,
+  "height": 720,
+  "mb": 38.8,
+  "video": "https://footage.ericrius1.workers.dev/algorythmicexplorations/7b28a6f804b83e2e/particle-worlds.mp4",
+  "small": null,
+  "poster": "https://footage.ericrius1.workers.dev/algorythmicexplorations/58cb34ca3d1e425f/particle-worlds.jpg",
+  "card": "https://footage.ericrius1.workers.dev/algorythmicexplorations/01abbaaf0c3cdbe2/particle-worlds-card.jpg"
+ },
+ {
+  "id": "ground-truth",
+  "title": "Ground Truth",
+  "sub": "A sunset flight over terrain streamed so it never reaches an edge, a meadow moving blade by blade in the wind, a valley carved by ninety thousand simulated raindrops, the eroding island dragged round in 3D, and the endless flight steered by hand. All of it grown live in the browser from noise.",
+  "date": "2026-10-31",
+  "seconds": 52,
+  "width": 1280,
+  "height": 720,
+  "mb": 36.4,
+  "video": "https://footage.ericrius1.workers.dev/algorythmicexplorations/1703de96b4b990d3/ground-truth.mp4",
+  "small": null,
+  "poster": "https://footage.ericrius1.workers.dev/algorythmicexplorations/c056a1236e4c9c16/ground-truth.jpg",
+  "card": "https://footage.ericrius1.workers.dev/algorythmicexplorations/e64419aa5d9fa862/ground-truth-card.jpg"
+ },
+ {
+  "id": "thirteen-live-figures",
+  "title": "Thirteen Live Figures",
+  "sub": "The home page's film: thirteen figures a few seconds each, from the galaxy behind the title to dust gathering into worlds, water sorted and stirred, the fluid instrument, fireworks, a bonfire, fog, a lava lamp, a prism, a ferrofluid crown, a neuron firing, the synthesizer and a flight to the horizon.",
+  "date": "2026-10-29",
+  "seconds": 47,
+  "width": 1280,
+  "height": 720,
+  "mb": 19.5,
+  "video": "https://footage.ericrius1.workers.dev/algorythmicexplorations/eead80adec7b0429/thirteen-live-figures.mp4",
+  "small": null,
+  "poster": "https://footage.ericrius1.workers.dev/algorythmicexplorations/a1448d0ddc3d0bfd/thirteen-live-figures.jpg",
+  "card": "https://footage.ericrius1.workers.dev/algorythmicexplorations/bf35c4441a80f6d2/thirteen-live-figures-card.jpg"
+ }
+]
