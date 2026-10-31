@@ -33,10 +33,12 @@ export function masterBus(): Tone.Gain {
 }
 _registerBus(masterBus);
 
-// Tone's context isn't made as the page loads (lib/tone.ts): it's made half a
-// second in, once the first figures are up, and waits there (suspended, as it
-// always did) so the first tap still sounds at once.
-window.setTimeout(() => void Tone.getContext(), 500);
+// Tone's context isn't made as the page loads (lib/tone.ts): it's made once the
+// page is in (loaded, a frame shown since, a moment more), and waits there
+// (suspended, as it always did) so the first tap still sounds at once.
+const makeContext = (): void => void requestAnimationFrame(() => setTimeout(() => void Tone.getContext(), 200));
+if (document.readyState === "complete") makeContext();
+else window.addEventListener("load", makeContext, { once: true });
 
 export async function unlockAudio(): Promise<void> {
   if (!unlocked) {
