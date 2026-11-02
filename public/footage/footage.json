@@ -1,5 +1,20 @@
 [
  {
+  "id": "trailer",
+  "title": "Trailer",
+  "sub": "Algorythmic Explorations in twenty-five seconds, cut from its films on the song's peak: a galaxy spiralling up out of dust, a wave of particles, an accretion ring, the lava lamp, the web of cells, light bounced through colour, lightning, and a terrain raised from noise.",
+  "date": "2026-11-02",
+  "created": "2026-11-02T00:01-07:00",
+  "seconds": 26,
+  "width": 1920,
+  "height": 1080,
+  "mb": 28.8,
+  "video": "https://footage.ericrius1.workers.dev/algorythmicexplorations/62bad01088c43958/explorations-trailer-2026-11-02.mp4",
+  "small": "https://footage.ericrius1.workers.dev/algorythmicexplorations/fcf3b81f68854300/explorations-trailer-2026-11-02-720p.mp4",
+  "poster": "https://footage.ericrius1.workers.dev/algorythmicexplorations/ffa217ad8ee6ed8e/trailer-poster.jpg",
+  "card": "https://footage.ericrius1.workers.dev/algorythmicexplorations/50b4bff114d4ed28/trailer-card.jpg"
+ },
+ {
   "id": "bounced-light",
   "title": "Bounced Light",
   "sub": "Five of the light figures, played with: embers stirred over the bonfire, a lamp carried from the red wall to the green one so the room takes each colour, the lava lamp warming, light painted in ember and cyan with a wall drawn to throw shadows, and smoke blown into two shafts of sun. Every figure live on the GPU, lit by radiance cascades.",
