@@ -7,6 +7,7 @@
 import { POSTS, SITE_NAME, SITE_REPO, currentPost, siteUrl, type Post } from "./posts";
 import { initSeriesChrome } from "./seriesChrome";
 import { controls } from "./controls";
+import { picture, canvasPicture } from "./picture";
 import { home } from "./home";
 import { kit } from "./kit";
 import { KIT_HUE } from "./demoShell";
@@ -108,7 +109,7 @@ export function initNav(): void {
   // The figures' interface is the kit's (lib/kit.ts): its CSS and fonts go in here, before the first figure builds.
   if (document.querySelector("[data-demo]")) {
     kit({ hue: KIT_HUE });
-    controls({
+    const ctl = controls({
       name: "explorations",
       label: "the figures' controls",
       phone: true,
@@ -116,6 +117,18 @@ export function initNav(): void {
       onChange: (open) => {
         document.body.classList.toggle("ui-off", !open);
         window.dispatchEvent(new CustomEvent("ui-toggle", { detail: open }));
+      },
+    });
+    // a picture of the figure most in view (G, or the camera before the sliders): its canvas as drawn, none of its
+    // controls; on the music pages G is a note, so F2 there
+    picture({
+      name: "algorythmic-explorations",
+      mount: right,
+      before: ctl.button,
+      letter: () => !MUSIC.test(location.pathname),
+      grab: () => {
+        const c = figureInView();
+        return c ? canvasPicture(c) : Promise.reject(new Error("no figure in view"));
       },
     });
   }
@@ -173,4 +186,18 @@ export function initNav(): void {
   }
   wrap.appendChild(grid);
   footer.parentNode?.insertBefore(wrap, footer);
+}
+
+/** the pages with a keyboard instrument on the letter keys */
+const MUSIC = /\/(living-music\/|core\/music-lab)/;
+
+/** the figure most in view: the canvas of a figure that covers the most of the window */
+function figureInView(): HTMLCanvasElement | null {
+  let best: HTMLCanvasElement | null = null, most = 0;
+  for (const c of document.querySelectorAll<HTMLCanvasElement>("[data-demo] canvas")) {
+    const r = c.getBoundingClientRect();
+    const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0), h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+    if (w > 0 && h > 0 && w * h > most) { most = w * h; best = c; }
+  }
+  return best;
 }

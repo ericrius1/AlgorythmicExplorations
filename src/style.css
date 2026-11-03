@@ -1013,8 +1013,9 @@ footer {
 }
 
 /* the controls' toggle (lib/controls.ts, the same in every project on ericlevin.dev), at the end of the bar in its
-   buttons' shape; folded, the figures keep only their canvases */
-.site-nav .ctl-toggle {
+   buttons' shape, the camera (lib/picture.ts, the same too) before it; folded, the figures keep only their canvases */
+.site-nav .ctl-toggle,
+.site-nav .pic-button {
   height: 1.75rem;
   gap: 0.4rem;
   padding: 0 0.4rem 0 0.5rem;
@@ -1027,18 +1028,24 @@ footer {
   --ctl-on-ink: var(--text);
   --ctl-on-bg: #1a1e2c;
   --ctl-on-edge: var(--border);
+  --pic-ink: var(--muted);
+  --pic-bg: transparent;
+  --pic-edge: var(--border);
 }
 
-.site-nav .ctl-toggle:hover {
+.site-nav .ctl-toggle:hover,
+.site-nav .pic-button:hover {
   border-color: var(--accent);
 }
 
-.site-nav .ctl-toggle svg {
+.site-nav .ctl-toggle svg,
+.site-nav .pic-button svg {
   width: 15px;
   height: 15px;
 }
 
-.site-nav .ctl-toggle kbd {
+.site-nav .ctl-toggle kbd,
+.site-nav .pic-button kbd {
   min-width: 15px;
   height: 15px;
   border-radius: 4px;
@@ -1049,9 +1056,11 @@ body.ui-off .demo-readout {
   display: none;
 }
 
-/* (a phone: the bar runs off its right edge, so the toggle leads the group where it can be reached) */
+/* (a phone: the bar runs off its right edge, so the toggle leads the group where it can be reached, the camera
+   (lib/picture.ts) just before it) */
 @media (max-width: 42rem) {
-  .site-nav .ctl-toggle {
+  .site-nav .ctl-toggle,
+  .site-nav .pic-button {
     order: -1;
   }
 }
