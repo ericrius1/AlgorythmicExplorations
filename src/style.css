@@ -945,6 +945,35 @@ footer {
   height: 18px;
 }
 
+/* and right after it, the X (Twitter) and the email in their pill, the same height, ink and edge */
+.site-nav .home-contact {
+  height: 1.75rem;
+  margin-right: 0.2rem;
+  box-shadow: none;
+  opacity: 1;
+  --home-ink: var(--muted);
+  --home-bg: transparent;
+  --home-edge: var(--border);
+}
+
+.site-nav .home-contact:hover {
+  border-color: var(--accent);
+}
+
+.site-nav .home-contact a {
+  width: 1.6rem;
+}
+
+.site-nav .home-contact svg {
+  width: 13px;
+  height: 13px;
+}
+
+.site-nav .home-contact .home-mail {
+  width: 15px;
+  height: 15px;
+}
+
 .site-nav-home {
   margin-right: auto;
   color: var(--text);
@@ -1126,6 +1155,11 @@ body.ui-off .demo-readout {
   }
 
   .site-nav-right > .site-nav-github {
+    display: none;
+  }
+
+  /* (and the X and the email's pill with them: the menu's Contact carries those too) */
+  .site-nav .home-contact {
     display: none;
   }
 
