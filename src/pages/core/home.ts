@@ -19,7 +19,7 @@ if (heroEl) {
 const seriesNames = [...new Set(POSTS.map((p) => p.series))];
 const meta = document.querySelector<HTMLElement>("[data-home-meta]");
 if (meta) {
-  meta.textContent = `${POSTS.length} interactive essays · ${seriesNames.length} series · every figure simulated live on your GPU`;
+  meta.textContent = `${POSTS.length} essays · ${seriesNames.length} series · every figure live`;
 }
 
 // ---- the essay index ---------------------------------------------------------

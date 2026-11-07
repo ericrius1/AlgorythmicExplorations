@@ -2,7 +2,7 @@
  {
   "id": "trailer",
   "title": "Trailer",
-  "sub": "Algorythmic Explorations in twenty-five seconds, cut to the song's peak. A galaxy spiralling out of dust, a wave of particles, the lava lamp, lightning and terrain raised from noise.",
+  "sub": "Twenty-five seconds, cut to the song's peak: a galaxy out of dust, a lava lamp, lightning, land raised from noise.",
   "date": "2026-11-02",
   "created": "2026-11-02T00:01-07:00",
   "seconds": 26,
@@ -17,7 +17,7 @@
  {
   "id": "bounced-light",
   "title": "Bounced Light",
-  "sub": "Five of the light pieces, played with live. Embers over a bonfire, a lamp carried from a red wall to a green one, a lava lamp warming up, light painted on the walls and smoke blown through shafts of sun. It's all lit in real time with radiance cascades.",
+  "sub": "Embers over a bonfire, a lamp carried from a red wall to a green one, light painted on the walls, smoke through shafts of sun.",
   "date": "2026-10-31",
   "seconds": 55,
   "width": 1280,
@@ -31,7 +31,7 @@
  {
   "id": "particle-worlds",
   "title": "Particle Worlds",
-  "sub": "A tank of 45,000 water particles splashed around with the cursor. Then a ring of dust collapsing under its own gravity into galaxies, and about 590,000 particles growing into a cosmic web.",
+  "sub": "A tank of water splashed with the cursor, a ring of dust falling into galaxies, a cosmic web growing.",
   "date": "2026-10-31",
   "seconds": 36,
   "width": 1280,
@@ -45,7 +45,7 @@
  {
   "id": "ground-truth",
   "title": "Ground Truth",
-  "sub": "A sunset flight over terrain that never runs out, a meadow moving in the wind, and a valley carved by ninety thousand simulated raindrops. Everything is generated live in the browser from noise.",
+  "sub": "A sunset flight over land that never runs out, a meadow in the wind, a valley carved by rain.",
   "date": "2026-10-31",
   "seconds": 52,
   "width": 1280,
@@ -59,7 +59,7 @@
  {
   "id": "thirteen-live-figures",
   "title": "Thirteen Live Figures",
-  "sub": "The film from the home page, thirteen pieces a few seconds each. Galaxies, water, fireworks, a bonfire, a lava lamp, a ferrofluid crown, a firing neuron, a synthesizer and a flight to the horizon.",
+  "sub": "Thirteen figures, a few seconds each: from galaxies to a firing neuron to the horizon.",
   "date": "2026-10-29",
   "seconds": 47,
   "width": 1280,
