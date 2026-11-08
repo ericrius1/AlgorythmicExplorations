@@ -8,6 +8,7 @@
 //   A S D F G H J K L ; '     white keys, A = C
 //   Z / X  octave down / up
 
+import { keysPlay } from "../../../lib/debugmode";
 export interface NoteTarget {
   el: HTMLElement;
   /** midi note of the A key */
@@ -152,6 +153,7 @@ class Router {
     window.addEventListener("scroll", remark, { passive: true });
     window.addEventListener("resize", remark, { passive: true });
     window.addEventListener("keydown", (e) => this.keydown(e));
+    keysPlay.on = true;
     window.addEventListener("keyup", (e) => this.keyup(e));
     window.addEventListener("blur", () => this.releaseAll());
   }

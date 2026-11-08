@@ -5,6 +5,7 @@
 // schemaVersion when that shape changes.
 
 import { Group, Panel, kit } from "./kit";
+import { pageDebug } from "./debugmode";
 import { KIT_HUE } from "./demoShell";
 
 export interface NumberSpec {
@@ -275,11 +276,8 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("ui-toggle", onUiToggle);
 
-  // the foot: frame rate and frame time, smoothed, told a few times a second
-  let fpsEma = 60;
-  let msEma = 16;
-  let last = performance.now();
-  let lastFoot = 0;
+  // the foot: how to reset (the frame rate and time are in the page's debug mode, ; : lib/debugmode.ts)
+  foot.textContent = ". resets";
 
   const devTools: DevTools<S> = {
     panel,
@@ -297,15 +295,7 @@ export function createDevTools<S extends ParamSchema>(opts: DevToolsOptions<S>):
     reset,
     persist: () => saveValues(values, opts.schemaVersion, opts.storageKey),
     tick() {
-      const now = performance.now();
-      const dt = now - last;
-      last = now;
-      fpsEma += (1000 / Math.max(dt, 0.01) - fpsEma) * 0.05;
-      msEma += (dt - msEma) * 0.05;
-      if (panel.open && now - lastFoot > 250) {
-        lastFoot = now;
-        foot.textContent = `${fpsEma.toFixed(0)} fps · ${msEma.toFixed(1)} ms · . resets`;
-      }
+      pageDebug();
     },
     dispose() {
       window.removeEventListener("keydown", onKeyDown);

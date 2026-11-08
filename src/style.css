@@ -2258,14 +2258,6 @@ body {
   gap: 0.3rem 0.6rem;
 }
 
-.essay .demo-fps {
-  flex: none;
-  padding: 0.02rem 0.45rem;
-  border-radius: 999px;
-  color: #8fe0b0;
-  background: rgba(125, 214, 160, 0.08);
-  border: 1px solid rgba(125, 214, 160, 0.2);
-}
 
 .essay .demo-info::before {
   content: none;

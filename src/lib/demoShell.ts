@@ -6,6 +6,7 @@
 // site's.
 
 import { Group, kit } from "./kit";
+import { registerDemo } from "./debugmode";
 
 // the kit's accent, turned to the site's blue (#7aa2ff)
 export const KIT_HUE = 222;
@@ -34,10 +35,7 @@ export class Shell {
   readonly controls: HTMLDivElement;
   readonly readout: HTMLSpanElement;
 
-  private fpsEma = 60;
-  private last = performance.now();
   private info: (() => string) | null = null;
-  private fpsEl = document.createElement("span");
   private infoEl = document.createElement("span");
 
   constructor(container: HTMLElement, aspect = 0.62) {
@@ -72,11 +70,12 @@ export class Shell {
     const bar = document.createElement("div");
     bar.className = "demo-readout";
     this.readout = document.createElement("span");
-    this.fpsEl.className = "demo-fps";
     this.infoEl.className = "demo-info";
-    this.readout.append(this.fpsEl, this.infoEl);
+    this.readout.append(this.infoEl);
     bar.appendChild(this.readout);
     container.appendChild(bar);
+    // (the frame rate is in the page's debug mode, ; : lib/debugmode.ts)
+    registerDemo(this.canvas, () => (this.info ? this.info() : ""));
   }
 
   // A kit slider in the strip. What comes back is a native range input, hidden
@@ -167,13 +166,8 @@ export class Shell {
   }
 
   tick(): void {
-    const now = performance.now();
-    const dt = now - this.last;
-    this.last = now;
-    this.fpsEma += (1000 / Math.max(dt, 0.01) - this.fpsEma) * 0.05;
-    // a demo that wrote its own readout text detached these; put them back
-    if (this.fpsEl.parentNode !== this.readout) this.readout.replaceChildren(this.fpsEl, this.infoEl);
-    this.fpsEl.textContent = `${this.fpsEma.toFixed(0)} fps`;
+    // a demo that wrote its own readout text detached this; put it back
+    if (this.infoEl.parentNode !== this.readout) this.readout.replaceChildren(this.infoEl);
     this.infoEl.textContent = this.info ? this.info() : "";
   }
 }

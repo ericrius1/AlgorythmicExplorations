@@ -6,6 +6,7 @@
 // that received their note-on, even if the target changes while a key is held.
 
 import "../../styles/music.css";
+import { keysPlay } from "../debugmode";
 import { installUnlock } from "./lifecycle";
 
 export type NoteSource = "qwerty" | "midi" | "pointer";
@@ -101,6 +102,7 @@ function releaseAllKeys(): void {
 function installKeys(): void {
   if (keysInstalled) return;
   keysInstalled = true;
+  keysPlay.on = true;
   window.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || typingInto(e)) return;
     const code = e.code;
