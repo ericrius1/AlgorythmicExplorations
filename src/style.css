@@ -14,6 +14,13 @@
   box-sizing: border-box;
 }
 
+/* a phone's browser doesn't zoom the page by a pinch or a double tap (it cropped the page): it scrolls, and the
+   figures take their own drags. The pinch is cancelled in each page's head too, for an iPhone */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
 body {
   margin: 0;
   background: var(--bg);
