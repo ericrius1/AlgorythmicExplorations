@@ -1,13 +1,15 @@
 // Open Species Registry for Small Minds: Part 5.
-// Starts with 6 distinct procedural 3D companions and is structured so adding
-// 10–20+ more species (crafted by any model or artist) is a single-line plug-in.
+// 3 procedural 3D companions crafted by Claude Opus 5.5 (Mochi, Kitsune, Pebble)
+// and 3 crafted by Gemini 4 Neon (Pip, Bramble, Luma) — press `;` in the
+// sanctuary to see live FPS, WebGPU LLM stats, and each creature's model author!
+// Adding up to 20+ more species only requires registering another builder here.
 
-import { EXTRA_SPECIES } from "./speciesExtra";
+import { CLAUDE_SPECIES } from "./speciesClaude";
 import { GEMINI_SPECIES } from "./speciesGemini";
 import type { SpeciesDefinition } from "./types";
 
 export const SPECIES_CATALOG: SpeciesDefinition[] = [
-  ...EXTRA_SPECIES,
+  ...CLAUDE_SPECIES,
   ...GEMINI_SPECIES,
 ];
 
