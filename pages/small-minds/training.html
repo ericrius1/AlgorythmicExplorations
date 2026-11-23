@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Teaching the Weights — Small Minds</title>
+    <meta
+      name="description"
+      content="Full Transformer backpropagation and live training in pure WebGPU: fused cross-entropy backward, FlashAttention gradients, AdamW vs Muon-style updates, and live text generation."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 3</p>
+        <h1>Teaching the Weights</h1>
+        <p class="subtitle">
+          Sending gradients backward through every WGSL kernel — and watching coherent words rise
+          out of Gaussian noise on your GPU in real time.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        The curve dropping overhead right now is not a pre-recorded animation. Every animation
+        frame, a real two-layer Transformer living inside WebGPU storage buffers reads a batch of
+        haiku lines, predicts the next character at every position, computes its cross-entropy error,
+        propagates exact gradients backward through SwiGLU, RMSNorm, FlashAttention, and RoPE, and
+        updates roughly 70,000 weights — all inside a single command encoder submission.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="loss"><span class="kicker">Step 1 · One clean gradient</span>Fused softmax and cross-entropy</h2>
+      <p>
+        At the top of the network, the LM head outputs one raw score (logit) per token in our
+        vocabulary. Turning those scores into probabilities via softmax and grading the true next
+        token with negative log-likelihood sounds complicated, yet their combined derivative collapses
+        into the single cleanest formula in deep learning:
+      </p>
+      <pre><code><span class="cm">// fused softmax + cross-entropy backward in ops.wgsl</span>
+let prob = exp(logits[v] - maxVal) / sumExp;
+let y    = select(0.0, 1.0, v == target);
+dLogits[v] = (prob - y) / f32(N);</code></pre>
+      <p>
+        That's it: <em>predicted probability minus truth</em>. If the model gave the right letter 95%
+        probability, the push is tiny (<code>−0.05</code>). If it gave a wrong letter 80%, the
+        gradient pushes that logit straight down by <code>+0.80</code>. Fusing the forward loss and
+        backward gradient into one WGSL pass means we never even allocate a separate probability
+        buffer.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="highway"><span class="kicker">Step 2 · The residual highway</span>Why deep gradients don't die</h2>
+      <p>
+        From <code>dLogits</code>, backpropagation walks backward layer by layer. Notice something
+        crucial about our architecture: every sub-block adds its output back into the main stream
+        via <code>x_next = x + f(RMSNorm(x))</code>. Because the derivative of addition is
+        <code>1</code>, gradients flow untouched straight down the residual stream from the top
+        layer all the way to the token embeddings, picking up gentle corrections at each layer
+        rather than multiplying together and blowing up.
+      </p>
+
+      <div
+        data-demo="grad-flow"
+        data-title="Backward gradient norms across depth"
+        data-hint="Toggle Residual or RMSNorm off and adjust weight gain"
+      ></div>
+
+      <p>
+        Try turning <strong>Residual: OFF</strong> and nudging <strong>weight gain</strong> just
+        slightly above or below <code>1.0</code>. Over 12 layers, even a tiny <code>1.2×</code>
+        factor explodes gradients by an order of magnitude, while <code>0.8×</code> starves the
+        earliest layers to zero. Flip <strong>Residual: ON</strong> back on and the highway
+        stabilizes immediately.
+      </p>
+      <details class="fold">
+        <summary>How FlashAttention backward avoids atomic contention</summary>
+        <div class="fold-body">
+          <p>
+            In WebGPU, floating-point storage buffers do not support native
+            <code>atomicAdd(f32)</code>. Rather than fighting software CAS loops, our
+            <code>attention.wgsl</code> splits attention backward into two clean, race-free compute
+            passes: <code>flash_attn_bwd_dq</code> assigns one thread per query position
+            <code>qt</code> (looping over keys <code>0..qt</code>), and
+            <code>flash_attn_bwd_dkv</code> assigns one thread per key position <code>kt</code>
+            (looping over future queries <code>kt..T-1</code>). Both recompute exact attention
+            probabilities from the saved scalar log-sum-exp <code>LSE</code>, writing directly to
+            their own rows with zero atomics and zero <code>T × T</code> matrices.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="trainer"><span class="kicker">Step 3 · Live training</span>Train your own micro-LLM in WebGPU</h2>
+      <p>
+        Once every parameter buffer has its gradient, our optimizer pass takes a step. You can
+        switch between classic decoupled <strong>AdamW</strong> (tracking per-weight first and
+        second moments) and a <strong>Muon-inspired</strong> RMS-steered Nesterov update that
+        equalizes step norms across 2D weight projections.
+      </p>
+      <p>
+        Pick a corpus below, press <strong>train</strong>, and watch the live loss curve plunge from
+        random guessing (<code>ln(98) ≈ 4.58</code> nats) down past <code>1.5</code> in just a few
+        seconds. Every 25 steps — or whenever you hit <strong>sample now</strong> — the model
+        generates fresh text straight from your GPU and renders its live causal attention matrix on
+        the right.
+      </p>
+
+      <div
+        data-demo="live-trainer"
+        data-title="Pure-WebGPU Micro-LLM Trainer"
+        data-hint="Pick a corpus, hit Train, and watch words emerge from noise"
+      ></div>
+
+      <p>
+        Watch the progression carefully: around step 15 it discovers spaces and line breaks; by step
+        60 it captures character pairs, speaker colons, or chord arrows; past step 150 real words,
+        rhymes, and jazz progressions emerge from weights that started as pure Gaussian static.
+      </p>
+      <p>
+        Now imagine we don't just train one fixed model by hand. What if we squeeze inference down
+        to 4-bit weights and let the browser run its <em>own</em> scientific loop — proposing
+        architectural tweaks, running timed WebGPU experiments, keeping improvements, and discarding
+        dead ends? That is <a href="/pages/small-minds/autoresearch.html">Part 4: The Browser That Researches Itself</a>.
+      </p>
+    </main>
+
+    <footer>
+      <p><a href="/index.html">← All essays</a></p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/training.ts"></script>
+  </body>
+</html>

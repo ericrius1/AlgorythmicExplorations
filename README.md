@@ -3,7 +3,7 @@
 [Source on GitHub](https://github.com/ericrius1/AlgorythmicExplorations) ·
 [Live site](https://www.ericlevin.dev/algorythmicexplorations/)
 
-Interactive essays where every figure is a live simulation, mostly WebGPU. 10 series, 39 essays.
+Interactive essays where every figure is a live simulation, mostly WebGPU. 11 series, 44 essays.
 
 **Particle Worlds**: A step-by-step n-body simulation, from two falling dots to 300,000 gravitating bodies.
 
@@ -73,6 +73,14 @@ Interactive essays where every figure is a live simulation, mostly WebGPU. 10 se
 **Spark & Signal**: Neurons, action potentials, synaptic transmission, and small circuits — explained with live simulations.
 
 1. [How Neurons Signal](pages/spark-signal/signaling.html)
+
+**Small Minds**: A modern LLM built from first principles in pure WebGPU — tiled SGEMM, RoPE, FlashAttention, live GPU backpropagation, 4-bit inference, browser AutoResearch, and a keystone living 3D companion that chats, plays, dreams, and evolves with you.
+
+1. [The Grid That Thinks](pages/small-minds/matmul.html)
+2. [Paying Attention in One Pass](pages/small-minds/attention.html)
+3. [Teaching the Weights](pages/small-minds/training.html)
+4. [The Browser That Researches Itself](pages/small-minds/autoresearch.html)
+5. [A Creature of Your Own](pages/small-minds/companion.html)
 
 ## How it's built
 

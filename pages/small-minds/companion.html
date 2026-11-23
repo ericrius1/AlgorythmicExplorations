@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>A Creature of Your Own — Small Minds</title>
+    <meta
+      name="description"
+      content="The Small Minds keystone project: an adorable 3D WebGPU companion powered by a live pure-WebGPU micro-LLM, continual online memory, trick reinforcement learning, and dream-time AutoResearch across five worlds."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero hero-title-below">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 5 · Keystone Project</p>
+        <h1>A Creature of Your Own</h1>
+        <p class="subtitle">
+          Adopt a tiny 3D companion whose brain trains live on your GPU — chat, pet, toss glowing
+          orbs, teach moves, explore five worlds, and put them to sleep to run AutoResearch dreams.
+        </p>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Everything in the sanctuary above runs locally in your browser with zero servers and zero
+        cloud APIs. Click directly on your companion to pet them, double-click the ground (or hit
+        <strong>Toss Orb ✦</strong>) to play fetch, chat to teach them your name and favorite words,
+        cue and reward physical tricks, or switch between six distinct species and five worlds drawn
+        from the other series on this site. Every weight tensor, episodic memory, trick score, and
+        evolution stage is persisted quietly in your browser's <code>IndexedDB</code>, so when you
+        return tomorrow, your companion picks up right where you left off.
+      </p>
+      <aside class="note">
+        <span class="note-label">Debug mode · press <code>;</code></span>
+        <p>
+          Hit the semicolon key <code>;</code> anywhere outside a text box (or add
+          <code>?debug</code> to the URL) to open the live telemetry overlay: frame rate, frame time,
+          JS heap, active species, <strong>3D model author</strong>, WebGPU LLM parameter count,
+          training steps, decode speed, plus one-click buttons to preview evolution stages 1–4.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="brain"><span class="kicker">Architecture · Part 1</span>Continual learning without forgetting</h2>
+      <p>
+        A pet that never changes gets stale in five minutes; a neural network that only trains on
+        the newest message suffers <strong>catastrophic forgetting</strong>, overwriting its entire
+        vocabulary with the last sentence you typed. Our companion solves this with an
+        <strong>episodic replay buffer</strong>.
+      </p>
+      <p>
+        Whenever you send a message, the pet first runs real autoregressive decoding through our
+        pure-WebGPU micro-Transformer (<code>RMSNorm + RoPE + FlashAttention + SwiGLU</code>) and
+        captures its live Layer-0 attention heatmap. It then appends your exchange to its personal
+        memory bank and executes a short burst of conservative WebGPU gradient steps sampled from a
+        mixture of its species personality seed, core dialogue, and your personal memories. Open the
+        <strong>Brain Peek</strong> tab above after a few chats to inspect the live attention map,
+        falling cross-entropy loss, and raw token samples straight from GPU memory.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="tricks"><span class="kicker">Architecture · Part 2</span>Teaching moves with policy gradients</h2>
+      <p>
+        Chat is only one channel. Real companions learn physical habits through play and
+        reinforcement. Inside the <strong>Teach Moves</strong> tab, six procedural animations
+        (<em>Hop</em>, <em>Spin</em>, <em>Sing</em>, <em>Zoomies</em>, <em>Bow</em>, and
+        <em>Starflip</em>) sit behind a compact policy weight table.
+      </p>
+      <p>
+        When you cue a move and click <strong>Reward ✦</strong>, a reward-modulated policy step
+        raises that trick's logit and mastery score while boosting bond and experience. As mastery
+        climbs, your companion begins performing favorite learned moves spontaneously when happy and
+        unlocks higher visual evolution stages.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="dreams"><span class="kicker">Architecture · Part 3</span>Recursive self-improvement while dreaming</h2>
+      <p>
+        Why should a pet stop learning when the conversation pauses? Tap
+        <strong>Start Dream Cycle ☽</strong> in the <strong>Dream</strong> tab and the sanctuary
+        dims to twilight. Your creature closes its eyes and breathes slowly while the
+        <a href="/pages/small-minds/autoresearch.html">Part 4 Browser AutoResearcher</a> wakes up in
+        the background, running UCB-bandit optimization experiments over your pet's personal replay
+        buffer on WebGPU and consolidating calmer, lower-loss weights before waking back up.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="worlds"><span class="kicker">Architecture · Part 4</span>Five worlds from across this site</h2>
+      <p>
+        Every sanctuary backdrop borrows an idea from an earlier series in
+        <em>Algorythmic Explorations</em>:
+      </p>
+      <ul>
+        <li><strong>Meadow Valley</strong> (<em>Ground Truth</em>) — procedural terrain contour, hundreds of instanced wind-swaying grass blades, and drifting twilight fireflies.</li>
+        <li><strong>Starlight Nebula</strong> (<em>Particle Worlds</em>) — a floating crystal plinth ringed by Keplerian orbital dust motes that accelerate when your pet plays.</li>
+        <li><strong>Bonfire Clearing</strong> (<em>Bounced Light</em>) — a flickering warm campfire sending luminous embers curling into the dark sky.</li>
+        <li><strong>Harmonic Hall</strong> (<em>Living Music &amp; Acoustic Spaces</em>) — concentric acoustic floor rings that pulse with gentle pentatonic Web Audio chimes whenever your pet hops or sings.</li>
+        <li><strong>Ferro Sanctuary</strong> (<em>Strange Matter</em>) — a glossy obsidian magnetic pool that ripples and raises Rosensweig-style spikes whenever your pet moves or you tap the floor.</li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="species"><span class="kicker">Architecture · Part 5</span>Six evolving species, built to grow to twenty</h2>
+      <p>
+        Each species is defined by a self-contained procedural 3D rig implementing a shared
+        <code>SpeciesDefinition</code> interface — smooth look-at eye tracking, natural blinks,
+        happy crescent squints when petted, neural glow tied to live WebGPU attention energy, and
+        four visual evolution stages (<em>Hatchling → Curious Sprout → Radiant Friend → Starlight
+        Sage</em>) that unlock collars, constellations, spirit fox tails, and celestial crowns.
+      </p>
+      <p>
+        Adding a seventh or twentieth creature only takes registering one more builder in
+        <code>speciesRegistry.ts</code>. Spin the gallery turntable below to inspect all six
+        companions across every evolution stage and watch their signature moves up close.
+      </p>
+
+      <div
+        data-demo="gallery"
+        data-title="Species &amp; evolution turntable"
+        data-hint="Drag to orbit · cycle species and evolution stage 1–4"
+      ></div>
+
+      <p>
+        From a single 16×16 shared-memory tile in Part 1 to a tiny evolving creature dreaming better
+        weights in your browser tab — every layer of the stack is right here in the source, open to
+        poke, break, and expand with new species, new worlds, and new learning rules.
+      </p>
+    </main>
+
+    <footer>
+      <p><a href="/index.html">← All essays</a></p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/companion.ts"></script>
+  </body>
+</html>

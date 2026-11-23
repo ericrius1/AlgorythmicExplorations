@@ -43,6 +43,8 @@ export const SERIES_TAGLINES: Record<string, string> = {
     "A solar cell, photon by photon.",
   "Spark & Signal":
     "How a neuron fires, and what it tells the next.",
+  "Small Minds":
+    "An LLM built from scratch on WebGPU, up to a dreaming companion that grows with you.",
 };
 
 export const POSTS: Post[] = [
@@ -318,6 +320,41 @@ export const POSTS: Post[] = [
     part: 1,
     title: "How Neurons Signal",
     subtitle: "From one ion to twenty thousand neurons",
+  },
+  {
+    href: "/pages/small-minds/matmul.html",
+    series: "Small Minds",
+    part: 1,
+    title: "The Grid That Thinks",
+    subtitle: "Matrix tiles, shared memory, and tokens on WebGPU",
+  },
+  {
+    href: "/pages/small-minds/attention.html",
+    series: "Small Minds",
+    part: 2,
+    title: "Paying Attention in One Pass",
+    subtitle: "RoPE, FlashAttention's online softmax, RMSNorm, and SwiGLU",
+  },
+  {
+    href: "/pages/small-minds/training.html",
+    series: "Small Minds",
+    part: 3,
+    title: "Teaching the Weights",
+    subtitle: "Backpropagation and training a Transformer live on your GPU",
+  },
+  {
+    href: "/pages/small-minds/autoresearch.html",
+    series: "Small Minds",
+    part: 4,
+    title: "The Browser That Researches Itself",
+    subtitle: "4-bit decode and an autonomous WebGPU research loop",
+  },
+  {
+    href: "/pages/small-minds/companion.html",
+    series: "Small Minds",
+    part: 5,
+    title: "A Creature of Your Own",
+    subtitle: "A living WebGPU companion that chats, plays, dreams, and evolves",
   },
 ];
 

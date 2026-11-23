@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Grid That Thinks — Small Minds</title>
+    <meta
+      name="description"
+      content="Building a language model from first principles in pure WebGPU: why LLMs are 95% matrix multiplication, workgroup shared-memory tiling, arithmetic intensity, and BPE tokenization."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 1</p>
+        <h1>The Grid That Thinks</h1>
+        <p class="subtitle">
+          Before a single word is predicted, a language model is a memory-bandwidth puzzle solved
+          in tiny 16×16 tiles of shared GPU silicon.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Strip away the mystique around modern language models and you are left with a remarkably
+        compact machine. Almost everything a Transformer does — projecting tokens into queries,
+        keys, and values, routing concepts through gated feed-forward layers, predicting the next
+        character, and sending gradients backward through time — boils down to one operation repeated
+        hundreds of times per second: multiplying two dense grids of floating-point numbers.
+      </p>
+      <p>
+        In this five-part series, we are going to build an entire modern language model from raw
+        metal inside your browser tab using <strong>pure WebGPU</strong> and hand-written WGSL
+        compute shaders — no ML runtimes, no ONNX, no black boxes. We will start with matrix math
+        and tokens here, build RoPE and FlashAttention in
+        <a href="/pages/small-minds/attention.html">Part 2</a>, wire up full GPU backpropagation in
+        <a href="/pages/small-minds/training.html">Part 3</a>, turn your browser into an autonomous
+        researcher that mutates and improves its own models in
+        <a href="/pages/small-minds/autoresearch.html">Part 4</a>, and finally pour all of it into a
+        <a href="/pages/small-minds/companion.html">living 3D companion</a> that chats, plays,
+        dreams, and grows with you across visits.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="roofline"><span class="kicker">Step 1 · Hardware reality</span>Why GPUs wait on memory, not math</h2>
+      <p>
+        A modern laptop or phone GPU can perform trillions of floating-point multiply-adds every
+        second, yet its main memory (VRAM or unified DRAM) can only feed a tiny fraction of those
+        numbers across the wire each cycle. Computer architects call the ratio between math done and
+        bytes moved <strong>arithmetic intensity</strong>.
+      </p>
+      <p>
+        When you write the textbook triple-loop matrix multiply in a compute shader — one thread per
+        output element <code>C[row, col]</code>, looping <code>k = 0..K-1</code> — every fused
+        multiply-add (2 FLOPs) reads two 4-byte floats (8 bytes) straight from global memory. That
+        gives an arithmetic intensity of just <code>0.25 FLOP/byte</code>. Your GPU's arithmetic
+        units sit idle almost the entire time waiting for bytes to arrive.
+      </p>
+      <pre><code><span class="cm">// Naive: every thread hits global DRAM 2·K times</span>
+for (var k = 0u; k &lt; dims.K; k++) {
+  acc = fma(A[row * dims.K + k], B[k * dims.N + col], acc);
+}</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="tiling"><span class="kicker">Step 2 · Shared memory</span>Sixteen-by-sixteen cooperation</h2>
+      <p>
+        The trick that unlocks GPU speed is noticing that neighboring output cells need the exact
+        same rows of <code>A</code> and columns of <code>B</code>. Instead of letting 256 threads
+        fetch the same numbers independently from slow global memory, we group them into a
+        <code>16 × 16</code> workgroup and give them two tiny scratchpads inside fast on-chip SRAM
+        using WGSL's <code>var&lt;workgroup&gt;</code>.
+      </p>
+      <pre><code>var&lt;workgroup&gt; tileA: array&lt;f32, 256&gt;;
+var&lt;workgroup&gt; tileB: array&lt;f32, 256&gt;;
+
+for (var t = 0u; t &lt; numTiles; t++) {
+  tileA[ly * 16u + lx] = A[row * K + t * 16u + lx];
+  tileB[ly * 16u + lx] = B[(t * 16u + ly) * N + col];
+  workgroupBarrier();
+  for (var k = 0u; k &lt; 16u; k++) {
+    acc = fma(tileA[ly * 16u + k], tileB[k * 16u + lx], acc);
+  }
+  workgroupBarrier();
+}</code></pre>
+      <p>
+        Each thread loads just <em>one</em> element of <code>A</code> and <em>one</em> element of
+        <code>B</code> per tile, waits at <code>workgroupBarrier()</code>, and then performs 16
+        multiply-adds out of on-chip SRAM before touching main memory again. Global memory traffic
+        instantly drops by <strong>16×</strong>, pushing arithmetic intensity up to
+        <code>4.0 FLOP/byte</code>. Below, both WGSL kernels race live on your actual GPU and
+        verify their outputs match to floating-point precision.
+      </p>
+
+      <div
+        data-demo="gemm-race"
+        data-title="Naive vs. 16×16 shared-memory SGEMM"
+        data-hint="Slide matrix size N to race both WebGPU kernels"
+      ></div>
+
+      <p>
+        Try pushing <code>N</code> up to 1024. At small sizes, dispatch overhead hides the gap; once
+        matrices outgrow the L1 cache, the tiled kernel pulls dramatically ahead because its threads
+        cooperate instead of competing for the memory bus. Every linear layer in our Transformer —
+        forward projections (<code>A @ Bᵀ</code>), backward activation gradients
+        (<code>dY @ W</code>), and weight gradients (<code>dYᵀ @ X</code>) — reuses this exact
+        16×16 workgroup-tiling engine.
+      </p>
+      <details class="fold">
+        <summary>Why three matmul layouts matter for backpropagation</summary>
+        <div class="fold-body">
+          <p>
+            A linear layer computes <code>Y = X · Wᵀ</code> where <code>X</code> is
+            <code>[N, D_in]</code> and <code>W</code> is <code>[D_out, D_in]</code>. During the
+            backward pass we need two different transposes without copying or transposing buffers in
+            memory: <code>dX = dY · W</code> (standard tiled <code>A @ B</code>) and
+            <code>dW += dYᵀ · X</code> (tiled <code>Aᵀ @ B</code> with an accumulate flag). Writing
+            those three tiled entry points in <code>matmul.wgsl</code> eliminates every intermediate
+            transpose kernel from our training step.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="tokens"><span class="kicker">Step 3 · Words into vectors</span>Tokenization and embeddings</h2>
+      <p>
+        Matrix multipliers only speak floats, so our first bridge from human language to silicon is
+        twofold: slice text into integer IDs (<strong>tokenization</strong>), then look up each ID
+        in a learned table of vectors <code>W_E</code> (<strong>embeddings</strong>).
+      </p>
+      <p>
+        Real frontier models use <strong>Byte-Pair Encoding (BPE)</strong>: start with individual
+        characters, count every adjacent pair in the text, merge the single most frequent pair into
+        a new token ID, and repeat. Common words collapse into single integers while rare words fall
+        back cleanly to pieces. Type anything into the box below and drag the merge slider to watch
+        BPE compress the stream and project every unique token into a vector neighborhood.
+      </p>
+
+      <div
+        data-demo="tokenizer-embed"
+        data-title="Live BPE merges &amp; embedding space"
+        data-hint="Type your own sentence and drag BPE merges"
+      ></div>
+
+      <p>
+        For our interactive in-browser GPU trainer in Parts 3 through 5, we will use a crisp
+        98-token printable-ASCII vocabulary. That keeps the output softmax matrix tiny —
+        <code>[N, 98]</code> instead of <code>[N, 50257]</code> — so a complete Transformer can train
+        at hundreds of steps per second on your browser GPU while still spelling arbitrary English,
+        punctuation, and code from scratch. Next up: teaching those token vectors how to talk to
+        each other in <a href="/pages/small-minds/attention.html">Part 2: Paying Attention in One Pass</a>.
+      </p>
+    </main>
+
+    <footer>
+      <p><a href="/index.html">← All essays</a></p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/matmul.ts"></script>
+  </body>
+</html>

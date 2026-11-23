@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Paying Attention in One Pass — Small Minds</title>
+    <meta
+      name="description"
+      content="Modern Transformer internals in pure WebGPU: Rotary Positional Embeddings (RoPE), FlashAttention's online safe softmax, RMSNorm, and SwiGLU gated feed-forward blocks."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 2</p>
+        <h1>Paying Attention in One Pass</h1>
+        <p class="subtitle">
+          How RoPE encodes distance as rotation, why FlashAttention never writes its score matrix to
+          VRAM, and how RMSNorm + SwiGLU replaced the 2017 Transformer.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Once a sentence becomes a sequence of embedding vectors, each token sits in isolation: the
+        vector for <em>"it"</em> has no idea whether it refers to <em>"cat"</em> or
+        <em>"star"</em> five positions earlier. Self-attention solves that by turning every token
+        into three projections — a <strong>Query</strong> (what I am looking for), a
+        <strong>Key</strong> (what I offer), and a <strong>Value</strong> (what information I pass
+        along if matched) — and blending earlier values in proportion to how strongly their keys
+        align with my query.
+      </p>
+      <p>
+        Because we are building a language model that predicts the next token, position
+        <code>t</code> is only allowed to look backward at positions <code>0..t</code> — never into
+        the future. Above, click <strong>next head</strong> to watch different attention heads
+        specialize: one locks onto subjects, another tracks local syntax, and another bridges
+        long-range pronouns across the sentence.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="rope"><span class="kicker">Step 1 · Position as angle</span>Rotary Positional Embeddings (RoPE)</h2>
+      <p>
+        Raw dot products are blind to word order: shuffle the sentence and every query-key score
+        stays identical. Early Transformers added a learned position vector straight onto the token
+        embedding. Modern architectures (Llama, Qwen, DeepSeek) do something far cleaner:
+        <strong>Rotary Positional Embeddings (RoPE)</strong>.
+      </p>
+      <p>
+        Pair up adjacent dimensions <code>(x₀, x₁), (x₂, x₃), …</code> inside every Query and Key
+        head, and rotate each pair in its 2D plane by an angle proportional to token position
+        <code>t · ω_p</code>, where frequencies sweep geometrically from fast local clocks
+        (<code>ω = 1</code>) down to slow long-range clocks (<code>ω = θ⁻¹</code>). When you take
+        the dot product between query at position <code>m</code> and key at position <code>n</code>,
+        the absolute angles cancel out and leave a function of <em>only</em> their relative distance
+        <code>m − n</code>:
+      </p>
+      <pre><code>⟨R(m) q, R(n) k⟩ = qᵀ R(n − m) k   <span class="cm">// pure relative distance!</span></code></pre>
+
+      <div
+        data-demo="rope"
+        data-title="Rotary Positional Embeddings as 2D clocks"
+        data-hint="Move m and n together — relative angle stays frozen"
+      ></div>
+
+      <p>
+        Try moving both <strong>query pos m</strong> and <strong>key pos n</strong> upward by the
+        same amount (say from <code>(12, 5)</code> to <code>(20, 13)</code>). All four phasor pairs
+        spin around their circles, yet every green wedge and every cosine score stays locked to the
+        exact same number. And during backpropagation, the gradient through RoPE is trivial: just
+        call the exact same shader with <code>sign = -1.0</code> to rotate backward.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="flash"><span class="kicker">Step 2 · Online softmax</span>FlashAttention in one pass</h2>
+      <p>
+        Textbook attention computes <code>S = QKᵀ / √d</code>, writes that entire
+        <code>T × T</code> matrix to GPU memory, reads it back to compute softmax, writes the
+        probabilities out again, and reads them back a third time to multiply by <code>V</code>.
+        For long sequences, those quadratic <code>O(T²)</code> global memory reads dominate
+        everything.
+      </p>
+      <p>
+        <strong>FlashAttention</strong> eliminates the <code>T × T</code> matrix completely using
+        <em>online safe softmax</em>. Each GPU thread keeps its query vector plus three tiny running
+        values in on-chip registers: the largest score seen so far <code>m_i</code>, the running
+        exponential sum <code>l_i</code>, and the running weighted value vector <code>O_i</code>. As
+        each new key-value arrives, if a larger score appears we simply rescale the accumulated sum
+        by <code>exp(m_old − m_new)</code> and keep going:
+      </p>
+      <pre><code>let m_new = max(m_i, score);
+let alpha = exp(m_i - m_new);
+let p_ij  = exp(score - m_new);
+oAcc = oAcc * alpha + p_ij * V[kt];
+l_i  = l_i * alpha + p_ij;
+m_i  = m_new;</code></pre>
+
+      <div
+        data-demo="flash-attn"
+        data-title="FlashAttention running (m, l, O) verified on WebGPU"
+        data-hint="Slide sequence length T to compare VRAM traffic"
+      ></div>
+
+      <p>
+        The readout above isn't a mockup: every time you drag <strong>sequence T</strong>, our
+        actual <code>flash_attn_fwd</code> WGSL compute shader executes on your GPU and checks its
+        output against exact naive softmax. The maximum numerical difference sits around
+        <code>10⁻⁷</code> (pure floating-point rounding), while VRAM traffic drops from
+        <code>O(T²)</code> down to a single scalar log-sum-exp per query row — which is also all we
+        need to recompute probabilities during the backward pass!
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="block"><span class="kicker">Step 3 · Modern block</span>RMSNorm and SwiGLU</h2>
+      <p>
+        Between attention layers sits the feed-forward network — the model's key-value memory bank.
+        Two quiet upgrades since 2017 make small models train dramatically cleaner:
+      </p>
+      <p>
+        First, <strong>RMSNorm</strong> drops mean-centering from LayerNorm and divides each vector
+        only by its root-mean-square length, cutting memory passes in half while keeping activation
+        scales rock-steady. Second, <strong>SwiGLU</strong> projects the normalized stream through
+        two parallel matrices — a <em>gate</em> passed through <code>SiLU(g) = g · σ(g)</code> and
+        an <em>up</em> path — then multiplies them elementwise so every feature can smoothly switch
+        itself on or off.
+      </p>
+
+      <div
+        data-demo="block"
+        data-title="RMSNorm stability &amp; SwiGLU multiplicative gating"
+        data-hint="Crank signal scale up and toggle RMSNorm off"
+      ></div>
+
+      <p>
+        Try pushing <strong>signal scale</strong> to <code>6×</code> with RMSNorm on: columns 2 and
+        3 don't even flinch. Now click <strong>RMSNorm: OFF</strong> and watch the downstream
+        activations explode off the rails. With tiled SGEMM, RoPE, FlashAttention, RMSNorm, and
+        SwiGLU all running in WGSL, we have the complete forward pass of a modern LLM. Time to send
+        gradients backward and teach the weights to speak in
+        <a href="/pages/small-minds/training.html">Part 3: Teaching the Weights</a>.
+      </p>
+    </main>
+
+    <footer>
+      <p><a href="/index.html">← All essays</a></p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/attention.ts"></script>
+  </body>
+</html>
