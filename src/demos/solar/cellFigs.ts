@@ -423,8 +423,8 @@ export async function mountTwoGaps(container: HTMLElement): Promise<Demo> {
             xTicks: [1.4, 1.6, 1.8, 2.0, 2.2],
           },
         );
-        hudLabel(stage, [1.1, -0.55, -0.15], "top cell: takes everything above its gap", [16, -10], "rgba(150, 240, 200, 0.8)");
-        hudLabel(stage, [1.1, -0.55, -0.6], "silicon: what's left above 1.12 eV", [16, 10], "rgba(160, 190, 255, 0.8)");
+        hudLabel(stage, [1.1, -0.55, -0.15], "top cell: absorbs above its gap", [16, -24], "rgba(150, 240, 200, 0.9)");
+        hudLabel(stage, [-1.1, -0.55, -0.58], "silicon: catches the rest above 1.12 eV", [-14, 14], "rgba(160, 190, 255, 0.9)");
       }
       shell.tick();
     },
@@ -563,7 +563,7 @@ export async function mountSeriesStack(container: HTMLElement): Promise<Demo> {
           marker: [r.stack.vmp, r.stack.jmp],
           xTicks: [0, 0.5, 1, 1.5, 2],
         });
-        hudLabel(stage, [1.1, -0.55, -0.265], "the junction: holes from above meet electrons from below", [16, -12], "rgba(220, 200, 255, 0.85)");
+        hudLabel(stage, [-1.1, -0.55, -0.265], "junction: holes meet electrons", [-14, 18], "rgba(220, 200, 255, 0.92)");
       }
       shell.tick();
     },

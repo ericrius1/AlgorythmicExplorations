@@ -171,7 +171,7 @@ function dragging<T extends string>(
 }
 
 // An offscreen image at device resolution, redrawn only when `key` changes.
-// `shade` gives the colour of pixel (i, j) of a W×H image, or null for clear.
+// `shade` gives the color of pixel (i, j) of a W×H image, or null for clear.
 class Raster {
   private canvas = document.createElement("canvas");
   private key = "";
@@ -242,7 +242,7 @@ function domePattern(d: Vec3, lineDeg = 0.7): RGB {
 const TEX_W = 12;
 const TEX_H = 5;
 
-// A tiny texture: twelve columns that go once round a colour wheel (so the
+// A tiny texture: twelve columns that go once round a color wheel (so the
 // content itself is seamless) and five rows of alternating brightness.
 function texel(i: number, j: number): RGB {
   const t = i / TEX_W;
@@ -409,7 +409,7 @@ export function mountPolarCircle(container: HTMLElement): Demo {
         line(ctx, m.cx, m.cy, m.px, m.py, "#ffffff", 2);
         dot(ctx, m.cx, m.cy, 3, C.text);
         handle(ctx, m.px, m.py);
-        const mid = theta / 2;
+        const mid = theta < 0.28 ? 0.16 : theta / 2;
         label(ctx, "θ", m.cx + Math.cos(mid) * m.s * 0.33, m.cy - Math.sin(mid) * m.s * 0.33, { color: C.good, size: fs + 2 });
         label(ctx, "r", (m.cx + m.px) / 2 + 8 * Math.sin(theta), (m.cy + m.py) / 2 + 8 * Math.cos(theta), { size: fs + 2 });
         label(ctx, "the circle: (x, y) or (r, θ)", m.cx, m.cy - m.s - (narrow ? 12 : 22), { size: fs, align: "center" });
@@ -439,7 +439,7 @@ export function mountPolarCircle(container: HTMLElement): Demo {
         label(ctx, "1", m.rx + m.rw, by, { size: fs - 2, color: C.warm, mono: true, align: "center" });
         if (!narrow) {
           label(ctx, "v = 1, edge", m.rx + m.rw + 8, m.ry + 6, { size: fs - 2, mono: true, color: C.muted, weight: 400 });
-          label(ctx, "v = 0, centre", m.rx + m.rw + 8, m.ry + m.rh - 6, { size: fs - 2, mono: true, color: C.muted, weight: 400 });
+          label(ctx, "v = 0, center", m.rx + m.rw + 8, m.ry + m.rh - 6, { size: fs - 2, mono: true, color: C.muted, weight: 400 });
         }
       });
       shell.tick();
@@ -497,18 +497,18 @@ function fisheyeLayout(w: number, h: number, narrow: boolean) {
       fr,
       fc: { x: w * 0.5, y: 22 + fr },
       dr: Math.min(w * 0.2, h * 0.13),
-      dc: { x: w * 0.26, y: h * 0.78 },
-      chart: { x: w * 0.56, y: h * 0.58, w: w * 0.4, h: h * 0.2 },
-      textY: h * 0.94,
+      dc: { x: w * 0.26, y: h * 0.77 },
+      chart: { x: w * 0.56, y: h * 0.56, w: w * 0.4, h: h * 0.19 },
+      textY: h * 0.95,
     };
   }
   const fr = Math.min(w * 0.22, h * 0.36);
   return {
     fr,
     fc: { x: w * 0.27, y: h * 0.46 },
-    dr: Math.min(w * 0.17, h * 0.3),
-    dc: { x: w * 0.73, y: h * 0.44 },
-    chart: { x: w * 0.6, y: h * 0.58, w: w * 0.3, h: h * 0.24 },
+    dr: Math.min(w * 0.17, h * 0.29),
+    dc: { x: w * 0.73, y: h * 0.42 },
+    chart: { x: w * 0.58, y: h * 0.55, w: w * 0.34, h: h * 0.22 },
     textY: h * 0.92,
   };
 }
@@ -550,7 +550,7 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
     onInput: (v) => (zenithDeg = v),
   });
   shell.slider({
-    label: "lens field of view",
+    label: "field of view",
     min: 120,
     max: 180,
     step: 1,
@@ -558,10 +558,11 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
     format: (v) => `${v.toFixed(0)}°`,
     onInput: (v) => (fovDeg = v),
   });
-  const lawButton = shell.button(`law: ${FISHEYE_LAWS[0].name}`, () => {
-    lawIndex = (lawIndex + 1) % FISHEYE_LAWS.length;
+  const setLaw = (idx: number): void => {
+    lawIndex = ((idx % FISHEYE_LAWS.length) + FISHEYE_LAWS.length) % FISHEYE_LAWS.length;
     lawButton.textContent = `law: ${FISHEYE_LAWS[lawIndex].name}`;
-  });
+  };
+  const lawButton = shell.button(`law: ${FISHEYE_LAWS[0].name}`, () => setLaw(lawIndex + 1));
   const spinButton = shell.button("spin φ", () => {
     spinning = !spinning;
     spinButton.textContent = spinning ? "stop" : "spin φ";
@@ -612,6 +613,52 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
     },
   );
 
+  // Order the legend entries top-to-bottom as the curves appear on the plot:
+  // orthographic (highest), equisolid, equidistant (diagonal), stereographic (lowest).
+  const LEGEND_ORDER = [2, 1, 0, 3];
+  const legendItems = (m: ReturnType<typeof metrics>, w: number, h: number) => {
+    const ch = m.chart;
+    if (narrow) {
+      const colW = (w - 24) / 2;
+      const y0 = h * 0.845;
+      return LEGEND_ORDER.map((idx, pos) => ({
+        idx,
+        x: 16 + (pos % 2) * colW,
+        y: y0 + Math.floor(pos / 2) * 18,
+        w: colW - 8,
+        h: 16,
+      }));
+    }
+    const colW = Math.max(122, ch.w * 0.52);
+    const y0 = ch.y + ch.h + 30;
+    return LEGEND_ORDER.map((idx, pos) => ({
+      idx,
+      x: ch.x + (pos % 2) * colW,
+      y: y0 + Math.floor(pos / 2) * 19,
+      w: colW - 6,
+      h: 18,
+    }));
+  };
+  const hitLegend = (x: number, y: number): number => {
+    const w = shell.canvas.clientWidth;
+    const h = shell.canvas.clientHeight;
+    const items = legendItems(metrics(), w, h);
+    for (const it of items) {
+      if (x >= it.x - 4 && x <= it.x + it.w && y >= it.y - it.h / 2 && y <= it.y + it.h / 2) return it.idx;
+    }
+    return -1;
+  };
+  shell.canvas.addEventListener("pointermove", (e) => {
+    if (shell.canvas.style.cursor === "grabbing" || shell.canvas.style.cursor === "grab") return;
+    const p = pointerPoint(shell.canvas, e);
+    shell.canvas.style.cursor = hitLegend(p.x, p.y) >= 0 ? "pointer" : "default";
+  });
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const p = pointerPoint(shell.canvas, e);
+    const idx = hitLegend(p.x, p.y);
+    if (idx >= 0) setLaw(idx);
+  });
+
   shell.setInfo(() => {
     const m = metrics();
     const law = FISHEYE_LAWS[lawIndex];
@@ -625,7 +672,7 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
         phi = normAngle(phi + 0.005);
         syncSlider(phiSlider, phi);
       }
-      withCanvas(shell.canvas, (ctx, w, _h, dpr) => {
+      withCanvas(shell.canvas, (ctx, w, h, dpr) => {
         const m = metrics();
         const law = FISHEYE_LAWS[lawIndex];
         const fs = narrow ? 11 : 13;
@@ -692,8 +739,8 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
         line(ctx, ch.x, ch.y, ch.x, ch.y + ch.h, C.gridStrong);
         FISHEYE_LAWS.forEach((L, k) => {
           ctx.strokeStyle = L.color;
-          ctx.globalAlpha = k === lawIndex ? 1 : 0.32;
-          ctx.lineWidth = k === lawIndex ? 2.2 : 1.2;
+          ctx.globalAlpha = k === lawIndex ? 1 : 0.5;
+          ctx.lineWidth = k === lawIndex ? 2.4 : 1.35;
           ctx.beginPath();
           for (let s = 0; s <= 48; s++) {
             const t = (s / 48) * m.maxT;
@@ -712,7 +759,23 @@ export function mountFisheyeMap(container: HTMLElement): Demo {
         dot(ctx, mx, my, 4, law.color);
         label(ctx, "ρ", ch.x - 10, ch.y + 4, { size: fs, color: C.muted, align: "center" });
         label(ctx, "θ →", ch.x + ch.w, ch.y + ch.h + 12, { size: fs - 1, color: C.muted, align: "right" });
-        label(ctx, law.formula, ch.x + 6, ch.y - 10, { size: fs - 1, mono: true, color: law.color });
+        label(ctx, law.formula, ch.x + 6, ch.y - 11, { size: fs - 1, mono: true, color: law.color });
+
+        // compact color-coded legend for all four lens laws (clickable)
+        const items = legendItems(m, w, h);
+        for (const it of items) {
+          const L = FISHEYE_LAWS[it.idx];
+          const active = it.idx === lawIndex;
+          ctx.save();
+          ctx.globalAlpha = active ? 1 : 0.72;
+          line(ctx, it.x, it.y, it.x + 12, it.y, L.color, active ? 2.6 : 1.6);
+          ctx.restore();
+          label(ctx, L.name, it.x + 17, it.y, {
+            size: narrow ? 10 : 11,
+            color: active ? L.color : C.muted,
+            weight: active ? 600 : 400,
+          });
+        }
 
         const dir = domeDirection(phi, m.th);
         const uvX = 0.5 + 0.5 * Math.cos(phi) * m.rho;
@@ -1084,11 +1147,11 @@ export function mountWarpBlendShow(container: HTMLElement): Demo {
     max: 0.5,
     step: 0.01,
     value: state.misalign,
-    format: (v) => `${(v * 100).toFixed(0)}% of a cell`,
+    format: (v) => `${(v * 100).toFixed(0)}% cell`,
     onInput: (v) => (state.misalign = v),
   });
   shell.slider({
-    label: "projector black level",
+    label: "black level",
     min: 0,
     max: 0.06,
     step: 0.001,
@@ -1173,7 +1236,8 @@ export function mountWarpBlendShow(container: HTMLElement): Demo {
         label(ctx, "from B", x0 + (narrow ? 78 : 92), py - 2, { size: fs - 1, color: C.warm, weight: 500 });
         label(ctx, "total", x0 + (narrow ? 130 : 150), py - 2, { size: fs - 1, color: "#ffffff", weight: 500 });
         const dip = light(1, 0.5) - 2 * state.black;
-        label(ctx, `${(dip * 100).toFixed(0)}%`, X(0.5), Y(dip) + (dip > 1.05 ? -12 : 14), {
+        const dipOffset = dip < 0.9 ? -14 : 14;
+        label(ctx, `${(dip * 100).toFixed(0)}%`, X(0.5), Y(dip) + dipOffset, {
           size: fs,
           mono: true,
           align: "center",
@@ -1208,12 +1272,12 @@ export function mountRealtimeProjectors(container: HTMLElement): Demo {
     onInput: (v) => (state.projectors = Math.round(v)),
   });
   shell.slider({
-    label: "projector width",
+    label: "projector size",
     min: 1280,
     max: 3840,
     step: 640,
     value: state.projW,
-    format: (v) => `${v.toFixed(0)} × ${Math.round((v * 10) / 16)}`,
+    format: (v) => `${v.toFixed(0)}×${Math.round((v * 10) / 16)}`,
     onInput: (v) => (state.projW = v),
   });
   shell.slider({
@@ -1230,7 +1294,7 @@ export function mountRealtimeProjectors(container: HTMLElement): Demo {
   const costs = () => {
     const n = state.projectors;
     const proj = state.projW * Math.round((state.projW * 10) / 16);
-    // a cube face that matches the fisheye's sharpness at the face centre:
+    // a cube face that matches the fisheye's sharpness at the face center:
     // the fisheye has master/π pixels per radian, a face has face/2
     const face = Math.round((2 * state.master) / Math.PI);
     return {
@@ -1246,7 +1310,7 @@ export function mountRealtimeProjectors(container: HTMLElement): Demo {
 
   shell.setInfo(() => {
     const c = costs();
-    return `cube faces ${c.face} px to match the ${(state.master / 1024).toFixed(0)}K fisheye at the centre of each face`;
+    return `cube faces ${c.face} px to match the ${(state.master / 1024).toFixed(0)}K fisheye at the center of each face`;
   });
 
   return {
@@ -1324,7 +1388,12 @@ export function mountRealtimeProjectors(container: HTMLElement): Demo {
         const rows = [
           { name: `direct: ${n} projector camera${n === 1 ? "" : "s"}`, renders: c.direct.renders, px: c.direct.px, color: C.accent },
           { name: `fisheye master, ${(state.master / 1024).toFixed(0)}K`, renders: c.fisheye.renders, px: c.fisheye.px, color: C.warm },
-          { name: `cubemap, five ${c.face}² faces (half of four used)`, renders: c.cube.renders, px: c.cube.px, color: C.good },
+          {
+            name: narrow ? `cubemap: 5 × ${c.face}² (4 halved)` : `cubemap: 5 × ${c.face}² (4 half-height)`,
+            renders: c.cube.renders,
+            px: c.cube.px,
+            color: C.good,
+          },
         ];
         const maxPx = Math.max(...rows.map((x) => x.px), 1);
         label(ctx, "pixels shaded with the full scene, per frame", bx, top - (narrow ? 14 : 22), { size: fs + 1 });
@@ -1353,8 +1422,8 @@ export function mountRealtimeProjectors(container: HTMLElement): Demo {
         });
         const wy = top + rows.length * rowH + (narrow ? 2 : 6);
         const warpText = narrow
-          ? `+ warp and blend: ${(c.warp / 1e6).toFixed(1)} MP of cheap lookups`
-          : `plus the warp and blend: ${(c.warp / 1e6).toFixed(1)} MP of cheap texture lookups on every path`;
+          ? `+ warp & blend: ${(c.warp / 1e6).toFixed(1)} MP of cheap lookups`
+          : `plus warp & blend: ${(c.warp / 1e6).toFixed(1)} MP of cheap texture lookups either way`;
         label(ctx, warpText, bx, wy, {
           size: fs - 1,
           color: C.dim,

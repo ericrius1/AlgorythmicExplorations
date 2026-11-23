@@ -137,13 +137,13 @@ export function decodeState(raw: string | null): RoomState | null {
   if (!raw || !raw.startsWith("2.")) return null;
   try {
     const n = raw.slice(2).split(".").map((t) => parseInt(t, 36));
-    if (n.length < 19 || n.some((v) => !Number.isFinite(v))) return null;
+    if (n.length < 17 || n.some((v) => !Number.isFinite(v))) return null;
     const ids = Object.keys(PRESETS) as PresetId[];
     const mat = (i: number): string => MATERIALS[Math.max(0, Math.min(MATERIALS.length - 1, i))].id;
     const f = (v: number): number => Math.max(0.02, Math.min(0.98, v / 100));
     const clampDim = (v: number): number => Math.max(1.5, Math.min(90, v / 10));
     const stones: P2[] = [];
-    for (let i = 19; i + 1 < n.length && stones.length < MAX_STONES; i += 2) stones.push({ x: f(n[i]), y: f(n[i + 1]) });
+    for (let i = 17; i + 1 < n.length && stones.length < MAX_STONES; i += 2) stones.push({ x: f(n[i]), y: f(n[i + 1]) });
     return {
       preset: ids[n[0]] ?? "studio",
       L: clampDim(n[1]),
@@ -581,7 +581,10 @@ export function mountRoomInstrument(container: HTMLElement, opts: InstrumentOpti
   shell.setInfo(() => {
     const T = eyring(room());
     const n = hits.reduce((a, h) => a + h.length, 0);
-    return `${PRESETS[st.preset].name} ${st.L.toFixed(1)} × ${st.W.toFixed(1)} × ${st.H.toFixed(1)} m · T ${T[3].toFixed(2)} s at 1 kHz · ${st.stones.length} stones, ${n} hits a bar` + (hero ? " · tap a wall to change it" : "");
+    const prefix = hero ? `${PRESETS[st.preset].name} ` : "";
+    const stoneWord = st.stones.length === 1 ? "stone" : "stones";
+    const hitWord = n === 1 ? "hit" : "hits";
+    return `${prefix}${st.L.toFixed(1)} × ${st.W.toFixed(1)} × ${st.H.toFixed(1)} m · T ${T[3].toFixed(2)} s at 1 kHz · ${st.stones.length} ${stoneWord}, ${n} ${hitWord} a bar` + (hero ? " · tap a wall to change it" : "");
   });
 
   let lastBuild = 0;
@@ -604,7 +607,7 @@ export function mountRoomInstrument(container: HTMLElement, opts: InstrumentOpti
       const narrow = Wc / d < 560;
       const pad = 14 * d;
       const top = (inHero ? (narrow ? 86 : 96) : 22) * d;
-      const gridH = Math.max(60 * d, Math.min(26 * d * Math.max(1, st.stones.length), Hc * 0.3)) + 28 * d;
+      const gridH = Math.max(60 * d, Math.min(26 * d * Math.max(1, st.stones.length), Hc * 0.3)) + 32 * d;
       plan.L = st.L;
       plan.W = st.W;
       plan.fit(pad + 18 * d, top, Wc - pad * 2 - 36 * d, Hc - top - gridH - pad * 2 - 14 * d);
@@ -725,7 +728,6 @@ export function mountRoomInstrument(container: HTMLElement, opts: InstrumentOpti
         g.arc(p.x, p.y, (8 + 5 * flash) * d, 0, Math.PI * 2);
         g.fill();
         g.restore();
-        g.fillStyle = "rgba(10,12,18,0.85)";
         label(g, midiName(m), p.x, p.y + (19 + 4 * flash) * d, 9 * d, "rgba(230,235,250,0.8)", "center", 600, true);
       });
 
@@ -734,8 +736,8 @@ export function mountRoomInstrument(container: HTMLElement, opts: InstrumentOpti
       // ---- the bar, as the room wrote it ----
       const gy = Hc - gridH - pad + 10 * d;
       const gx = pad + 52 * d;
-      const gw = Wc - gx - pad;
-      const gh = gridH - 22 * d;
+      const gw = Wc - gx - pad - 10 * d;
+      const gh = gridH - 26 * d;
       g.fillStyle = "#0b0d14";
       roundRect(g, pad, gy - 8 * d, Wc - pad * 2, gridH, 8 * d);
       g.fill();
@@ -772,7 +774,7 @@ export function mountRoomInstrument(container: HTMLElement, opts: InstrumentOpti
           }
         }
       });
-      label(g, "plain: direct · amber ring: one bounce · violet ring: two", gx + gw, gy + gh + 9 * d, 9 * d, SC.muted, "right", 500);
+      label(g, "plain: direct · amber ring: one bounce · violet ring: two", gx + gw, gy + gh + 11 * d, 9 * d, SC.muted, "right", 500);
     },
     dispose() {
       clearInterval(timer);

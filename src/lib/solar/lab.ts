@@ -274,7 +274,7 @@ export function histogram(
   const u = hudScale(stage);
   panel(stage, b);
   const pad = 10 * s;
-  const top = opts.title ? 22 * u : pad;
+  const top = opts.line ? 32 * u : opts.title ? 22 * u : pad;
   const bot = opts.xTicks ? 16 * u : pad;
   const n = bins.length;
   let peak = 1e-9;
@@ -312,10 +312,19 @@ export function histogram(
     g.strokeStyle = opts.line.color;
     g.lineWidth = 1.4 * s;
     g.beginPath();
-    g.moveTo(lx, b.y + top - 4 * s);
+    g.moveTo(lx, b.y + top - 8 * u);
     g.lineTo(lx, b.y + top + ih);
     g.stroke();
-    text(stage, opts.line.label, lx + 4 * s, b.y + top + 6 * u, 9, opts.line.color);
+    g.font = `600 ${9 * u}px ${HUD_FONT}`;
+    const lw = g.measureText(opts.line.label).width;
+    const flip = lx + lw + 10 * s > b.x + b.w - pad;
+    const tx = flip ? lx - 4 * s : lx + 4 * s;
+    const ty = b.y + top - 2 * u;
+    g.fillStyle = "rgba(8, 9, 15, 0.8)";
+    g.beginPath();
+    g.roundRect(flip ? tx - lw - 3 * s : tx - 3 * s, ty - 9 * u, lw + 6 * s, 11.5 * u, 3 * s);
+    g.fill();
+    text(stage, opts.line.label, tx, ty, 9, opts.line.color, 600, flip ? "right" : "left");
   }
   if (opts.title) text(stage, opts.title, b.x + pad, b.y + 15 * u, 9.5, "rgba(200, 210, 235, 0.75)");
   if (opts.xTicks) {

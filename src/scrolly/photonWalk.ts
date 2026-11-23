@@ -124,23 +124,23 @@ export function mountPhotonWalk(container: HTMLElement): void {
     steps: [
       {
         at: 0.0,
-        text: "The rendering equation in words: the light leaving a point is what it emits, plus the light arriving from every direction, dimmed by the surface. Here the camera's ray for one pixel lands on the floor.",
+        text: "To shade one pixel, the camera sends a ray into the box and lands on the floor. The light leaving that spot equals whatever it emits plus everything arriving from the room, dimmed by the surface.",
       },
       {
         at: 0.16,
-        text: "Light could arrive at that point from any direction above it. Monte Carlo doesn't try them all. It picks one at random, favouring the directions a matte surface cares about most.",
+        text: "Light can arrive from anywhere in the hemisphere above the floor. Rather than testing every angle, Monte Carlo picks a single random bounce direction, favoring angles closer to straight up where matte surfaces collect the most light.",
       },
       {
         at: 0.36,
-        text: `Every bounce multiplies the path's <em>throughput</em> by the surface colour, ${ALBEDO} for these white walls, so each bounce counts for less than the one before.`,
+        text: `Each bounce multiplies the path's <em>throughput</em> by the surface color (${ALBEDO} for these matte white walls), so deeper bounces carry less and less weight.`,
       },
       {
         at: 0.58,
-        text: `This path found the lamp after ${bounces + 1} bounces. Its light is worth ${lastWeight.toFixed(2)} of the lamp's by the time it reaches the camera. Paths that leave through the open front, or run out of bounces, bring back nothing.`,
+        text: `After ${bounces + 1} bounces this walk lands on the ceiling lamp, returning ${lastWeight.toFixed(2)} of the lamp's brightness to the camera. Walks that slip out the open front or exhaust their bounces return zero.`,
       },
       {
         at: 0.8,
-        text: `One path is a terrible estimate. Forty more from the same pixel: ${lucky} of them found the lamp. The average of all of them, over thousands of samples, is the answer to the integral.`,
+        text: `A single random walk is wildly inaccurate. Launching forty more from the same pixel gives ${lucky} hits on the lamp; averaging thousands of walks like these converges to the true integral.`,
       },
     ],
     draw(ctx, w, h, t) {
@@ -233,17 +233,20 @@ export function mountPhotonWalk(container: HTMLElement): void {
         if (i < segs - 1 && prog >= showAt && pCrowd < 0.25 && (i > 0 || t > 0.4)) {
           const wNext = Math.pow(ALBEDO, i + 1);
           // walls get their number outside the box, clear of the paths;
-          // the sphere gets it just above its surface
+          // the sphere gets it tucked cleanly inside its upper interior, clear of both rays
           const onCeil = Math.abs(p1.y - T) < 1e-3;
           const onFloorWall = Math.abs(p1.y - B) < 1e-3;
+          const onSphere = !onCeil && !onFloorWall;
           const nearBack = p1.x > 0.85;
-          const dy = onCeil ? -10 : onFloorWall ? 14 : p1.y > (T + B) / 2 ? -12 : 14;
-          label(ctx, wNext.toFixed(2), X(p1.x) + (nearBack ? -7 : 6), Y(p1.y) + dy, {
-            align: nearBack ? "right" : "left",
-            color: PAL.muted,
+          const lx = onSphere ? X(p1.x) : X(p1.x) + (nearBack ? -8 : 8);
+          const ly = onCeil ? Y(p1.y) - 12 : onFloorWall ? Y(p1.y) + 14 : Y(p1.y) + 16;
+          label(ctx, wNext.toFixed(2), lx, ly, {
+            align: onSphere ? "center" : nearBack ? "right" : "left",
+            color: onSphere ? PAL.text : PAL.muted,
             size: 11,
             mono: true,
             alpha: 1 - 4 * pCrowd,
+            bg: onSphere ? "rgba(29, 34, 51, 0.9)" : "rgba(6, 7, 11, 0.85)",
           });
         }
       }
@@ -269,7 +272,13 @@ export function mountPhotonWalk(container: HTMLElement): void {
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
-        label(ctx, "pick one at random", X(P0.x), Y(P0.y - 0.12), { color: PAL.accent, align: "center", size: 11, alpha: pFan });
+        label(ctx, "pick one at random", X(P0.x), Y(P0.y - 0.12), {
+          color: PAL.accent,
+          align: "center",
+          size: 11,
+          alpha: pFan,
+          bg: "rgba(6, 7, 11, 0.85)",
+        });
       }
 
       // the legend sits above the box until the payoff label needs the room
@@ -292,11 +301,12 @@ export function mountPhotonWalk(container: HTMLElement): void {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
         const right = end.x > 0.6;
-        label(ctx, `found it · worth ${lastWeight.toFixed(2)}`, X(end.x) + (right ? -10 : 10), Y(end.y) - 12, {
+        label(ctx, `found it · worth ${lastWeight.toFixed(2)}`, X(end.x) + (right ? -12 : 12), Y(end.y) - 15, {
           color: PAL.warm,
           alpha: pWin,
           size: 12,
           align: right ? "right" : "left",
+          bg: "rgba(6, 7, 11, 0.85)",
         });
       }
 
@@ -316,7 +326,12 @@ export function mountPhotonWalk(container: HTMLElement): void {
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
-        label(ctx, `${found} of ${shown} found the lamp`, X(R), Y(B) + 14, { color: PAL.warm, align: "right", size: 12, alpha: clamp01((pCrowd - 0.2) * 5) });
+        label(ctx, `${found} of ${shown} found the lamp`, X(R), Y(B) + 14, {
+          color: PAL.warm,
+          align: "right",
+          size: 12,
+          alpha: clamp01(pCrowd * 4),
+        });
       }
     },
   });

@@ -120,7 +120,7 @@ export async function mountLfo(container: HTMLElement): Promise<Demo> {
 
   const fbuf = new Float32Array(4096);
   shell.setInfo(() => {
-    const kind = st.rate < 15 ? "a slow wobble" : st.rate < 30 ? "on the edge of audio rate" : "audio rate: new partials, not a wobble";
+    const kind = st.rate < 15 ? "a slow wobble" : st.rate < 30 ? "on the edge of audio rate" : "audio rate: sidebands appear in the spectrum";
     return `${SHAPES[st.wave][1]} LFO at ${fmtRate(st.rate)} · ${kind}`;
   });
 

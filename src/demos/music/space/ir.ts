@@ -52,7 +52,7 @@ function bandCurve(g: number[], n: number, fs: number, out: Float64Array): void 
   }
 }
 
-// A zero-phase FIR (centred, Hann-windowed) with the given magnitude per bin.
+// A zero-phase FIR (centered, Hann-windowed) with the given magnitude per bin.
 function kernelFrom(mag: Float64Array, n: number): Float32Array {
   const re = new Float64Array(n);
   const im = new Float64Array(n);
@@ -63,7 +63,7 @@ function kernelFrom(mag: Float64Array, n: number): Float32Array {
   fft(re, im, true);
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    const src = (i + n / 2) % n; // centre the kernel
+    const src = (i + n / 2) % n; // center the kernel
     const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
     out[i] = re[src] * w;
   }

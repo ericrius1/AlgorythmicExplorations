@@ -312,8 +312,8 @@ export class Glow {
   // ------------------------------------------------------------ shapes
 
   /**
-   * A polyline through pts = [x0, y0, x1, y1, …]. `width` in CSS px; colour
-   * may exceed 1 for HDR glow. `colors` (r,g,b,a per point) overrides colour.
+   * A polyline through pts = [x0, y0, x1, y1, …]. `width` in CSS px; color
+   * may exceed 1 for HDR glow. `colors` (r,g,b,a per point) overrides color.
    */
   line(
     pts: ArrayLike<number>,
@@ -429,7 +429,7 @@ export class Glow {
     this.line([x0, y0, x1, y1], width, color, alpha, { soft });
   }
 
-  /** Filled disc of radius r (soft = gaussian glow). */
+  /** Filled disk of radius r (soft = gaussian glow). */
   dot(x: number, y: number, r: number, color: RGB, alpha = 1, soft = false): void {
     if (!this.gpu) return this.dot2d(x, y, r, color, alpha, soft);
     const s = this.s;
@@ -449,7 +449,7 @@ export class Glow {
     }
   }
 
-  /** Axis-aligned rectangle with a vertical colour/alpha gradient. */
+  /** Axis-aligned rectangle with a vertical color/alpha gradient. */
   rect(x: number, y: number, w: number, h: number, top: RGB, aTop: number, bottom: RGB = top, aBottom = aTop): void {
     if (w <= 0 || h <= 0) return;
     if (!this.gpu) return this.rect2d(x, y, w, h, top, aTop, bottom, aBottom);

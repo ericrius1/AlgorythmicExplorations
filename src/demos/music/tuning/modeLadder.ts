@@ -151,7 +151,7 @@ export function mountModeLadder(container: HTMLElement): Demo {
       const nameW = narrow ? 78 : 112;
       const rightW = narrow ? 0 : 150;
       const top = narrow ? 44 : 46;
-      const bottom = h - (narrow ? 16 : 18);
+      const bottom = h - (narrow ? 22 : 24);
       const rowH = (bottom - top) / 7;
       geo = { top, rowH };
       const gx0 = 14 + nameW;
@@ -167,7 +167,7 @@ export function mountModeLadder(container: HTMLElement): Demo {
         });
       }
       text(ctx, "brighter", 14, top - 12, { size: 10, color: "#ffd9a0" });
-      text(ctx, "darker", 14, bottom + 12, { size: 10, color: "#c4a8ff" });
+      text(ctx, "darker", 14, bottom + 14, { size: 10, color: "#c4a8ff" });
 
       for (let r = 0; r < 7; r++) {
         const m = MODES[r];

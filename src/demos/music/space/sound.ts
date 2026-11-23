@@ -70,7 +70,7 @@ function normalize(x: Float32Array, peak: number): Float32Array {
 }
 
 // A clap: a few quick bursts of noise (fingers meeting at slightly different
-// times), coloured by the cupped hands' resonance around 1 kHz.
+// times), colored by the cupped hands' resonance around 1 kHz.
 export function clapSamples(fs: number, seed = 3): Float32Array {
   const n = Math.floor(fs * 0.18);
   const x = new Float32Array(n);
@@ -119,7 +119,7 @@ export function malletPhrase(fs: number, notes: [number, number][] = [[72, 0], [
 
 // A vowel-ish voice: a buzzy pulse train at speaking pitch through three
 // formant resonances that move from vowel to vowel. Not words, but it has the
-// broad, shifting spectrum of speech, which is what a room colours.
+// broad, shifting spectrum of speech, which is what a room colors.
 const VOWELS: Record<string, [number, number, number]> = {
   a: [730, 1090, 2440],
   e: [530, 1840, 2480],

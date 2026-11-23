@@ -169,6 +169,35 @@ export function mountAccompanist(container: HTMLElement): Demo {
         g.fillText(soundOn ? "play a few notes…" : "", W - 14 * s, 30 * s);
       }
 
+      // bottom-left: compact color key matching the density meter on the right
+      if (W / s >= 520) {
+        const items: [string, readonly number[]][] = [
+          ["you", C.you],
+          ["piano", C.comp],
+          ["bass", C.bass],
+          ["vibes", C.answer],
+        ];
+        g.font = font(10 * s, 600);
+        let lw = 14 * s;
+        for (const [lab] of items) lw += g.measureText(lab).width + 20 * s;
+        const lx = 34 * s;
+        const ly = H - 32 * s;
+        g.fillStyle = "rgba(9,10,16,0.72)";
+        roundRect(g, lx, ly, lw, 22 * s, 7 * s);
+        g.fill();
+        let cx = lx + 10 * s;
+        g.textAlign = "left";
+        for (const [lab, col] of items) {
+          g.fillStyle = rgba(col, 0.95);
+          g.beginPath();
+          g.arc(cx + 3 * s, ly + 11 * s, 3 * s, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "rgba(215,222,242,0.82)";
+          g.fillText(lab, cx + 10 * s, ly + 14.5 * s);
+          cx += g.measureText(lab).width + 20 * s;
+        }
+      }
+
       // bottom-right: the density seesaw
       const nps = band.notesPerSecond(now);
       const bx = W - 170 * s;

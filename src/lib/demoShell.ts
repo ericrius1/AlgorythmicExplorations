@@ -98,13 +98,15 @@ export class Shell {
     input.value = String(enc(spec.value));
     wrap.appendChild(input);
 
-    // the grid the slider walks: the range's own steps, or hundredths of a decade when logarithmic
+    // the grid the slider walks: the range's own steps, or 500ths of a decade when logarithmic
     const lo = enc(spec.min);
-    const fine = spec.log ? 0.01 : spec.step;
+    const fine = spec.log ? 0.002 : spec.step;
     const n = Math.max(1, Math.round((enc(spec.max) - lo) / fine));
     const places = decimals(fine);
     const toIndex = (v: number): number => clamp(Math.round((enc(v) - lo) / fine), 0, n);
+    const initIndex = toIndex(spec.value);
     const fromIndex = (i: number): number => {
+      if (spec.log && i === initIndex) return spec.value;
       const v = dec(+(lo + i * fine).toFixed(places));
       return spec.log ? Math.round(v / spec.step) * spec.step : v;
     };
@@ -116,19 +118,26 @@ export class Shell {
 
     const fmt = spec.format ?? ((v: number) => String(Math.round(v * 1000) / 1000));
     const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!;
-    const state = { i: toIndex(spec.value) };
+    const state = { i: initIndex };
     const ctl = new Group(wrap).bind(state, "i", { label: spec.label, min: 0, max: n, step: 1, format: (i) => fmt(fromIndex(i)) });
-    ctl.on((i) => {
-      const v = fromIndex(i);
-      native.set!.call(input, String(enc(v)));
-      spec.onInput(v);
-    });
     // (the value reads in whatever units the figure formats it, so it isn't typed into)
     const val = wrap.querySelector<HTMLInputElement>(".k-val");
+    const sizeVal = (): void => {
+      if (!val) return;
+      const len = Math.max(4, val.value.length);
+      val.style.width = `${len + 1.2}ch`;
+    };
     if (val) {
       val.readOnly = true;
       val.tabIndex = -1;
+      sizeVal();
     }
+    ctl.on((i) => {
+      const v = fromIndex(i);
+      native.set!.call(input, String(enc(v)));
+      sizeVal();
+      spec.onInput(v);
+    });
 
     // setting .value moves the knob at once, with or without an "input" to follow
     Object.defineProperty(input, "value", {
@@ -138,12 +147,14 @@ export class Shell {
         native.set!.call(input, v);
         state.i = toIndex(fromInput());
         ctl.refresh();
+        sizeVal();
       },
     });
     input.addEventListener("input", () => {
       const v = fromInput();
       state.i = toIndex(v);
       ctl.refresh();
+      sizeVal();
       spec.onInput(v);
     });
 

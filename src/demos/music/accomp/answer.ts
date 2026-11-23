@@ -134,11 +134,10 @@ export function mountAnswerFig(container: HTMLElement): Demo {
       const s = ui(shell.canvas);
       g.fillStyle = C.bg;
       g.fillRect(0, 0, W, H);
-      drawRoll(g, band, 0, 0, W, H, s, { lo: 50, hi: 88, past: 7, future: 3.2, showDrums: false, showSpans: true });
-      if (!band.player.length) {
+      if (band.player.length) {
+        drawRoll(g, band, 0, 0, W, H, s, { lo: 50, hi: 88, past: 7, future: 3.2, showDrums: false, showSpans: true });
+      } else {
         // resting state: one call and its four possible answers
-        g.fillStyle = "rgba(9,10,16,0.82)";
-        g.fillRect(0, 0, W, H);
         let lo = 127;
         let hi = 0;
         for (const p of preview) for (const n of p.notes) {
@@ -151,12 +150,25 @@ export function mountAnswerFig(container: HTMLElement): Demo {
         const pw = (W - pad * 6) / 5;
         const py = 46 * s;
         const ph = H - py - 34 * s;
+        const yOf = (m: number): number => py + ph - 8 * s - ((m - lo) / (hi - lo)) * (ph - 16 * s);
         preview.forEach((p, i) => {
           const px = pad + i * (pw + pad);
           const col = i === 0 ? C.you : C.answer;
           g.fillStyle = "rgba(122,162,255,0.05)";
           roundRect(g, px, py, pw, ph, 8 * s);
           g.fill();
+          // subtle octave reference lines (C4, C5) so contour shifts are legible
+          for (const ref of [60, 72]) {
+            if (ref < lo || ref > hi) continue;
+            const ry = yOf(ref);
+            g.fillStyle = "rgba(170,180,220,0.09)";
+            g.fillRect(px + 4 * s, ry, pw - 8 * s, Math.max(1, s));
+            if (i === 0) {
+              g.fillStyle = "rgba(170,180,220,0.45)";
+              g.font = font(9 * s, 600, true);
+              g.fillText(ref === 60 ? "C4" : "C5", px + 6 * s, ry - 4 * s);
+            }
+          }
           g.fillStyle = rgba(col, 0.95);
           g.font = font(12 * s, 700);
           g.fillText(p.label, px + 2 * s, py - 10 * s);
@@ -164,16 +176,22 @@ export function mountAnswerFig(container: HTMLElement): Demo {
           for (const n of p.notes) {
             const x = px + 6 * s + (n.offset / span) * (pw - 12 * s);
             const w = Math.max(3 * s, (n.dur / span) * (pw - 12 * s) - 2 * s);
-            const y = py + ph - 8 * s - ((n.midi - lo) / (hi - lo)) * (ph - 16 * s);
+            const y = yOf(n.midi);
             g.fillStyle = rgba(col, 0.9);
             roundRect(g, x, y - 3 * s, w, 6 * s, 2.5 * s);
             g.fill();
           }
         });
-        g.fillStyle = "rgba(200,210,240,0.6)";
-        g.font = font(11 * s, 600);
+        g.fillStyle = "rgba(200,210,240,0.65)";
+        g.font = font((W / s < 480 ? 10 : 11) * s, 600);
         g.textAlign = "center";
-        g.fillText("one call (C E G E D F A) and the four ways the band can answer it over Dm", W / 2, H - 12 * s);
+        g.fillText(
+          W / s < 480
+            ? "call (C E G E D F A) and four answers over Dm"
+            : "one call (C E G E D F A) and the four ways the band can answer it over Dm",
+          W / 2,
+          H - 12 * s,
+        );
         g.textAlign = "left";
       }
       const now = pageNow();

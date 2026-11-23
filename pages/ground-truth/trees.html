@@ -10,7 +10,7 @@
     <title>The Trees — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Procedural trees grown by space colonization, thickened with the pipe model, meshed with bark rings and leaf cards, lit by a baked crown estimate, and planted as a grove on eroded hills."
+      content="Procedural trees grown by space colonization, thickened with the pipe model, meshed with bark tubes and leaf cards, lit by a baked crown estimate, and instanced into a hillside grove."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Ground Truth · Part 4</p>
         <h1>The Trees</h1>
         <p class="subtitle">
-          Six trees grown from three rules about competing for space, planted a hundred
-          times over on the hills from part two.
+          Six skeletons grown by competing for open space, then instanced over a hundred
+          times across the eroded hillsides from part two.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,43 +43,47 @@
 
     <main>
       <p>
-        Everything in this series so far has been a function of position. Ask the ground for
-        its height at a point and you get an answer. Ask the soil whether grass grows there
-        and you get another. Trees don't work that way. A branch exists because of the
-        branch it grew from, and it goes where it goes because other branches already took
-        the space next to it. A tree is a history, so it has to be grown.
+        Up to now, almost every question we asked about the landscape could be answered
+        directly from coordinates: plug in <code>(x, z)</code> to get elevation, check the
+        soil ledger to see if grass takes root. A branching tree resists that kind of local
+        lookup. Every limb exists because an older limb reached that neighborhood first, and
+        it swerves away from its siblings because they already claimed the light next door.
+        To get believable silhouettes, you have to grow the skeleton step by step.
       </p>
       <p>
-        The classic way to grow plants in a computer is the L-system, a grammar that
-        rewrites each branch into smaller branches, generation after generation. It makes
-        convincing botany, but a grammar works from the inside out and knows nothing about
-        its surroundings. Real trees are shaped from the outside in, by where the light and
-        open air are. So I went with an algorithm that models that directly, called space
-        colonization.
+        For decades, the standard way to synthesize plants in computer graphics was the
+        L-system, a formal grammar that rewrites stem symbols into smaller twigs over
+        successive generations. L-systems produce striking botanical symmetry, though pure
+        grammars expand blindly from the inside out without sensing nearby branches or open
+        sky. Real canopies are sculpted from the outside in by competition for light and
+        room, so here we use an algorithm built around that competition directly:
+        <em>space colonization</em>.
       </p>
       <p>
-        The grove at the top is six trees grown that way, each a few hundred branch
-        segments, instanced 104 times across a 64-unit patch of eroded hills with hashed
-        sizes and rotations. The low sun throws each crown's shadow onto the grass, and the
-        wind moves the trees and the blades together.
+        The hillside grove overhead is built from just six grown skeletons, each a few
+        hundred branch segments long, instanced 104 times across a 64-unit eroded patch
+        with hashed rotations and scales. Every canopy stamps a soft shadow onto the ground
+        and grass beneath it, and the whole forest bends together with the wind.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="competition"><span class="kicker">Step 1 · Competition</span>Branches chase open space</h2>
       <p>
-        Scatter a few hundred attraction points through the volume where leaves could live.
-        They stand for light and open air. Plant a short trunk. Then repeat three rules
-        until nothing changes:
+        Begin by scattering a cloud of attraction points throughout the volume where you
+        want foliage to live, representing pockets of sunlight and open air. Plant a short
+        starter trunk beneath the cloud, then loop through three simple rules until growth
+        stops:
       </p>
       <pre><code>1. every attractor picks the nearest branch node within its influence radius
 2. every node that was picked grows one step toward the average direction of its attractors
 3. every attractor that a branch has come within the kill radius of is removed</code></pre>
       <p>
-        That's the whole algorithm. Nothing in it says "branch here". A fork appears when
-        one node's attractors pull in directions far enough apart that its new shoots end
-        up closest to different groups, and from then on they grow apart. The crown's shape
-        is just the shape of the attractor cloud. Branches don't collide, because an
-        attractor near an existing branch has already been removed.
+        Nowhere in those three steps is there an explicit branching probability or fork
+        angle. Splits emerge on their own whenever attractors tug a node from two wide
+        directions so its newly added tips fall closest to separate clusters and pull apart
+        on subsequent rounds. Limbs avoid colliding automatically as well, because once a
+        branch claims a pocket of attractors and deletes them, nearby shoots have no reason
+        to grow back into that occupied space.
       </p>
 
       <div
@@ -89,75 +93,81 @@
       ></div>
 
       <p>
-        The cyan dots are the 240 attractors, in two hashed lobes. They go dark as branches
-        reach them, and the faint circles show how far each growing tip can see. One round
-        of the rules runs every five frames, and the readout says how many rounds it took
-        and how many attractors were never reached. A finished tree stays up for four
-        seconds and then grows again.
+        Watch the rules play out in 2D above. The 240 cyan dots are attractors arranged into
+        two hashed crown lobes; they dim once a tip comes within their kill radius, and the
+        faint blue rings outline how far each active growing tip can sense. One iteration
+        runs every five frames, pausing four seconds on the finished skeleton before growing
+        again.
       </p>
       <p>
-        <strong>Influence</strong> is how far a tip can see. Small values mean each branch
-        only feels the points right next to it, and growth stalls in gaps: lower it and
-        watch attractors get stranded. Large values let distant points pull, so the tree
-        reaches across the crown in long sweeping limbs. <strong>Kill radius</strong> is
-        how close a branch has to get before a point counts as used up. Small values pack
-        the crown with twigs; large values leave it airy, with fewer, straighter branches.
-        Those two numbers and the shape of the attractor cloud account for most of the
-        difference between one kind of tree and another.
+        Two radii control almost the entire character of the branching.
+        <strong>Influence</strong> sets each tip's search range: dial it down and tips only
+        notice nearby dots, stalling out across gaps and stranding attractors; open it wide
+        and distant clusters exert a strong pull, stretching the tree into long sweeping
+        boughs. <strong>Kill radius</strong> sets how close a shoot must get to consume an
+        attractor. Tight kill radii pack the crown with fine, gnarled twigs, while generous
+        ones finish faster with an open, airy scaffold. Pairing those two parameters with
+        different attractor cloud volumes accounts for much of the variety across tree
+        species.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The algorithm came from leaves</span>
         <p>
-          Adam Runions and colleagues first used this idea in 2005 to model the veins of a
-          growing leaf, where the attractors are sources of the plant hormone auxin and the
-          veins grow toward them. Two years later Runions, Lane and Prusinkiewicz turned
-          it on whole trees, with open space playing the part of the hormone.
+          Adam Runions and his co-authors originally introduced space colonization in 2005
+          to simulate vein networks inside growing leaves, where attractors represented
+          microscopic sources of the growth hormone auxin. Two years later, Runions, Lane,
+          and Prusinkiewicz scaled the same mechanism up to full 3D trees, casting open air
+          in the role of auxin.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="pipes"><span class="kicker">Step 2 · Thickness</span>The pipe model</h2>
       <p>
-        Colonization produces a skeleton of nodes with no widths. To give it a trunk, I use
-        the pipe model: think of a tree as a bundle of pipes carrying water from the roots
-        to the leaves, so a branch has to be thick enough to carry everything that grows
-        beyond it. Leonardo da Vinci wrote down the version most people know: where a
-        branch splits, the children's cross-sections add up to the parent's. As a
-        recurrence, walking from the tips back to the root:
+        Space colonization leaves behind a wire skeleton of nodes with no thickness. To give
+        each limb realistic taper, we borrow the botanical pipe model: picture a tree as a
+        bundle of narrow straws hauling water from soil to foliage, so every parent limb
+        must be wide enough to carry the combined flow of all the branches sprouting past
+        it. Leonardo da Vinci noted an early version in his notebooks, observing that the
+        cross-sectional area of a trunk roughly equals the summed cross-sections of its
+        offshoots at every fork. Walking backward from twig tips down to the root gives a
+        clean recurrence:
       </p>
       <pre><code>radius(tip)    = 0.016
 radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area; I use 2.4</span></code></pre>
       <p>
-        With E = 2, area is conserved at every fork. Murray's law for blood vessels says
-        E = 3, and measured trees mostly land in between. I use 2.4 because it gave trunks
-        that looked right to me next to the crowns. The nodes are stored in growth order,
-        so every child comes after its parent, and one backward pass over the list
-        computes every radius.
+        Setting the exponent <code>E = 2</code> preserves exact cross-sectional area at
+        every split. Murray's law for branching blood vessels predicts <code>E = 3</code>,
+        and field measurements of real timber usually land between 2 and 3. Using 2.4 gave
+        trunks sturdy enough to balance these crowns visually. Because we append nodes to
+        the array in growth order, every child sits after its parent, so a single reverse
+        pass over the array assigns every radius in the tree.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="mesh"><span class="kicker">Step 3 · The mesh</span>Bark rings and leaf cards</h2>
       <p>
-        The 3D version is the same three rules with a third coordinate. The attractors fill
-        two or three hashed ellipsoid lobes above a 1.5-unit trunk (one ellipsoid grows
-        suspiciously tidy trees), every shoot gets a slight upward bias, and growth stops
-        when no attractor is left or after 160 rounds. The default tree finishes in 24.
+        Moving to 3D adds a third coordinate to the exact same loop. Attractors scatter
+        through two or three overlapping hashed ellipsoid lobes perched above a 1.5-unit
+        trunk (a single clean ellipsoid grows suspiciously manicured trees), each shoot gets
+        a gentle upward phototropism bias, and iteration stops once attractors are spent or
+        at 160 rounds. The default tree completes in 24 rounds.
       </p>
       <p>
-        Each branch segment becomes a six-sided tube, a ring of vertices around the node
-        joined to the ring around its parent, with normals pointing straight out from the
-        branch so the bark shades smoothly. The tubes are written in growth order and not
-        indexed, so drawing only the first part of the buffer shows the tree as it was a
-        few rounds in. That's how the studio below animates growth without regrowing
-        anything.
+        Every parent-child edge is wrapped in a six-sided bark cylinder whose ring vertices
+        share outward-pointing normals for smooth shading. Because we write all bark tubes
+        into an unindexed vertex buffer strictly in growth order, animating the tree growing
+        from sapling to mature crown takes zero extra simulation: we simply sweep WebGPU's
+        draw range forward through the existing vertex array.
       </p>
       <p>
-        Leaves are diamond-shaped cards, two triangles each, 0.17 to 0.27 units long,
-        scattered along the thin twigs: ten around each branch tip and five to eight
-        around other twigs. Lighting a few thousand separately facing cards one by one would
-        make the crown glitter, so their normals are mostly the direction outward from the
-        crown's centre, with 30% of each card's own facing mixed in. The crown then shades
-        like a rounded mass with a leafy edge.
+        Foliage consists of diamond-shaped leaf cards (two triangles each, 0.17 to 0.27
+        units across) clustered around slender twigs: ten per branch tip and five to eight
+        along thin sub-branches. Shading thousands of tiny randomly angled diamonds using
+        their literal flat face normals creates harsh sparkling highlights, so each leaf
+        card borrows 70% of its normal pointing radially outward from the canopy's center
+        and keeps only 30% of its own plane normal. That blend lets the crown shade as a
+        cohesive sunlit volume while preserving a crisp, leafy silhouette.
       </p>
 
       <div
@@ -167,95 +177,90 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
       ></div>
 
       <p>
-        Every slider change grows a new skeleton and replays the growth: the trunk shoots
-        up over two and a half seconds and the leaves come out once it's mostly done. The
-        default tree has 333 segments and 2,116 leaf cards, and the readout updates with
-        each regrow. Push attractors up and the crown fills in; raise influence and the
-        limbs get longer and straighter.
+        The studio opens on the default tree (333 bark segments and 2,116 leaf cards, grown
+        in 24 rounds). Hit <strong>replay growth</strong>, click <strong>new tree</strong>,
+        or move any slider to watch the skeleton shoot up over two and a half seconds and
+        unfurl its canopy once the outer twigs arrive. Cranking up
+        <strong>attractors</strong> packs the crown denser, raising
+        <strong>influence</strong> pulls out longer, straighter boughs, and tightening
+        <strong>kill radius</strong> increases fine twig branching.
       </p>
       <p>
-        The light inside a crown would need ray tracing to do properly, so I estimate it
-        once per vertex from where the point sits. Points on the side facing the sun and
-        near the crown's surface get most of the sunlight; points deep inside or on the
-        far side get less sun and less sky. When you look toward the sun, the leaves the
-        sun reaches also let some light through, tinted yellow-green, the same way the
-        grass in part three glows when it's backlit. That estimate is stored with the
-        geometry, so it costs nothing per frame.
+        True light bounce inside a dense leafy canopy would call for path tracing, so we
+        approximate self-shadowing once per vertex when building the mesh. Vertices on the
+        sunward exterior of the crown receive full sunlight and open sky, while leaves
+        tucked deep inside or on the shaded backside drop into cool ambient shade. When you
+        orbit around to look back toward the sun, sunlit leaves also pick up a yellow-green
+        backlit glow similar to part three's grass shader. Storing those values in vertex
+        attributes makes canopy shading virtually free every frame.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="grove"><span class="kicker">Step 4 · A grove</span>Six trees, a hundred places</h2>
       <p>
-        The grove at the top grows six trees with different seeds and 300 to 450
-        attractors, which takes a few milliseconds each. Each one is uploaded once as an
-        instanced mesh for its bark and one for its leaves, and every copy is just a
-        position, a rotation, and a scale between 0.8 and 1.3. You identify a tree mostly
-        by its silhouette, and the same skeleton turned 90 degrees and scaled up on
-        different ground reads as a different tree. The whole grove is twelve draw calls.
+        For the hero hillside, we grow six distinct trees with varying seeds and 300 to 450
+        attractors (taking only a few milliseconds apiece), upload each variant as one
+        instanced bark mesh and one instanced leaf mesh, and stamp out 104 instances with
+        hashed yaws and scales between 0.8 and 1.3. Because human vision mostly reads trees
+        by overall silhouette, turning the same skeleton 90 degrees, scaling it slightly,
+        and planting it on a different slope makes repetitions vanish. All 104 trees render
+        in twelve draw calls.
       </p>
       <p>
-        The spots come from hashed candidate points on the eroded terrain, kept on gentle,
-        lowish ground and thinned by a slow sine pattern so the trees gather into groups.
-        A candidate is rejected if an earlier tree already stands within 2.6 units. That's
-        dart throwing, the simplest way to keep trees from crowding, and it's fine for one
-        bounded patch. The next part explains why it won't work for a world that has to be
-        built in pieces.
+        Tree positions come from hashed candidate points filtered for low, gentle terrain
+        and modulated by a slow sine wave so woods cluster into natural groves with open
+        clearings between them. Any candidate within 2.6 units of an already accepted tree
+        is discarded. That greedy dart-throwing loop works cleanly on a single bounded
+        hillside, though as we will see in part five, it breaks down the moment a world has
+        to be generated piece by piece.
       </p>
       <p>
-        Two things make the trees sit in the scene instead of floating over it. Each crown
-        stamps a soft shadow into the terrain's baked sunlight: an ellipse pushed away from
-        the sun by the crown's height and stretched along the sun's direction, the way a
-        low sun throws a long shadow. The grass reads the same baked light when it's
-        planted, so blades in a tree's shadow are darker too. And the wind sways each tree
-        in proportion to the square of the height, like the grass blades, with a phase
-        taken from the instance number so a hundred copies of the same tree don't move in
-        lockstep. The leaves add a faster flutter on top.
+        Two subtle touches anchor the grove into the landscape. First, every tree projects
+        an elongated soft ellipse into the terrain's baked sunlight map, offset away from
+        the sun in proportion to canopy height so low golden-hour rays throw long shadows;
+        because the grass planter reads that exact sunlight grid, turf tucked beneath a
+        canopy darkens automatically. Second, the vertex shader sways each tree in
+        proportion to height squared, offset by its instance index so copies never lean in
+        lockstep, while leaf cards add a quick high-frequency flutter on top.
       </p>
       <details class="fold">
         <summary>Deep dive: the cost of growing a tree</summary>
         <div class="fold-body">
           <p>
-            The inner loop is "every attractor finds its nearest node", which is
-            attractors × nodes distance checks per round. For the default tree that's at
-            most 320 attractors against a node count that grows to 333 over 24 rounds, a
-            couple of million checks in all, and it finishes in a few milliseconds in
-            plain JavaScript. The 2007 paper uses a spatial grid to find neighbours, which pays
-            off with thousands of attractors. With a few hundred, the brute-force loop is
-            simpler and fast enough to regrow on every slider move.
+            The heaviest step is matching every living attractor to its nearest branch node,
+            requiring <code>attractors × nodes</code> distance checks per round. With 320
+            attractors and a skeleton reaching 333 nodes over 24 rounds, that adds up to
+            around two million simple arithmetic checks, finishing in a few milliseconds in
+            plain JavaScript. Runions's 2007 paper accelerates neighbor lookup with a
+            spatial hash grid, which pays off once you push into thousands of attractors;
+            for a few hundred, the flat loop stays short and fast enough to regrow
+            interactively on every slider tweak.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>Model the competition.</strong> Three rules about space produce
-          branching, crown shape and spacing without describing any of them.
-        </li>
-        <li>
-          <strong>One physical rule for proportion.</strong> The pipe model sets every
-          radius in one backward pass.
-        </li>
-        <li>
-          <strong>Store things in the order they grew.</strong> The growth animation is a
-          draw range, nothing more.
-        </li>
-        <li>
-          <strong>Uniqueness comes from placement.</strong> Six meshes, rotated, scaled and
-          shadowed, make a grove.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>From saplings to woods</h2>
       <p>
-        Things I'd try next: shape the attractor cloud by species (a tall narrow cone for
-        conifers, a wide flat one for an acacia); let the terrain's own shadows thin out the
-        attractors on the shady side so trees lean toward the light; and bake a few views
-        of each tree into impostor cards for the far distance, which part six could use.
+        Modeling competition for open space gave us organic branching, realistic crown
+        silhouettes, and collision-free limbs out of three lines of logic, while a single
+        reverse pass of the pipe model handled trunk and branch proportions. Keeping vertex
+        buffers ordered by birth round turned growth animation into a free draw-range
+        slider, and instancing six varied skeletons with baked ground shadows turned them
+        into a full grove for twelve draw calls.
+      </p>
+      <p>
+        Where I would take this next: sculpt species-specific attractor clouds (narrow
+        cones for spruces, flat umbrellas for acacias), thin out attractors inside terrain
+        shadows so hillside trees naturally lean toward open sky, and render distant trees
+        to a handful of billboard impostor cards for far-off ridges. Right now, though, our
+        trees and meadows are still arranged by hand per scene; part five replaces that
+        manual choreography with climate rules.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/ground-truth/biomes.html">Part 5, The Biomes</a>.</strong>
-        A climate field and a few rules decide where forest, meadow, scree and snow go, and
-        place every tree without a list.
+        A moisture field and altitude rules sort out forest, meadow, scree, and snow, and
+        place every tree without keeping a list.
       </p>
     </main>
 

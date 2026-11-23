@@ -93,7 +93,7 @@ export function mountDropletTrace(container: HTMLElement): Demo {
     shell.readout.textContent = `${traced.toLocaleString()} droplets · cyan = carrying little, amber = carrying a full load, blue = pooled in a pit · ${raining ? "raining" : "paused"}`;
   };
 
-  // colour by load: a droplet that has picked up 0.12 units of sediment or
+  // color by load: a droplet that has picked up 0.12 units of sediment or
   // more is drawn fully amber. The trail stops once the droplet has gone six
   // steps without reaching a new low, which means it's sloshing about in a
   // pit until it dries up; that spot gets a faint blue dot instead, and the
@@ -224,11 +224,16 @@ export async function mountErode3D(container: HTMLElement): Promise<Demo> {
   shell.slider({ label: "capacity", min: 0.5, max: 8, step: 0.1, value: ep.capacity, onInput: (v) => { ep.capacity = v; } });
   shell.slider({ label: "deposition", min: 0.02, max: 0.8, step: 0.01, value: ep.deposition, onInput: (v) => { ep.deposition = v; } });
   shell.slider({ label: "brush radius", min: 1, max: 5, step: 0.25, value: ep.radius, onInput: (v) => { ep.radius = v; } });
-  shell.button("before / after", () => {
+  const beforeBtn = shell.button("before / after", () => {
     showBefore = !showBefore;
+    beforeBtn.textContent = showBefore ? "show eroded" : "before / after";
     refresh();
   });
-  shell.button("sediment paint", () => { tint = !tint; refresh(); });
+  const tintBtn = shell.button("sediment paint", () => {
+    tint = !tint;
+    tintBtn.textContent = tint ? "sediment paint" : "sediment paint: off";
+    refresh();
+  });
   shell.button("new terrain", () => {
     tp.seed = (Math.random() * 1e6) | 0;
     grid = makeErosionGrid(tp, SIZE, W);
@@ -237,6 +242,7 @@ export async function mountErode3D(container: HTMLElement): Promise<Demo> {
     geometry = buildGridGeometry(grid, meshOpts);
     mesh.geometry = geometry;
     showBefore = false;
+    beforeBtn.textContent = "before / after";
     raining = true;
     rainBtn.textContent = "pause rain";
   });

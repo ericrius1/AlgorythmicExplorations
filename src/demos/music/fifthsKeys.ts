@@ -192,7 +192,7 @@ export function mountFifthsKeys(container: HTMLElement): Demo {
     const steps = from >= 0 ? Math.min(mod(sel - from, 12), mod(from - sel, 12)) : 0;
     const move =
       from >= 0
-        ? ` · from ${minorView ? MINORS[from] + " minor" : KEYS[from] + " major"}: ${steps} step${steps === 1 ? "" : "s"} round the circle, ${shared(from, sel)} notes in common`
+        ? ` · from ${minorView ? MINORS[from] + " minor" : KEYS[from] + " major"}: ${steps} step${steps === 1 ? "" : "s"} around the circle, ${shared(from, sel)} notes in common`
         : "";
     const notes = SPELL[KEYS[sel]].split(" ");
     const spelled = minorView ? [...notes.slice(5), ...notes.slice(0, 5)] : notes;
@@ -245,7 +245,7 @@ export function mountFifthsKeys(container: HTMLElement): Demo {
       for (let k = 0; k < 12; k++) {
         const s = shownShare[k];
         const isSel = k === sel;
-        // 7 shared = home, 6 = neighbour … 2 = far side
+        // 7 shared = home, 6 = neighbor … 2 = far side
         const warmth = (s - 2) / 5;
         const col: RGB = isSel ? [255, 214, 150] : mixRgb(hex("#5a6fd6"), hex("#ffb86b"), warmth);
         for (const [rr, lab, isMinor] of [
@@ -287,7 +287,7 @@ export function mountFifthsKeys(container: HTMLElement): Demo {
       text(ctx, "notes shared with", cx, cy - 8, { size: 10, color: COL.dim, align: "center" });
       text(ctx, minorView ? `${MINORS[sel]} minor` : `${KEYS[sel]} major`, cx, cy + 9, { size: fs, color: "#ffd9a0", align: "center", weight: 700 });
 
-      // ---- side panel: the selected key's notes and its neighbours ----
+      // ---- side panel: the selected key's notes and its neighbors ----
       if (!narrow) {
         const px = w * 0.7;
         let py = h * 0.2;

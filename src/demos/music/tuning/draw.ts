@@ -1,6 +1,6 @@
 // Canvas 2D helpers for the tuning figures: a Retina-aware surface that
 // keeps its backing store matched to its on-screen size, additive glows,
-// and the fonts and colours the figures share.
+// and the fonts and colors the figures share.
 
 export const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
 export const MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
@@ -46,15 +46,15 @@ export function hsl(h: number, s: number, l: number): RGB {
   return [f(0), f(8), f(4)];
 }
 
-// One colour per pitch class, ordered around the circle of fifths so that
-// close keys get close colours: C gold, then G, D … through cool blues and
-// violets back round to F.
+// One color per pitch class, ordered around the circle of fifths so that
+// close keys get close colors: C gold, then G, D … through cool blues and
+// violets back around to F.
 export function pcColor(pc: number, light = 0.66): RGB {
   const q = (((pc * 7) % 12) + 12) % 12; // position on the circle of fifths
   return hsl(0.11 + q / 12, 0.78, light);
 }
 
-// Error colour: 0 = calm green, 1 = hot coral, beyond = magenta.
+// Error color: 0 = calm green, 1 = hot coral, beyond = magenta.
 export function heat(t: number): RGB {
   const stops: RGB[] = [hex("#7dd6a0"), hex("#e8d27a"), hex("#ff9a5c"), hex("#ff5d6c"), hex("#e25bd6")];
   const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);

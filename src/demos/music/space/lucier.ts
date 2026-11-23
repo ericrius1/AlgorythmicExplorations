@@ -257,7 +257,7 @@ export function mountLucier(container: HTMLElement): Demo {
       const narrow = Wc / d < 560;
       const lx = pad + (narrow ? 26 : 34) * d;
       const top = pad + 22 * d;
-      const ww = Wc - lx - pad;
+      const ww = Wc - lx - pad - 10 * d;
       const wh = Hc - top - pad - 26 * d;
       g.fillStyle = "#0b0d14";
       roundRect(g, pad, pad, Wc - pad * 2, Hc - pad * 2, 8 * d);

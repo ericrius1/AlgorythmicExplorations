@@ -119,7 +119,7 @@ export async function mountPluckString(container: HTMLElement): Promise<Demo> {
       pill.show(false);
       if (mode === "pluck") pluck(0.5, 0.7);
     });
-  }, "top");
+  }, [0.5, 0.52]);
 
   canvas.addEventListener("pointerdown", (e) => {
     e.preventDefault();

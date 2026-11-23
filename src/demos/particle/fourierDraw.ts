@@ -71,12 +71,29 @@ export function mountFourierDraw(container: HTMLElement): Demo {
         out[i] += amp * (coefRe[k] * Math.cos(ang) - coefIm[k] * Math.sin(ang));
       }
     }
+    if (m >= N / 2) {
+      const nyq = coefRe[N / 2];
+      for (let i = 0; i < N; i++) out[i] += i % 2 === 0 ? nyq : -nyq;
+    }
     return out;
   };
 
-  for (const p of ["square", "bump", "two tones", "noise"] as PresetName[]) {
-    shell.button(p, () => setPreset(p));
+  const presetNames: PresetName[] = ["square", "bump", "two tones", "noise"];
+  const presetBtns: HTMLButtonElement[] = [];
+  const syncPresetButtons = (): void => {
+    presetNames.forEach((p, i) => {
+      presetBtns[i].textContent = p === presetName ? `● ${p}` : p;
+    });
+  };
+  for (const p of presetNames) {
+    presetBtns.push(
+      shell.button(p, () => {
+        setPreset(p);
+        syncPresetButtons();
+      }),
+    );
   }
+  syncPresetButtons();
   shell.slider({
     label: "waves used",
     min: 1,

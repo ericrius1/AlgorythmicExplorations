@@ -200,7 +200,7 @@ export async function mountOsc(container: HTMLElement): Promise<Demo> {
           const x = barBox.x + (n - 0.5) * slot;
           g.dot(x, dbY(barBox, d, LO_DB, 0), 3, C.white, 0.95);
         }
-        g.text("● measured", barBox.x + barBox.w - 4, barBox.y + 14, { size: 10, align: "right", color: TEXT.mid });
+        g.text("● measured", barBox.x + barBox.w - 4, barBox.y + (shape === 4 ? 28 : 14), { size: 10, align: "right", color: TEXT.mid });
       }
     }
     if (shape === 4) {

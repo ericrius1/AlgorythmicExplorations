@@ -68,8 +68,19 @@
   color: #ffe2c2;
 }
 
+.tn-page .demo-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .tn-page .tn-range {
-  min-width: 12rem;
+  min-width: 14rem;
+  max-width: 24rem;
+}
+
+.tn-page .tn-range .k-val {
+  max-width: 28ch;
 }
 
 .tn-page .tn-break {

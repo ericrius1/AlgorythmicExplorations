@@ -34,44 +34,55 @@ export function mountOctaves1D(container: HTMLElement): Demo {
     for (let o = 0; o < octaves; o++) norm += Math.pow(gain, o);
 
     // top: each octave alone, in its own lane, drawn at its real amplitude
-    const laneTop = h * 0.05, laneBottom = h * 0.5;
+    const laneTop = h * 0.11, laneBottom = h * 0.54;
     const laneH = (laneBottom - laneTop) / octaves;
-    const labelW = 64 * dpr;
+    const freqX = 48 * dpr;
+    const ampX = 86 * dpr;
+    const x0 = 98 * dpr;
     const font = Math.round(11 * dpr);
-    ctx.font = `${font}px ui-monospace, Menlo, monospace`;
+    const headFont = Math.round(9.5 * dpr);
+
+    // subtle column headers above the frequency and amplitude numbers
+    ctx.font = `${headFont}px ui-monospace, Menlo, monospace`;
+    ctx.textAlign = "right";
     ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(150, 168, 210, 0.52)";
+    ctx.fillText("freq", freqX, laneTop * 0.48);
+    ctx.fillText("amp", ampX, laneTop * 0.48);
+
+    ctx.font = `${font}px ui-monospace, Menlo, monospace`;
     for (let o = 0; o < octaves; o++) {
       const amp = Math.pow(gain, o);
       const freq = Math.pow(lacunarity, o);
       const mid = laneTop + laneH * (o + 0.5);
-      ctx.fillStyle = "rgba(150, 168, 210, 0.75)";
-      ctx.fillText(`×${freq.toFixed(freq < 10 ? 1 : 0)}  ${amp.toFixed(2)}`, 8 * dpr, mid);
+      ctx.fillStyle = "rgba(150, 168, 210, 0.78)";
+      ctx.fillText(`×${freq.toFixed(freq < 10 ? 1 : 0)}`, freqX, mid);
+      ctx.fillText(amp.toFixed(2), ampX, mid);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
       ctx.lineWidth = dpr;
       ctx.beginPath();
-      ctx.moveTo(labelW + 12 * dpr, mid);
+      ctx.moveTo(x0, mid);
       ctx.lineTo(w, mid);
       ctx.stroke();
       ctx.strokeStyle = `rgba(150, 178, 235, ${0.85 - o * 0.06})`;
       ctx.lineWidth = 1.4 * dpr;
       ctx.beginPath();
-      for (let px = labelW + 12 * dpr; px <= w; px += 1.5 * dpr) {
-        const x = ((px - labelW) / (w - labelW)) * span;
+      for (let px = x0; px <= w; px += 1.5 * dpr) {
+        const x = ((px - x0) / (w - x0)) * span;
         const y = mid - perlin1(x * freq, seed + o * 131) * amp * laneH * 0.8;
-        px === labelW + 12 * dpr ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        px === x0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
       }
       ctx.stroke();
     }
 
     // bottom: their sum, as a mountain profile
-    const base = h * 0.95, mid = h * 0.74, yScale = h * 0.2;
+    const base = h * 0.95, mid = h * 0.76, yScale = h * 0.19;
     const sumAt = (px: number): number => {
-      const x = ((px - labelW) / (w - labelW)) * span;
+      const x = ((px - x0) / (w - x0)) * span;
       let s = 0;
       for (let o = 0; o < octaves; o++) s += perlin1(x * Math.pow(lacunarity, o), seed + o * 131) * Math.pow(gain, o);
       return mid - (s / norm) * yScale * 1.6;
     };
-    const x0 = labelW + 12 * dpr;
     const grad = ctx.createLinearGradient(0, mid - yScale * 1.6, 0, base);
     grad.addColorStop(0, "rgba(103, 232, 249, 0.38)");
     grad.addColorStop(1, "rgba(103, 232, 249, 0.02)");
@@ -88,9 +99,10 @@ export function mountOctaves1D(container: HTMLElement): Demo {
     for (let px = x0; px <= w; px += dpr) (px === x0 ? ctx.moveTo(px, sumAt(px)) : ctx.lineTo(px, sumAt(px)));
     ctx.stroke();
     ctx.fillStyle = "rgba(103, 232, 249, 0.9)";
-    ctx.fillText("sum", 8 * dpr, mid);
+    ctx.fillText("sum", ampX, mid);
+    ctx.textAlign = "left";
 
-    shell.readout.textContent = `${octaves} octave${octaves > 1 ? "s" : ""} · each lane is one octave (frequency ×, amplitude) · the filled profile is their sum`;
+    shell.readout.textContent = `${octaves} octave${octaves > 1 ? "s" : ""} · each lane is one octave (freq ×, amp) · the filled profile is their sum`;
   };
 
   shell.slider({ label: "octaves", min: 1, max: 8, step: 1, value: octaves, onInput: (v) => { octaves = v; dirty = true; } });
@@ -209,7 +221,10 @@ export async function mountRelief(container: HTMLElement): Promise<Demo> {
   shell.slider({ label: "ridge", min: 0, max: 1, step: 0.02, value: params.ridge, onInput: (v) => { params.ridge = v; queueRebuild(); } });
   shell.slider({ label: "warp", min: 0, max: 2, step: 0.05, value: params.warp, onInput: (v) => { params.warp = v; queueRebuild(); } });
   shell.slider({ label: "height", min: 0.5, max: 6, step: 0.1, value: params.amplitude, onInput: (v) => { params.amplitude = v; queueRebuild(); } });
-  shell.button("wireframe", () => { terrain.material.wireframe = !terrain.material.wireframe; });
+  const wireBtn = shell.button("wireframe", () => {
+    terrain.material.wireframe = !terrain.material.wireframe;
+    wireBtn.textContent = terrain.material.wireframe ? "solid mesh" : "wireframe";
+  });
   shell.button("reroll", () => { params.seed = (Math.random() * 1e6) | 0; queueRebuild(); });
   shell.setInfo(() => stats);
 

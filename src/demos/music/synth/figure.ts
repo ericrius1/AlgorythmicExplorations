@@ -217,7 +217,7 @@ export function syncSlider(input: HTMLInputElement, v: number, log = false, fmt?
   if (label && fmt) label.textContent = fmt(v);
 }
 
-// ---------------------------------------------------------------- colours
+// ---------------------------------------------------------------- colors
 // Linear-light RGB for the HDR renderer (values above 1 bloom).
 
 export const C = {

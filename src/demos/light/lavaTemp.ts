@@ -1,5 +1,5 @@
 // Step demo: the temperature field, naked. Same sim as the lamp, but every
-// particle is drawn as a dot coloured by its own temperature — no metaballs,
+// particle is drawn as a dot colored by its own temperature — no metaballs,
 // no light transport. The point is to watch heat enter at the coil, ride a
 // plume up, and leak away near the top. A 2D overlay draws the glass and
 // labels at full resolution.
@@ -215,7 +215,7 @@ export async function mountLavaTemp(container: HTMLElement): Promise<Demo> {
     sim.rebuild(count);
     bindDots();
   });
-  shell.setInfo(() => `${count.toLocaleString()} particles · colour = temperature · stir with your cursor`);
+  shell.setInfo(() => `${count.toLocaleString()} particles · color = temperature · stir with your cursor`);
 
   return {
     frame() {

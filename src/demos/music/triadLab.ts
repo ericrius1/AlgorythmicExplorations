@@ -1,7 +1,7 @@
 // The chord microscope. Each note of a chord is drawn as its ladder of
 // harmonics on a log-frequency axis, one row per note. Where partials from
 // two notes land together the figure joins them: white when they coincide,
-// amber-to-red when they're close enough to beat, labelled with the beat
+// amber-to-red when they're close enough to beat, labeled with the beat
 // rate. Underneath sits the chord's implied fundamental, the note whose
 // harmonic series the chord is a slice of (C2 for C major's 4:5:6; A♭ far
 // below for C minor's 10:12:15), with its harmonics drawn as a faint comb.
@@ -212,6 +212,25 @@ export async function mountTriadLab(container: HTMLElement): Promise<Demo> {
       font: font(px, narrow ? 8.5 : 9.5, 600),
     });
     line(ctx, left, laneY, right, laneY, rgba("#8a91a5", 0.12), 1 * px);
+    // subtle key on the empty low-frequency side of the collision strip
+    if (!narrow) {
+      const items: [string, string][] = [
+        [COL.white, "exact"],
+        [COL.major, "slow beat"],
+        [COL.tension, "rough"],
+      ];
+      let kx = left + 6 * px;
+      const ky = laneY - 12 * px;
+      ctx.font = font(px, 8.5, 600);
+      for (const [col, lab] of items) {
+        ctx.beginPath();
+        ctx.arc(kx + 3 * px, ky, 2.8 * px, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+        text(ctx, lab, kx + 9 * px, ky, { color: COL.muted, font: font(px, 8.5, 600), alpha: 0.85 });
+        kx += ctx.measureText(lab).width + 20 * px;
+      }
+    }
     const maxRough = Math.max(1e-6, ...pairs.map((p) => p.rough));
     const labels: number[] = [];
     const byWeight = pairs.slice().sort((x, y) => 1 / (y.i * y.j) - 1 / (x.i * x.j));
@@ -310,10 +329,10 @@ export async function mountTriadLab(container: HTMLElement): Promise<Demo> {
     ctx.fillRect(0, 0, w, tableH);
     line(ctx, 0, tableH, w, tableH, rgba("#8a91a5", 0.14), 1 * px);
     table.forEach((r, k) => {
-      const x = bx0 + k * colW + (narrow ? 2 : 10) * px;
+      const x = bx0 + k * colW + (narrow ? 2 : 6) * px;
       const isCur = r.q === q;
       const c = isCur ? COL.bright : COL.muted;
-      const bw = (colW - (narrow ? 34 : 40) * px) * (r.r / maxR);
+      const bw = (colW - (narrow ? 34 : 28) * px) * (r.r / maxR);
       if (narrow) {
         text(ctx, r.q.short, x, 12 * px, { color: isCur ? COL.major : c, font: font(px, fsz, 700) });
         text(ctx, r.q.ratio.join(":"), x, 26 * px, { color: c, font: font(px, fsz - 1.5, 600, true) });
@@ -322,8 +341,9 @@ export async function mountTriadLab(container: HTMLElement): Promise<Demo> {
         text(ctx, r.r.toFixed(2), x + bw + 3 * px, 43 * px, { color: c, font: font(px, fsz - 2, 500, true) });
         return;
       }
-      text(ctx, r.q.name, x, 14 * px, { color: isCur ? COL.major : c, font: font(px, fsz, 700) });
-      text(ctx, r.q.ratio.join(":"), x + colW - 26 * px, 14 * px, { color: c, align: "right", font: font(px, fsz - 1, 600, true) });
+      const tight = colW < 134 * px;
+      text(ctx, tight ? r.q.short : r.q.name, x, 14 * px, { color: isCur ? COL.major : c, font: font(px, tight ? fsz - 0.5 : fsz, 700) });
+      text(ctx, r.q.ratio.join(":"), x + colW - 14 * px, 14 * px, { color: c, align: "right", font: font(px, tight ? fsz - 1.5 : fsz - 1, 600, true) });
       ctx.fillStyle = rgba(isCur ? COL.major : "#8a91a5", isCur ? 0.9 : 0.3);
       ctx.fillRect(x, 28 * px, bw, 7 * px);
       text(ctx, `roughness ${r.r.toFixed(2)}`, x, 46 * px, { color: c, font: font(px, fsz - 1.5, 500, true), alpha: 0.9 });

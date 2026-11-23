@@ -2,7 +2,7 @@
 // harmonics, one bar each; draw on the bars to set the recipe. The trace is
 // two periods of the sum, computed from the same amplitudes and phases the
 // oscillators play. The level is held at a constant RMS, so changing the
-// recipe changes the colour of the sound, not its loudness. "Scramble
+// recipe changes the color of the sound, not its loudness. "Scramble
 // phases" shifts every harmonic in time: the trace changes completely, the
 // sound barely does.
 

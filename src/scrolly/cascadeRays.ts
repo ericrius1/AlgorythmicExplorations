@@ -46,23 +46,23 @@ export function mountCascadeRays(el: HTMLElement): void {
     steps: [
       {
         at: 0,
-        text: "One probe (blue), one hot blob that gives off light, one cold blob that blocks it. The probe needs to know how much light arrives from every direction.",
+        text: "A single probe (blue), a glowing blob of hot wax, and two cold blobs that block light. The probe needs to know how much light reaches it from every direction.",
       },
       {
         at: 0.08,
-        text: "Cascade 0: four short rays, out to 4 px. Probes at this level sit 2 px apart, because light from close by changes quickly from one spot to the next.",
+        text: "Cascade 0 fires four short rays out to 4 px. Its probes sit just 2 px apart, because light from nearby objects shifts rapidly over short distances.",
       },
       {
         at: 0.3,
-        text: "Cascade 1: sixteen rays from 4 to 20 px, each starting where cascade 0 stopped. Its probes are twice as far apart, so there are a quarter as many of them.",
+        text: "Cascade 1 picks up where cascade 0 left off: sixteen rays from 4 to 20 px, one of which stops on the near cold blob. Its probes sit twice as far apart on each axis, leaving a quarter as many of them.",
       },
       {
         at: 0.52,
-        text: "Cascade 2: sixty-four rays from 20 to 84 px. Some reach the hot blob. Others stop at the cold blob first, and that gap in the fan is the shadow.",
+        text: "Cascade 2 traces sixty-four rays from 20 to 84 px. Several reach the hot wax, while others stop on the farther cold blob, carving out the shadow behind it.",
       },
       {
         at: 0.78,
-        text: "The merge, from the top level down: a ray that hit nothing takes the average of the four rays one level up that continue it. The warm rays flow inward until the probe has its light.",
+        text: "Now the cascades merge from the top down. Any ray that missed its interval inherits the average of the four next-level rays continuing in its direction, carrying the warm glow back down to the probe.",
       },
     ],
     draw(ctx, w, h, t) {
@@ -138,8 +138,6 @@ export function mountCascadeRays(el: HTMLElement): void {
         ctx.stroke();
       }
       ctx.restore();
-      label(ctx, "hot wax (emits)", light.x, light.y - light.r - 11, { color: PAL.warm, size: small ? 10 : 11, align: "center", alpha: pIn });
-      label(ctx, "cold wax (blocks)", cold.x + cold.r * 0.2, cold.y + cold.r + 13, { color: PAL.muted, size: small ? 10 : 11, align: "center", alpha: pIn });
 
       // ---- trace every level's rays: what each one hits, and the light it
       // carries back after the merge (1 = the hot blob, fully)
@@ -185,8 +183,10 @@ export function mountCascadeRays(el: HTMLElement): void {
       for (let l = 0; l < LEVELS.length; l++) {
         const extend = shown(l);
         if (extend <= 0) continue;
-        // the merge sweeps down: top level lights first
-        const sweep = phase(pMerge, (LEVELS.length - 1 - l) * 0.28, (LEVELS.length - 1 - l) * 0.28 + 0.4);
+        // the merge sweeps inward: cascade 2's direct hits are already warm,
+        // so cascade 1 lights first, followed by cascade 0
+        const depth = Math.max(0, LEVELS.length - 2 - l);
+        const sweep = phase(pMerge, depth * 0.35, depth * 0.35 + 0.45);
         for (let i = 0; i < LEVELS[l].rays; i++) {
           const r = rays[l][i];
           if (r.skip) continue;
@@ -229,13 +229,35 @@ export function mountCascadeRays(el: HTMLElement): void {
         }
       }
 
+      // ---- blob labels (drawn after rays so pills stay crisp)
+      label(ctx, "hot wax (emits)", light.x, light.y - light.r - 12, {
+        color: PAL.warm,
+        size: small ? 10 : 11,
+        align: "center",
+        alpha: pIn,
+      });
+      label(ctx, "cold wax (blocks)", cold.x + cold.r * 0.2, cold.y + cold.r + 14, {
+        color: PAL.muted,
+        size: small ? 10 : 11,
+        align: "center",
+        alpha: pIn,
+        bg: "rgba(6, 7, 11, 0.85)",
+      });
+      label(ctx, "near cold wax", near.x, near.y + near.r + 14, {
+        color: PAL.muted,
+        size: small ? 10 : 11,
+        align: "center",
+        alpha: pIn,
+        bg: "rgba(6, 7, 11, 0.85)",
+      });
+
       // ---- level labels, stacked in the top-left corner
       const fs = small ? 9.5 : 11;
       const nShown = LEVELS.filter((_, l) => shown(l) > 0).length;
       if (nShown > 0) {
         // a dark backing so the labels read over the rays
         ctx.save();
-        ctx.globalAlpha = 0.72;
+        ctx.globalAlpha = 0.8;
         ctx.fillStyle = PAL.bg;
         ctx.beginPath();
         ctx.roundRect(6, 6, small ? 150 : 380, nShown * (fs + 7) + 6, 6);
@@ -243,8 +265,8 @@ export function mountCascadeRays(el: HTMLElement): void {
         ctx.restore();
       }
       for (let l = 0; l < LEVELS.length; l++) {
-        const a = shown(l);
-        if (a <= 0) continue;
+        if (shown(l) <= 0) continue;
+        const a = phase(t, levelStart(l), levelStart(l) + 0.05);
         const spacing = 2 << l;
         const txt = small
           ? `c${l}: ${LEVELS[l].rays} rays · ${PX[l]}–${PX[l + 1]} px`
@@ -260,7 +282,7 @@ export function mountCascadeRays(el: HTMLElement): void {
       // ---- the probe, glowing with whatever the merge delivered
       let probeLight = 0;
       for (let i = 0; i < 4; i++) probeLight += carried[0][i] / 4;
-      const glow = phase(pMerge, 0.82, 1) * Math.min(1, Math.sqrt(probeLight) * 1.6);
+      const glow = phase(pMerge, 0.65, 0.96) * Math.min(1, Math.sqrt(probeLight) * 1.6);
       if (glow > 0) {
         const pg = ctx.createRadialGradient(px, py, 0, px, py, 30);
         pg.addColorStop(0, `rgba(255, 200, 130, ${0.65 * glow})`);
@@ -277,7 +299,13 @@ export function mountCascadeRays(el: HTMLElement): void {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1;
       ctx.stroke();
-      label(ctx, "probe", px - 10, py + 4, { color: PAL.accent, size: small ? 10 : 11, align: "right", alpha: pIn });
+      label(ctx, "probe", px - 12, py, {
+        color: PAL.accent,
+        size: small ? 10 : 11,
+        align: "right",
+        alpha: pIn,
+        bg: "rgba(6, 7, 11, 0.85)",
+      });
 
       // ---- the cost: probes × rays is the same at every level
       if (current >= 0 && pMerge === 0) {

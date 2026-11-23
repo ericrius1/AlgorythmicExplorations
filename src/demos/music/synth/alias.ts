@@ -2,7 +2,7 @@
 // Nyquist frequency: a rising saw's harmonics climb, and in the naive
 // oscillator the ones that should go past the top come back down as
 // inharmonic lines. Below it, the spectrum at the current pitch, computed by
-// running the engine's own oscillator code offline: harmonics in colour,
+// running the engine's own oscillator code offline: harmonics in color,
 // aliases in red.
 
 import type { Demo } from "../../../lib/demoShell";
@@ -62,7 +62,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
 
   // 0 → 80 dB below full scale; gamma keeps the faint floor dark so the
   // lines stand out
-  const colour = (t0: number, out: Uint8ClampedArray, o: number): void => {
+  const color = (t0: number, out: Uint8ClampedArray, o: number): void => {
     const t = Math.pow(t0, 1.8);
     const [r, gg, b] = heatRgb(t);
     const k = Math.min(1, t * 2.5);
@@ -91,7 +91,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
           const m = Math.max(mag[r * 2], mag[r * 2 + 1]);
           const t = clamp((db(m) + 76) / 74, 0, 1);
           // row 0 is the top of the image = Nyquist
-          colour(t, data, ((ROWS - 1 - r) * COLS + c) * 4);
+          color(t, data, ((ROWS - 1 - r) * COLS + c) * 4);
         }
       }
       precomputed.set(key, data);
@@ -212,7 +212,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
       agc = Math.max(mx, agc - 0.15);
       for (let r = 0; r < ROWS; r++) {
         const d = Math.max(fbuf[r * 4], fbuf[r * 4 + 1], fbuf[r * 4 + 2], fbuf[r * 4 + 3]);
-        colour(clamp((d - (agc - 80)) / 80, 0, 1), colBuf, (ROWS - 1 - r) * 4);
+        color(clamp((d - (agc - 80)) / 80, 0, 1), colBuf, (ROWS - 1 - r) * 4);
       }
       img.push(colBuf);
     }
@@ -228,7 +228,7 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
       g.text(`${fk / 1000}k`, sg.x - 7, y + 3.5, { size: 9.5, align: "right", color: TEXT.dim, mono: true });
     }
     g.seg(sg.x, sg.y, sg.x + sg.w, sg.y, 1.5, C.pink, 0.9);
-    g.text(`Nyquist · ${fmtHz(nyq)}`, sg.x + sg.w - 6, sg.y + 14, { size: 10.5, align: "right", color: "#ff9db4", weight: 600 });
+    g.text(`Nyquist · ${fmtHz(nyq)}`, sg.x + sg.w - 2, sg.y - 8, { size: 10, align: "right", color: "#ff9db4", weight: 600, mono: true });
     g.text("time →", sg.x + sg.w - 6, sg.y + sg.h + 14, { size: 9.5, align: "right", color: TEXT.dim });
     g.text("0", sg.x - 7, sg.y + sg.h + 3.5, { size: 9.5, align: "right", color: TEXT.dim, mono: true });
 
@@ -264,8 +264,10 @@ export async function mountAlias(container: HTMLElement): Promise<Demo> {
       }
     }
     g.seg(sp.x + sp.w, sp.y, sp.x + sp.w, base, 1.5, C.pink, 0.8);
-    g.text("harmonics", sp.x + 8, sp.y + 14, { size: 10.5, color: TEXT.accent });
-    g.text(`aliases (${aliasCount})`, sp.x + 80, sp.y + 14, { size: 10.5, color: "#ff8a8a" });
+    const alText = `aliases (${aliasCount})`;
+    const alW = g.textWidth(alText, 10);
+    g.text(alText, sp.x + sp.w - 2, sp.y - 8, { size: 10, align: "right", color: "#ff8a8a" });
+    g.text("harmonics", sp.x + sp.w - 2 - alW - 14, sp.y - 8, { size: 10, align: "right", color: TEXT.accent });
     for (const fk of [5000, 10000, 15000, 20000]) {
       if (fk > nyq) continue;
       const x = sp.x + (fk / nyq) * sp.w;

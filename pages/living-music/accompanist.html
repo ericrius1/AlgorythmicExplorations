@@ -10,7 +10,7 @@
     <title>The Accompanist — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A browser band that listens: probe-tone key profiles, Krumhansl–Schmuckler key finding, chord templates, rootless voicings, a density seesaw, and call and response you can jam with on your keyboard or a MIDI controller."
+      content="A browser band that listens as you play: probe-tone key profiles, Krumhansl–Schmuckler key finding, chord templates, rootless jazz voicings, a density seesaw, and call-and-response replies over keyboard or MIDI."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,46 +31,53 @@
         <p class="hero-kicker">Living Music · Part 8</p>
         <h1>The Accompanist</h1>
         <p class="subtitle">
-          A band in the browser that listens before it plays. The rings above light up with
-          how well each of the 24 keys fits what it has heard so far.
+          A small band in the browser that listens before it plays. The glowing rings above score
+          all twenty-four keys against what the ear has heard so far.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        The circle at the top of the page is listening. A stand-in player is working its way
-        through a slow tour of keys, and the ring lights up the key it thinks the music is in.
-        Tap it and a band joins in: bass, electric piano, brushes, and a vibraphone that
-        answers back. Then take over. Tap the inner circle to play a note, tap a key's name
-        to play its chord, or type on your computer keyboard.
+        Sit down beside a good jazz pianist or bassist, play four or five notes, and watch how fast
+        they lock in. Within a couple of seconds they have already settled on a key, inferred a
+        plausible chord under your fingers, and judged whether to lay back or step into the empty
+        space you leave. Try it on the compass above: a stand-in player is currently strolling
+        around the circle of fifths while the rings track its key. Tap the canvas and the band
+        comes alive with bass, electric piano, brushed drums, and a vibraphone ready to trade
+        phrases. Once the sound is running, jump right in by tapping the inner spokes for single
+        notes, tapping any key wedge around the rings to strike its tonic chord, or playing on your
+        computer keyboard.
       </p>
       <p>
-        <a href="/pages/living-music/jukebox.html">Part seven</a> ended with a band that
-        writes plausible music and can't hear anything. This one runs the other way: notes
-        come in, theory gets applied, notes go out, quickly enough to feel like playing with
-        somebody. Nothing here listens to a microphone. Your notes arrive as events, key down
-        and key up with a pitch and a time, so there's no pitch detection to get wrong. What's
-        left are three questions a human accompanist answers without thinking about them:
-        what key are we in, what chord is this, and how much should I play?
+        In <a href="/pages/living-music/jukebox.html">part seven</a> we built a generative band
+        that composes and mixes whole songs from a seed, completely deaf to the outside world. Here
+        we flip the pipeline around: notes flow in, theory runs in real time, and accompaniment
+        flows back out fast enough to feel conversational. Rather than wrestling with microphone
+        pitch detection, every note arrives as a clean key-down and key-up event carrying an exact
+        MIDI pitch and timestamp. That strips accompaniment down to three musical questions a human
+        bandmate solves almost subconsciously: what key are we in, what chord fits right now, and
+        how busy should the band be?
       </p>
 
       <!-- ================================================================ -->
       <h2 id="listeners"><span class="kicker">Step 1 · The data</span>What listeners hear</h2>
       <p>
-        A key isn't written anywhere in the notes. It's an impression that builds up as you
-        listen. In 1982 Carol Krumhansl and Edward Kessler measured that impression. They
-        played musically trained listeners something that sets up a key, a tonic chord or a
-        short cadence, followed by a single <em>probe tone</em>, and asked them to rate on a
-        scale of 1 to 7 how well the probe fit. After all twelve probes, in major and in minor,
-        they had two <em>key profiles</em>: how much each scale degree belongs to the key.
+        Musical key lives in the listener's head, accumulated over a few seconds of notes rather
+        than stamped onto any single pitch. In 1982, psychologists Carol Krumhansl and Edward
+        Kessler set out to measure that mental hierarchy directly. They played musically trained
+        listeners a short context that firmly established a key (a tonic chord or brief cadence),
+        followed by a single <em>probe tone</em>, and asked them to rate on a 1-to-7 scale how well
+        that final note fit. Repeating the question across all twelve chromatic pitch classes in
+        both major and minor contexts gave them two empirical <em>key profiles</em>, capturing how
+        strongly each scale degree feels like it belongs.
       </p>
       <p>
-        You can run the same test on yourself. Each question plays a I–IV–V–I cadence in
-        C, then one note. Rate it, and your answer lands on the chart next to the 1982 average.
-        As in the original study, every sound is a Shepard tone: one note name spread over six
-        octaves under a bell-shaped loudness curve, so you're judging which note it is and
-        not how high it is.
+        You can take their exact test below. Each trial plays a four-chord cadence in C followed by
+        one probe note; click a rating from 1 to 7 and your dot drops onto the graph alongside the
+        1982 group average. Just as in the original experiment, every note is synthesized as a
+        Shepard tone (the same pitch class layered across six octaves under a bell-shaped loudness
+        envelope), which removes octave height as a cue so you judge the note's tonal fit alone.
       </p>
 
       <div
@@ -80,27 +87,29 @@
       ></div>
 
       <p>
-        If your profile looks like theirs, the tonic C is near the top, G and E come next,
-        the rest of the C major scale sits in the middle, and the five notes outside the scale
-        are at the bottom. The minor context gives a different shape: E♭ jumps up, E drops,
-        and A♭ rises. Nobody told the listeners which notes were in the scale. The hierarchy
-        came out of what they heard.
+        Most listeners produce a curve surprisingly close to Krumhansl and Kessler's bars. In C
+        major, C sits clearly on top, G and E form the next tier, the other four diatonic notes
+        cluster through the middle, and the five chromatic notes sink to the bottom. Flip the
+        <em>context</em> toggle to <em>minor</em> and the shape rearranges itself: E♭ leaps toward
+        the top, E drops sharply, and A♭ climbs up. Nobody handed the 1982 participants a scale
+        diagram; that whole multi-tiered hierarchy came straight out of their ears.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="key"><span class="kicker">Step 2 · The key</span>Finding the key</h2>
       <p>
-        The profiles turn key finding into a matching problem. Count how much of each pitch
-        class you've heard, then compare that histogram with the major profile rotated to all
-        twelve tonics and the minor profile rotated the same way. That's 24 candidate keys.
-        The comparison is a correlation, and the best-correlated key wins. Krumhansl and Mark
-        Schmuckler published this as an algorithm in Krumhansl's 1990 book, weighting each
-        note by how long it sounds, and most key finders since have been built on it.
+        Once you have those two twelve-number profiles, identifying a key becomes template
+        matching. Tally how strongly each of the twelve pitch classes has appeared in the music,
+        then correlate that histogram against the major profile shifted to all twelve tonics and
+        the minor profile shifted the same way. That yields 24 correlation scores, and the highest
+        correlation names the key. Krumhansl and Mark Schmuckler introduced this method in
+        Krumhansl's 1990 book, weighting each note by its duration, and decades of MIR key-finding
+        systems trace back to it.
       </p>
       <p>
-        A live player needs one more thing, a memory that fades. Notes from a minute ago
-        shouldn't count as much as notes from a second ago, or the ear could never follow a
-        key change. So the histogram decays:
+        For live playing, the ear also needs a fading memory. Notes you played two minutes ago
+        shouldn't drag down a key change you just made, so the histogram decays exponentially every
+        frame while active notes keep topping it up:
       </p>
       <pre><code><span class="cm">// every frame, dt seconds since the last one</span>
 hist[pc] *= 2 ** (-dt / 5)          <span class="cm">// half-life of 5 seconds</span>
@@ -109,10 +118,11 @@ hist[pc] += 0.45 * dt               <span class="cm">// for as long as it's held
 
 r[key] = correlation(hist, profile turned to key's tonic)   <span class="cm">// × 24 keys</span></code></pre>
       <p>
-        In the figure, the bars are the histogram and the blue dots are the winning key's
-        profile. Both are drawn as distance from their own average, which is what a
-        correlation compares: where the bars and the dots point the same way, the match gets
-        better. The grid on the right scores every key at once.
+        On the left side of the figure below, the bars show the ear's fading pitch-class memory and
+        the blue curve shows the winning key's profile. Both are plotted as deviations above and
+        below their own average, which is literally what Pearson correlation measures: whenever
+        tall bars line up with high dots and missing notes line up with low dots, the score climbs
+        toward 1. On the right, all twenty-four keys light up live in circle-of-fifths order.
       </p>
 
       <div
@@ -122,59 +132,62 @@ r[key] = correlation(hist, profile turned to key's tonic)   <span class="cm">// 
       ></div>
 
       <p>
-        Start with Twinkle. After its first four notes, C C G G, C minor is a close second,
-        because there's no third yet to say major or minor; the A on note five settles it. The
-        tune never plays a B or a B♭, the one note that would separate C major from F major,
-        and C still wins easily because the melody keeps landing on C and G, the two highest
-        points of the major profile. The A minor tune shows the minor profile at work. A minor and C major share
-        all seven notes, so what separates them is which notes get the weight, plus the G♯
-        that only the minor tune uses.
+        Try <em>Twinkle (C major)</em> first. Through the opening four notes (C, C, G, G), C minor
+        trails close behind because no third has appeared yet; the A on note five breaks the tie.
+        Notice that Twinkle never once plays B or B♭, the sole note separating C major from F
+        major, yet C major wins comfortably because the tune keeps leaning on C and G, the two
+        tallest peaks in the major profile. Next try <em>a tune in A minor</em>: A minor and C
+        major share the same seven white keys, so the ear separates them by which pitches carry the
+        weight, helped along by the leading tone G♯ at the cadences.
       </p>
       <p>
-        The third tune plays a phrase in C and then the same phrase twice in E♭. Watch the
-        grid during the switch. The ear doesn't go straight to E♭ major. For a few seconds its
-        memory holds the old C and G alongside the new E♭ and A♭, and that mix is a C minor
-        scale, so C minor takes over first (with a shorter or longer memory, G minor or B♭
-        major gets a turn too). E♭
-        major wins once the C major notes have faded, about nine seconds after the first E♭.
-        None of those changes happens instantly, because I added some hysteresis: the current
-        key keeps its place until another key has beaten it by 0.05 for a second and a half
-        (the green bar fills while that happens). Without it, one borrowed chord would send
-        the bass player to a new key for a bar. The last button plays all twelve notes at once.
-        The histogram is flat, every correlation is zero, and the ear declines to name a key,
-        which is the right answer.
+        The third button, <em>C major, then E♭ major</em>, shows how a fading memory handles a real
+        modulation. Watch the grid as the melody jumps into E♭. Instead of teleporting straight to
+        E♭ major, the ear briefly holds fading C and G alongside fresh E♭ and A♭, a blend that
+        resembles C minor, so C minor claims the lead for a few seconds (and depending on the
+        half-life slider, G minor or B♭ major can take a brief turn too) before E♭ major wins out
+        roughly nine seconds after the switch. To keep a single passing chromatic chord from
+        yanking the bass player into another key for one measure, the ear uses hysteresis: a
+        challenger has to beat the current key by at least 0.05 for a full 1.5 seconds (tracked by
+        the green progress bar under the tile) before taking over. Finally, hit
+        <em>all twelve notes at once</em>: the histogram flattens out, every correlation collapses
+        to zero, and the ear sensibly refuses to guess a key.
       </p>
       <p>
-        The memory slider is a real trade-off. Short memories follow a modulation quickly and
-        lose the key during a chromatic run. Long memories hold steady and lag. Five seconds
-        is about two bars at the band's tempo, which felt right to me when I played with it.
+        Dragging <em>memory half-life</em> reveals an unavoidable engineering trade-off. A short
+        half-life pivots quickly on modulations, yet gets easily spooked by chromatic runs; a long
+        half-life stays rock steady and lags behind real key changes. Five seconds works out to
+        around two bars at the band's default tempo, which struck a comfortable balance when I
+        played against it.
       </p>
       <aside class="note">
         <span class="note-label">Aside · A map of keys</span>
         <p>
-          Krumhansl and Kessler also correlated the 24 profiles with each other. Keys a fifth
-          apart came out similar, and so did each major key and its relative and parallel
-          minors. Laid out in space by similarity, the keys fall around the circle of fifths,
-          and Krumhansl and Kessler found the arrangement wraps onto the surface of a torus. The
-          hero at the top of this page is a flat version of that map: majors around the
-          outside in fifths order, each relative minor just inside it.
+          Krumhansl and Kessler also correlated all 24 key profiles against one another. Keys a
+          perfect fifth apart scored high similarity, as did every major key paired with its
+          relative and parallel minors. Embedding those pairwise similarities into geometry arranges
+          the keys along the circle of fifths and wraps the whole neighborhood onto the surface of a
+          torus. The hero compass at the top of this page flattens that torus into two concentric
+          rings: major keys around the outside in fifths order, each relative minor tucked right
+          inside it.
         </p>
       </aside>
       <details class="fold">
         <summary>Better profiles, and what this method can't do</summary>
         <div class="fold-body">
           <p>
-            David Temperley revisited the algorithm in 1999 and proposed adjusted profiles
-            and a version that judges short segments with a penalty for changing key, which
-            did better on his test set. Later work fit profiles to large corpora of scores
-            instead of listener ratings. I kept the 1982 numbers because they come from what
-            people heard, and the figure above is about that.
+            In 1999, David Temperley refined the algorithm with adjusted profiles and a dynamic
+            segmentation pass that penalizes frequent key switches, improving accuracy across
+            classical corpora; later systems fit profiles directly from large databases of scores
+            rather than behavioral ratings. I kept the original 1982 numbers here because they come
+            directly from human listeners, tying step one straight into the live band.
           </p>
           <p>
-            Any method built on a histogram ignores order. C–E–G and G–E–C count the same,
-            and so does a melody played backwards. Order matters to listeners (a G going to C
-            says "C major" more strongly than C going to G), so a better ear would also look
-            at intervals and where the notes fall in the bar.
+            One blind spot affects every histogram-based key finder: order disappears. Playing
+            C–E–G produces the exact same histogram as G–E–C, and reversing an entire melody leaves
+            every correlation untouched. Real ears care heavily about direction and meter (a G
+            resolving to C signals C major much more strongly than C drifting up to G), so a more
+            complete model would score intervals and metric placement alongside pitch duration.
           </p>
         </div>
       </details>
@@ -182,10 +195,11 @@ r[key] = correlation(hist, profile turned to key's tonic)   <span class="cm">// 
       <!-- ================================================================ -->
       <h2 id="chords"><span class="kicker">Step 3 · The chord</span>Naming the chord</h2>
       <p>
-        The key changes every few phrases. The chord changes every bar or two, so the chord
-        ear uses a second, much faster memory, with a half-life of 0.9 seconds, plus whatever
-        you're holding down right now. It scores every triad, 12 roots times major, minor and
-        diminished, against that evidence:
+        While a key usually holds steady across several phrases, chords turn over every bar or two.
+        To track harmony at that faster pace, the ear maintains a second pitch-class histogram with
+        a much shorter half-life of 0.9 seconds, summed together with whatever keys you are holding
+        down at this instant. Every one of the 36 basic triads (twelve roots across major, minor,
+        and diminished) gets scored against that evidence:
       </p>
       <pre><code>fit   = (1.1·ev[root] + 1.0·ev[third] + 0.75·ev[fifth] − 0.6·ev[other notes]) / Σ ev
 
@@ -195,11 +209,12 @@ score = fit
       + 0.06 if it's already playing             <span class="cm">// changing has to be worth it</span>
       + 0.03 if its root is a fifth below        <span class="cm">// V→I, ii→V: the strongest move</span></code></pre>
       <p>
-        The fit term does most of the work. Notes that aren't in the chord count against it,
-        so a chord can't win just by containing your notes. The fifth counts least because
-        it's shared by the most chords. The other terms are the key prior, small nudges that
-        only matter when the evidence is ambiguous, which is often. Two notes are rarely enough
-        to name a chord.
+        The raw evidence fit carries the main weight. Any active note outside a triad's three
+        pitches counts negatively, preventing a chord from winning simply because it overlaps one
+        or two notes, while the fifth carries the smallest bonus since so many chords share it. The
+        remaining terms form a lightweight key prior, gentle tie-breakers that step in whenever the
+        notes under your hands leave room for interpretation (which happens constantly when you
+        play single-line melodies or open two-note intervals).
       </p>
 
       <div
@@ -209,55 +224,60 @@ score = fit
       ></div>
 
       <p>
-        Try the examples. D and A, with no third, could be D major or D minor, and the fit
-        can't tell them apart. The prior decides: in C major it's D minor (ii), in G major
-        it's D major (V), and with the prior off the two tie. A and C is A minor rather than F
-        major, because C is A minor's third but only F major's fifth. G B D F is G7: the F
-        counts against G major's fit, but nothing else explains the other three notes as
-        well. B D F is a real diminished chord and gets named as one. B♭ D F isn't in C major
-        at all and still wins, because the evidence outweighs the prior. That's how borrowed
-        chords like ♭VII get through. In A minor, E G♯ B comes out as V, because I let minor
-        keys use the major dominant, as most minor-key music does.
+        Click through the six examples to watch the prior and the evidence negotiate.
+        <em>D + A</em> lacks a third, so D major and D minor tie on raw fit; the key prior breaks
+        the deadlock, picking Dm (ii) in C major, D (V) in G major, and leaving them dead even when
+        you switch <em>key prior</em> to <em>off</em>. <em>A + C</em> goes to A minor over F major
+        because C serves as A minor's third (weight 1.0) rather than F major's fifth (weight 0.75).
+        <em>G B D F</em> is a dominant seventh: the extra F subtracts a little from G major's fit,
+        yet G still outperforms every rival across the other three notes. <em>B D F</em> overcomes
+        the diminished penalty to win cleanly as B°, and <em>B♭ D F</em> wins even in C major
+        because strong evidence overrides the diatonic bonus, letting borrowed chords like ♭VII
+        through naturally. Switch <em>key</em> to <em>A minor</em> and try <em>E G♯ B</em>: it
+        shows up outlined as V because the minor key table admits the major dominant used in most
+        minor-key music.
       </p>
       <p>
-        The band decides on a chord twice a bar, on beats one and three. It will also change
-        on beats two and four, but only if you're holding at least two notes and they fit a
-        different chord clearly. That keeps the harmony from twitching under a melody while
-        still letting you push a chord change by playing it.
+        In the full band, harmony updates on beats one and three of every bar. It will also switch
+        on beats two and four, provided you are actively holding at least two keys that point
+        unmistakably to a new chord. That compromise prevents passing melody notes from rattling
+        the accompaniment while letting you steer quick chord changes whenever you grab them.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="band"><span class="kicker">Step 4 · The band</span>Voicing, bass and brushes</h2>
       <p>
-        A chord name still isn't music. Somebody has to decide which notes to play, in which
-        octave, and when. I gave the band four players.
+        Knowing the chord symbol is only the starting point; turning "Dm" into live accompaniment
+        requires deciding which octave each instrument occupies, which extensions to add, and how
+        often to strike. The backing section splits those jobs across three rhythm-section players.
       </p>
       <p>
-        <strong>The pianist</strong> plays rootless voicings: the third, fifth, seventh and
-        ninth of the chord, with no root. That's how jazz pianists usually voice chords when a
-        bassist already has the root, and it sounds fuller than a triad while using the same
-        four fingers. The sevenths come from the key, so ii gets a minor seventh, V a dominant
-        seventh, and I a major seventh. Where the ninth would clash with the scale (on iii, for
-        example) the root goes back in. Each new chord is voiced the way
-        <a href="/pages/living-music/chords.html">part six</a> described: try every inversion
-        with the bottom note between E3 and D♯4, and keep the one whose fingers move the least
-        from the last chord.
+        <strong>The pianist</strong> comps with rootless four-note voicings: the third, fifth,
+        seventh, and ninth of the chord, leaving the root out because the bassist already owns the
+        bottom end. Sevenths come straight from the active key (so ii receives a minor seventh, V a
+        dominant seventh, and I a major seventh), and whenever the major ninth would clash with the
+        key's scale (such as on iii), the voicing folds the root back in. Every chord change runs
+        through the minimum-motion voice-leading search from
+        <a href="/pages/living-music/chords.html">part six</a>, testing each inversion with its
+        bottom note between E3 and D♯4 and picking whichever sits closest to the previous hand
+        position.
       </p>
       <p>
-        <strong>The bassist</strong> plays the root on beat one and the fifth on beat three,
-        what jazz players call a two-feel, between C2 and B2. Now and then it adds a pickup a
-        half step from the root on the last eighth of the bar.
+        <strong>The bassist</strong> anchors the floor between C2 and B2 with a relaxed jazz
+        two-feel, landing on the root on beat one and the fifth on beat three, occasionally
+        slipping in a chromatic pickup a half step away from the root on the final eighth note of
+        the bar.
       </p>
       <p>
-        <strong>The drummer</strong> plays brushes: a ride cymbal on every beat with a swung
-        skip into beats two and four, a brush swish on two and four, and a soft kick on one
-        and three. The off-beat eighths are pushed late, 60% of the way to a full triplet
-        swing.
+        <strong>The drummer</strong> plays a quiet brush kit: a ride cymbal on every beat with a
+        swung skip leading into beats two and four, a soft brush swish on the backbeats, and a
+        featherweight kick on one and three. Off-beat eighths are delayed 60% of the way toward a
+        full triplet swing.
       </p>
       <p>
-        <strong>All of them</strong> follow one rule about how much to play, and it's the
-        rule a human rhythm section follows most: the busier the soloist, the quieter the
-        band.
+        <strong>The density seesaw</strong> ties all three players together around one simple rule
+        that good human rhythm sections follow instinctively: leave space when the soloist is busy,
+        and step forward when they pause.
       </p>
       <pre><code>notesPerSecond = your notes in the last 4 seconds / 4
 
@@ -265,38 +285,50 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
       : notesPerSecond &lt; 2.6 ? "comp"   <span class="cm">// short chords, on and off the beat</span>
       :                        "hold"   <span class="cm">// long pads, so someone holds the floor</span></code></pre>
       <p>
-        The style is re-read at the start of every bar. You'll see it switch in the last
-        figure as you play more or less.
+        The band re-checks your note rate at the top of each bar, shifting smoothly between
+        arpeggiated fills, syncopated comping, and sustained pads as your playing speeds up or
+        thins out.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="answers"><span class="kicker">Step 5 · Conversation</span>Call and response</h2>
       <p>
-        Comping keeps the harmony going. What makes it feel like a bandmate is that it says
-        something back. When you play a phrase and stop, the vibraphone answers. A phrase
-        counts as finished after at least three notes and a beat of silence. The answer comes
-        in at the same spot in the bar where your call started, one phrase later, so call and
-        answer line up like the two halves of a sentence.
+        Solid comping gives you a floor to stand on, while call and response makes the band feel
+        like a partner listening back. Whenever you play a phrase of at least three notes and then
+        leave a full beat of silence, the vibraphone waits until the corresponding beat of the next
+        phrase and plays a reply, lining up call and answer like the two halves of a spoken
+        exchange.
       </p>
       <p>
-        The answer borrows your rhythm, snapped to eighth notes and cut to one bar at most.
-        For the pitches there are four options, and all of them move in scale steps rather
-        than semitones, so the answer stays in the key:
+        Every reply borrows your call's rhythm, quantized onto an eighth-note grid and trimmed to
+        at most one bar. For the pitches, the vibraphone works in scale degrees rather than raw
+        semitones so its replies stay inside the key, choosing among four melodic transformations:
       </p>
       <ul>
-        <li><strong>Echo</strong> repeats your phrase, moved so it starts on a tone of the current chord.</li>
-        <li><strong>Mirror</strong> turns your contour upside down: where you went up a third, it goes down a third.</li>
-        <li><strong>Sequence</strong> repeats your phrase a third higher, the oldest way to develop a tune.</li>
         <li>
-          <strong>Riff</strong> improvises from your habits. Every interval you play goes
-          into a table of which step tends to follow which, and the riff walks that table.
+          <strong>Echo</strong> shifts your phrase vertically so it opens on a tone of the current
+          chord while preserving your contour.
+        </li>
+        <li>
+          <strong>Mirror</strong> flips your melodic contour upside down around its opening pitch,
+          turning every rising third into a falling third.
+        </li>
+        <li>
+          <strong>Sequence</strong> transposes your motif up a diatonic third, one of the oldest
+          devices for extending a musical idea.
+        </li>
+        <li>
+          <strong>Riff</strong> improvises from your own melodic habits: every scale-step interval
+          you play updates a small first-order transition table, and the vibraphone walks that
+          table to spin a reply in your style.
         </li>
       </ul>
       <p>
-        Then two rules clean it up. Notes on the beat are moved to the nearest chord tone, and
-        the last note resolves to a chord tone and rings. Without them the answers sounded
-        like random notes in the right key. With them they sound like replies. If you start
-        playing again in the middle of an answer, the band stops talking.
+        Two finishing touches pull these replies together: notes landing on strong beats snap to
+        the closest chord tone, and the final note always resolves onto a chord tone and rings out.
+        Before I added those two constraints, the replies sounded like generic scale noodling; with
+        them in place, they land with clear harmonic punctuation. If you jump back in before the
+        vibraphone finishes, it immediately yields the floor and cancels its remaining notes.
       </p>
 
       <div
@@ -306,36 +338,40 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
       ></div>
 
       <p>
-        The example phrases are handy for hearing the four modes side by side. Pick one mode,
-        play the same call a few times, then switch. Echo and sequence are the most obviously
-        "yours". Mirror is the one that surprised me: it often sounds like a real answer, a
-        rising question followed by a falling reply. Riff starts out vague and gets more like
-        you the longer you play, as the table fills up.
+        The two preset phrases (<em>a phrase in C</em> and <em>a phrase in A minor</em>) make it
+        easy to compare the four modes back to back under <em>answer by</em>. Echo and sequence feel
+        immediately recognizable as variations on your own line. Mirror turned out to be the nicest
+        surprise: flipping a climbing question into a descending contour often sounds genuinely
+        conversational. Riff starts off generic on the first few phrases and gradually takes on
+        your fingerprints as your interval table fills up.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Machine bandmates</span>
         <p>
-          People have built these for forty years. Roger Dannenberg's 1984 score follower
-          accompanied a live soloist through a written piece, tracking where in the score the
-          player was. Robert Rowe's Cypher and George Lewis's Voyager, both developed through
-          the 1980s and 90s, went the other way, toward free improvisation. Lewis, a trombonist,
-          designed Voyager to act as an independent player with its own ideas rather than a
-          follower. In 2002 François Pachet's Continuator learned a player's style from their
-          phrases with variable-order Markov chains and answered in kind. The riff mode here is
-          a very small cousin of it: one step of memory instead of many.
+          Interactive computer accompanists go back more than four decades. Roger Dannenberg's
+          1984 real-time score follower tracked a live soloist through a written piece and adapted
+          its tempo to match. Around the same time and into the 1990s, Robert Rowe's
+          <em>Cypher</em> and trombonist George Lewis's <em>Voyager</em> explored free
+          improvisation, with Lewis deliberately designing <em>Voyager</em> as an autonomous peer
+          with its own musical agenda rather than a passive follower. In 2002, François Pachet
+          built <em>The Continuator</em>, which learned a pianist's phrasing on the fly using
+          variable-order Markov chains and immediately traded licks in their voice. Our riff mode
+          is a tiny single-step cousin of that idea.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="jam"><span class="kicker">Step 6 · All together</span>The whole band</h2>
       <p>
-        Here's everything at once. Tap the figure, then play the on-screen keys or your
-        computer keyboard: <code>A S D F G H J K</code> are the white keys from middle C,
-        <code>W E T Y U</code> the black keys, and <code>Z</code>/<code>X</code> shift the
-        octave. Any MIDI keyboard works too, after you click the MIDI button and allow it.
-        Your notes are white, the bass violet, the piano amber, the vibraphone's answers
-        green. Everything right of the line hasn't happened yet: the band plans half a bar
-        ahead, so you can watch its next notes coming.
+        Below is the complete accompanist wired together. Tap the canvas to wake the audio, then
+        play using the on-screen keys, a MIDI controller (click <em>use a MIDI keyboard</em> to
+        grant browser permission), or your computer keyboard: <code>A S D F G H J K</code> play the
+        white keys starting at middle C (continuing up through <code>L</code>, <code>;</code>, and
+        <code>'</code>), <code>W E T Y U O P</code> play the black keys, and
+        <code>Z</code>/<code>X</code> shift octaves. On the scrolling roll, your notes appear in
+        white, the electric piano in amber, the bass in violet, and vibraphone replies in green.
+        Everything to the right of the vertical playhead sits half a bar in the future, letting you
+        watch the band plan its next chords and answers just before they sound.
       </p>
 
       <div
@@ -345,57 +381,54 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
       ></div>
 
       <p>
-        A few things to try. Hold a chord for a bar and watch the band settle into it. Play
-        sparse single notes and it fills in arpeggios; play fast and it backs off to pads, and
-        the meter in the corner shows why. Play a phrase in C, then one that leans on F♯, and
-        watch the key name change after the hysteresis lets it. If you don't want to play,
-        the stand-in button hands the keys to the same player that's in the hero.
+        Start by holding a slow three-note chord for a bar and watch the key label and chord symbol
+        snap into focus in the upper right. Leave generous gaps between sparse single notes and the
+        bottom-right meter stays in <em>fill</em> while the piano threads gentle arpeggios through
+        the empty space; play a fast flurry of notes and the meter swings into <em>hold</em> as the
+        band steps back onto quiet sustained pads. Play a few bars in C major, then lean into F♯
+        and D to nudge the ear toward G major and watch the hysteresis wait before committing. If
+        you would rather just listen and watch the mechanics run, click <em>stand-in plays</em> to
+        hand the keyboard back to the hero's automatic soloist.
       </p>
       <p>
-        It has two big limits. The band keeps the time and you follow it. Following a player's
-        tempo, with rubato, is the problem Dannenberg was solving, and this doesn't try. And
-        the harmony is greedy: it picks the best chord for the last second, with no idea of
-        form. It will never hold the IV back for the chorus or set up a deceptive cadence. Both
-        come from what I put in. The band doesn't understand music. It runs the assumptions
-        I wrote down, and some of them came from Krumhansl's listeners.
+        Playing with it for a few minutes also makes its two main boundaries obvious. First, the
+        band runs on a fixed clock, so you follow its groove rather than pulling it around with
+        expressive rubato (the exact tempo-tracking problem Dannenberg tackled). Second, its
+        harmonic sense is purely local: it grabs the best chord for the last second of evidence
+        without any awareness of verse-chorus form, so it can never anticipate a bridge or hold
+        back a resolution for dramatic effect. Both reflect the simplicity of the model: every move
+        comes directly from fading histograms, heuristic chord priors, and the empirical profiles
+        gathered from Krumhansl's listeners.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>What the series built</h2>
-      <p>A few lessons from this part:</p>
-      <ul>
-        <li>
-          <strong>Ask listeners, then fit the data.</strong> The key profiles are the core of
-          the ear, and they came from people rating notes, not from a theory book.
-        </li>
-        <li>
-          <strong>Memory is a design choice.</strong> Two fading histograms with different
-          half-lives give a slow sense of key and a fast sense of chord from the same notes.
-        </li>
-        <li>
-          <strong>Priors break ties.</strong> The key prior only matters when the evidence is
-          thin, and with two or three notes it usually is.
-        </li>
-        <li>
-          <strong>Restraint is a feature.</strong> The density seesaw is one line of code, and
-          it does more for the feel than any of the voicing work.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: follow the player's tempo instead of a fixed clock; learn chord
-        progressions so the band can anticipate the next chord instead of reacting to the
-        last one; give the riff mode a longer memory, closer to the Continuator; and
-        add an ear for intervals and metre, so G–C means more than C–G.
+        Building an accompanist from scratch highlights a few recurring principles. Grounding the
+        key finder in actual listener ratings beats hand-coded textbook heuristics, and splitting
+        pitch memory into two decay rates (a slow five-second window for key and a quick 0.9-second
+        window for harmony) pulls two timescales of structure out of the exact same note stream.
+        Small priors matter far more than you'd expect, because live playing spends most of its
+        time in ambiguous two- or three-note territory where pure template fit ties. And the
+        one-line density seesaw that quiets the band whenever you play faster contributes as much
+        to the musical feel as all the rootless jazz voicings put together.
       </p>
       <p>
-        That's the end of Living Music. It started with a single note: a vibrating string,
-        and the three numbers that describe what you hear. Then oscillators and filters to
-        make any sound; why some intervals are smooth and some rough; why the octave got
-        twelve notes; scales and modes; triads and voice leading; a generative band; and now
-        one that listens. Every part was already in the accompanist. The pitch classes are
-        part four's twelve notes, the key profiles rate part five's scales, the voicings are
-        part six's triads, and the band's clock comes from the jukebox. It ends as a band
-        that needs one more player.
+        Given more time, the next features on my wish list would be an adaptive beat tracker so the
+        band can follow a soloist's rubato, a chord transition model so it can anticipate where a
+        progression is heading instead of always reacting half a bar behind, a deeper multi-step
+        Markov memory for the vibraphone closer to Pachet's Continuator, and an ear sensitive to
+        melodic intervals and meter so G moving to C carries more tonal weight than C moving to G.
+      </p>
+      <p>
+        That brings Living Music to a close. Eight essays ago, we started with one vibrating string
+        and the three basic dimensions of a single tone, moved through oscillators, filters,
+        sensory roughness, the math behind twelve-tone tuning, scales and modes, triads and voice
+        leading, and a self-contained generative jukebox, arriving finally at a band that listens
+        back. Nearly every earlier part is still running quietly inside this last figure: the
+        twelve pitch classes from part four, the scale hierarchies from part five, the voice-led
+        triads from part six, and the swung look-ahead clock from part seven, all waiting for a
+        human pair of hands on the keys.
       </p>
       <p class="continue">
         <strong>Back to the start: <a href="/pages/living-music/vibration.html">Part one, The Anatomy of a Note</a>.</strong>

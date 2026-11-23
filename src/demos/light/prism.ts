@@ -1,7 +1,7 @@
 // Part six's demos.
 //   bench    — a 2D optics bench, canvas 2D: one white beam, one glass prism,
 //              Snell's law per wavelength. Newton's tabletop.
-//   spectrum — canvas 2D: random wavelengths, their colours, and their average
+//   spectrum — canvas 2D: random wavelengths, their colors, and their average
 //   hero     — the spectral path tracer: a slit of sunlight through a prism
 //   caustics — a glass ball in a beam, with light tracing on a toggle
 //   full     — prism and ball: dispersion, aperture, focus, beam spread, drag
@@ -41,16 +41,25 @@ export function wavelengthRGB(l: number): [number, number, number] {
   const r = 3.2406 * x - 1.5372 * y - 0.4986 * z;
   const g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
   const b = 0.0557 * x - 0.204 * y + 1.057 * z;
-  // out-of-gamut colours get white added until they fit, instead of clipping
+  // out-of-gamut colors get white added until they fit, instead of clipping
   const m = Math.min(0, r, g, b);
   return [(r - m) * 1.72741, (g - m) * 1.99996, (b - m) * 2.05417];
 }
 
-// a displayable swatch colour for one wavelength: brightest channel to 1
+// a displayable swatch color for one wavelength: CIE XYZ → clamped sRGB,
+// clamping hue at the far ends where the Gaussian fit's tails cross while
+// fading smoothly toward dark violet and dark crimson
 function spectralCss(l: number, alpha = 1): string {
-  const [r, g, b] = wavelengthRGB(l);
+  const lh = Math.max(405, Math.min(680, l));
+  const x = 1.056 * g2(lh, 599.8, 37.9, 31.0) + 0.362 * g2(lh, 442.0, 16.0, 26.7) - 0.065 * g2(lh, 501.1, 20.4, 26.2);
+  const y = 0.821 * g2(lh, 568.8, 46.9, 40.5) + 0.286 * g2(lh, 530.9, 16.3, 31.1);
+  const z = 1.217 * g2(lh, 437.0, 11.8, 36.0) + 0.681 * g2(lh, 459.0, 26.0, 13.8);
+  const r = Math.max(0, 3.2406 * x - 1.5372 * y - 0.4986 * z);
+  const g = Math.max(0, -0.9689 * x + 1.8758 * y + 0.0415 * z);
+  const b = Math.max(0, 0.0557 * x - 0.204 * y + 1.057 * z);
   const m = Math.max(r, g, b, 1e-6);
-  const e = (v: number): number => Math.round(255 * Math.pow(Math.min(1, v / m), 1 / 2.2));
+  const env = l < 420 ? (l - 375) / 45 : l > 660 ? (730 - l) / 70 : 1;
+  const e = (v: number): number => Math.round(255 * Math.pow(Math.min(1, (v / m) * env), 1 / 2.2));
   return `rgba(${e(r)}, ${e(g)}, ${e(b)}, ${alpha})`;
 }
 
@@ -93,7 +102,7 @@ function mountBench(container: HTMLElement): Demo {
   shell.slider({
     label: "dispersion B",
     min: 0, max: 0.04, step: 0.0005, value: B,
-    format: (v) => `${v.toFixed(3)} ${glassName(v)}`,
+    format: (v) => v.toFixed(3),
     onInput: (v) => (B = v),
   });
   const aim = (e: PointerEvent): void => {
@@ -207,7 +216,7 @@ function mountBench(container: HTMLElement): Demo {
     const exitAngles = new Map<number, number>();
     let tirCount = 0;
     if (entry) {
-      // every wavelength from 380 to 720 nm; their colours average to white,
+      // every wavelength from 380 to 720 nm; their colors average to white,
       // so where the rays overlap the light adds back up to white
       const strokes: { pts: [number, number][]; lambda: number }[] = [];
       for (let i = 0; i < NL; i++) {
@@ -259,10 +268,11 @@ function mountBench(container: HTMLElement): Demo {
     ctx.globalCompositeOperation = "source-over";
 
     // readout from the rays just drawn
+    const glass = glassName(B);
     if (!entry) {
-      info = "move the beam onto the prism";
+      info = `${glass} · move the beam onto the prism`;
     } else if (tirCount === NL) {
-      info = "total internal reflection: no colour gets out the second face";
+      info = `${glass} · total internal reflection: no color gets out the second face`;
     } else {
       const deg = (r: number): number => (r * 180) / Math.PI;
       const keys = [...exitAngles.keys()];
@@ -274,9 +284,9 @@ function mountBench(container: HTMLElement): Demo {
         let dev = Math.abs(deg(mid - beamAngle));
         if (dev > 180) dev = 360 - dev;
         const trapped = tirCount > 0 ? ` · ${Math.round((tirCount / NL) * 100)}% trapped` : "";
-        info = `bent ${dev.toFixed(1)}° · red to violet spread ${spread.toFixed(2)}°${trapped}`;
+        info = `${glass} · bent ${dev.toFixed(1)}° · red to violet spread ${spread.toFixed(2)}°${trapped}`;
       } else {
-        info = "most of the beam is trapped inside";
+        info = `${glass} · most of the beam is trapped inside`;
       }
     }
   };
@@ -358,7 +368,7 @@ function mountSpectrum(container: HTMLElement): Demo {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     for (const l of [400, 500, 600, 700]) {
-      ctx.fillText(String(l), X(l), plotB + stripH + 8 * pr);
+      ctx.fillText(l === 700 ? "700 nm" : String(l), X(l), plotB + stripH + 8 * pr);
     }
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
@@ -441,7 +451,7 @@ type TracerMode = "hero" | "caustics" | "full";
 
 interface Scene {
   prism: [number, number, number, number]; // x, z, rotation, height (0 = none)
-  sphere: [number, number, number, number]; // centre, radius (0 = none)
+  sphere: [number, number, number, number]; // center, radius (0 = none)
   aim: [number, number, number];            // where the beam is pointed
   az: number;                               // beam azimuth, radians (direction of travel)
   el: number;                               // beam elevation (downward), radians
@@ -709,7 +719,7 @@ async function mountTracer(container: HTMLElement, mode: TracerMode): Promise<De
     shell.slider({
       label: "aperture",
       min: 0, max: 0.2, step: 0.002, value: aperture,
-      format: (v) => (v < 0.003 ? "pinhole" : `${(v * 2).toFixed(2)} wide`),
+      format: (v) => (v < 0.003 ? "pinhole" : (v * 2).toFixed(2)),
       onInput: (v) => {
         aperture = v;
         reset();

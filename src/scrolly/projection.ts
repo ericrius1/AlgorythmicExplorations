@@ -85,61 +85,68 @@ export function mountProjection(el: HTMLElement): void {
     screens: 4,
     aspect: 0.6,
     steps: [
-      { at: 0, text: "A velocity field after stirring: a vortex on the left, and an illegal pile-up on the right where flow pours outward from nothing. Real incompressible fluid forbids that." },
-      { at: 0.16, text: "Measure the crime: divergence. Red cells create fluid, blue cells swallow it. The vortex barely registers — rotation is legal. The source glows red." },
-      { at: 0.38, text: "Solve ∇²p = ∇·u for pressure. Here it's Jacobi relaxation: every cell repeatedly averages its neighbours. Scrub slowly — you're watching the pressure field negotiate itself into shape, sweep by sweep." },
-      { at: 0.68, text: "Subtract the pressure gradient. The outflow collapses, the divergence map goes dark, and what's left is pure swirl — the part of the motion that reads as fluid." },
+      { at: 0, text: "A velocity field right after stirring: a rotating vortex on the left, and a burst on the right where flow radiates outward from nothing. An incompressible fluid can't create volume like that." },
+      { at: 0.16, text: "First, measure divergence ∇·u. Red cells have net outflow and blue cells have net inflow. The swirling vortex barely registers, while the outward source glows bright red." },
+      { at: 0.38, text: "Next, solve ∇²p = ∇·u for pressure with Jacobi relaxation. On each sweep every cell averages its four neighbors and subtracts the local divergence, building the pressure well that pushes back." },
+      { at: 0.68, text: "Finally, subtract the pressure gradient u ← u − ∇p. The outward burst collapses to zero while the vortex survives untouched, leaving clean incompressible swirl." },
     ],
     draw(ctx, w, h, t) {
       const m = 12;
       const cw = (w - 2 * m) / GW;
-      const ch = (h - 2 * m - 16) / GH;
+      const ch = (h - 2 * m - 18) / GH;
       const ox = m;
       const oy = m;
 
       const pIn = phase(t, 0, 0.1);
-      const pDiv = phase(t, 0.16, 0.34);
+      const pDiv = phase(t, 0.16, 0.32);
+      const divFadeOut = 1 - phase(t, 0.36, 0.45);
       const pSolve = phase(t, 0.38, 0.66);
       const pProj = phase(t, 0.68, 0.92);
 
-      // Divergence underlay (fades as the projection removes it).
-      const divAlpha = pDiv * (1 - pProj);
+      // Divergence underlay: fades cleanly out as the Jacobi pressure solve fades in,
+      // avoiding muddy brown overlap between red +div and green -p.
+      const divAlpha = pDiv * divFadeOut;
       if (divAlpha > 0.01) {
         for (let j = 0; j < GH; j++) {
           for (let i = 0; i < GW; i++) {
             const d = div[j * GW + i] / maxD;
             if (Math.abs(d) < 0.04) continue;
-            ctx.fillStyle = d > 0 ? `rgba(255, 110, 110, ${0.45 * d * divAlpha})` : `rgba(100, 150, 255, ${-0.45 * d * divAlpha})`;
+            ctx.fillStyle =
+              d > 0
+                ? `rgba(255, 110, 110, ${0.55 * Math.pow(d, 0.85) * divAlpha})`
+                : `rgba(100, 150, 255, ${0.55 * Math.pow(-d, 0.85) * divAlpha})`;
             ctx.fillRect(ox + i * cw, oy + j * ch, cw, ch);
           }
         }
       }
 
       // Pressure contours during the solve (snapshot scrubbed by progress).
-      if (pSolve > 0) {
+      const pressAlpha = phase(t, 0.39, 0.47) * (1 - 0.72 * pProj);
+      if (pressAlpha > 0.01) {
         const snapF = pSolve * (snapshots.length - 1);
         const s0 = Math.floor(snapF);
         const s1 = Math.min(snapshots.length - 1, s0 + 1);
         const mix = snapF - s0;
-        const alpha = Math.min(1, pSolve * 3) * (1 - 0.55 * pProj);
         for (let j = 0; j < GH; j++) {
           for (let i = 0; i < GW; i++) {
             const val = lerp(snapshots[s0][j * GW + i], snapshots[s1][j * GW + i], mix) / (maxP || 1);
-            if (Math.abs(val) < 0.05) continue;
+            if (Math.abs(val) < 0.03) continue;
+            const mag = Math.pow(Math.min(1, Math.abs(val)), 0.75);
             ctx.fillStyle =
               val > 0
-                ? `rgba(255, 184, 107, ${0.4 * Math.min(1, val) * alpha})`
-                : `rgba(125, 214, 160, ${0.4 * Math.min(1, -val) * alpha})`;
+                ? `rgba(255, 184, 107, ${0.62 * mag * pressAlpha})`
+                : `rgba(125, 214, 160, ${0.62 * mag * pressAlpha})`;
             ctx.fillRect(ox + i * cw, oy + j * ch, cw, ch);
           }
         }
         const sweeps = Math.round(snapF * JACOBI_PER_SNAPSHOT);
-        label(ctx, `jacobi sweeps: ${sweeps}`, w - 14, h - 10, {
+        label(ctx, `jacobi sweeps: ${sweeps}`, w - 14, h - 12, {
           color: PAL.muted,
           size: 11,
           align: "right",
           mono: true,
-          alpha: Math.min(1, pSolve * 3) * (1 - pProj),
+          alpha: phase(t, 0.39, 0.47) * (1 - pProj),
+          bg: "rgba(6, 7, 11, 0.86)",
         });
       }
 
@@ -161,6 +168,25 @@ export function mountProjection(el: HTMLElement): void {
         }
       }
       ctx.globalAlpha = 1;
+
+      // Subtle bottom-left color key matching the currently visible scalar field.
+      if (divAlpha > 0.05) {
+        label(ctx, "red +div · blue −div", 14, h - 12, {
+          color: PAL.muted,
+          size: 11,
+          mono: true,
+          alpha: divAlpha,
+          bg: "rgba(6, 7, 11, 0.86)",
+        });
+      } else if (pressAlpha > 0.05) {
+        label(ctx, "orange +p · green −p", 14, h - 12, {
+          color: PAL.muted,
+          size: 11,
+          mono: true,
+          alpha: pressAlpha,
+          bg: "rgba(6, 7, 11, 0.86)",
+        });
+      }
 
       // Stage tag.
       const tag =

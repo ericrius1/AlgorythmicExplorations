@@ -503,11 +503,18 @@ details.fold pre {
 }
 
 .scrolly-progress {
-  height: 3px;
-  margin: 0.65rem 0.1rem 0;
+  padding: 6px 0;
+  margin: 0.35rem 0.1rem 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.scrolly-progress-track {
+  position: relative;
+  height: 4px;
   border-radius: 2px;
   background: var(--border);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .scrolly-progress-fill {
@@ -515,6 +522,17 @@ details.fold pre {
   width: 0%;
   background: var(--accent);
   border-radius: 2px;
+}
+
+.scrolly-progress-tick {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 8px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
 }
 
 .scrolly-caption {
@@ -595,17 +613,46 @@ header.hero .demo {
 
 .demo-slider {
   display: block;
-  flex: 1 1 11rem;
+  flex: 1 1 12.5rem;
   min-width: 11rem;
-  max-width: 17rem;
+  max-width: 20rem;
 }
 
 .demo-slider .k-ctl {
   padding: 2px 0;
 }
 
+.demo-slider .k-val {
+  min-width: 4ch;
+  max-width: 24ch;
+  padding: 1px 0;
+}
+
 .demo-button {
   font-family: var(--k-ui, ui-sans-serif, system-ui, sans-serif);
+  padding: 6px 10px;
+  border: 1px solid var(--k-line, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--k-label, #c4cadb);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.demo-button:hover {
+  border-color: var(--k-line-2, rgba(255, 255, 255, 0.24));
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--k-text, #eef1f8);
+}
+
+.demo-button.on,
+.demo-button.is-on,
+.demo-button.is-active,
+.demo-button[aria-pressed="true"] {
+  border-color: var(--k-accent-edge, rgba(122, 162, 255, 0.45));
+  background: var(--k-accent-soft, rgba(122, 162, 255, 0.16));
+  color: var(--k-text, #eef1f8);
 }
 
 .demo-readout {
@@ -2240,9 +2287,9 @@ body {
 }
 
 .essay .demo-slider {
-  flex: 1 1 10rem;
-  min-width: 10rem;
-  max-width: 15rem;
+  flex: 1 1 12.5rem;
+  min-width: 11rem;
+  max-width: 20rem;
   gap: 0.3rem;
 }
 

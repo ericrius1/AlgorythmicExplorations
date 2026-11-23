@@ -64,7 +64,7 @@ export class PitchSpiral {
     const { cx, cy, R } = this;
     const fs = Math.max(10, Math.min(14.5, R * 0.064));
 
-    // backdrop: soft centre glow
+    // backdrop: soft center glow
     glow(ctx, cx, cy, R * 1.25, [40, 52, 96], 0.22);
 
     // semitone spokes with equal-tempered names round the rim
@@ -153,7 +153,7 @@ export class PitchSpiral {
       const base = isComma ? (hex("#ff8a6e") as RGB) : col;
       dot(ctx, x, y, (3.4 + 2.2 * f + 1.4 * hov) * scale, base, 0.95, 3.6 + 2 * f);
       if (s.labels) {
-        // label outward from the centre
+        // label outward from the center
         const ang = Math.atan2(y - cy, x - cx);
         const off = (fs * 1.05 + 4) * scale;
         let lx = x + Math.cos(ang) * off;

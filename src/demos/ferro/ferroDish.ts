@@ -194,16 +194,14 @@ export async function mountDish(container: HTMLElement, opts: DishOptions): Prom
     });
   }
   if (opts.full || opts.pipeline) {
-    shell.button(`extract: ${EXTRACTOR_NAMES[extractor]}`, function (this: void) {
+    const exBtn = shell.button(`extract: ${EXTRACTOR_NAMES[extractor]}`, () => {
       extractor = EXTRACTORS[(EXTRACTORS.indexOf(extractor) + 1) % EXTRACTORS.length];
+      exBtn.textContent = `extract: ${EXTRACTOR_NAMES[extractor]}`;
     });
-    const exBtn = shell.controls.querySelectorAll("button")[0];
-    exBtn?.addEventListener("click", () => (exBtn.textContent = `extract: ${EXTRACTOR_NAMES[extractor]}`));
-    shell.button(`view: ${VIEW_NAMES[view]}`, function (this: void) {
+    const vBtn = shell.button(`view: ${VIEW_NAMES[view]}`, () => {
       view = (view + 1) % VIEW_NAMES.length;
+      vBtn.textContent = `view: ${VIEW_NAMES[view]}`;
     });
-    const vBtn = shell.controls.querySelectorAll("button")[1];
-    vBtn?.addEventListener("click", () => (vBtn.textContent = `view: ${VIEW_NAMES[view]}`));
   }
   if (opts.full) {
     shell.button("re-pour", () => {

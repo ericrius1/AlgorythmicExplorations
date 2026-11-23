@@ -45,7 +45,7 @@ const GENS: Generation[] = [
     sRearContact: 600,
     rearSpots: false,
     front: "phosphorus emitter under silicon nitride · silver fingers on the silicon",
-    rear: "the whole rear alloyed with aluminium",
+    rear: "the whole rear alloyed with aluminum",
   },
   {
     name: "PERC",
@@ -58,8 +58,8 @@ const GENS: Generation[] = [
     sRear: 20,
     sRearContact: 300,
     rearSpots: true,
-    front: "phosphorus emitter under silicon nitride · silver fingers on the silicon",
-    rear: "aluminium oxide, metal through small openings",
+    front: "phosphorus emitter under silicon nitride · silver fingers on silicon",
+    rear: "aluminum oxide, metal through small openings",
   },
   {
     name: "TOPCon",
@@ -72,7 +72,7 @@ const GENS: Generation[] = [
     sRear: 4,
     sRearContact: 4,
     rearSpots: false,
-    front: "boron emitter under aluminium oxide · fingers on the silicon",
+    front: "boron emitter under aluminum oxide · fingers on silicon",
     rear: "1.5 nm oxide + doped polysilicon: passivated and conducting",
   },
   {
@@ -459,8 +459,8 @@ export async function mountSiliconSurfaces(container: HTMLElement): Promise<Demo
         const box = stage.corner(250, 90);
         box.x = 14 * s;
         drawScope(stage, box, [{ trace, color: "#9fd8ff" }], [0.6, 0.78], [{ v: 0.7, label: "0.70 V" }], "voltage as the count builds");
-        hudLabel(stage, [0, -0.6, 0.02], gen.front, [24, -26], "rgba(200, 210, 235, 0.8)");
-        hudLabel(stage, [0.9, -0.6, -DEPTH], gen.rear, [20, 24], "rgba(200, 210, 235, 0.8)");
+        hudLabel(stage, [-0.15, -0.55, 0.02], gen.front, [12, -52], "rgba(220, 228, 248, 0.92)");
+        hudLabel(stage, [0.9, -0.6, -DEPTH], gen.rear, [16, 26], "rgba(220, 228, 248, 0.92)");
       }
       shell.tick();
     },

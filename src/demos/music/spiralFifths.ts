@@ -247,7 +247,7 @@ export function mountSpiralFifths(container: HTMLElement): Demo {
       ctx.arc(fx, fy, fR, 0, Math.PI * 2);
       ctx.stroke();
 
-      // step arcs, coloured by size class
+      // step arcs, colored by size class
       pitches.forEach((p, i) => {
         const g = gaps[i];
         if (n < 2) return;
@@ -267,7 +267,7 @@ export function mountSpiralFifths(container: HTMLElement): Demo {
         const [x, y] = clock(fx, fy, fR, p.c / 1200);
         const col = p.k === 12 ? (hex("#ff8a6e") as RGB) : pcColor(mod(p.k * 7, 12));
         dot(ctx, x, y, 3.6 + 2 * flash[p.k], col, 1, 3.4);
-        // crowded neighbours (C and B♯) get their labels staggered inward
+        // crowded neighbors (C and B♯) get their labels staggered inward
         const prev = i > 0 ? pitches[i - 1].c : pitches[pitches.length - 1].c - 1200;
         const crowd = p.c - prev < 45 && pitches.length > 1;
         const [lx, ly] = clock(fx, fy, fR - (crowd ? 31 : 17), p.c / 1200);
@@ -302,7 +302,7 @@ export function mountSpiralFifths(container: HTMLElement): Demo {
             alpha: 0.75,
           });
       }
-      // steps as coloured bars just above the ruler
+      // steps as colored bars just above the ruler
       pitches.forEach((p, i) => {
         if (n < 2) return;
         const kind = kindOf(gaps[i]);

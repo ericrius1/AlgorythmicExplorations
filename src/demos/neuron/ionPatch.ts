@@ -950,22 +950,22 @@ export async function mountIonPatch(container: HTMLElement, opts: IonPatchOption
       }
       g.textAlign = "left";
 
-      label([BX * 0.55, -BY, BZ * 0.75], "OUTSIDE", [24, -10], "rgba(255, 190, 130, 0.9)");
-      label([BX * 0.55, -BY, -BZ * 0.75], "INSIDE", [24, 10], "rgba(140, 200, 255, 0.9)");
+      label([BX * 0.55, -BY, BZ * 0.75], "OUTSIDE", [24, -14], "rgba(255, 190, 130, 0.92)");
+      label([BX * 0.55, -BY, -BZ * 0.75], "INSIDE", [-28, 14], "rgba(140, 200, 255, 0.92)");
       if (!c) label([BX, -BY * 0.4, 0], "membrane", [20, 0]);
 
       const box = stage.corner(300, 106);
       if (c) box.y = 10 * s;
       const lines = [
-        { v: eK, label: `E_K ${eK.toFixed(0)}`, color: "rgba(56, 200, 255, 0.3)" },
+        { v: eK, label: `E_K ${eK.toFixed(0)} mV`, color: "rgba(56, 200, 255, 0.3)" },
         { v: 0, label: "0 mV" },
       ];
-      if (spike) lines.push({ v: 55, label: "E_Na +66", color: "rgba(255, 140, 36, 0.3)" });
+      if (spike) lines.push({ v: 66, label: "E_Na +66 mV", color: "rgba(255, 140, 36, 0.3)" });
       drawScope(
         stage,
         box,
         [{ trace, color: "#ffb86b" }],
-        spike ? [-100, 70] : [-100, 20],
+        spike ? [-100, 82] : [-100, 24],
         lines,
         "voltage across the membrane",
       );

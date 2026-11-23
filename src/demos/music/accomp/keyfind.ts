@@ -244,13 +244,15 @@ export function mountKeyFinder(container: HTMLElement): Demo {
       const mid = ly + lh * 0.55;
       const colW = lw / 12;
       const best = ear.keyIdx >= 0 ? keyOf(ear.keyIdx) : null;
-      g.font = font(12 * s, 650);
+      g.font = font((narrow ? 10.5 : 12) * s, 650);
+      const head = frozen
+        ? (narrow ? "after Twinkle" : "what the ear remembers after Twinkle")
+        : (narrow ? "ear memory" : "what the ear remembers");
       g.fillStyle = "rgba(220,226,245,0.85)";
-      g.fillText(frozen ? "what the ear remembers after Twinkle" : "what the ear remembers", lx, 22 * s);
+      g.fillText(head, lx, 22 * s);
       if (best) {
         g.fillStyle = rgba(C.accent, 0.95);
-        const head = frozen ? "what the ear remembers after Twinkle " : "what the ear remembers ";
-        g.fillText(`· ${keyName(best)} profile`, lx + g.measureText(head).width, 22 * s);
+        g.fillText(` · ${keyName(best)} profile`, lx + g.measureText(head).width, 22 * s);
       }
       let mh = 0;
       for (let i = 0; i < 12; i++) mh += ear.hist[i];
@@ -268,6 +270,11 @@ export function mountKeyFinder(container: HTMLElement): Demo {
       const unit = lh * 0.2; // one standard deviation
       g.fillStyle = "rgba(170,180,220,0.25)";
       g.fillRect(lx, mid, lw, Math.max(1, s));
+      g.fillStyle = "rgba(170,180,220,0.45)";
+      g.font = font(9 * s, 600, true);
+      g.textAlign = "right";
+      g.fillText("avg", lx + lw, mid - 4 * s);
+      g.textAlign = "left";
       const held = new Set([...ear.held.keys()].map((m) => ((m % 12) + 12) % 12));
       for (let pc = 0; pc < 12; pc++) {
         const x = lx + pc * colW;

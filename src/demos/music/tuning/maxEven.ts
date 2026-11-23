@@ -154,11 +154,11 @@ export function mountMaxEven(container: HTMLElement): Demo {
       const { ctx, w, h } = surf;
       surf.clear();
       const narrow = w < 600;
-      const R = narrow ? Math.min(w * 0.3, h * 0.17) : Math.min(w * 0.135, h * 0.33);
-      const c1 = narrow ? { x: w * 0.5, y: R + 40 } : { x: w * 0.175, y: h * 0.5 + 4 };
-      const c2 = narrow ? { x: w * 0.5, y: c1.y + 2 * R + 76 } : { x: w * 0.5, y: h * 0.5 + 4 };
+      const R = narrow ? Math.min(w * 0.3, h * 0.17) : Math.min(w * 0.112, h * 0.3);
+      const c1 = narrow ? { x: w * 0.5, y: R + 40 } : { x: w * 0.16, y: h * 0.5 + 4 };
+      const c2 = narrow ? { x: w * 0.5, y: c1.y + 2 * R + 76 } : { x: w * 0.48, y: h * 0.5 + 4 };
       geo = { cx: c1.x, cy: c1.y, R };
-      const fs = narrow ? 10.5 : 11.5;
+      const fs = narrow ? 10.5 : w < 700 ? 10.5 : 11.5;
 
       const ring = (cx: number, cy: number, angleOf: (pc: number) => number, title: string, chain: boolean): void => {
         glow(ctx, cx, cy, R * 1.35, [40, 52, 96], 0.18);
@@ -211,8 +211,8 @@ export function mountMaxEven(container: HTMLElement): Demo {
 
       // ---- interval content ----
       const iv = intervalVector(set);
-      const px = narrow ? 22 : w * 0.76;
-      const pw = narrow ? w - 44 : w * 0.21;
+      const px = narrow ? 22 : w * 0.71;
+      const pw = narrow ? w - 44 : w * 0.26;
       let py = narrow ? c2.y + R + 70 : h * 0.5 - 100;
       text(ctx, "pairs at each distance", px, py, { size: 10.5, color: COL.dim });
       py += 14;
@@ -220,15 +220,16 @@ export function mountMaxEven(container: HTMLElement): Demo {
       const barH = narrow ? 13 : 17;
       const distinct = new Set(iv.filter((x) => x > 0)).size === iv.filter((x) => x > 0).length && iv.every((x) => x > 0);
       const labels = ["1 semitone", "2", "3", "4", "5", "6 (tritone)"];
+      const trackW = Math.max(24, pw - 70 - 22);
       iv.forEach((c, i) => {
         const y = py + i * (barH + 7);
-        const bw = (pw - 70) * (c / maxCount);
+        const bw = trackW * (c / maxCount);
         ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-        ctx.fillRect(px + 70, y, pw - 70, barH);
+        ctx.fillRect(px + 70, y, trackW, barH);
         ctx.fillStyle = rgba(distinct ? hex("#7dd6a0") : hex("#7aa2ff"), 0.75);
         ctx.fillRect(px + 70, y, bw, barH);
         text(ctx, labels[i], px, y + barH - 4, { size: 10, color: COL.dim });
-        text(ctx, String(c), px + 74 + bw, y + barH - 4, { size: 10.5, color: COL.text, mono: true, weight: 600 });
+        text(ctx, String(c), px + 75 + bw, y + barH - 4, { size: 10.5, color: COL.text, mono: true, weight: 600 });
       });
       py += 6 * (barH + 7) + 10;
       const ev = MAX_SPREAD[set.length] > 0 ? spread(set) / MAX_SPREAD[set.length] : 1;

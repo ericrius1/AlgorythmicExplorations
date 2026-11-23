@@ -22,7 +22,7 @@ export interface AccretionDemoOptions {
   physics?: "gravity" | "contacts" | "both"; // collapse mode's starting toggle
 }
 
-// Cold disc of dust: uniform density, gentle solid-body spin, almost no heat.
+// Cold disk of dust: uniform density, gentle solid-body spin, almost no heat.
 function seedCloud(count: number): Float32Array {
   const state = new Float32Array(count * 4);
   const R = 0.55;
@@ -140,15 +140,25 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
 
   if (!opts.hero) {
     if (opts.mode === "collapse") {
-      const modeButton = (label: string, g: boolean, c: boolean): HTMLButtonElement =>
-        shell.button(label, () => {
-          gravity = g;
-          contacts = c;
+      const modeSpecs: Array<{ label: string; g: boolean; c: boolean; btn?: HTMLButtonElement }> = [
+        { label: "gravity only", g: true, c: false },
+        { label: "contacts only", g: false, c: true },
+        { label: "both", g: true, c: true },
+      ];
+      const syncButtons = (): void => {
+        for (const m of modeSpecs) {
+          if (m.btn) m.btn.textContent = gravity === m.g && contacts === m.c ? `● ${m.label}` : m.label;
+        }
+      };
+      for (const m of modeSpecs) {
+        m.btn = shell.button(m.label, () => {
+          gravity = m.g;
+          contacts = m.c;
+          syncButtons();
           rebuild();
         });
-      modeButton("gravity only", true, false);
-      modeButton("contacts only", false, true);
-      modeButton("both", true, true);
+      }
+      syncButtons();
     } else {
       shell.slider({
         label: "grains",
@@ -180,9 +190,10 @@ export async function mountAccretion(container: HTMLElement, opts: AccretionDemo
     if (opts.hero) return `${count.toLocaleString()} dust grains around one star${timing ? ` · ${timing}` : ""} — stir the ring`;
     const phys =
       gravity && contacts ? "tree + grid" : gravity ? "tree only — ghosts" : "grid only — loose sand";
+    const sortInfo = contacts ? ` · ${solver.sort.table.toLocaleString()} hash buckets` : "";
     return (
-      `${count.toLocaleString()} grains · ${phys} · sorted into ${solver.sort.table.toLocaleString()} buckets ` +
-      `${steps}× per frame${timing ? ` · ${timing}` : ""} · stir with your cursor`
+      `${count.toLocaleString()} grains · ${phys}${sortInfo} · ` +
+      `${steps} substeps/frame${timing ? ` · ${timing}` : ""} · stir with your cursor`
     );
   });
 

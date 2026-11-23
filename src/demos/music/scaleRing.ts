@@ -1,5 +1,5 @@
-// Fig. 1 of Part 5: a scale is a step pattern. Twelve positions round a
-// ring, the scale's notes lit, the gaps between them labelled in semitones
+// Fig. 1 of Part 5: a scale is a step pattern. Twelve positions around a
+// ring, the scale's notes lit, the gaps between them labeled in semitones
 // (whole steps cool, half steps hot, wider gaps violet). "Rotate" starts the
 // same pattern from its next note while C stays home, which is how one
 // pattern gives seven modes. A drone on C makes the change audible.
@@ -107,7 +107,7 @@ export function mountScaleRing(container: HTMLElement): Demo {
     const s = pcs();
     playSeq([...s, 12, ...[...s].reverse()], 0.26);
   };
-  // a short tune written in scale degrees, so it takes on each mode's colour
+  // a short tune written in scale degrees, so it takes on each mode's color
   const TUNE = [0, 2, 4, 7, 6, 4, 5, 3, 4, 2, 1, 0];
   const playTune = (): void => {
     const s = pcs();
@@ -187,7 +187,7 @@ export function mountScaleRing(container: HTMLElement): Demo {
       glow(ctx, cx, cy, R * 1.3, [40, 52, 96], 0.2);
       if (drone) glow(ctx, cx, cy, R * 0.45, hex("#ffb86b"), 0.18 + 0.05 * Math.sin(now / 400));
 
-      // step arcs between consecutive notes, labelled
+      // step arcs between consecutive notes, labeled
       const g = gaps();
       s.forEach((pc, i) => {
         const gap = g[i];
@@ -226,7 +226,7 @@ export function mountScaleRing(container: HTMLElement): Demo {
       const px = narrow ? 18 : w * 0.62;
       const pw = narrow ? w - 36 : w * 0.34;
       let py = narrow ? cy + R + fs * 3.4 : h * 0.24;
-      text(ctx, modeName(), px, py, { size: narrow ? 15 : 18, color: "#f4f6fc", weight: 700 });
+      text(ctx, modeName(), px, py, { size: narrow ? 15 : Math.min(18, pw * 0.078), color: "#f4f6fc", weight: 700 });
       py += narrow ? 22 : 30;
       // strip: one cell per semitone, lit cells are scale notes
       const cell = pw / 12;
@@ -268,7 +268,7 @@ export function mountScaleRing(container: HTMLElement): Demo {
               ? `the pattern repeats every ${repeatSemis} semitones, so home is ambiguous`
               : half === 0
                 ? "no half steps: no two notes clash a semitone apart"
-                : `${half} half step${half === 1 ? "" : "s"}, placed unevenly: every note has different neighbours`;
+                : `${half} half step${half === 1 ? "" : "s"}, placed unevenly: every note has different neighbors`;
         // wrap to the panel width
         ctx.font = `500 11px ${"ui-sans-serif, system-ui, sans-serif"}`;
         let line = "";

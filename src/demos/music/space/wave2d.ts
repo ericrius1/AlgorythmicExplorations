@@ -91,7 +91,7 @@ export class Wave2D {
             continue;
           }
           const c = p[i];
-          // rigid walls: a solid neighbour contributes nothing to the Laplacian
+          // rigid walls: a solid neighbor contributes nothing to the Laplacian
           let lap = 0;
           if (!solid[i - 1]) lap += p[i - 1] - c;
           if (!solid[i + 1]) lap += p[i + 1] - c;

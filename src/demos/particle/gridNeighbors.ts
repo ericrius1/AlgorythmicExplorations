@@ -1,10 +1,11 @@
 // Demo 2 of part three: the uniform grid, made touchable. Same pile of
-// discs, but space is cut into cells one interaction-radius wide; each
+// disks, but space is cut into cells one interaction-radius wide; each
 // particle only tests the 3×3 cells around it. Your cursor runs the same
-// query: yellow cells are the ones it would search, yellow discs the only
+// query: yellow cells are the ones it would search, yellow disks the only
 // candidates it would test.
 
 import { Shell, type Demo } from "../../lib/demoShell";
+import { pixelRatio } from "../../lib/palette";
 import {
   seedBox,
   contactForce,
@@ -15,6 +16,7 @@ import {
 } from "./contactsCpu";
 
 const GRID = 24; // cells per side; cell width = 2/24 ≈ 0.083 > 2·R
+const R = 0.016; // matches contactsCpu disk radius
 const VIEW = 0.92;
 const N = 3500;
 const PROBE_AT_REST: [number, number] = [0.12, -0.62];
@@ -27,6 +29,7 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
   let ay = new Float32Array(N);
   let showGrid = true;
   let candidates = 0;
+  let nearCount = 0;
   const mouse = canvasMouse(shell);
 
   // counting sort, the same three moves the GPU will make
@@ -39,17 +42,19 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
     return cy * GRID + cx;
   };
 
-  shell.button("toggle grid lines", () => (showGrid = !showGrid));
+  const gridBtn = shell.button("grid lines: on", () => {
+    showGrid = !showGrid;
+    gridBtn.textContent = showGrid ? "grid lines: on" : "grid lines: off";
+  });
   shell.button("re-seed", () => (sim = seedBox(N)));
   shell.setInfo(
     () =>
-      `${candidates.toLocaleString()} candidate pairs this step — the all-pairs loop would check ` +
-      `${(((N * (N - 1)) / 2 / 1e6)).toFixed(1)}M`,
+      `3×3 query: ${nearCount} of ${N.toLocaleString()} · ` +
+      `${candidates.toLocaleString()} candidate pairs/step (vs ${(((N * (N - 1)) / 2) / 1e6).toFixed(1)}M all-pairs)`,
   );
 
   return {
     frame() {
-      shell.tick();
       const s = sim.state;
 
       // build: count, prefix-sum, scatter
@@ -64,7 +69,7 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
       const cursor = starts.slice(0, GRID * GRID);
       for (let i = 0; i < N; i++) order[cursor[cellOf(s[i * 4], s[i * 4 + 1])]++] = i;
 
-      // forces: each particle vs its 3×3 neighbourhood only
+      // forces: each particle vs its 3×3 neighborhood only
       ax.fill(0);
       ay.fill(0);
       candidates = 0;
@@ -95,10 +100,12 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
       const ox0 = width / 2;
       const oy0 = height / 2;
       const cw = (sc * 2) / GRID;
+      const dpx = pixelRatio(shell.canvas);
+      const pr = Math.max(R * sc, 1.2);
 
       if (showGrid) {
-        ctx.strokeStyle = "rgba(80, 90, 120, 0.22)";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(80, 90, 120, 0.24)";
+        ctx.lineWidth = dpx;
         ctx.beginPath();
         for (let g = 0; g <= GRID; g++) {
           ctx.moveTo(ox0 - sc + g * cw, oy0 - sc);
@@ -113,46 +120,49 @@ export function mountGridNeighbors(container: HTMLElement): Demo {
       // query inside the pile so the figure still shows what it's about.
       const hover = mouse.get();
       const m = hover && Math.abs(hover[0]) < 1 && Math.abs(hover[1]) < 1 ? hover : PROBE_AT_REST;
-      {
-        const cx = Math.min(GRID - 1, Math.max(0, Math.floor(((m[0] + 1) / 2) * GRID)));
-        const cy = Math.min(GRID - 1, Math.max(0, Math.floor(((m[1] + 1) / 2) * GRID)));
-        ctx.strokeStyle = "rgba(255, 205, 80, 0.55)";
-        ctx.fillStyle = "rgba(255, 205, 80, 0.06)";
-        let near = 0;
-        ctx.beginPath();
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let ox = -1; ox <= 1; ox++) {
-            const gx = cx + ox;
-            const gy = cy + oy;
-            if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
-            ctx.rect(ox0 - sc + gx * cw, oy0 + sc - (gy + 1) * cw, cw, cw);
-            near += starts[gy * GRID + gx + 1] - starts[gy * GRID + gx];
-          }
-        }
-        ctx.fill();
-        ctx.stroke();
+      const cx = Math.min(GRID - 1, Math.max(0, Math.floor(((m[0] + 1) / 2) * GRID)));
+      const cy = Math.min(GRID - 1, Math.max(0, Math.floor(((m[1] + 1) / 2) * GRID)));
+      let near = 0;
 
-        // highlight the candidates inside the 3×3 window
-        ctx.fillStyle = "rgb(255, 220, 110)";
-        ctx.beginPath();
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let ox = -1; ox <= 1; ox++) {
-            const gx = cx + ox;
-            const gy = cy + oy;
-            if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
-            const c = gy * GRID + gx;
-            for (let k = starts[c]; k < starts[c + 1]; k++) {
-              const j = order[k];
-              const x = ox0 + s[j * 4] * sc;
-              const y = oy0 - s[j * 4 + 1] * sc;
-              ctx.moveTo(x + 2.2, y);
-              ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-            }
+      // Highlight the candidates inside the 3×3 window at full disk radius.
+      ctx.fillStyle = "rgb(255, 224, 118)";
+      ctx.beginPath();
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const gx = cx + ox;
+          const gy = cy + oy;
+          if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
+          const c = gy * GRID + gx;
+          near += starts[c + 1] - starts[c];
+          for (let k = starts[c]; k < starts[c + 1]; k++) {
+            const j = order[k];
+            const x = ox0 + s[j * 4] * sc;
+            const y = oy0 - s[j * 4 + 1] * sc;
+            ctx.moveTo(x + pr, y);
+            ctx.arc(x, y, pr, 0, Math.PI * 2);
           }
         }
-        ctx.fill();
-        shell.readout.textContent = `cursor's query: ${near} candidates of ${N.toLocaleString()} particles`;
       }
+      ctx.fill();
+
+      // Draw the 3×3 cell boundaries cleanly on top so the search window pops.
+      ctx.fillStyle = "rgba(255, 215, 95, 0.08)";
+      ctx.strokeStyle = "rgba(255, 215, 95, 0.8)";
+      ctx.lineWidth = 1.4 * dpx;
+      ctx.beginPath();
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const gx = cx + ox;
+          const gy = cy + oy;
+          if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
+          ctx.rect(ox0 - sc + gx * cw, oy0 + sc - (gy + 1) * cw, cw, cw);
+        }
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      nearCount = near;
+      shell.tick();
     },
   };
 }

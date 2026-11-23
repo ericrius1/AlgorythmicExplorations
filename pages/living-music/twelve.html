@@ -10,7 +10,7 @@
     <title>Twelve Imperfect Notes — Living Music</title>
     <meta
       name="description"
-      content="Why a piano has twelve notes per octave: stacking pure fifths, the Pythagorean comma, the beats it leaves in chords, meantone and well temperaments, and how 12 compares with 19, 31, 53 and the Bohlen–Pierce scale. Every figure is playable."
+      content="Why pianos have twelve notes per octave: stacking pure fifths, the Pythagorean comma, audible harmonic beats, historical temperaments, and equal divisions of 19, 31, 53, and Bohlen–Pierce."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,139 +31,145 @@
         <p class="hero-kicker">Living Music · Part 4</p>
         <h1>Twelve Imperfect Notes</h1>
         <p class="subtitle">
-          Stack twelve pure fifths and you almost land back where you started. The spiral
-          above is that almost, drawn live. Tap a note to hear it.
+          Stack twelve pure fifths and you miss the starting octave by a quarter of a semitone,
+          then have to shave every step to close the loop. Tap a dot on the spiral to hear it.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        <a href="/pages/living-music/harmony.html">Part three</a> showed why some pairs of
-        notes sound smooth together: their frequencies sit in simple ratios like 2:1, 3:2 and
-        5:4, so their harmonics line up instead of rubbing. A singer or a violinist can put a
-        note anywhere, so they can always reach those ratios. A piano can't. Its strings are
-        tuned before the concert starts, and a fretted guitar or a flute with holes drilled in
-        it has the same problem. Building an instrument means choosing a fixed set of pitches
-        in advance.
+        In <a href="/pages/living-music/harmony.html">part three</a> we saw why simple frequency
+        ratios like 2:1, 3:2, and 5:4 sound so calm together: their harmonics overlap neatly
+        instead of rubbing against each other. If you sing or play the violin, you can nudge any
+        pitch on the fly to hit those ratios cleanly. Once you build a piano, fret a guitar, or
+        drill finger holes into a flute, though, every available pitch has to be decided ahead of
+        time.
       </p>
       <p>
-        The obvious way to choose them is to start on C and build every other note out of
-        the smoothest interval after the octave, the fifth. Multiply by 3/2 to get G. Do it
-        again to get D, and fold it back down an octave so it stays in range. Keep going and
-        new notes keep appearing. This article follows that plan to the point where it breaks,
-        and then looks at the ways people have patched it, from medieval organs to the
-        31-note organ in Amsterdam.
+        A natural first attempt is to start on C and generate the rest of the notes from the
+        cleanest interval after the octave, the fifth. Multiply C by 3/2 to get G, multiply G by
+        3/2 to get D (dropping it an octave so it stays near home), and keep chaining outward.
+        New notes keep showing up, and for a while it feels like the whole keyboard is going to
+        build itself cleanly out of pure arithmetic. Then you reach the twelfth step and hit a
+        wall that instrument makers have been negotiating since medieval organs, all the way up
+        to a 31-tone concert organ still played in Amsterdam.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="spiral"><span class="kicker">Step 1 · Stacked fifths</span>The spiral that doesn't close</h2>
+      <h2 id="spiral"><span class="kicker">Step 1 · Stacked fifths</span>The spiral that never closes</h2>
       <p>
-        The figure at the top of the page draws pitch as a spiral. The angle is where a note
-        sits inside the octave, with C at twelve o'clock, and the radius grows as the pitch
-        rises, so one full turn outward is one octave up. A fifth is 701.96 cents (a cent is
-        a hundredth of an equal-tempered semitone; more on that below), which is 0.585 of a
-        turn. Each new fifth swings a bit more than halfway round and lands one ring further
-        out.
+        The spiral at the top of the page maps pitch onto polar coordinates: angle tracks where a
+        note falls inside an octave (with C at twelve o'clock), and radius grows with height so
+        that each full turn outward adds one octave. A pure 3:2 fifth spans 701.96 cents (where a
+        cent is one hundredth of an equal-tempered semitone), which works out to 0.585 of a turn.
+        Each time you stack another fifth, the point swings just over halfway around the circle
+        and steps outward along the curve.
       </p>
       <p>
-        Twelve fifths go round seven times. If 3:2 and 2:1 fit together, the twelfth fifth
-        would land on C, seven octaves up. It lands just past it:
+        After twelve fifths, the trail has wound around seven times. You'd hope to land squarely
+        back on C, seven octaves above where you started, but the arithmetic overshoots slightly:
       </p>
       <pre><code>(3/2)¹² = 129.746        <span class="cm">// twelve fifths</span>
 2⁷      = 128            <span class="cm">// seven octaves</span>
 129.746 / 128 = 1.01364  <span class="cm">// 23.46 cents: the Pythagorean comma</span></code></pre>
       <p>
-        That 23.46-cent overshoot is the <strong>Pythagorean comma</strong>, about a quarter
-        of a semitone. Stacking more fifths doesn't help. For any number of fifths to equal
-        some number of octaves you'd need 3<sup>m</sup> = 2<sup>n</sup>, and a power of 3 is
-        always odd while a power of 2 is always even. The spiral never closes. Every tuning
-        system on this page is a way of living with that.
+        That 23.46-cent overshoot is the <strong>Pythagorean comma</strong>, roughly a quarter of
+        a semitone. Adding more fifths only shifts the mismatch around, because getting a stack
+        of fifths to match an exact number of octaves would mean solving
+        3<sup><em>m</em></sup> = 2<sup><em>n</em></sup> in positive integers. Any power of 3 is
+        odd, and any power of 2 is even, so no two stacks can ever meet. Every fixed-pitch tuning
+        system has to absorb that gap somewhere.
       </p>
       <p>
-        Below, the same spiral sits next to the octave-folded view: the notes you've
-        collected, sorted into a scale, with the size of every step and how far each note is
-        from the piano key with the same name.
+        In the figure below, the unfolded spiral sits beside the same notes folded back into a
+        single octave, along with a ruler showing every step size and how many cents each pitch
+        sits away from the matching piano key.
       </p>
 
       <div
         data-demo="spiral"
         data-title="Stacking fifths"
-        data-hint="Stack, then bend the fifth"
+        data-hint="Stack fifths, then bend their size"
       ></div>
 
       <p>
-        Watch the step sizes as you add notes. With 5 notes (C G D A E) the octave splits
-        into steps of only two sizes, 203.9 and 294.1 cents. That's the pentatonic scale.
-        With 7 notes there are again two sizes, five steps of 203.9 and two of 90.2. That's
-        the major scale and its relatives, and part five is about why it won. With 12 notes
-        the two sizes are 113.7 and 90.2: a chromatic scale with two different semitones.
-        In between, at 8 notes for example, there are three sizes, never more. Mathematicians
-        call this the three-distance theorem. It's the reason the scales that come out of a
-        chain of fifths have the step counts they do.
+        Watch what happens to the step sizes as you click through the chain presets. At 5 notes
+        (C, G, D, A, E), the octave divides into just two step widths, 203.9 and 294.1 cents: a
+        pentatonic scale. At 7 notes you again get two sizes, five steps of 203.9 cents and two
+        of 90.2 cents, which gives you the major scale and its relatives (the subject of part
+        five). At 12 notes the octave splits into two slightly different semitones, 113.7 and
+        90.2 cents. Pick any count in between, say 8 notes, and you get three step sizes, never
+        four or more. In mathematics this is known as the <em>three-distance theorem</em>: place
+        points around a circle by repeating any fixed rotation, and the gaps between neighboring
+        points can take at most three lengths, dropping to two at special counts.
       </p>
       <p>
-        The thirteenth note is B♯, and it adds a third step size: a sliver 23.46 cents wide
-        between B♯ and C. That's the comma again, seen from inside the octave. Press
-        <em>C against the 13th note</em> to hear the two together. Near middle C they beat
-        about 3.6 times a second.
+        Adding the 13th note, B♯, introduces a tiny third step size: a 23.46-cent sliver tucked
+        right between C and B♯. That sliver is the Pythagorean comma viewed inside a single
+        octave. Hit <em>C against the 13th note</em> to hear them together; near middle C the two
+        pitches pulse against each other about 3.6 times a second.
       </p>
       <p>
-        Now drag the fifth-size slider. Every fifth changes at once, so the overshoot changes
-        twelve times as fast. At 700.00 cents the thirteenth note lands on C and the spiral
-        closes. At 696.58 cents (a tuning called meantone, coming up in Step 3) it falls 41
-        cents short instead. Only one fifth size closes the loop, and shaving each fifth by
-        1.96 cents to get there is <strong>equal temperament</strong>, the tuning of almost
-        every piano, fretted guitar and synthesizer.
+        If you drag the <em>size of every fifth</em> slider, all twelve intervals stretch or
+        shrink together, so the endpoint moves twelve times as fast. Pull it down to 700.00 cents
+        and B♯ merges cleanly onto C, closing the loop. Pull it further to 696.58 cents (a
+        Renaissance tuning called quarter-comma meantone, coming up in Step 3) and the thirteenth
+        note falls 41.06 cents short instead. Shaving every fifth by 1.96 cents so that twelve of
+        them equal seven octaves is <strong>equal temperament</strong>, the compromise built into
+        almost every modern piano, fretted guitar, and synthesizer.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The same chain, twice</span>
         <p>
-          The Greeks credited this tuning to Pythagoras, but the chain of fifths was found
-          more than once. Chinese texts from the third century BCE generate twelve pitches by
-          alternately cutting a pipe to two-thirds of its length and lengthening it by a
-          third, which is the same chain of fifths folded into the same octave. In the first
-          century BCE the theorist Jing Fang carried the chain much further and noticed that
-          53 fifths come back to within a few cents of the start. That observation comes back
-          in Step 5.
+          Greek tradition attached this tuning to Pythagoras, though Chinese musical treatises
+          from the third century BCE describe the exact same construction independently: cutting a
+          pitch pipe to two-thirds of its length (up a fifth) and then extending it by a third
+          (down a fourth) over and over to produce twelve tones within an octave. In the first
+          century BCE, the Han dynasty theorist Jing Fang kept the chain going much further and
+          discovered that 53 fifths return within a few cents of the starting note, a fact that
+          reappears in Step 5.
         </p>
       </aside>
       <details class="fold">
         <summary>Cents, the logarithm music runs on</summary>
         <div class="fold-body">
           <p>
-            The ear hears ratios, not differences: A 220 to A 440 sounds like the same step
-            as A 440 to A 880, even though one is 220 Hz and the other 440 Hz. So to compare
-            intervals you take logarithms. One cent is 1/1200 of an octave, and an interval
-            with frequency ratio <em>r</em> is 1200·log₂(<em>r</em>) cents. Equal-tempered
-            semitones are 100 cents each, and the pure intervals come out as awkward numbers:
-            the fifth 701.955, the major third 386.314, the minor third 315.641.
+            Pitch perception tracks frequency ratios: jumping from 220 Hz to 440 Hz sounds like
+            the exact same octave leap as 440 Hz to 880 Hz, even though the second jump covers
+            twice as many hertz. Logarithms turn those multiplicative ratios into additive sizes.
+            One cent is 1/1200 of an octave, so any ratio <em>r</em> measures
+            1200·log₂(<em>r</em>) cents. Equal-tempered semitones come out to a tidy 100 cents
+            apiece, while pure ratios turn into irrational decimals: 701.955 for the 3:2 fifth,
+            386.314 for the 5:4 major third, and 315.641 for the 6:5 minor third.
           </p>
           <p>
-            Alexander Ellis introduced the cent in 1885, in a paper comparing the scales of
-            instruments he had measured from around the world, including Javanese gamelan.
-            His conclusion was that there is no single natural scale. Different musical
-            cultures have tuned the octave in very different ways. Part five comes back to
-            some of them.
+            Alexander Ellis introduced the cent in 1885 in a landmark survey measuring the pitches
+            of instruments from around the world, including Javanese gamelan ensembles. After
+            cataloging hundreds of scales in cents, he concluded that musical tuning varies widely
+            across cultures rather than following a single universal law, something we'll hear
+            firsthand in part five.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="beats"><span class="kicker">Step 2 · Beats</span>Where the error is audible</h2>
+      <h2 id="beats"><span class="kicker">Step 2 · Beats</span>Where the error becomes audible</h2>
       <p>
-        Two cents per fifth is too small to hear in a melody. Part three showed where tuning
-        errors do show up: in notes played together. Every note is a stack of harmonics at
-        whole-number multiples of its frequency. When a harmonic of one note lands a few
-        hertz away from a harmonic of another, the two add up and cancel by turns, and the
-        sound swells and fades at the difference of their frequencies. Those swells are
-        called beats, and they're how piano tuners tune.
+        Shaving 1.96 cents off a fifth is practically invisible in a single-note melody. Where you
+        actually hear it, as part three showed, is in chords. Every sustained tone carries a
+        ladder of harmonics at whole-number multiples of its fundamental frequency. When one
+        note's harmonic lands a few hertz away from another note's harmonic, the two waves drift
+        in and out of phase, causing the combined amplitude to swell and dip at the exact
+        difference between their frequencies. Piano tuners listen straight for these
+        <strong>beats</strong> and count them to set every interval on the keyboard.
       </p>
       <p>
-        The figure draws each note as its ladder of harmonics. Collisions are joined by a
-        line, with the beat rate written on it. The strip at the bottom draws the loudness of
-        the strongest collision over one second. Hold the chord, then switch between pure
-        ratios and equal temperament.
+        Below, each note in the chord appears as its ladder of harmonics on a log-frequency axis.
+        Near-collisions are linked by vertical lines with their beat rates marked, and the ribbon
+        along the bottom traces one second of loudness for the selected collision (click any
+        glowing dot to switch pairs). Hold the chord and flip between <em>pure ratios</em> and
+        <em>equal temperament</em> to hear the difference directly.
       </p>
 
       <div
@@ -173,60 +179,66 @@
       ></div>
 
       <p>
-        With pure ratios every collision is exact and the chord sits still. In equal
-        temperament the fifth from middle C beats 0.89 times a second: the third harmonic of
-        C is at 784.88 Hz and the second harmonic of G is at 783.99 Hz. That's slow enough to
-        sound like a gentle sway. The major third is a different story. Equal temperament's
-        third is 400 cents against a pure 386.3, 13.7 cents wide, seven times the fifth's
-        error. The fifth harmonic of C and the fourth harmonic of E miss by 10.4 Hz, so a C
-        major chord on a piano shimmers about ten times a second. Inside the triad the minor
-        third between E and G is worse again, at 17.8 beats a second.
+        Under pure ratios, every linked pair of harmonics locks onto the same frequency and the
+        chord sits completely still. Flip to equal temperament on a C major triad and the
+        harmonics split apart. For the fifth from middle C, C's 3rd harmonic sits at 784.88 Hz
+        while G's 2nd sits at 783.99 Hz, producing a slow 0.89-beat-per-second sway that is easy
+        to miss unless you listen closely. The major third is much rougher. Equal temperament puts
+        E at 400 cents instead of the pure 386.3 cents, an error of 13.7 cents, seven times worse
+        than the fifth. C's 5th harmonic and E's 4th miss by 10.4 Hz, giving a piano's C major
+        chord a brisk ten-per-second shimmer. Meanwhile the minor third inside that same triad,
+        between E and G, misses by 15.6 cents and beats 17.8 times a second at E×6 against G×5.
       </p>
       <p>
-        Move the root slider and the beat rates scale with it. The miss is a fixed fraction
-        of the frequency, so an octave higher the same chord beats twice as fast. That's part
-        of why tempered chords in the bass sound calmer than the same chords up high.
+        Try dragging the <em>root note</em> slider up and down. Because a fixed cent error means a
+        fixed percentage difference in frequency, raising the chord by an octave doubles every
+        beat rate. That scaling explains a lot about piano voicing: close chords in the middle and
+        upper registers sparkle and buzz, whereas the same interval down low rolls along slowly.
       </p>
       <p>
-        Most of us have heard tempered thirds all our lives and hear the shimmer as part of
-        the sound of a piano. Musicians who can tune each note as they play often move toward
-        the pure ratios on long chords. Barbershop singers chase it on purpose and call a
-        locked-in chord one that rings. Use the A/B button for a while and the difference gets
-        easier to hear.
+        Growing up around pianos and guitars trains your ear to accept that shimmer as normal.
+        Even so, singers and string players routinely pull sustained thirds closer to 5:4 without
+        thinking about it, and barbershop quartets chase pure alignment deliberately to make a
+        chord "ring." Turning on <em>A/B every 2 s</em> for half a minute is the quickest way to
+        hear how dramatic the contrast really is.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="temperament"><span class="kicker">Step 3 · Temperament</span>Where to hide the comma</h2>
       <p>
-        The comma has to go somewhere. Twelve fifths have to fit into seven octaves, so
-        between them they must give up 23.46 cents. Choosing which fifths give up how much is
-        called <em>temperament</em>, and the choice decides how every chord in every key
-        sounds.
+        Since twelve fifths have to squeeze into seven octaves, those twelve intervals must give
+        up a combined 23.46 cents. Deciding how to distribute that deficit across the circle of
+        fifths is called <em>temperament</em>, and different choices give every key on a keyboard
+        a noticeably different sound.
       </p>
       <p>
-        <strong>Pythagorean tuning</strong> keeps eleven fifths pure and puts the whole comma
-        into the twelfth, usually between G♯ and E♭. That fifth is 23.46 cents narrow, so
-        badly out of tune that it howls, and organists called it the <em>wolf</em>. Its major
-        thirds are four pure fifths stacked up, 407.8 cents, which is 21.5 cents wide and
-        rough. Medieval polyphony built its cadences on octaves and fifths and treated thirds
-        as unstable sounds that had to move on, which fits this tuning.
+        <strong>Pythagorean tuning</strong> keeps eleven fifths completely pure and dumps the
+        entire 23.46-cent shortfall into one leftover interval, usually between G♯ and E♭. That
+        lopsided fifth howls so violently that organists nicknamed it the <em>wolf</em>. Stacking
+        four pure fifths also pushes every major third up to 407.8 cents, 21.5 cents sharper than
+        5:4. Medieval polyphony treated octaves and fifths as resting places and thirds as tense
+        passing sounds that needed to resolve, which suited a Pythagorean keyboard well.
       </p>
       <p>
-        When the third became the heart of harmony in the Renaissance, the tuning had to
-        change. Four pure fifths overshoot a pure third by a different comma, the
-        <em>syntonic comma</em>: 81/64 against 80/64, or 21.5 cents.
-        <strong>Quarter-comma meantone</strong>, described by Pietro Aron in 1523, narrows
-        every fifth by a quarter of that, 5.4 cents, so four fifths make a pure 5:4. Eight
-        major thirds come out pure. The price is a wolf fifth of 737.6 cents and four keys
-        whose thirds are 41 cents wide. Music in meantone stays near home.
+        Once Renaissance composers made the major third the backbone of harmony, 21.5-cent errors
+        became unbearable. Four pure fifths overshoot a pure 5:4 third by a slightly smaller gap
+        called the <em>syntonic comma</em> (81/64 versus 80/64, or 21.51 cents). In 1523 Pietro
+        Aron described <strong>quarter-comma meantone</strong>, which narrows eleven fifths by a
+        quarter of the syntonic comma (5.4 cents each). Four of those fifths land dead on a pure
+        5:4 major third, giving you eight gorgeously calm keys (E♭ through E on the circle of
+        fifths). The tradeoff hits hard on the far side: the wolf fifth stretches out to 737.6
+        cents (+35.7 cents wide), and B, F♯, C♯, and G♯ major end up with thirds 41.1 cents sharp,
+        keeping composers safely close to C.
       </p>
       <p>
-        The <strong>well temperaments</strong> of the late seventeenth and eighteenth
-        centuries split the difference. Andreas Werckmeister's best-known scheme (1691)
-        narrows four fifths by a quarter of the Pythagorean comma and leaves the other eight
-        pure. Every key is usable, and they aren't all alike: C major's third is 3.9 cents
-        wide, while F♯, C♯ and G♯ major get the old Pythagorean 21.5. Kirnberger and
-        Vallotti published other ways to split it.
+        By the late seventeenth and eighteenth centuries, theorists invented <strong>well
+        temperaments</strong> to make all twelve keys playable without flattening them into
+        identical copies. Andreas Werckmeister's popular 1691 system (Werckmeister III) narrows
+        four fifths by a quarter of the Pythagorean comma and leaves the remaining eight pure. No
+        wolf remains, and every key keeps a distinct flavor: C major's third is only 3.9 cents
+        wide, whereas remote keys like F♯, C♯, and G♯ major inherit the full 21.5-cent Pythagorean
+        bite. Johann Kirnberger and Francesco Vallotti later published their own variations on the
+        same idea.
       </p>
 
       <div
@@ -236,42 +248,46 @@
       ></div>
 
       <p>
-        The arcs round the outside are the twelve fifths, labelled with how much each was
-        narrowed. The bars pointing in are each key's major third, green for pure and red for
-        rough. Pick meantone and tour the keys: C, G, D, A and E major sound calm, then B, F♯,
-        C♯ and G♯ major arrive with thirds 41 cents wide. Pick Werckmeister III and the same
-        tour goes from smooth to restless without ever falling apart. Pick equal and every
-        key sounds the same.
+        In the wheel above, the outer arcs show each fifth's deviation from pure (with any wolf
+        drawn as a jagged coral line), while the inward bars and key circles track major-third
+        error, shifting from green for pure through amber and red into magenta as the third
+        stretches wider. In <em>¼-comma meantone</em>, click around from C through G, D, A, and E
+        to hear dead-still major triads, then click B, F♯, C♯, or G♯ to feel the tuning fall off a
+        cliff. Switch to <em>Werckmeister III</em> and run <em>tour the keys</em>: the chords warm
+        from serene to edgy and back again without ever breaking. Switch to <em>equal</em> and all
+        twelve bars snap to the exact same +13.7-cent shimmer.
       </p>
       <p>
-        Bach's <em>Well-Tempered Clavier</em> (Book I, 1722) has a prelude and fugue in each
-        of the 24 major and minor keys, written for a keyboard tuned so that all of them
-        work. It wasn't necessarily equal temperament, and nobody knows what tuning Bach
-        used. In 2005 the harpsichordist Bradley Lehman argued that the looping drawing on the
-        title page encodes one, and that reading is still argued over. Eighteenth-century
-        writers such as Christian Schubart described each key as having its own character.
-        Some of that was association and habit, and some of it was probably the tuning: in a
-        well temperament, remote keys really do sound different.
+        Bach's <em>Well-Tempered Clavier</em> (Book I, 1722) paired a prelude and fugue in all 24
+        major and minor keys for a keyboard tuned so every key worked. Historians still debate
+        exactly which scheme Bach preferred; in 2005 harpsichordist Bradley Lehman proposed that a
+        row of decorative loops on Bach's handwritten title page is actually a tuning diagram, an
+        idea that sparked years of lively argument. Meanwhile eighteenth-century writers like
+        Christian Schubart cataloged distinct emotional moods for every key. Habit and
+        instrument ergonomics played a role, certainly, yet in a well temperament remote keys
+        genuinely have faster-beating thirds and a more restless physical edge than home keys.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Who worked out equal temperament</span>
         <p>
-          Equal temperament needs the twelfth root of 2, and two people computed it
-          independently around the same time. Zhu Zaiyu, a prince of the Ming dynasty,
-          published a precise calculation of twelve equal steps in 1584. Simon Stevin worked
-          it out in the Netherlands around 1605. Keyboards were mostly tuned in meantone and
-          well temperaments for two more centuries, and equal temperament only became the
-          normal piano tuning in the nineteenth century.
+          Calculating twelve equal semitones requires the twelfth root of 2, and two scholars
+          cracked it independently within about twenty years of each other. Ming dynasty prince
+          Zhu Zaiyu published an accurate calculation of twelve equal ratios in 1584, and Flemish
+          mathematician Simon Stevin derived the same numbers around 1605. Even with the math in
+          hand, keyboard players stuck with meantone and well temperaments for another two
+          centuries; equal temperament only became standard piano practice in the nineteenth
+          century.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="why-twelve"><span class="kicker">Step 4 · Why twelve</span>Dividing the octave</h2>
       <p>
-        Equal steps buy freedom: every key is the same, so music can move anywhere. But
-        nothing says the steps have to be semitones. Divide the octave into N equal steps and
-        ask how close the nearest step comes to a pure fifth. The chart does that for every N
-        from 5 to 53, along with the major third.
+        Equal steps let you modulate anywhere on the keyboard without hitting a bad chord, which
+        raises an obvious follow-up: if we're slicing the octave into equal pieces, why stop at
+        twelve? You can divide the octave into any whole number <em>N</em> of equal steps and ask
+        how close its nearest pitch lands to a pure 3:2 fifth or a pure 5:4 major third. The chart
+        below runs that check for every <em>N</em> from 5 to 53.
       </p>
 
       <div
@@ -281,34 +297,38 @@
       ></div>
 
       <p>
-        Five and seven equal steps miss the fifth by 18 and 16 cents. Then twelve lands
-        within 1.96 cents, and nothing does better until 29 (1.49), 41 (0.48) and 53 (0.07).
-        Twelve is the smallest division that gets the fifth right, which is a large part of
-        why we ended up with it.
+        Dividing the octave into 5 or 7 equal steps leaves the fifth off by 18 and 16 cents. At 12
+        steps the fifth suddenly drops to 1.96 cents of error, and no larger division beats it
+        until 29 (1.49 cents), 41 (0.48 cents), and 53 (0.07 cents). Twelve is the smallest equal
+        grid that nails the fifth cleanly, which goes a long way toward explaining why it took
+        over.
       </p>
       <p>
-        Where those record-holders come from is number theory. A fifth is
-        log₂(3/2) = 0.58496… of an octave, and an N-step system with its fifth at step p is
-        approximating that number by the fraction p/N. The best fractions for any number come
-        from its continued fraction, and for this one they are 1/2, 3/5, 7/12, 24/41, 31/53,
-        179/306. The chart labels them. 7/12 is unusually close for such a small denominator,
-        which makes twelve a lucky size.
+        Number theory explains why those specific counts stand out. A pure fifth fills
+        log₂(3/2) = 0.58496… of an octave, so placing a fifth at step <em>p</em> of an
+        <em>N</em>-step scale means approximating that irrational number with the fraction
+        <em>p</em>/<em>N</em>. The best rational approximations for any real number come from its
+        continued-fraction expansion, and for log₂(3/2) those convergents are 1/2, 3/5, 7/12,
+        24/41, 31/53, and 179/306 (tagged right above their columns on the chart). The jump in
+        accuracy at 7/12 is unusually steep for such a small denominator.
       </p>
       <p>
-        Twelve is not as lucky with the major third: it misses by 13.7 cents, which is where
-        Step 2's shimmer comes from. Turn on the 7:4 bars too and 12 looks worse again. It
-        misses the seventh harmonic by 31 cents, so the barbershop seventh chord can't be
-        played in tune on a piano at all. The systems that do better on thirds are bigger:
-        19, 22, 31, 34 and 53.
+        Twelve has much worse luck with the major third, missing 5:4 by 13.7 cents (the source of
+        the 10.4-Hz shimmer in Step 2). Switch the toggle to <em>+ harmonic 7th (7:4)</em> and 12
+        looks rougher still: its nearest step misses 7:4 by 31.2 cents, leaving the classic
+        ringing barbershop seventh chord completely out of reach on a standard piano. Getting
+        clean thirds and sevenths alongside decent fifths pushes you to larger divisions like 19,
+        22, 31, 34, and 53.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="other-divisions"><span class="kicker">Step 5 · Other divisions</span>Nineteen, thirty-one, fifty-three</h2>
       <p>
-        These systems have all been built and played. Below, each is a ring with one tick per
-        step. The pure intervals sit outside it, joined to their nearest step and coloured by
-        the miss. Each key underneath plays one step, so you can drag across to hear how fine
-        the grid is, or play a scale and the chords each system does well.
+        Musicians and instrument builders have actually built keyboards, guitars, and pipe organs
+        for all of these systems. Below, each tuning appears as a ring with one tick per equal
+        step, while pure target ratios float just outside, linked to their closest step and
+        colored by the size of the miss. Tap or drag across the keyboard strip underneath to hear
+        how dense the grid feels, or audition each division's scale and signature chords.
       </p>
 
       <div
@@ -318,86 +338,83 @@
       ></div>
 
       <p>
-        <strong>19 equal</strong> has a fifth 7.2 cents narrow and a major third 7.4 cents
-        narrow, so it trades a worse fifth for a much better third, and its minor third is
-        within 0.15 cents of pure 6:5. In 1577 Francisco de Salinas proposed a meantone with
-        a third of a syntonic comma per fifth, which is within a fraction of a cent of
-        19-equal.
+        <strong>19-equal</strong> gives up a little accuracy on the fifth (−7.2 cents) to cut the
+        major-third error nearly in half (−7.4 cents), and its minor third lands within 0.15 cents
+        of a pure 6:5. Way back in 1577, the Spanish theorist Francisco de Salinas described a
+        third-comma meantone that matches 19-equal to within a tiny fraction of a cent.
       </p>
       <p>
-        <strong>31 equal</strong> is meantone that closes. Its fifth (−5.2) is almost
-        quarter-comma meantone's (−5.4), its major third is 0.8 cents from pure, and its 7:4
-        is 1.1 cents from pure. Play the 4:5:6:7 chord here and then in 12: the seventh is the
-        note that gives the difference away. In 1555 Nicola Vicentino proposed a 31-note
-        extended meantone and had a harpsichord built to play it, and Christiaan Huygens
-        described 31 equal steps in 1691. Adriaan Fokker revived it in the twentieth century,
-        and the 31-tone organ he designed was inaugurated in Teylers Museum in Haarlem in
-        1950. Since 2009 it has been in the Muziekgebouw aan 't IJ in Amsterdam, where it is
-        still used in concerts.
+        <strong>31-equal</strong> behaves like quarter-comma meantone with the wolf removed. Its
+        fifth (−5.2 cents) sits right next to meantone's (−5.4 cents), its major third is just 0.8
+        cents sharp of pure, and its harmonic seventh 7:4 comes within 1.1 cents. Play the
+        <em>4:5:6:7</em> chord in 31-equal and then switch back to 12-equal; that seventh harmonic
+        locks into place in 31 and grates immediately in 12. Nicola Vicentino commissioned a
+        31-note harpsichord in 1555, and Christiaan Huygens worked out the exact 31-equal
+        logarithms in 1691. In the twentieth century physicist Adriaan Fokker revived the system
+        and had a 31-tone pipe organ installed at Teylers Museum in Haarlem in 1950. Relocated in
+        2009 to the Muziekgebouw aan 't IJ in Amsterdam, that organ still hosts regular concerts
+        today.
       </p>
       <p>
-        <strong>53 equal</strong> gets the fifth within 0.07 cents and the major third within
-        1.4, so it's nearly Pythagorean and nearly pure at once. Jing Fang's 53 fifths from
-        Step 1 are why. William Holder wrote about it in 1694, and in the 1870s R. H. M.
-        Bosanquet built a 53-step harmonium with a keyboard laid out to make it playable.
-        Turkish makam theory measures intervals in <em>commas</em>, each one ninth of a whole
-        tone, which is one step of 53.
+        <strong>53-equal</strong> lands within 0.07 cents of a pure fifth and 1.4 cents of a pure
+        major third, giving you practically pure fifths and thirds in the same equal grid thanks to
+        Jing Fang's 53-fifth cycle from Step 1. William Holder analyzed it in 1694, and in the
+        1870s R. H. M. Bosanquet built a 53-note harmonium with a clever generalized keyboard so
+        chords kept uniform shapes across all keys. Traditional Turkish makam theory still
+        measures intervals in <em>commas</em>, defining a whole tone as nine commas, which
+        corresponds directly to one step of 53-equal.
       </p>
       <p>
-        The last option changes the period. The <strong>Bohlen–Pierce scale</strong> gives
-        up the octave and repeats at 3:1, an octave and a fifth, which it splits into 13
-        equal steps of 146.3 cents. Its basic chord is 3:5:7, steps 0, 6 and 10, and its
-        harmonics line up the way a major triad's do. Heinz Bohlen worked it out in 1972
-        (published 1978), Kees van Prooijen found it independently in 1978, and John Pierce
-        found it again in the 1980s. Pierce and Max Mathews later gave it Bohlen's name too.
-        It suits instruments whose sound has mostly odd harmonics, like the clarinet, where
-        3:1 plays the role 2:1 plays for everything else. Switch the timbre to all harmonics
-        and the 3:5:7 chord gets noticeably muddier. The clarinet maker Stephen Fox has built
-        Bohlen–Pierce clarinets.
+        The final chip breaks with the octave altogether. The <strong>Bohlen–Pierce scale</strong>
+        replaces the 2:1 octave with a 3:1 "tritave" (an octave plus a fifth) and divides that
+        span into 13 equal steps of 146.3 cents. Its consonant triad is 3:5:7 (steps 0, 6, and
+        10), whose odd harmonics line up cleanly the way a major triad's harmonics do in an
+        octave-based scale. Heinz Bohlen derived it in 1972 (publishing in 1978), Kees van
+        Prooijen arrived at it independently the same year, and John Pierce rediscovered it in the
+        1980s alongside Max Mathews, later crediting Bohlen in its name. Because the scale drops
+        the 2:1 octave, it pairs naturally with timbres dominated by odd harmonics like a
+        clarinet's cylindrical bore. Switch the timbre from <em>odd harmonics only</em> to
+        <em>all harmonics</em> while playing <em>3:5:7</em> and notice how quickly the even
+        harmonics muddy the chord. Clarinet maker Stephen Fox has even built working Bohlen–Pierce
+        clarinets.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Twenty-four</span>
         <p>
-          24 equal steps, quarter tones, are in the figure too. Since the early twentieth
-          century Arabic music has notated its scales on a 24-step grid, with half-flats and
-          half-sharps. The grid is a notation, not the tuning: the notes musicians play
-          between the piano's keys are learned by ear and vary by region. Part five plays
-          some of them.
+          You can also try <em>24</em>-equal (quarter tones) in the figure above. Since the early
+          twentieth century, Arabic music theory has often written its scales on a 24-step grid
+          using half-flats and half-sharps. In practice, that grid serves as shorthand on the page
+          while performers tune those intermediate notes by ear to match the maqam and regional
+          style, which we'll explore closely in part five.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <p>The tuning problem comes back in every part of this series, so here's what to keep:</p>
-      <ul>
-        <li>
-          <strong>Pure intervals can't tile the octave.</strong> No number of fifths equals a
-          number of octaves, so every fixed-pitch instrument has to put the error somewhere.
-        </li>
-        <li>
-          <strong>Errors hide in melodies and show up in chords.</strong> They come out as
-          beats between harmonics, and the major third is where equal temperament pays.
-        </li>
-        <li>
-          <strong>Twelve is a good fraction.</strong> 7/12 is the first close approximation
-          to the fifth's share of the octave, and the next one is 24/41.
-        </li>
-        <li>
-          <strong>There are other answers.</strong> 19, 31 and 53 steps, meantone and well
-          temperaments, and a scale with no octave at all are all playable.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Living with the gap</h2>
       <p>
-        Things I'd try next: a keyboard that retunes every chord to pure ratios while you
-        play it (several research instruments and commercial keyboards do this already);
-        mapping the step player above onto a MIDI keyboard so 31-equal can be played with two
-        hands; and measuring a real piano, whose stiff strings push the upper harmonics sharp
-        so tuners stretch the octaves wider than 2:1.
+        Every fixed-pitch instrument begins with the same stubborn arithmetic: powers of 3 never
+        meet powers of 2, so pure intervals can never tile an octave cleanly. Melodies mostly hide
+        the resulting compromise, whereas sustained chords expose it immediately through beating
+        harmonics, especially in equal temperament's 13.7-cent-wide major thirds. Twelve notes won
+        because 7/12 is an unusually tight fraction for such a compact keyboard, and the next
+        clean leap for fifths doesn't arrive until 41 or 53 steps. Still, historical temperaments,
+        meantone cousins like 19- and 31-equal, and even octave-free systems like Bohlen–Pierce
+        show how wide the space of workable answers really is.
+      </p>
+      <p>
+        If I were extending this page further, three experiments sit near the top of my list: a
+        dynamic-tuning keyboard that listens to whatever notes you hold and nudges each chord onto
+        pure ratios in real time (several software instruments and research keyboards already do
+        this); wiring the step player above to a physical MIDI controller so 31-equal can be
+        played two-handed; and recording a real acoustic piano, whose stiff steel strings push
+        upper harmonics sharp enough that tuners intentionally stretch octaves slightly wider than
+        2:1.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/scales.html">Part five, Seven of Twelve</a>.</strong>
-        Most music uses only seven of these twelve notes at a time. Which seven, why seven,
-        and what other traditions do with the octave.
+        Even with twelve notes sitting on the keyboard, most music draws from just seven at a time.
+        Why those seven, how modes reshuffle them, and what traditions outside the piano's grid do
+        with the octave.
       </p>
     </main>
 

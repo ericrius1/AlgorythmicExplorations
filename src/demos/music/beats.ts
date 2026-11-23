@@ -67,7 +67,7 @@ export async function mountBeats(container: HTMLElement): Promise<Demo> {
   const toggle = (): void => {
     void unlockAudio().then(() => setPlaying(!playing));
   };
-  const pill = new PlayPill(stage, "Tap to play both tones", toggle, "top");
+  const pill = new PlayPill(stage, "Tap to play both tones", toggle, [0.5, 0.28]);
   const sync = playButton(stage, ["▶ play both", "■ stop"], toggle);
   shell.slider({
     label: "second tone, above the first",
@@ -277,7 +277,7 @@ export async function mountBeats(container: HTMLElement): Promise<Demo> {
       const ry0 = topY1 + 52;
       const ry1 = H - 26;
       const dx = (d: number): number => rx0 + (d / DMAX) * (rx1 - rx0);
-      const ry = (v: number): number => ry1 - (v / PEAK) * (ry1 - ry0 - 10);
+      const ry = (v: number): number => ry1 - (v / PEAK) * (ry1 - ry0 - 16);
       const z = zones();
       // zones
       const zoneFill = (a: number, b: number, col: string): void => {
@@ -288,14 +288,14 @@ export async function mountBeats(container: HTMLElement): Promise<Demo> {
       zoneFill(0, beatsEnd, "rgba(122,162,255,0.06)");
       zoneFill(beatsEnd, z.b, "rgba(255,92,84,0.07)");
       zoneFill(z.b, DMAX, "rgba(125,214,160,0.05)");
-      const zl = (s: string, a: number, b: number, col: string): void => {
+      const zl = (s: string, a: number, b: number, col: string, y = ry1 - 8): void => {
         const x = (dx(a) + dx(Math.min(b, DMAX))) / 2;
         if (dx(Math.min(b, DMAX)) - dx(a) < 40) return;
-        text(g, s, x, ry1 - 8, { size: 10, align: "center", color: col, weight: 600 });
+        text(g, s, x, y, { size: 10, align: "center", color: col, weight: 600 });
       };
       zl("beats", 0, beatsEnd, "rgba(160,190,255,0.85)");
       zl("rough", beatsEnd, z.b, "rgba(255,140,130,0.9)");
-      zl("smooth: two notes", z.b, DMAX, "rgba(140,220,170,0.85)");
+      zl("smooth: two notes", z.b, DMAX, "rgba(140,220,170,0.85)", ry0 + 18);
       hline(g, rx0, rx1, ry1, "rgba(122,162,255,0.2)");
       for (let d = 0; d < DMAX; d += 20) {
         text(g, `${d}`, dx(d), ry1 + 13, { size: 9.5, align: d === 0 ? "left" : "center", color: "rgba(150,160,190,0.55)", mono: true });
@@ -313,7 +313,7 @@ export async function mountBeats(container: HTMLElement): Promise<Demo> {
       // the peak, a quarter of a critical band
       vline(g, dx(z.peakD), ry(PEAK) + 2, ry1, "rgba(255,140,130,0.35)", 1, [2, 4]);
       if (!narrow)
-        text(g, `worst at ${Math.round(z.peakD)} Hz apart`, dx(z.peakD) + 6, ry(PEAK) + 12, { size: 9.5, color: "rgba(255,170,160,0.85)" });
+        text(g, `worst at ${Math.round(z.peakD)} Hz apart`, dx(z.peakD) + 8, ry(PEAK) - 3, { size: 9.5, color: "rgba(255,170,160,0.9)" });
       const md = Math.min(delta, DMAX);
       glowDot(g, dx(md), ry(curveAt(md)), 3.6, [255, 240, 220], 1);
       text(g, `roughness of two sines near ${f1} Hz`, rx0, ry0 - 10, { size: 10.5, color: label });

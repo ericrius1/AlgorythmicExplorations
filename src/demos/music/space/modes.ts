@@ -243,8 +243,9 @@ export function mountModes(container: HTMLElement): Demo {
       g.fillStyle = SC.bg;
       g.fillRect(0, 0, Wc, Hc);
       const pad = 14 * d;
+      const narrow = Wc / d < 560;
       const respH = Hc * 0.36;
-      plan.fit(pad + 20 * d, pad + 16 * d, Wc - pad * 2 - 40 * d, Hc - respH - pad * 3 - 16 * d);
+      plan.fit(pad + 20 * d, pad + 18 * d, Wc - pad * 2 - 40 * d, Hc - respH - pad * 3 - 26 * d);
       const a = plan.px({ x: 0, y: 0 });
       const rw = ROOM.L * plan.s;
       const rh = ROOM.W * plan.s;
@@ -256,8 +257,11 @@ export function mountModes(container: HTMLElement): Demo {
       g.strokeStyle = "rgba(230,235,250,0.85)";
       g.lineWidth = 3 * d;
       g.strokeRect(a.x, a.y, rw, rh);
-      label(g, `loudness of a ${Math.round(freq)} Hz tone at ear height (30 dB from dark to bright)`, a.x, pad + 4 * d, 10.5 * d, SC.muted);
-      label(g, `${ROOM.L} m`, a.x + rw / 2, a.y + rh + 11 * d, 9.5 * d, SC.muted, "center", 500, true);
+      const topCap = narrow
+        ? `loudness at ${Math.round(freq)} Hz · ear height (30 dB range)`
+        : `loudness of a ${Math.round(freq)} Hz tone at ear height (30 dB from dark to bright)`;
+      label(g, topCap, Wc / 2, pad + 5 * d, 10.5 * d, SC.muted, "center");
+      label(g, `${ROOM.L} × ${ROOM.W} m`, a.x + rw / 2, a.y + rh + 12 * d, 9.5 * d, SC.muted, "center", 500, true);
       drawSource(g, plan.px(src), 6 * d, d, 0.3);
       drawHead(g, plan.px(lis), Math.PI, 9 * d, d, 0.6);
 
@@ -297,7 +301,13 @@ export function mountModes(container: HTMLElement): Demo {
         const x = xOf(fs);
         g.fillStyle = "rgba(125,224,176,0.06)";
         g.fillRect(x, py0, px0 + pw - x, ph);
-        label(g, "above here, modes blur together", x + 6 * d, py0 + 8 * d, 9 * d, "rgba(125,224,176,0.8)", "left", 500);
+        g.strokeStyle = "rgba(125,224,176,0.45)";
+        g.setLineDash([3 * d, 3 * d]);
+        g.beginPath();
+        g.moveTo(x, py0);
+        g.lineTo(x, py0 + ph);
+        g.stroke();
+        g.setLineDash([]);
       }
       g.save();
       g.shadowColor = "#ffb86b";
@@ -326,7 +336,28 @@ export function mountModes(container: HTMLElement): Demo {
       g.beginPath();
       g.arc(fx, py0 + (fdb / dbMin) * ph, 4.5 * d, 0, Math.PI * 2);
       g.fill();
-      label(g, "response where the listener stands · blue lines: axial modes", px0, ry + 11 * d, 9.5 * d, SC.muted, "left", 500);
+      label(
+        g,
+        narrow ? "response at listener · blue: axial" : "response where the listener stands · blue lines: axial modes",
+        px0,
+        ry + 11 * d,
+        9.5 * d,
+        SC.muted,
+        "left",
+        500,
+      );
+      if (fs < FMAX) {
+        label(
+          g,
+          narrow ? `>${Math.round(fs)} Hz: modes blur` : `Schroeder ${Math.round(fs)} Hz → modes blur`,
+          px0 + pw,
+          ry + 11 * d,
+          9 * d,
+          "rgba(125,224,176,0.85)",
+          "right",
+          500,
+        );
+      }
     },
   };
 }

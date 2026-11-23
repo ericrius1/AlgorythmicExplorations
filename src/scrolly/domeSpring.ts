@@ -81,13 +81,34 @@ export function mountDomeSpring(el: HTMLElement): void {
     screens: 4,
     aspect: 0.56,
     steps: [
-      { at: 0, text: "A slice through the dome. The dashed arc is the shell, radius R. The body starts on it, sliding slowly along, and the spring has almost nothing to do." },
-      { at: lead(KICK_OUT), text: "A kick knocks it outward. Now r > R and the spring pulls it back in, straight toward the centre, harder the farther out it is." },
-      { at: lead(inside), text: "It overshoots to the inside, gets pushed back out, overshoots again. A little damping lets it settle." },
-      { at: lead(KICK_ALONG), text: "A second kick sends it fast along the shell. Going fast, it rides a bit outside the arc: the stretch is what supplies the force that curves its path." },
-      { at: lead(below), text: "It skids off the rim and below the equator. The floor spring is 4× stiffer and shoves it straight back up. The floor is a hard edge, the shell a soft preference." },
-      { at: lead(above), text: "Back over the rim, it swings across the top with the shell spring reeling it in the whole way." },
-      { at: 0.92, text: "That's the whole constraint: two if-statements that produce forces. The integrator and the gravity solver never find out the world became a dome." },
+      {
+        at: 0,
+        text: "A cross-section through the dome, with the dashed arc marking the shell at radius R. The body starts sliding slowly along the arc, so the spring barely has to pull.",
+      },
+      {
+        at: lead(KICK_OUT),
+        text: "A radial kick knocks it outward past R. The shell spring immediately pulls straight back toward the center, growing stronger the farther out it strays.",
+      },
+      {
+        at: lead(inside),
+        text: "Momentum carries it inside the arc, so the spring reverses and pushes it back out. A touch of velocity damping lets the oscillation settle down.",
+      },
+      {
+        at: lead(KICK_ALONG),
+        text: "A tangential kick sends it racing along the dome. At high speed it rides slightly outside radius R, because that stretch supplies the centripetal force needed to curve its path.",
+      },
+      {
+        at: lead(below),
+        text: "Over the rim and below the equator, the floor spring kicks in at four times the stiffness and shoves it straight back up. The shell behaves like a soft guide, while the floor acts like a hard edge.",
+      },
+      {
+        at: lead(above),
+        text: "Popped back above the rim, it swings across the dome while the shell spring reels it toward the arc.",
+      },
+      {
+        at: 0.92,
+        text: "Those two force terms are the entire dome constraint. Both the octree gravity solver and the integrator run without ever knowing the world is curved.",
+      },
     ],
     draw(ctx, w, h, t) {
       const cx = w / 2;
@@ -117,9 +138,6 @@ export function mountDomeSpring(el: HTMLElement): void {
       ctx.setLineDash([]);
       ctx.restore();
 
-      label(ctx, "shell  r = R", cx + S * 0.74, cy - S * 0.78, { color: PAL.accent, size: 11, alpha: 0.8 * appear });
-      label(ctx, "equator (floor)", cx - S * 1.42, cy + 14, { color: PAL.muted, size: 11, alpha: 0.8 * appear });
-
       // Scrub position along the precomputed path. Linear, so the caption
       // timings computed from progressAt() line up with what's on screen.
       const scrub = Math.min(1, Math.max(0, (t - 0.02) / 0.96));
@@ -127,26 +145,51 @@ export function mountDomeSpring(el: HTMLElement): void {
       const s = path[idx];
       const PX = (p: Sample | { x: number; y: number }): [number, number] => [cx + p.x * S, cy - p.y * S];
 
-      // Trail.
-      ctx.save();
-      ctx.strokeStyle = PAL.dot;
-      ctx.lineWidth = 1.4;
+      // Fading trail drawn in short contiguous chunks so alpha ramps smoothly.
       const trail = 220;
-      ctx.beginPath();
-      for (let i = Math.max(0, idx - trail); i <= idx; i++) {
-        const [tx, ty] = PX(path[i]);
-        const a = (i - (idx - trail)) / trail;
-        if (i === Math.max(0, idx - trail)) ctx.moveTo(tx, ty);
-        else ctx.lineTo(tx, ty);
-        ctx.globalAlpha = 0.1 + 0.4 * a;
+      const start = Math.max(0, idx - trail);
+      const span = idx - start;
+      if (span >= 1) {
+        ctx.save();
+        ctx.strokeStyle = PAL.dot;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        const chunks = Math.min(24, span);
+        for (let c = 0; c < chunks; c++) {
+          const i0 = start + Math.floor((c / chunks) * span);
+          const i1 = start + Math.floor(((c + 1) / chunks) * span);
+          if (i1 <= i0) continue;
+          const frac = (c + 0.5) / chunks;
+          ctx.globalAlpha = 0.04 + 0.58 * frac * frac;
+          ctx.beginPath();
+          const [x0, y0] = PX(path[i0]);
+          ctx.moveTo(x0, y0);
+          for (let i = i0 + 1; i <= i1; i++) {
+            const [tx, ty] = PX(path[i]);
+            ctx.lineTo(tx, ty);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
       }
-      ctx.globalAlpha = 0.45;
-      ctx.stroke();
-      ctx.restore();
+
+      label(ctx, "shell  r = R", cx + S * 0.74, cy - S * 0.78, {
+        color: PAL.accent,
+        size: 11,
+        alpha: 0.85 * appear,
+        bg: "rgba(6,7,11,0.85)",
+      });
+      label(ctx, "equator (floor)", cx - S * 1.42, cy + 14, {
+        color: PAL.muted,
+        size: 11,
+        alpha: 0.8 * appear,
+        bg: "rgba(6,7,11,0.85)",
+      });
 
       const [bx, by] = PX(s);
 
-      // Radial guide from centre through the body, showing r vs R.
+      // Radial guide from center through the body, showing r vs R.
       const r = Math.hypot(s.x, s.y);
       const off = Math.abs(r - R);
       if (off > 0.02 && s.y > -0.02) {
@@ -165,21 +208,39 @@ export function mountDomeSpring(el: HTMLElement): void {
       // Spring force arrows (scaled for visibility).
       const FS = S / K / 0.55;
       const fmag = Math.hypot(s.fx, s.fy);
-      if (fmag * FS > 6) {
-        arrow(ctx, bx, by, bx + s.fx * FS, by - s.fy * FS, PAL.warm, 2.5, 8);
-        // flip the label to the left of the arrowhead near the right edge
-        const lx = bx + s.fx * FS;
-        const flip = lx + 170 > w;
-        label(ctx, "shell spring  −k·(r−R)·r̂", flip ? lx - 8 : lx + 8, by - s.fy * FS, {
+      const showShell = fmag * FS > 6;
+      const gmag = Math.hypot(s.gx, s.gy);
+      const showFloor = gmag * FS > 6;
+
+      let shellLabelY = 0;
+      if (showShell) {
+        const fxTip = bx + s.fx * FS;
+        const fyTip = by - s.fy * FS;
+        arrow(ctx, bx, by, fxTip, fyTip, PAL.warm, 2.5, 8);
+        const flip = fxTip + 175 > w;
+        shellLabelY = Math.max(40, Math.min(h - 16, fyTip));
+        label(ctx, "shell spring  −k·(r−R)·r̂", flip ? fxTip - 10 : fxTip + 10, shellLabelY, {
           color: PAL.warm,
           size: 11,
           align: flip ? "right" : "left",
+          bg: "rgba(6,7,11,0.85)",
         });
       }
-      const gmag = Math.hypot(s.gx, s.gy);
-      if (gmag * FS > 6) {
-        arrow(ctx, bx, by, bx + s.gx * FS * 0.5, by - s.gy * FS * 0.5, PAL.red, 2.5, 8);
-        label(ctx, "floor spring  −4k·z", bx + 12, by - s.gy * FS * 0.5 - 10, { color: PAL.red, size: 11 });
+      if (showFloor) {
+        const gxTip = bx + s.gx * FS * 0.5;
+        const gyTip = by - s.gy * FS * 0.5;
+        arrow(ctx, bx, by, gxTip, gyTip, PAL.red, 2.5, 8);
+        const flipG = gxTip + 145 > w;
+        let floorLabelY = Math.max(40, Math.min(h - 16, gyTip - 10));
+        if (showShell && Math.abs(floorLabelY - shellLabelY) < 20) {
+          floorLabelY = floorLabelY <= shellLabelY ? Math.max(40, shellLabelY - 22) : Math.min(h - 16, shellLabelY + 22);
+        }
+        label(ctx, "floor spring  −4k·z", flipG ? gxTip - 10 : gxTip + 10, floorLabelY, {
+          color: PAL.red,
+          size: 11,
+          align: flipG ? "right" : "left",
+          bg: "rgba(6,7,11,0.85)",
+        });
       }
 
       // Body.
@@ -199,6 +260,7 @@ export function mountDomeSpring(el: HTMLElement): void {
         size: 12,
         align: "right",
         mono: true,
+        bg: "rgba(6,7,11,0.85)",
       });
     },
   });

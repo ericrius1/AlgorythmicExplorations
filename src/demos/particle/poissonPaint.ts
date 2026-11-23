@@ -35,7 +35,33 @@ export async function mountPoissonPaint(container: HTMLElement): Promise<Demo> {
   const reseed = (): void => {
     dev.queue.writeBuffer(buf, 0, seedTracers() as BufferSource);
   };
+  // Seed two modest starter blobs so the contour map and tracer streams are
+  // immediately visible on load; "clear mass" still wipes to a blank slate.
+  const seedInitialPaint = (): void => {
+    const init = new Float32Array(DIM * DIM);
+    const blobs: Array<[number, number, number, number]> = [
+      [0.34, 0.56, 0.042, 3.0],
+      [0.67, 0.44, 0.036, 2.4],
+    ];
+    for (let y = 0; y < DIM; y++) {
+      const cy = (y + 0.5) / DIM;
+      for (let x = 0; x < DIM; x++) {
+        const cx = (x + 0.5) / DIM;
+        let v = 0;
+        for (const [bx, by, rad, str] of blobs) {
+          let dx = Math.abs(cx - bx);
+          let dy = Math.abs(cy - by);
+          dx = Math.min(dx, 1 - dx);
+          dy = Math.min(dy, 1 - dy);
+          v += str * Math.exp(-((dx * dx + dy * dy) / (rad * rad)) * 4);
+        }
+        init[y * DIM + x] = v;
+      }
+    }
+    dev.queue.writeBuffer(solver.paint, 0, init as BufferSource);
+  };
   reseed();
+  seedInitialPaint();
   solver.setParticles(buf);
 
   // field colormap underneath, tracers on top

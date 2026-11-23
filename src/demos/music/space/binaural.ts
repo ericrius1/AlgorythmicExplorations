@@ -5,7 +5,7 @@
 
 import { C_SOUND } from "./room";
 
-export const HEAD_RADIUS = 0.0875; // metres
+export const HEAD_RADIUS = 0.0875; // meters
 
 // Interaural time difference for a source whose direction has lateral
 // component s = sin(lateral angle), +1 = straight right. Positive: the left

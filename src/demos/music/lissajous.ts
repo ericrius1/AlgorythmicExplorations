@@ -72,9 +72,14 @@ export async function mountLissajous(container: HTMLElement): Promise<Demo> {
   };
   const pill = new PlayPill(stage, "Tap to play the interval", toggle, stage.narrow ? [0.5, 0.2] : [0.25, 0.5]);
   const sync = playButton(stage, ["▶ play", "■ stop"], toggle);
+  const snapBtns: { r: number; b: HTMLButtonElement }[] = [];
+  const syncSnaps = (): void => {
+    for (const s of snapBtns) s.b.classList.toggle("is-on", Math.abs(ratio - s.r) < 0.0006);
+  };
   const setRatio = (r: number): void => {
     ratio = r;
     ob?.frequency.setTargetAtTime(F1 * r, now(), 0.01);
+    syncSnaps();
   };
   const slider = shell.slider({
     label: "frequency ratio",
@@ -98,7 +103,9 @@ export async function mountLissajous(container: HTMLElement): Promise<Demo> {
       setRatio(p / q);
     });
     row.appendChild(b);
+    snapBtns.push({ r: p / q, b });
   }
+  syncSnaps();
   shell.controls.appendChild(row);
 
   const guard = guardSound(container, () => setPlaying(false));
@@ -199,8 +206,8 @@ export async function mountLissajous(container: HTMLElement): Promise<Demo> {
         ["sum", (tau) => 0.5 * (Math.sin(2 * Math.PI * F1 * tau) + Math.sin(2 * Math.PI * f2 * tau)), [255, 240, 220], 1],
       ];
       rows.forEach(([name, fn, col, k], ri) => {
-        const mid = ty0 + rowH * (ri + 0.5);
-        const half = rowH * 0.36;
+        const mid = ty0 + rowH * (ri + 0.5) + (ri === 2 ? 4 : 0);
+        const half = rowH * 0.35;
         hline(g, tx0, tx1, mid, "rgba(122,162,255,0.08)");
         const p = new Path2D();
         for (let i = 0; i <= NPT; i++) {
@@ -211,19 +218,22 @@ export async function mountLissajous(container: HTMLElement): Promise<Demo> {
           else p.lineTo(x, y);
         }
         glowStroke(g, p, col, ri === 2 ? 1.3 : 1, k * (ri === 2 ? 0.95 : 0.7));
-        text(g, name, tx0, mid - half - 5, { size: 9.5, color: rgba(col, 0.75), mono: true });
+        const lyRow = ri === 2 ? mid - half - 14 : mid - half - 5;
+        text(g, name, tx0, lyRow, { size: 9.5, color: rgba(col, 0.75), mono: true });
       });
       // repeat brackets on the sum
       if (d.exact) {
         const T = d.exact.q / F1;
-        const yb = ty0 + rowH * 2 + rowH * 0.06;
+        const sumMid = ty0 + rowH * 2.5 + 4;
+        const sumHalf = rowH * 0.35;
+        const yb = sumMid - sumHalf - 9;
         for (let k = 0; k * T <= span + 1e-9; k++) {
           const x = tx0 + ((k * T) / span) * (tx1 - tx0);
           g.save();
           g.strokeStyle = rgba(ORANGE, 0.55);
           g.setLineDash([3, 4]);
           g.beginPath();
-          g.moveTo(x, ty0 + rowH * 2 + 4);
+          g.moveTo(x, yb);
           g.lineTo(x, ty1);
           g.stroke();
           g.restore();
@@ -240,9 +250,11 @@ export async function mountLissajous(container: HTMLElement): Promise<Demo> {
           g.lineTo(x1, yb + 5);
           g.stroke();
           g.restore();
-          text(g, `repeats every ${((1000 * d.exact.q) / F1).toFixed(2)} ms`, (tx0 + x1) / 2, yb - 4, {
+          const repLab = `repeats every ${((1000 * d.exact.q) / F1).toFixed(2)} ms`;
+          const centered = x1 - tx0 > 180;
+          text(g, repLab, centered ? Math.max((tx0 + x1) / 2, tx0 + 96) : tx0 + 34, yb - 5, {
             size: 10,
-            align: x1 - tx0 > 140 ? "center" : "left",
+            align: centered ? "center" : "left",
             color: rgba(ORANGE, 1),
             weight: 600,
           });

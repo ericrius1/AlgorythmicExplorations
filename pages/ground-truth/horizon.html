@@ -10,7 +10,7 @@
     <title>The Horizon — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Procedural terrain, part six: an endless world built around the camera from chunks, distance-based level of detail, skirts, a per-frame millisecond budget and a coarse backdrop out to the haze."
+      content="Procedural terrain, part six: an endless world streamed around a flying camera using chunk rings, distance-based level of detail, edge skirts, a per-frame millisecond budget, and a coarse horizon backdrop."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Ground Truth · Part 6</p>
         <h1>The Horizon</h1>
         <p class="subtitle">
-          A flight that never reaches an edge. The land ahead is built a few milliseconds
-          at a time, and the land behind is thrown away.
+          A flight with no boundary: terrain ahead streams in a few milliseconds at a time
+          while hills behind are discarded and forgotten.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,39 +43,43 @@
 
     <main>
       <p>
-        Every scene in this series so far has had edges: a 64-unit eroded patch, a 96-unit
-        valley, with plain land around them out to the haze. Meanwhile most of the design
-        decisions were made with this part in mind.
-        <a href="/pages/ground-truth/heightfield.html">Part one</a> made the ground a
-        function with no stored map.
-        <a href="/pages/ground-truth/biomes.html">Part five</a> made every tree depend only
-        on integers it can compute where it stands. This part uses those choices to build a
-        world that doesn't run out.
+        Every earlier demo in this series had walls around it: a 16-unit cutaway block, a
+        64-unit hillside, a 96-unit valley. Yet almost every architectural shortcut along
+        the way was chosen for this moment.
+        <a href="/pages/ground-truth/heightfield.html">Part one</a> kept the mountains
+        stateless so any coordinate evaluates without a stored map, and
+        <a href="/pages/ground-truth/biomes.html">part five</a> tied every tree and rock to
+        world-indexed grid integers so no tile ever needs to consult its neighbors. Now we
+        cash in both guarantees and drop the boundary completely.
       </p>
       <p>
-        You can't store an endless world, but if everything visible is a function of
-        coordinates you don't have to. You only need to build the part around the camera,
-        in time, and throw away what falls behind. The machine that does it has three
-        parts: chunks decide what to build, level of detail decides how finely, and a
-        budget decides when.
+        Memory is finite, so an endless landscape has to behave like a sliding window
+        centered on the viewer: generate the ground approaching the nose before it arrives,
+        and free whatever drifts past the tail. Making that window run smoothly at 60 frames
+        per second rests on three mechanisms working together: a coordinate grid of chunks
+        tracking what exists, distance-based level of detail keeping vertex counts bounded,
+        and a strict millisecond budget spreading builds cleanly across frames.
       </p>
       <p>
-        The flight at the top heads toward a low sun with a slow weave and never turns
-        back. Everything in the view is generated as it goes: nearly 200 chunks of terrain
-        around the camera, trees out to three chunks away, grass in the nearest few, and one
-        coarse mesh beyond the last chunk that carries the land out to the haze.
+        Overhead, the camera weaves gently toward a low sunset and never circles back.
+        Everything visible is constructed live as it flies: a moving grid of terrain chunks
+        surrounding the lens, instanced woods reaching three rings out, grass carpeting the
+        closest tiles, and a single coarse backdrop mesh carrying distant ridges all the way
+        into the horizon haze.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="ring"><span class="kicker">Step 1 · The ring</span>Chunk coordinates</h2>
       <p>
-        Cut the plane into square chunks 24 units on a side, and name each one by the
-        integer pair (⌊x / 24⌋, ⌊z / 24⌋). The rule for existence: a chunk exists if it's
-        within six chunks of the camera's chunk in both directions, a 13 × 13 square. Every
-        frame, the manager compares the rule with what it has. Chunks that are wanted but
-        missing go into a queue, nearest first. Chunks more than seven away are thrown out,
-        geometry and all. The one-chunk gap between "wanted" and "thrown out" keeps a camera
-        that wobbles on a boundary from building and destroying the same chunk over and over.
+        Partition the world plane into square chunks 24 units wide, identified by integer
+        grid coordinates <code>(⌊x / 24⌋, ⌊z / 24⌋)</code>. The existence rule is a square
+        radius around the camera's current chunk: keep every chunk within six steps in both
+        axes, forming a 13 × 13 patch of 169 tiles. On every frame, the world manager diffs
+        that desired set against what is already in memory. Missing tiles enter a build
+        queue sorted closest first, while any chunk more than seven steps away is disposed,
+        freeing its GPU buffers. Leaving a one-chunk hysteresis buffer between the load
+        radius (6) and the eviction radius (7) stops a camera hovering near a tile border
+        from thrashing, building and destroying the same edge rows back and forth.
       </p>
 
       <div
@@ -85,56 +89,67 @@
       ></div>
 
       <p>
-        The white flashes are builds. They run ahead of the camera because the queue is
-        sorted by distance and only a few builds happen per frame. In this diagram the limit
-        is a fixed count you can set; the real world uses milliseconds, which comes up in
-        step 3. Drop the builds per frame to one and raise the speed, and the queue falls
-        behind and the far edge gets ragged. At the trailing edge, chunks disappear without
-        losing anything, because every chunk can be rebuilt identically. Come back to the same
-        coordinates and the hash gives you the same hill, the same boulder and the same tree
-        leaning the same way. That's what all the determinism in the earlier parts was for.
+        Watch the moving window from above. As the camera glides forward, new chunks pop in
+        along the leading edge (flashing white as they build) while trailing rows drop off
+        behind, with the color key in the margin showing each resolution ring. Because the
+        queue prioritizes tiles nearest the camera, high-detail ground right under the lens
+        updates first while outer tiles catch up on later frames. In this top-down diagram,
+        <strong>builds per frame</strong> caps work by tile count as a stand-in for the
+        real engine's millisecond timer. Lower builds per frame to 1 and push
+        <strong>flight speed</strong> up to see the queue back up and leave ragged gaps on
+        the far edge. Evicting trailing tiles costs nothing permanently: fly back to those
+        exact coordinates later and the hashes rebuild the identical hill, boulder, and tree
+        leaning at the exact same angle.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="lod"><span class="kicker">Step 2 · Detail by distance</span>Level of detail and skirts</h2>
       <p>
-        A chunk five rings out covers a small patch of the screen, and building it at full
-        resolution is wasted work. So resolution follows distance: a 48 × 48 grid for the
-        camera's chunk and its neighbours, 24 × 24 for the next two rings, and 12 × 12
-        beyond that. The diagram's readout does the sum. At the default radius the live chunks
-        hold about 85,000 vertices, against about half a million if every chunk were full
-        resolution, and the total stays the same however far you fly.
+        A 24-unit tile five rings away shrinks to a sliver on screen, so giving it the same
+        mesh density as the ground directly beneath the camera wastes both CPU build time
+        and GPU vertices. Instead, mesh resolution steps down by ring distance: a 48 × 48
+        grid for the camera's own chunk and its eight immediate neighbors, 24 × 24 across
+        the next two rings, and 12 × 12 out to the rim. At the default radius of six chunks,
+        the readout shows how dramatically that pays off: roughly 80,000 live vertices across
+        the entire window, compared with nearly half a million if every tile built at full
+        resolution, and that footprint stays flat whether you fly one kilometer or a
+        thousand.
       </p>
       <pre><code>rings 0–1: 48² grid    rings 2–3: 24²    rings 4–6: 12²    <span class="cm">// every chunk gets a skirt</span></code></pre>
       <p>
-        Mixing resolutions creates seams. Where a 48-segment chunk meets a 24-segment one,
-        both edges sample the same height function, but the coarse edge draws straight lines
-        between its samples and the fine edge doesn't, so thin cracks of sky open between
-        them. The exact fix is to stitch the edge vertices of every pair of resolutions
-        together, which is a lot of bookkeeping. The cheap fix that many engines use is a
-        skirt: every chunk gets a curtain of geometry hanging four units straight down from
-        its border. A crack then shows skirt, which is shaded like the ground above it, and
-        the cracks only happen far enough away that nobody can tell.
+        Stepping mesh resolution across a shared border introduces T-junction cracks. Even
+        though both adjacent tiles sample the exact same height function, the 48-segment
+        edge follows an extra midpoint between every pair of 24-segment vertices, leaving
+        thin slivers of sky peeking between the two polygons. Stitching edge indices across
+        every possible neighbor combination works, at the cost of a tangle of special-case
+        index buffers. A far simpler production trick is a <em>skirt</em>: extrude a narrow
+        vertical curtain hanging four units straight down around all four borders of every
+        chunk, carrying the same normals and paint as the surface edge. Whenever a crack
+        opens between mismatched rings, your eye hits matching shaded terrain skirt instead
+        of bright sky, and at two rings away the seam disappears completely.
       </p>
       <details class="fold">
         <summary>Deep dive: matching normals and shadows across seams</summary>
         <div class="fold-body">
           <p>
-            Cracks are the visible seam problem. Lighting is the quieter one. Normals come
-            from differences between neighbouring heights, and a border vertex has no
-            neighbour on one side. Use a one-sided difference there and every chunk border
-            shows as a faint crease in the shading. Because the height function is pure,
-            the fix is cheap: sample one extra row of heights beyond each edge, which the
-            chunk never draws, and every border normal becomes the same two-sided
-            difference its neighbour computes.
+            Geometry cracks are only half of hiding tile edges; lighting mismatches can give
+            away chunk borders just as easily. Surface normals come from elevation
+            differences between adjacent vertices, and a vertex sitting on a tile edge has
+            no neighbor inside its own mesh. Falling back to a one-sided difference there
+            prints a faint lighting crease along every chunk boundary. Because our height
+            function is stateless, the fix is almost free: evaluate one extra hidden row of
+            heights outside all four borders so edge vertices run the exact same two-sided
+            central difference as their neighbors.
           </p>
           <p>
-            Shadows have the same problem at a larger scale. Each chunk bakes its own sun
-            shadows by marching 40 units toward the sun from every vertex, and most of that
-            march leaves the chunk. Evaluating the full height function out there would
-            cost more than building the chunk, so heights beyond the edge come from a
-            coarse lattice at 2-unit spacing, computed once per 32-unit tile and cached.
-            Neighbouring chunks read the same lattice, so their shadows line up.
+            Baked sun shadows run into the same boundary issue at longer range. Each chunk
+            marches 40 world units toward the sun from every vertex to test whether distant
+            peaks block the light, and most of those rays cross into neighboring chunks.
+            Evaluating full multi-octave warped fBm along every march step outside the tile
+            would cost more than building the terrain itself, so off-chunk heights come
+            from a shared coarse height lattice sampled at 2-unit spacing and cached in
+            32-unit tiles. Adjacent chunks read identical distant peaks from that cache, so
+            ridge shadows line up cleanly from tile to tile.
           </p>
         </div>
       </details>
@@ -142,12 +157,15 @@
       <!-- ================================================================ -->
       <h2 id="budget"><span class="kicker">Step 3 · The budget</span>Building a few milliseconds at a time</h2>
       <p>
-        At 60 frames a second there are 16.7 ms per frame for everything. In my measurements
-        a full-resolution chunk with its shadow bake takes about 4 ms, a tree scatter well
-        under one, and a quarter-chunk of grass about 2. Crossing a chunk boundary changes
-        what several dozen chunks want, and building all of that at once would make the flight stutter
-        every few seconds. So each frame, the manager walks the distance-sorted queue and
-        builds until 6 ms have passed, then stops and leaves the rest for the next frame:
+        Hitting 60 frames per second gives you 16.7 milliseconds for everything: simulation,
+        mesh generation, and rendering. On my laptop, building one full-resolution chunk
+        with its shadow bake takes roughly 4 ms, scattering its trees takes well under 1 ms,
+        and planting a quarter-chunk of grass takes around 2 ms. Every time the camera
+        crosses a chunk boundary, dozens of tiles simultaneously need creating or upgrading;
+        rebuilding all of them on the spot would freeze the animation for tens of
+        milliseconds at regular intervals. Instead, the manager works down the
+        distance-sorted queue until 6 ms have elapsed, then yields the rest of the frame
+        and resumes on the next tick:
       </p>
       <pre><code>wanted.sort((a, b) =&gt; a.ring - b.ring);              <span class="cm">// nearest first</span>
 const t0 = performance.now();
@@ -157,25 +175,29 @@ for (const w of wanted) {
   buildOneStep(w);                                   <span class="cm">// terrain, then trees, then grass</span>
 }</code></pre>
       <p>
-        The check happens before each build, so a frame can overrun by one build, at most
-        a few milliseconds. Each chunk does one step per turn (terrain first, then its
-        trees and rocks, then a quarter of its grass) so no single step is large.
+        Checking the clock before each unit of work means a frame can overshoot by at most
+        one quick build step. Breaking each chunk into incremental stages (terrain mesh
+        first, then trees and boulders, then grass in four quarter-chunk slices) guarantees
+        no single step can stall a frame.
       </p>
       <p>
-        The same thrift decides what each chunk gets. Trees exist out to three rings, where
-        a forest's silhouette still matters, using the lighter tree meshes from part five,
-        and lighter still past the first ring. Grass only grows in the nearest rings, 24,000
-        candidate blades per chunk, because from a few chunks away a blade is less than a
-        pixel. When a chunk falls far enough behind, its grass and trees are dropped and the
-        rules will bring them back if you return.
+        Foliage follows the same distance discipline. Trees scatter out to three rings
+        around the camera using the lighter canopy meshes from part five (and an even
+        sparser branch/leaf mesh beyond ring one), since distant silhouettes matter while
+        inner twigs don't. Grass only populates the innermost rings at 24,000 candidates
+        per chunk, where blades still span multiple pixels on screen; as tiles recede, their
+        grass and trees are disposed until you circle back.
       </p>
       <p>
-        Past the last ring there's one more piece. A 1,600-unit square of coarse terrain at
-        10-unit spacing, 25,921 vertices, lies under and around the chunks with a hole where
-        they are. When the camera has moved 24 units from its centre, a new one is built in
-        slices of a couple of milliseconds per frame (heights a few rows at a time, then the
-        shadow march, then one assembly) and swapped in when it's done. It sits a little
-        lower than the chunks where they overlap, so the detailed ground always wins.
+        One last layer carries the land past the outermost chunk ring all the way to the
+        horizon. Sitting beneath and around the chunk grid is a single 1,600-unit square
+        backdrop mesh sampled every 10 units (25,921 vertices), with a square cutout in the
+        center where the detailed chunks live. Whenever the camera drifts 24 units from the
+        backdrop's center, a replacement builds quietly in slices of a couple of
+        milliseconds per frame (evaluating a few rows of heights at a time, running its
+        shadow march, assembling the mesh) and swaps in cleanly once ready. Nudging the
+        backdrop slightly below the live chunk height where their edges overlap ensures
+        detailed ground always wins the depth buffer.
       </p>
 
       <div
@@ -185,69 +207,61 @@ for (const w of wanted) {
       ></div>
 
       <p>
-        This is the whole machine. <strong>Drag</strong> sideways to turn and up or down to
-        climb or descend, and fly in any direction you like. The readout shows the live
-        chunk count, the queue, the time the last build took, the terrain vertex total and
-        the number of trees. Press <strong>freeze streaming</strong> and keep flying to see
-        what's being hidden: you leave the detailed chunks behind and fly on over the bare,
-        coarse backdrop, and if you keep going long enough you reach its edge. Resume and
-        the queue rebuilds the world around you, nearest first.
-        <strong>LOD tint</strong> repaints each chunk as it's rebuilt: cyan for full
-        resolution, amber for half, red for quarter, and violet for the backdrop. Each time
-        you cross a chunk boundary the queue count jumps and then drains over the next few
-        frames.
+        Here the entire system runs live. <strong>Drag</strong> horizontally on the canvas
+        to turn and vertically to climb or descend, heading anywhere you want across the
+        world. Beneath the controls, the readout tracks live chunks, pending queue length,
+        last build duration, total terrain vertices, and active tree count. Click
+        <strong>freeze streaming</strong> while continuing to fly to peel back the stage
+        illusion: you outrun the detailed 13 × 13 ring, glide out over the smooth coarse
+        backdrop, and eventually sail past its rim into open sky. Unfreeze and watch the
+        priority queue stitch the world back together around you, closest tiles first.
+        Toggle <strong>LOD tint</strong> to color-code chunks as they stream in (cyan for
+        full resolution, amber for half, red for quarter, violet for the far backdrop) and
+        watch the queue jump and smoothly drain every time you cross a tile border.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Why this world isn't eroded</span>
         <p>
-          <a href="/pages/ground-truth/erosion.html">Part two's erosion</a> is the one
-          technique missing here. It's a history: every droplet changes the ground for the
-          next one, and a river depends on everything upstream. It can't be split into
-          chunks that agree at their borders, and a hundred thousand droplets don't fit in a
-          6 ms budget. So the endless world relies on the shaping curve from part one to
-          suggest old terrain, and simulated rain stays in the bounded scenes. Large games
-          often run erosion offline and ship the result as data. In a browser with no
-          download, I chose the function.
+          You might notice one ingredient missing from the flight above:
+          <a href="/pages/ground-truth/erosion.html">part two's hydraulic erosion</a>.
+          Erosion has memory: every raindrop alters the slope seen by the next one, and a
+          watershed depends on every ridge upstream, so you cannot carve an independent
+          24-unit tile without mismatches at its edges, nor fit a hundred thousand droplets
+          inside a 6 ms streaming budget. To keep the world boundless and zero-download in
+          a browser, this flight falls back on part one's shaping curve to suggest broad
+          valleys while leaving particle rain for the bounded patches. Commercial open-world
+          games usually solve that tension by eroding a huge finite map offline and
+          shipping gigabytes of precomputed height tiles.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>The whole series</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Putting the pieces together</h2>
       <p>
-        That's the end of Ground Truth. Here's what the pieces turned out to be:
+        Looking back across all six parts of Ground Truth, the whole landscape grew out of
+        one recurring engineering trade-off: deciding what can stay pure math and what
+        genuinely needs state. Hashed gradient noise summed across rotated octaves, ridged,
+        warped, and shaped gave us reproducible mountains at any coordinate. Where a scene
+        could afford bounded memory, simulated raindrops carved connected drainage networks
+        and handed over a soil ledger for free. Grass and trees pushed static placement and
+        self-shadowing to build time so the GPU could animate hundreds of thousands of
+        vertices in wind without asking the CPU for help. Climate noise and world-indexed
+        jittered grids let biomes populate every hillside without consulting neighbors, and
+        chunk rings, skirts, and a millisecond budget turned those stateless rules into a
+        flight that never meets an edge.
       </p>
-      <ul>
-        <li>
-          <strong>A height function.</strong> Hashed gradient noise, summed over octaves,
-          ridged and warped, gives mountains at any coordinate.
-        </li>
-        <li>
-          <strong>A history, where it's affordable.</strong> Simulated raindrops carve
-          connected valleys and leave a soil map behind.
-        </li>
-        <li>
-          <strong>Decisions made once.</strong> Grass and trees are planted and baked into
-          buffers, and only the wind moves them.
-        </li>
-        <li>
-          <strong>Rules instead of lists.</strong> Climate, biome and a world-indexed grid
-          decide what grows where without remembering anything.
-        </li>
-        <li>
-          <strong>A budget.</strong> Build what's near first, build it finely only where it's
-          close, and never spend more of a frame than you planned to.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: move the height function and the chunk builds to the GPU or a
-        worker so the main thread never pays for them; let the backdrop carry a coarse
-        version of the biome tint and tree shadows so the transition at the last ring is
-        invisible; and find a function-of-position approximation of erosion that's good
-        enough to use everywhere.
+        Plenty of tempting upgrades still sit right around the corner: offloading height
+        evaluation and chunk assembly into Web Workers or GPU compute shaders so the main
+        thread never feels a build tick, tinting the coarse far backdrop with biomes and
+        canopy shadows so the handoff past the outer chunk ring vanishes completely, and
+        experimenting with stateless approximations of hydraulic erosion (such as
+        derivative-damped noise or analytic gully ridges) that capture weathered drainage
+        without breaking infinite tiling.
       </p>
       <p class="continue">
         <strong>Back to the start: <a href="/pages/ground-truth/heightfield.html">Part 1, The Heightfield</a>.</strong>
-        Where the one function that all of this samples gets built.
+        Where the single function behind all of this begins.
       </p>
     </main>
 

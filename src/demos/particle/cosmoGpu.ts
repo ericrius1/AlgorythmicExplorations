@@ -95,7 +95,7 @@ class BoxRenderer {
 
 export { BoxRenderer };
 
-// Cold uniform disc in the middle of the box — the part-four ghost cloud,
+// Cold uniform disk in the middle of the box — the part-four ghost cloud,
 // reborn in a periodic world.
 function seedBlob(count: number): Float32Array {
   const state = new Float32Array(count * 4);
@@ -183,14 +183,13 @@ export async function mountCosmo(container: HTMLElement, opts: CosmoDemoOptions)
     if (web) {
       shell.slider({
         label: "particles",
-        min: 256 * 256,
-        max: 1024 * 1024,
-        step: 1,
-        value: lattice * lattice,
-        log: true,
-        format: (v) => (Math.round(Math.sqrt(v)) ** 2).toLocaleString(),
+        min: 256,
+        max: 1024,
+        step: 32,
+        value: lattice,
+        format: (v) => (Math.round(v) ** 2).toLocaleString(),
         onInput: (v) => {
-          lattice = Math.min(1024, Math.max(256, Math.round(Math.sqrt(v))));
+          lattice = Math.round(v);
           reseed();
         },
       });
@@ -218,7 +217,15 @@ export async function mountCosmo(container: HTMLElement, opts: CosmoDemoOptions)
           reseed();
         },
       });
-      shell.button("expansion on/off", () => (expanding = !expanding));
+      let expBtn: HTMLButtonElement;
+      const syncExpBtn = (): void => {
+        expBtn.textContent = expanding ? "● expansion: on" : "expansion: off";
+      };
+      expBtn = shell.button("● expansion: on", () => {
+        expanding = !expanding;
+        syncExpBtn();
+      });
+      syncExpBtn();
       shell.button("big bang again", reseed);
     } else {
       shell.slider({

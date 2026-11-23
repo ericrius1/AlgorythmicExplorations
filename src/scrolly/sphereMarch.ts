@@ -74,27 +74,27 @@ export function mountSphereMarch(container: HTMLElement): void {
     steps: [
       {
         at: 0.0,
-        text: "A ray starts at the left. It can't see the scene. The only thing it can ask is how far it is to the nearest surface, from where it is right now.",
+        text: "A ray starts on the left, blind to the scene ahead. All it can ask from its current position is how far away the nearest surface lies.",
       },
       {
         at: 0.16,
-        text: "The answer is the radius of a circle with nothing inside it. The ray can move that far along its direction and be sure it hasn't passed through anything.",
+        text: "That distance is the radius of a circle guaranteed to be empty. The ray can jump straight forward by that radius without risking a collision.",
       },
       {
         at: 0.36,
-        text: "So it moves, and asks again. Out in the open the circles are big and the ray covers ground quickly.",
+        text: "Then it asks again from the new spot. Out in open space the circles stay large, so the ray covers ground in big leaps.",
       },
       {
         at: 0.56,
-        text: `Near a surface the answers shrink and the ray slows down, until it's within a small tolerance of the surface. This ray took ${nHit} steps.`,
+        text: `Close to a surface, the safe radii shrink and the ray slows down until it lands within a small threshold of the boundary. This ray hits after ${nHit} steps.`,
       },
       {
         at: 0.72,
-        text: `A ray that only grazes a surface has it worse. Every answer along the edge is small, so it inches past: ${nGraze} steps, ${nearEdge} of them right at the edge. Silhouettes are expensive for this reason.`,
+        text: `A grazing ray pays a much steeper price. Because every distance query along the rim returns a tiny radius, it inches past in ${nGraze} steps, spending ${nearEdge} of them right along that edge.`,
       },
     ],
     draw(ctx, w, h, t) {
-      // one scale for both axes, centred if the canvas is a little off-aspect
+      // one scale for both axes, centered if the canvas is a little off-aspect
       const s = Math.min(w, h / ASPECT);
       const ox = (w - s) / 2;
       const oy = (h - s * ASPECT) / 2;
@@ -172,7 +172,11 @@ export function mountSphereMarch(container: HTMLElement): void {
       // ray one: first just the question, then the march
       const p1 = phase(t, 0.1, 0.62);
       const shown1 = drawMarch(hitRay, p1, PAL.warm, 0.6, 3);
-      label(ctx, "the ray", X(hitRay.pts[0].x), Y(hitRay.pts[0].y) - 14, { color: PAL.warm, size: 12 });
+      label(ctx, "the ray", X(hitRay.pts[0].x), Y(hitRay.pts[0].y) - 16, {
+        color: PAL.warm,
+        size: 12,
+        bg: "rgba(6, 7, 11, 0.85)",
+      });
       if (shown1 === 0) {
         ctx.fillStyle = PAL.warm;
         ctx.beginPath();
@@ -184,11 +188,17 @@ export function mountSphereMarch(container: HTMLElement): void {
         label(ctx, "nearest surface is this far", X(c.x) + c.r * s * 0.35, Y(c.y) + c.r * s * 0.55, {
           color: PAL.muted,
           size: 11,
+          bg: "rgba(6, 7, 11, 0.85)",
         });
       }
       if (shown1 >= nHit) {
         const c = hitRay.pts[nHit - 1];
-        label(ctx, `hit · ${nHit} steps`, X(c.x) - 8, Y(c.y) + 18, { color: PAL.warm, size: 12, align: "right" });
+        label(ctx, `hit · ${nHit} steps`, X(c.x) - 14, Y(c.y) - 24, {
+          color: PAL.warm,
+          size: 12,
+          align: "right",
+          bg: "rgba(6, 7, 11, 0.85)",
+        });
       }
 
       // ray two: the graze
@@ -197,14 +207,19 @@ export function mountSphereMarch(container: HTMLElement): void {
         const shown2 = drawMarch(grazeRay, p2, PAL.red, 0.35, 2);
         if (shown2 > 0) {
           const c0 = grazeRay.pts[0];
-          label(ctx, "a grazing ray", X(c0.x), Y(c0.y) - 14, { color: PAL.red, size: 12 });
+          label(ctx, "a grazing ray", X(c0.x), Y(c0.y) - 16, {
+            color: PAL.red,
+            size: 12,
+            bg: "rgba(6, 7, 11, 0.85)",
+          });
           const c = grazeRay.pts[shown2 - 1];
           const done = shown2 >= nGraze;
           const txt = done ? `${nGraze} steps` : `${shown2} steps…`;
-          label(ctx, txt, Math.min(X(c.x) + 8, X(1) - 4), Y(c.y) - 14, {
+          label(ctx, txt, Math.min(X(c.x) + 8, X(1) - 4), Y(c.y) - 16, {
             color: PAL.red,
             size: 12,
             align: X(c.x) > X(0.85) ? "right" : "left",
+            bg: "rgba(6, 7, 11, 0.85)",
           });
         }
       }

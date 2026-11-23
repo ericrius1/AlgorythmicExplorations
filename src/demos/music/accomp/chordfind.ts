@@ -193,6 +193,13 @@ export function mountChordFinder(container: HTMLElement): Demo {
       // ---- the grid: roots in circle-of-fifths order ----
       const gx = 16 * s + 26 * s;
       const gy = ey + eh + 30 * s;
+      if (useKey) {
+        g.textAlign = "right";
+        g.font = font(10 * s, 600);
+        g.fillStyle = rgba(C.accent, 0.72);
+        g.fillText("outlined = in key", W - 18 * s, gy - 10 * s);
+        g.textAlign = "left";
+      }
       const gw = W - gx - 16 * s;
       const cell = gw / 12;
       const rowH = Math.min((H - gy - 12 * s) / 3 - 5 * s, 64 * s);

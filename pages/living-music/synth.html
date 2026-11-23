@@ -10,7 +10,7 @@
     <title>The Synthesizer — Living Music</title>
     <meta
       name="description"
-      content="A synthesizer built one module at a time and playable at every step: oscillators and their spectra, aliasing and band-limiting, a resonant ladder filter, envelopes, LFOs, FM synthesis, a Karplus–Strong plucked string, and a complete instrument with a live signal path."
+      content="A playable synthesizer built one module at a time: waveforms and spectra, digital aliasing and PolyBLEP, a resonant Moog ladder filter, ADSR envelopes, LFOs, FM bells, a Karplus–Strong plucked string, and a complete live instrument."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Living Music · Part 2</p>
         <h1>The Synthesizer</h1>
         <p class="subtitle">
-          Making sounds from scratch, one module at a time. The landscape above is the live
-          spectrum of a small synth. Touch it to play: across is pitch, up opens the filter.
+          Building playable instruments from scratch, one module at a time. Drag across the
+          spectral landscape above to play: horizontal sets the pitch, vertical opens the filter.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,59 +43,60 @@
 
     <main>
       <p>
-        Each ridge at the top of the page is one moment of sound split into frequencies, low
-        on the left and high on the right, with the newest ridge in front. Tap or drag on it
-        and a two-oscillator synth plays the nearest note of a C minor pentatonic scale
-        between C2 and C6. The tall ridge under your finger is the note itself, and the
-        ridges trailing off to the right are its harmonics. Move up and the filter opens, so
-        more of those harmonics get through. Until you play, a silent stand-in performs a
-        slow phrase and the ridges are computed from the patch instead of measured.
+        Once you have pulled a musical note apart into sines and resonances (as we did in Part 1),
+        the natural next impulse is to reverse the process and build sounds from nothing at all.
+        That spectral mountain range scrolling at the top of the page is already doing it. Each
+        glowing ridge is one slice of time split into frequencies from low on the left to high on
+        the right, with the newest moment in front. Touch or drag anywhere on it and a
+        two-oscillator synthesizer wakes up on the nearest note of a C minor pentatonic scale
+        between C2 and C6: the tall peak under your finger is the fundamental, the smaller peaks
+        trailing off to the right are its harmonics, and dragging upward opens the filter to let
+        more of those harmonics spill through. Until you touch it, a silent stand-in drifts
+        through a slow melody while the ridges are calculated analytically from the patch.
       </p>
       <p>
-        Part one took notes apart into stacks of sine waves. This part goes the other way. It
-        builds a synthesizer up one piece at a time, from a single oscillator to FM bells and a
-        plucked string, and every figure is playable. Use your computer keyboard (A to K are
-        the white keys from C, W E T Y U O P the black keys, Z and X shift the octave), a MIDI
-        keyboard (press the MIDI button under any of the on-screen keyboards), or the on-screen keys. Keys and MIDI go
-        to the figure you touched last, or to the one most in view, and that figure gets a
-        soft ring. Sound only starts after you press something, and each figure fades out when
-        you scroll away from it.
-      </p>
-      <p>
-        Every sound on this page comes from one synth engine I wrote for it, running in an
-        AudioWorklet (the browser's real-time audio thread). It has twelve voices, three ways
-        of making sound, and it reports its internal state back about 75 times a second, so the
-        figures draw what the engine is doing rather than a guess at it.
+        Every figure down the page is a working slice of a real-time synth engine running in an
+        AudioWorklet on the browser's audio thread. It supports up to twelve voices, three
+        synthesis architectures (subtractive, FM, and physical string modeling), and streams live
+        telemetry back about 75 times a second so every trace and meter reflects what the audio
+        thread is actually computing. You can play any figure with the on-screen keys, your
+        computer keyboard (<code>A</code> through <code>K</code> span an octave of white keys from
+        C, continuing onto <code>L</code>, <code>;</code>, and <code>'</code>, with
+        <code>W E T Y U O P</code> on the black keys and <code>Z</code>/<code>X</code> shifting
+        the octave), or a USB MIDI controller via the <strong>MIDI</strong> button under any
+        keyboard strip. Keyboard and MIDI input follow whichever figure you last touched (or the
+        one sitting squarely in view, outlined with a soft warm ring), and audio gently fades out
+        as soon as you scroll away.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="oscillators"><span class="kicker">Step 1 · Oscillators</span>Four shapes</h2>
       <p>
-        A synthesizer starts with an <strong>oscillator</strong>, something that repeats one
-        cycle of a wave over and over. The rate sets the pitch and the shape sets the timbre.
-        Part one showed that any repeating shape is a stack of harmonics. The classic shapes
-        are worth knowing by their recipes, because the rest of this page is about changing
-        those recipes.
+        Every electronic synthesizer begins with an <strong>oscillator</strong>, a circuit or loop
+        of code that repeats one cycle of a waveform over and over. Its repetition rate sets the
+        pitch, and its geometric shape determines the starting stack of harmonics. Four classic
+        shapes form the basic vocabulary of synthesis:
       </p>
       <ul>
-        <li><strong>Sine:</strong> one harmonic and nothing else. Pure and a little dull.</li>
+        <li><strong>Sine:</strong> a single fundamental with zero overtones. Pure and plain.</li>
         <li>
-          <strong>Triangle:</strong> only the odd harmonics, falling as 1/n², which is
-          12 dB per octave. Soft, like a flute.
+          <strong>Triangle:</strong> odd harmonics only, dropping steeply as 1/<em>n</em>² (12 dB
+          per octave). Round and flute-like.
         </li>
         <li>
-          <strong>Square:</strong> the odd harmonics again, but falling only as 1/n (6 dB per
-          octave). Hollow and reedy.
+          <strong>Square:</strong> odd harmonics again, falling more gently as 1/<em>n</em> (6 dB
+          per octave). Hollow and reedy.
         </li>
         <li>
-          <strong>Saw:</strong> every harmonic, at 1/n. The brightest and buzziest of the four.
+          <strong>Saw:</strong> every integer harmonic at 1/<em>n</em>. Dense, bright, and buzzy.
         </li>
       </ul>
       <p>
-        Pick a shape and play. The left panel draws two cycles of the ideal shape, and while a
-        note sounds the orange trace on top of it is the real signal, taken from the audio
-        output. The bars are the recipe, in decibels relative to the first harmonic, and the
-        white dots are the same harmonics measured from the output.
+        Pick a shape below and hold a key. The left panel shows two cycles of the ideal geometric
+        curve, and while a note rings, the glowing orange trace on top is the real audio signal
+        measured at the output. On the right, colored bars plot the theoretical harmonic recipe in
+        decibels relative to the fundamental, with live white dots verifying each measured harmonic
+        straight from the speaker signal.
       </p>
 
       <div
@@ -105,52 +106,60 @@
       ></div>
 
       <p>
-        The fifth button is the square's generalisation, the <strong>pulse</strong>. It's high
-        for a fraction d of each cycle and low for the rest, and its harmonics have amplitude
-        |sin(πnd)|/n. At d = 50% that's the square. At 25% the sine term is zero for every
-        fourth harmonic, so harmonics 4, 8, 12 and so on vanish. At 20% every fifth goes. Narrow
-        pulses sound thin and nasal, and sweeping the width while a note plays is one of the
-        oldest synth sounds there is (step 5 does it with an LFO).
+        The fifth button, <strong>pulse</strong>, generalizes the square wave. Instead of spending
+        half of each cycle high and half low, a pulse stays high for a fraction <em>d</em> (its
+        <strong>pulse width</strong>) and low for the remainder, giving harmonic amplitudes
+        proportional to |sin(π<em>n</em><em>d</em>)|/<em>n</em>. At <em>d</em> = 50% you get the
+        classic square wave. Slide it to 25% and sin(π<em>n</em>/4) hits zero for every fourth
+        harmonic, knocking out 4, 8, 12, and so on. At 20% every fifth harmonic vanishes. Narrow
+        pulses sound reedy and nasal, and gently sweeping the pulse width during a held note
+        creates one of the richest animation tricks in analog synthesis (we'll wire an LFO to it
+        in Step 5).
       </p>
       <p>
-        The saw is the one synthesizer designers reach for first. It has every harmonic, so it
-        can be carved into almost anything. That carving is the next three steps. First,
-        though, there's a problem with making a saw in a computer at all.
+        Synth designers lean heavily on the sawtooth because it contains every harmonic right out
+        of the gate, giving you raw marble to carve away with filters. Before we get to carving,
+        though, generating a clean sawtooth inside a digital computer turns out to hide a nasty
+        trap.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Why these shapes</span>
         <p>
-          They're the shapes that are cheap to build out of analog circuits. A typical analog
-          oscillator charges a capacitor with a constant current, which makes a straight ramp,
-          and snaps it back to zero when it crosses a threshold: that's a saw. Compare the saw
-          against a second voltage and you get a pulse whose width is set by that voltage.
-          Other shaping circuits fold the saw into a triangle and round the triangle into
-          something close to a sine.
+          These four waveforms became canonical simply because they are easy to generate with a
+          handful of analog components. A typical analog oscillator trickles a constant current
+          into a capacitor, producing a linear voltage ramp, and abruptly discharges it to zero at
+          a threshold: instant sawtooth. Feed that ramp into a comparator against a reference
+          voltage and you get a variable-width pulse. Simple wave-shaping circuits then fold the
+          ramp into a triangle and soften the triangle's corners into a close approximation of a
+          sine.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="aliasing"><span class="kicker">Step 2 · Going digital</span>Aliasing</h2>
       <p>
-        The obvious way to make a saw in code is to keep a phase t that climbs from 0 to 1 once
-        per cycle and output 2t − 1. That's the "naive" button below. It sounds fine for low
-        notes and gets nasty as you go up. The reason is the jump. An ideal saw drops
-        instantly, and an instant drop has harmonics that go on forever. Audio sampled at
-        48 kHz (a common rate; the figure uses your device's) can only hold frequencies up to
-        half that, 24 kHz, called the
-        <strong>Nyquist frequency</strong>. Anything above it doesn't disappear. It folds back
-        down: a harmonic that should be at 25 kHz shows up at 23 kHz, one at 30 kHz at 18 kHz.
-        These folded harmonics are <strong>aliases</strong>, and they land at frequencies that
-        have nothing to do with the note.
+        In code, the most tempting way to synthesize a sawtooth is to advance a phase counter
+        <code>t</code> from 0 to 1 each cycle and output <code>2 * t - 1</code>. That is the
+        <strong>naive</strong> setting below. Down in the bass it sounds passable, yet climb a few
+        octaves and a harsh, metallic whine creeps underneath the note. The culprit is the
+        instantaneous vertical reset. A mathematically crisp jump contains harmonics stretching to
+        infinite frequency, whereas digital audio sampled at 48 kHz (the figure uses your device's
+        sample rate) can only represent frequencies up to half that rate, 24 kHz, known as the
+        <strong>Nyquist frequency</strong>. Harmonics generated above Nyquist fold right back down
+        into the audible range: energy that belongs at 25 kHz shows up at 23 kHz, and energy at
+        30 kHz lands at 18 kHz. These reflected ghosts are <strong>aliases</strong>, and because
+        their frequencies rarely align with the note's harmonic series, they sound glaringly out of
+        tune.
       </p>
       <p>
-        The spectrogram shows a saw swept from A3 up to A7 and back down, eight seconds each
-        way, computed with the engine's own oscillator code. Time runs left to right and
-        frequency bottom to top, with the Nyquist frequency at the top edge. The real
-        harmonics fan upward as the pitch climbs. With the naive oscillator the ones that hit
-        the top bounce back down, and as the pitch keeps rising they move <em>down</em>, the
-        wrong way. Press play to hear the sweep. The lower panel is the spectrum at a single
-        pitch, A6 (1.76 kHz) until you play something: harmonics in colour, aliases in red.
+        The spectrogram below runs our engine's own oscillator code through a slow sweep from A3 up
+        to A7 and back down (eight seconds each way), with time across the horizontal axis and
+        frequency climbing up to the pink Nyquist line at the top. Watch the bright real harmonics
+        fan upward as the pitch rises. On <strong>naive</strong>, every line that strikes the top
+        ceiling ricochets downward, moving in the opposite direction as the note climbs. Click
+        <strong>sweep</strong> to listen. Beneath the spectrogram sits a single-pitch snapshot (at
+        A6, 1.76 kHz, until you play another key), separating true harmonics in blue-to-gold from
+        stray aliases in red.
       </p>
 
       <div
@@ -160,21 +169,25 @@
       ></div>
 
       <p>
-        At A6 only 13 harmonics fit under 24 kHz, and the naive saw's loudest alias below
-        5 kHz is 28 dB below the note, easily loud enough to hear as a whine that doesn't
-        belong. There are two ways to fix it, and the other two buttons are those fixes.
+        At A6, only 13 true harmonics fit beneath 24 kHz, while the naive saw sprays over a hundred
+        audible aliases across the band; the loudest below 5 kHz sits just 28 dB beneath the
+        fundamental, loud enough to cut straight through the mix. Switching to the other two modes
+        shows the two classic ways to clean it up.
       </p>
       <p>
-        <strong>Additive</strong> builds the saw from its recipe, adding up sines only up to
-        the Nyquist frequency. There's nothing to fold because nothing goes past the top. It's
-        exact, but it costs one step per harmonic per sample: 109 harmonics at A3. In the
-        figure the aliases drop to about −93 dB, which is the floor of the measurement.
+        <strong>additive</strong> constructs the sawtooth directly from Fourier's recipe, summing
+        only the sine waves that fall below Nyquist. Because no frequency ever crosses the ceiling,
+        aliasing drops straight down to the measurement floor around −93 dB. The catch is raw CPU
+        cost: every single sample requires summing every partial, which is 109 sines per sample
+        down at A3 and hundreds more in the sub-bass.
       </p>
       <p>
-        <strong>PolyBLEP</strong> keeps the cheap naive saw and patches the jump. The
-        trouble is concentrated in the one or two samples around each drop, so you subtract a
-        small polynomial there that turns the instant step into a band-limited one. This is
-        the version the engine uses everywhere else on the page:
+        <strong>band-limited (polyBLEP)</strong> takes a far cheaper shortcut. All the infinite
+        high-frequency energy of a sawtooth comes from the instantaneous discontinuity at the
+        reset edge, affecting just the one or two samples straddling the jump. Subtracting a tiny
+        quadratic polynomial (a Polynomial Band-Limited Step) right across those two samples rounds
+        the step smoothly enough to suppress the reflections at constant cost per sample, whatever
+        the pitch. This is what the rest of the page's engine actually runs:
       </p>
       <pre><code><span class="cm">// t: phase in [0, 1); dt: phase step per sample (frequency / sample rate)</span>
 function polyblep(t, dt) {
@@ -191,65 +204,72 @@ function polyblep(t, dt) {
 
 saw = 2 * t - 1 - polyblep(t, dt);</code></pre>
       <p>
-        That brings A6's loudest alias down to −70 dB, quiet enough to be masked by the note,
-        for a few multiplies per sample whatever the pitch. The square gets the same treatment
-        at both of its edges. The triangle has no jumps, only corners, and gets the integrated
-        version of the same patch (a "polyBLAMP").
+        Those ten lines knock A6's loudest alias down to −70 dB, buried safely beneath the
+        psychoacoustic masking of the note itself, for just a handful of multiplications per
+        sample. Square and pulse waves apply the same correction at both vertical transitions, and
+        triangles (which have sharp slope corners rather than vertical jumps) get the integrated
+        cousin of the polynomial, called a polyBLAMP.
       </p>
       <details class="fold">
         <summary>Why the aliases fall as the note rises</summary>
         <div class="fold-body">
           <p>
-            A sampled signal can't tell a frequency f from 48,000 − f (or from f + 48,000).
-            Each harmonic that should be above 24 kHz shows up mirrored about that line, at
-            48 kHz minus its true frequency. Raise the note and the true frequency goes up, so
-            the mirrored one goes down. The 14th harmonic of A6 belongs at 24.64 kHz and
-            appears at 23.36 kHz; the 20th belongs at 35.2 kHz and appears at 12.8 kHz.
+            At a 48 kHz sample rate, a discrete sequence of samples is mathematically identical for
+            frequency <em>f</em> and for 48,000 − <em>f</em> (and for <em>f</em> + 48,000). Any
+            overtone trying to climb past 24 kHz mirrors across that line, reappearing at 48 kHz
+            minus its true frequency. Raising the played note pushes the true harmonic higher,
+            which drives 48 kHz minus that harmonic downward. For A6 (1.76 kHz), the 14th harmonic
+            belongs at 24.64 kHz and folds back to 23.36 kHz; the 20th belongs at 35.2 kHz and
+            lands all the way down at 12.8 kHz.
           </p>
           <p>
-            The naive square looks a little different in the spectrogram from the naive saw
-            because it has only odd harmonics, so it has half as many aliases.
+            Try switching the wave to <strong>square</strong> in the naive mode too: because a
+            square wave contains only odd harmonics, its reflected lattice has half as many lines
+            as the saw's.
           </p>
         </div>
       </details>
       <aside class="note">
         <span class="note-label">Aside · Analog shapes, digitally</span>
         <p>
-          Making alias-free versions of analog waveforms was a research problem through the
-          1990s. Tim Stilson and Julius Smith at Stanford published band-limited impulse
-          trains (BLIT) in 1996, and the step-correction idea grew out of that line of work.
-          The polynomial shortcut used here was described by Vesa Välimäki and Antti
-          Huovilainen in a 2007 survey of antialiasing oscillators. Most software synths do
-          something in this family, or use tables of pre-band-limited waves.
+          Eliminating digital oscillator aliasing kept computer music researchers busy throughout
+          the 1990s. Tim Stilson and Julius Smith at Stanford introduced band-limited impulse
+          trains (BLIT) in 1996, sparking a family of analytical step-correction methods. Vesa
+          Välimäki and Antti Huovilainen popularized the lightweight polynomial approximation used
+          here in their 2007 antialiasing survey. Modern software synths almost all rely on
+          descendants of PolyBLEP or on banks of pre-band-limited wavetables swapped by pitch
+          register.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="filter"><span class="kicker">Step 3 · Subtractive synthesis</span>The resonant filter</h2>
       <p>
-        Part one ended with a voice built from a buzz and four filters. That's the idea behind
-        most of the synthesizers ever made: start with a bright oscillator and take away what
-        you don't want. This is <strong>subtractive synthesis</strong>, and the tool for taking
-        away is a lowpass filter. It passes everything below its <strong>cutoff</strong>
-        frequency and turns down everything above it.
+        In Part 1, passing a raw buzz through resonant cavities turned it into a human vowel. Most
+        classic synthesizers work on the exact same principle, called
+        <strong>subtractive synthesis</strong>: start with a bright harmonic-rich waveform and
+        sculpt it down with a lowpass filter that passes frequencies below a chosen
+        <strong>cutoff</strong> and progressively attenuates everything above it.
       </p>
       <p>
-        The filter in the engine is modelled on Robert Moog's transistor ladder: four simple
-        one-pole lowpass stages in a row, each cutting 6 dB per octave above the cutoff, so the
-        whole chain cuts 24 dB per octave. The buttons tap the ladder after one, two, three or
-        four stages. Then there's <strong>resonance</strong>: some of the output is fed back to
-        the input, upside down. Around the cutoff the four stages delay the signal by half a
-        cycle, so there the feedback adds instead of cancels, and a peak grows. With no
-        feedback (k = 0) the ladder is already 12 dB down at the cutoff. At k = 2 the peak is
-        back to 0 dB, at k = 3 it's 8 dB up, and at k = 4 the loop gain reaches one: the filter
-        rings at its cutoff with no input at all.
+        Our engine models Robert Moog's famous transistor ladder filter: four simple one-pole
+        lowpass stages chained in series, each sloping off at 6 dB per octave above the cutoff for
+        a combined 24 dB per octave drop (the slope buttons tap the ladder after 1, 2, 3, or 4
+        stages). Adding <strong>resonance</strong> feeds a fraction <em>k</em> of the fourth
+        stage's output back to the input with its polarity inverted. Right around the cutoff
+        frequency, the four stages collectively lag the signal by half a cycle (180°), turning
+        that negative feedback into positive reinforcement and pushing up a sharp resonant spike.
+        With no feedback (<em>k</em> = 0), the four-pole cascade sits 12 dB down at the cutoff.
+        At <em>k</em> = 2 the peak climbs back to 0 dB, at <em>k</em> = 3 it pokes 8 dB upward,
+        and at <em>k</em> = 4 the loop gain reaches unity: the filter breaks into pure
+        self-oscillation and sings a sine wave at the cutoff frequency even with zero input.
       </p>
       <p>
-        Drag the glowing handle. Sideways moves the cutoff (40 Hz to 16 kHz) and up raises the
-        resonance. The orange curve is the filter's response, the faint bars are the saw's
-        harmonics going in, and the bright bars are what comes out, the input times the
-        response. While you play, the thin white line is the measured spectrum of what you're
-        hearing, and it should sit on the bright bars.
+        Drag the glowing orange handle right on the plot (or use the <strong>cutoff</strong> and
+        <strong>resonance</strong> sliders). Moving sideways shifts the cutoff from 40 Hz to 16
+        kHz; lifting vertically pushes up the resonance. Faint vertical lines show the raw saw
+        harmonics entering the filter, bright bars show what survives at the output, and while you
+        hold a key, a thin white curve traces the live measured spectrum right over them.
       </p>
 
       <div
@@ -259,78 +279,85 @@ saw = 2 * t - 1 - polyblep(t, dt);</code></pre>
       ></div>
 
       <p>
-        A few things to try. Sweep the cutoff slowly on a held low note with the resonance
-        around 3, and the peak picks out one harmonic after another: that's the classic filter
-        sweep. Switch the source to noise and push the resonance near 4, and the noise turns
-        into a pitched whistle at the cutoff. And compare the slopes: 6 dB per octave barely
-        changes a saw, while 24 dB per octave turns it nearly into a sine a couple of octaves
-        above the cutoff.
+        Hold a low note with resonance around 3 and drag the cutoff slowly across the frequency
+        axis: you will hear the narrow resonant peak spotlight one individual harmonic after
+        another, creating the unmistakable liquid sweep of analog synth records. Switch the source
+        to <strong>noise</strong> and raise resonance toward 4 to hear white hiss condense into a
+        pure whistle tuned to the cutoff. Flipping between <strong>6 dB/oct</strong> and
+        <strong>24</strong> makes the slope difference visceral: a single pole barely dulls a saw,
+        while all four poles strip a saw nearly down to a sine wave a couple of octaves above the
+        cutoff.
       </p>
       <details class="fold">
         <summary>How the engine runs the ladder</summary>
         <div class="fold-body">
           <p>
-            The feedback loop is the hard part in a digital filter: the output you need to
-            feed back depends on the input you're computing. Naive versions add a sample of
-            delay to the loop, which detunes the peak and makes the resonance misbehave at
-            high cutoffs. The engine solves the loop for the current sample instead, using
-            Vadim Zavalishin's "topology-preserving" form of each stage. One stage is three
-            lines:
+            Digitizing a resonant feedback loop has a subtle catch: the filter output you want to
+            feed back depends instantaneously on the current input sample you haven't finished
+            computing yet. Inserting a naive one-sample delay into the feedback path detunes the
+            resonant peak and makes high cutoffs behave erratically. Instead, our engine solves
+            the algebraic loop simultaneously at every sample using Vadim Zavalishin's
+            zero-delay-feedback (topology-preserving) integrator. Each of the four stages takes
+            just three lines of arithmetic:
           </p>
           <pre><code><span class="cm">// G = g / (1 + g), where g = tan(π · cutoff / sample rate)</span>
 let t = (u - v.s1) * G;
 const y1 = t + v.s1;
 v.s1 = y1 + t;</code></pre>
           <p>
-            A tanh on the input keeps self-oscillation from growing without bound, which is
-            also roughly what the transistors do. One more detail comes from the real
-            circuit: resonance costs bass. The feedback cancels low frequencies too, and at
-            k = 4 the ladder's low end is 14 dB down. The engine gives some of that back,
-            multiplying the output by 1 + k/2, so at k = 4 the bass is only 4.4 dB down.
+            Wrapping the input in <code>Math.tanh</code> softly saturates the signal so
+            self-oscillation stabilizes at a clean amplitude, echoing the natural soft clipping of
+            Moog's transistor pairs. One quirk also carries straight over from the analog circuit:
+            cranking resonance steals bass, because inverted feedback cancels low frequencies too
+            (costing 14 dB of low end at <em>k</em> = 4). The engine partially compensates by
+            multiplying the output by 1 + <em>k</em>/2, reducing that bass dip to 4.4 dB.
           </p>
         </div>
       </details>
       <aside class="note">
         <span class="note-label">Aside · Moog and Buchla</span>
         <p>
-          Robert Moog filed the patent for his ladder filter in October 1966 and it was
-          granted in 1969. It went into the modular systems he'd been building since 1964 and
-          then into the Minimoog of 1970, and it's a large part of why "Moog" still means a
-          particular kind of bass. Wendy Carlos's <em>Switched-On Bach</em> (1968), recorded
-          on a Moog modular, introduced a lot of people to the sound.
+          Robert Moog filed the patent on his transistor ladder filter in October 1966 (granted in
+          1969). It sat at the heart of the modular cabinets he had been shipping since 1964 and
+          the portable Minimoog of 1970, anchoring the punchy bass sound still tied to his name.
+          Wendy Carlos's 1968 album <em>Switched-On Bach</em>, tracked painstakingly on a Moog
+          modular, brought that sound into millions of living rooms.
         </p>
         <p>
-          On the other coast, Morton Subotnick and Ramon Sender of the San Francisco Tape
-          Music Center commissioned Don Buchla in 1963 to build an instrument for live
-          electronic music. His 100 series used touch-sensitive metal plates instead of a
-          keyboard, and his designs leaned on shaping the oscillators themselves rather than
-          filtering them. People still divide synthesis into the "East Coast" and "West Coast"
-          schools after these two.
+          On the West Coast at nearly the same time, composers Morton Subotnick and Ramon Sender
+          at the San Francisco Tape Music Center commissioned Don Buchla (1963) to build a live
+          electronic instrument. Buchla skipped the piano keyboard in favor of touch-sensitive
+          capacitive plates and focused on wavefolders and complex oscillator modulation over
+          subtractive filtering. Synth builders still loosely call these philosophies "East Coast"
+          and "West Coast" synthesis.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="envelopes"><span class="kicker">Step 4 · Shape in time</span>Envelopes</h2>
       <p>
-        A held saw through a fixed filter is the same sound from start to finish, and real
-        instruments never are. A piano note is loudest and brightest the moment the hammer
-        lands. A trumpet note swells and gets brighter as the player pushes. Synthesizers
-        handle this with <strong>envelopes</strong>, control signals that rise and fall each
-        time a key goes down. The standard one has four parts:
+        A sawtooth parked behind a stationary filter drones identically for as long as you hold a
+        key, whereas acoustic instruments evolve continuously from attack to silence. A piano
+        string bursts out brightest and loudest the instant the felt hammer rebounds; a French
+        horn blossoms in both loudness and harmonic sparkle as the player leans into the breath.
+        Synthesizers sculpt that motion with <strong>envelopes</strong>: one-shot control curves
+        triggered every time a key goes down. The classic design breaks each note into four
+        stages, abbreviated ADSR:
       </p>
       <ul>
-        <li><strong>Attack:</strong> how long it takes to rise to full when the key goes down.</li>
-        <li><strong>Decay:</strong> how long it takes to fall from there to the sustain level.</li>
-        <li><strong>Sustain:</strong> the level it holds for as long as the key stays down.</li>
-        <li><strong>Release:</strong> how long it takes to fade out after the key comes up.</li>
+        <li><strong>Attack:</strong> how quickly the level climbs from zero to peak when a key is pressed.</li>
+        <li><strong>Decay:</strong> how long it takes to settle from the peak down to the sustain level.</li>
+        <li><strong>Sustain:</strong> the steady level held while your finger remains on the key.</li>
+        <li><strong>Release:</strong> how long the tail takes to fade back to zero once you lift off.</li>
       </ul>
       <p>
-        The figure has two. The top one sets the volume. The bottom one pushes the filter's
-        cutoff up by up to the "envelope → cutoff" amount (0 to 6 octaves) and lets it settle
-        back. Drag the corners to change the times and the sustain level, or start from a
-        preset. While you hold a key, a dot per voice rides each curve at the level the engine
-        reports, and the strip at the bottom draws the output over the last three seconds or
-        so, tinted by how open the filter is.
+        The patch below wires up two independent envelopes. The blue curve on top controls
+        overall volume; the amber curve below sweeps the filter cutoff upward by the amount set on
+        <strong>envelope → cutoff</strong> (0 to 6 octaves) before letting it fall back. Drag the
+        glowing corner handles directly on either curve, or step through the five presets. While
+        you play, a bright dot for each active voice rides along both curves using live telemetry
+        from the engine, and the strip along the bottom records the last three seconds of audio,
+        shifting color from cool blue to warm orange as the filter opens.
       </p>
 
       <div
@@ -340,46 +367,49 @@ v.s1 = y1 + t;</code></pre>
       ></div>
 
       <p>
-        Brass is the one to study. The volume rises in 60 ms, but the filter envelope takes
-        90 ms and lifts the cutoff three octaves, from 320 Hz to 2.56 kHz, so the note gets
-        brighter as it gets louder and then settles. "Pluck" has no sustain at all. Both
-        envelopes fall straight to zero, and the filter closes faster than the volume fades,
-        so the note goes dull as it dies, the way a struck string does.
+        Compare <strong>brass</strong> and <strong>pluck</strong> to see how much personality lives
+        strictly in timing. On <strong>brass</strong>, volume rises in 60 ms while the filter
+        takes a slightly lazier 90 ms to swing three octaves upward from 320 Hz to 2.56 kHz,
+        making the note bloom brighter as it swells before relaxing into sustain. On
+        <strong>pluck</strong>, sustain drops to zero on both envelopes and the filter snaps shut
+        twice as fast as the volume decays, so the upper harmonics die away first and leave a warm
+        tail, much like a real plucked string.
       </p>
       <p>
-        The curves aren't straight lines. The attack is a capacitor-style charge aimed at 1.5
-        that stops when it reaches 1, so it arrives in the attack time and bends like the
-        analog circuits did. Decay and release are exponentials, and their times are the time
-        to fall 60 dB, which is most of the way to silence. That matches how hearing works:
-        a sound that falls by the same number of decibels every second sounds like a steady
-        fade, and an exponential does that.
+        Notice the gentle bend in every segment. Attack curves follow an analog RC charging curve
+        aimed at 1.5 and clamped at 1.0, giving a brisk initial lift that eases into the peak.
+        Decay and release are true exponentials whose times specify how long it takes to fall
+        60 dB (effectively to silence), matching our logarithmic perception of loudness so a fade
+        sounds smooth rather than rushing to a cliff at the end.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Where ADSR came from</span>
         <p>
-          The four-stage envelope is usually credited to the composer Vladimir Ussachevsky,
-          who ran the Columbia–Princeton Electronic Music Center and asked Moog for an
-          envelope with those controls in the mid-1960s. It became the default on almost
-          every synthesizer since.
+          The four-parameter ADSR layout traces back to Vladimir Ussachevsky at the
+          Columbia–Princeton Electronic Music Center, who asked Robert Moog in the mid-1960s to
+          build an envelope generator with independent attack, initial decay, sustain level, and
+          final release controls. It proved so flexible that it became the default control layout
+          across nearly sixty years of synthesizers.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="lfo"><span class="kicker">Step 5 · Modulation</span>LFOs</h2>
       <p>
-        Envelopes move once per note. A <strong>low-frequency oscillator</strong>, or LFO,
-        moves continuously: it's an oscillator like the first one, but slow, and instead of
-        being heard it's patched into something else. The figure's LFO (left) is wired to four
-        destinations (right), and each lane draws the value that destination is getting right
-        now. Raise a depth to connect it.
+        Whereas an envelope triggers once per keypress, a <strong>low-frequency oscillator</strong>
+        (LFO) cycles continuously in the background, acting as an invisible hand turning a knob
+        back and forth. Below, a single LFO on the left patches into four destinations on the
+        right, with each lane displaying the real-time parameter value reaching the synth engine.
+        Push up any destination slider (or choose a preset) to bring its patch cable alive:
       </p>
       <ul>
-        <li><strong>Pitch</strong> gives vibrato. Five or six cycles a second at ±25 cents is a singer's.</li>
-        <li><strong>Cutoff</strong> gives a wah, the filter opening and closing.</li>
-        <li><strong>Volume</strong> gives tremolo.</li>
+        <li><strong>→ pitch:</strong> vibrato. Around 5 to 6 Hz at ±25 cents evokes a sung or bowed vibrato.</li>
+        <li><strong>→ cutoff:</strong> a rhythmic wah sweeping the filter up and down.</li>
+        <li><strong>→ volume:</strong> tremolo, pulsing loudness like a guitar amp.</li>
         <li>
-          <strong>Pulse width</strong> sweeps the square through narrower pulses and back,
-          which makes a single oscillator sound like several slightly out of tune.
+          <strong>→ pulse width:</strong> pulse-width modulation (PWM), continuously sliding the
+          square wave through narrower pulses and back so one oscillator thickens into a chorus of
+          detuned voices.
         </li>
       </ul>
 
@@ -390,41 +420,48 @@ v.s1 = y1 + t;</code></pre>
       ></div>
 
       <p>
-        The "random" shape picks a new value at the start of every cycle and holds it, called
-        sample and hold. On the cutoff it gives the bubbling sound of a lot of 1970s science
-        fiction. If you're using a MIDI keyboard, the mod wheel adds up to 30 cents of vibrato
-        in every figure.
+        Try the <strong>random</strong> wave shape (or the <strong>random</strong> preset, which
+        patches it to cutoff at 7 Hz): it grabs a fresh random value once per cycle and holds it
+        flat, an old circuit trick called sample-and-hold responsible for countless bubbling 1970s
+        sci-fi computer effects. If you have a MIDI keyboard plugged in, its mod wheel is wired
+        to add up to 30 cents of vibrato across every figure on this page.
       </p>
       <p>
-        Now press "audio rate". It's the vibrato setting pushed to an extreme: the LFO runs at
-        110 Hz and swings the pitch by ±900 cents. You can't hear a wobble that fast. Instead
-        the spectrum underneath fills with new partials that weren't in the square at all,
-        and the note turns metallic. Somewhere above about 20 Hz modulation stops being a
-        movement you hear and becomes part of the timbre. That's the next step.
+        Now click <strong>audio rate</strong> and hold a note. All this preset does is crank
+        vibrato to an absurd extreme: a 110 Hz LFO throwing the oscillator's pitch by ±900 cents.
+        Once modulation crosses roughly 20 Hz, your ear can no longer track individual wobbles as
+        motion in time. Look down at the live spectrum strip: brand-new partials have sprung into
+        existence on either side of the original harmonics, transforming the tone into something
+        clanging and metallic. Pushing modulation into audio rates opens up an entire synthesis
+        world of its own.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="fm"><span class="kicker">Step 6 · Frequency modulation</span>FM: bells from two sines</h2>
       <p>
-        Take two sine oscillators. One, the <strong>carrier</strong>, is the one you hear. The
-        other, the <strong>modulator</strong>, pushes the carrier's phase back and forth at an
-        audio rate:
+        Take two pure sine oscillators. One, the <strong>carrier</strong>, goes straight to your
+        speakers. The other, the <strong>modulator</strong>, stays unheard on its own and instead
+        wiggles the carrier's phase rapidly back and forth at an audio frequency:
       </p>
       <pre><code>y(t) = sin(2π·fc·t + I · sin(2π·fm·t))</code></pre>
       <p>
-        The result is a spectrum of lines at the carrier frequency plus and minus whole
-        multiples of the modulator frequency, fc ± n·fm, called <strong>sidebands</strong>.
-        The height of the nth pair is J<sub>n</sub>(I), a Bessel function of the
-        <strong>modulation index</strong> I, which is how hard the modulator pushes. At I = 0
-        there's only the carrier. As I grows, energy spreads out into more sidebands, roughly
-        I + 1 on each side. The Bessel functions wiggle, so individual lines come and go: at
-        I = 2.405 the carrier itself vanishes.
+        Even though both ingredients are completely pure sines, warping the carrier's phase
+        generates an entire family of new frequencies called <strong>sidebands</strong> at
+        <em>f</em><sub>c</sub> ± <em>n</em>·<em>f</em><sub>m</sub> for every integer <em>n</em>.
+        How strongly the modulator pushes is controlled by the <strong>modulation index</strong>
+        <em>I</em>, and the amplitude of the <em>n</em>th sideband pair is given exactly by the
+        Bessel function <em>J<sub>n</sub></em>(<em>I</em>). At <em>I</em> = 0 you hear only the
+        lone carrier. Raise <em>I</em> and energy spills outward into roughly <em>I</em> + 1
+        sideband pairs on each side. Because Bessel functions oscillate above and below zero,
+        individual components swell, vanish, and flip phase as you sweep the index: right at
+        <em>I</em> = 2.405, <em>J</em><sub>0</sub> crosses zero and the carrier itself disappears.
       </p>
       <p>
-        The figure shows the line spectrum on the left (worked out from the Bessel functions,
-        with sidebands that fall below 0 Hz folded back up, in pink), the waveform under it,
-        and J₀ to J₅ on the right with the index as a cursor you can drag. The horizontal axis
-        of the spectrum is in multiples of the note you're playing.
+        The figure below plots the analytical Bessel spectrum on the top left (scaled in multiples
+        of the played note, with negative-frequency sidebands reflected back above 0 Hz in pink),
+        the resulting warped waveform underneath it, and <em>J</em><sub>0</sub> through
+        <em>J</em><sub>5</sub> on the right. Drag directly across the Bessel graph or move the
+        <strong>index I</strong> slider to sweep the modulation depth.
       </p>
 
       <div
@@ -434,70 +471,79 @@ v.s1 = y1 + t;</code></pre>
       ></div>
 
       <p>
-        The ratio between carrier and modulator decides which partials you get. Every line is
-        at f·(c + n·m) for a note of frequency f, so with whole-number ratios they all land on
-        harmonics of one frequency. At 1:1 that's every harmonic of the note, a bright
-        saw-like spectrum. At 1:2 the lines fall on odd harmonics, like a square. At 1:1.4
-        they land on multiples of f/5, and with no common spacing the ear can lock onto, the
-        result sounds like a bell or a gong.
+        The frequency ratio between carrier and modulator (<em>c</em>:<em>m</em>) controls whether
+        the resulting spectrum sounds harmonic or metallic. Every sideband lands at
+        <em>f</em>·(<em>c</em> + <em>n</em>·<em>m</em>). Pick small integers and every partial
+        snaps onto a clean harmonic grid: 1:1 produces every harmonic like a bright sawtooth,
+        while 1:2 puts energy exclusively on odd harmonics like a square wave. Pick an
+        incommensurate-looking ratio like 1:1.4 (7:5), however, and sidebands scatter onto
+        multiples of <em>f</em>/5 with no neat fundamental spacing for your ear to lock onto,
+        producing the shimmering clang of a struck bronze bell.
       </p>
       <p>
-        The other half of FM is change over time. The modulator has its own envelope, so the
-        index moves through each note, and while a note sounds the cursor on the Bessel plot
-        follows it. On the bell, the index starts at 10 and decays over the note, so the
-        spectrum starts dense and thins toward a pure tone as it rings, the way a struck bell
-        does. On the brass, the index rises and falls with the volume, so loud means bright.
-        The presets follow the instrument examples in John Chowning's 1973 paper: the bell at
-        1:1.4, brass at 1:1 with a peak index of 5, and a wood drum at 80:55 whose index of 25
-        collapses in a few tens of milliseconds. The clarinet (3:2) and bassoon (5:1) are
-        woodwind-like settings in the same spirit.
+        Just as with subtractive filters, the real magic happens when the modulation index moves
+        over the life of a note. Wiring an envelope to the modulator lets the index curve evolve
+        automatically, and while a note sounds, the bright white cursor on the Bessel graph glides
+        along in real time. On <strong>bell</strong> (1:1.4), the index plunges from 10 down
+        toward zero as the bell rings, thinning a dense crash of metallic partials into a calm
+        pure sine tail. On <strong>brass</strong> (1:1, peak index 5), the index rises and falls
+        alongside loudness so louder notes automatically blow brighter. These presets adapt the
+        classic examples from John Chowning's 1973 paper, including his <strong>wood drum</strong>
+        at a 1:0.6875 (80:55) ratio whose huge index of 25 collapses in a few tens of
+        milliseconds, alongside reed-inspired <strong>clarinet</strong> (3:2) and
+        <strong>bassoon</strong> (5:1) patches.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Chowning, Stanford and Yamaha</span>
         <p>
-          John Chowning came across FM at Stanford in 1967, playing with vibrato that was
-          faster and deeper than any singer's, and published the theory in 1973. Stanford
-          licensed it to Yamaha, which took exclusive rights in 1975 and spent years making
-          it cheap enough to sell. The result was the DX7 in 1983: six sine
-          <em>operators</em> that could be wired in 32 arrangements, called algorithms. It
-          became one of the best-selling synthesizers ever made, and its electric piano is all
-          over the pop records of the 1980s. The patent became one of Stanford's highest
-          earning licenses.
+          John Chowning stumbled onto FM synthesis at Stanford in 1967 while pushing digital
+          vibrato far beyond human speeds and depths, and published the theory in 1973. Yamaha
+          secured an exclusive license from Stanford in 1975 and spent nearly eight years designing
+          custom digital chips cheap enough for a keyboard instrument. When the Yamaha DX7
+          arrived in 1983, housing six sine <em>operators</em> that could be rewired into 32
+          routing topologies called algorithms, its glassy electric pianos, punchy basses, and
+          sparkling bells swept across 1980s pop music and turned Chowning's patent into one of
+          Stanford's most lucrative licenses.
         </p>
         <p>
-          Strictly, the formula above is phase modulation, and so is what the DX7 computes.
-          For sine modulators the spectrum is the same as true frequency modulation, and
-          modulating the phase keeps the pitch steady when the index changes. This engine
-          does the same.
+          Strictly speaking, modulating the carrier's phase as written above is phase modulation
+          (and that is what the DX7 computes as well). For sinusoidal modulators it yields the
+          exact same Bessel sidebands as true frequency modulation while keeping pitch rock-solid
+          whenever the index changes rapidly.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="string"><span class="kicker">Step 7 · Physical modelling</span>A string in a delay line</h2>
+      <h2 id="string"><span class="kicker">Step 7 · Physical modeling</span>A string in a delay line</h2>
       <p>
-        Everything so far builds a sound out of its recipe. Physical modelling builds the
-        thing that makes the sound and lets the physics produce the recipe. The simplest and
-        most surprising example is the <strong>Karplus–Strong</strong> plucked string. Fill a
-        short buffer with random numbers. Read it out in a loop, and every time a sample goes
-        past, replace it with the average of itself and its neighbour. That's the whole
-        algorithm, and it sounds like a plucked string.
+        Subtractive and FM synthesis both start from spectra and aim to sculpt harmonics directly.
+        Physical modeling takes a completely different route: simulate a simplified physical object
+        and let its natural dynamics generate the sound. One of the most disarmingly simple
+        algorithms in all of audio programming is the <strong>Karplus–Strong</strong> plucked
+        string. Allocate a short circular buffer of samples, stuff it full of random noise, and
+        play it in a loop. Each time a sample passes the read head, replace it with the average of
+        itself and its neighbor. That tiny loop (scarcely five lines of arithmetic) sings out like a
+        real plucked guitar string.
       </p>
       <p>
-        It works because the buffer behaves like the string. A pulse on a real string travels
-        to the bridge and back once per period, so a buffer of N samples played in a loop
-        repeats every N samples, and the pitch is the sample rate divided by N: 436 samples
-        for A2 at 48 kHz. The random fill is the pluck, a burst with every frequency in it.
-        The loop only keeps frequencies that fit a whole number of times around it, so after
-        one trip the noise has become a harmonic series. The averaging is a gentle lowpass
-        filter, so on every trip the high harmonics lose a little more than the low ones, and
-        the note mellows as it dies, the way a real string's does.
+        It works because a circular delay line mirrors the physics of a vibrating string. On a
+        guitar, a pluck sends a wave racing to the bridge and back once per period; a circular
+        buffer of <em>N</em> samples repeats every <em>N</em> samples, tuning its fundamental
+        frequency to the sample rate divided by <em>N</em> (about 436 samples for A2 at 48 kHz).
+        The initial noise burst injects energy at every frequency simultaneously, just like a
+        sharp pluck, and circulating around the loop reinforces only waves that fit an integer
+        number of times around the ring, turning raw hiss into a full harmonic series in one trip.
+        Finally, averaging two adjacent samples acts as a gentle lowpass filter that attenuates
+        high frequencies more than low ones on every lap, causing upper harmonics to mellow and
+        fade first, exactly the way internal friction damps a real steel or nylon string.
       </p>
       <p>
-        The figure draws the delay line as a ring, with the sample about to be read at the top.
-        Pluck a low note and watch it start jagged and relax into a smooth, shrinking loop.
-        The bars are the harmonics in the ring right now, with the time each one takes to fall
-        60 dB printed above it. The strip at the bottom is the output level in decibels, where
-        an exponential decay is a straight line.
+        The left panel draws that circular delay line as a glowing ring, with the read/filter/write
+        head pinned at twelve o'clock. Play a low note and watch the jagged noise burst smooth out
+        into a clean, shrinking wave as it circles. Top right shows the live DFT of the harmonics
+        currently circulating in the ring (with each odd harmonic's predicted 60 dB ring time
+        printed above), and the bottom right plots output loudness in decibels, where exponential
+        decay traces a crisp straight downward slope.
       </p>
 
       <div
@@ -506,79 +552,91 @@ v.s1 = y1 + t;</code></pre>
         data-hint="Play a low note, watch the ring"
       ></div>
 
-      <p>This is the heart of it in the engine, run once per sample for each string:</p>
+      <p>Inside the audio worklet, the entire string loop comes down to this per-sample update:</p>
       <pre><code>let y = (1 - v.wgt) * buf[r1] + v.wgt * buf[r2]; <span class="cm">// wgt = ½: the plain average</span>
 if (ks.frac) {
-  <span class="cm">// all-pass filter: the fraction of a sample the loop is short by</span>
+  <span class="cm">// all-pass filter: adds the fractional sample the integer loop is short by</span>
   const ap = v.C * y + v.apx - v.C * v.apy;
   v.apx = y;
   v.apy = ap;
   y = ap;
 }
 y *= v.rho; <span class="cm">// loop gain, set from the decay time</span>
-if (blend &lt; 1 &amp;&amp; rand() &gt;= blend) y = -y; <span class="cm">// the drum variant, below</span>
+if (blend &lt; 1 &amp;&amp; rand() &gt;= blend) y = -y; <span class="cm">// the drum/bottle variant, below</span>
 buf[v.w] = y;</code></pre>
       <p>
-        The plain algorithm has three problems, and David Jaffe and Julius Smith fixed all of
-        them in a paper published alongside the original. The sliders are their fixes.
+        In its raw textbook form, the loop suffers from three practical headaches, all solved by
+        David Jaffe and Julius Smith in a companion paper published right beside Karplus and
+        Strong's original 1983 article. The controls below the keyboard expose each fix:
       </p>
       <ul>
         <li>
-          <strong>The decay depends wildly on pitch.</strong> The average loses very little at
-          low frequencies, so in the plain loop the fundamental of A2 would take about 40
-          minutes to fall 60 dB, and A6's under a second. A loop gain ρ just below 1 sets the
-          decay directly: the slider gives the fundamental's ring time, 0.3 to 30 seconds.
+          <strong>Pitch-dependent decay:</strong> a plain two-point average barely damps very low
+          frequencies, so an unattenuated A2 fundamental would ring for roughly 40 minutes while A6
+          vanished in under a second. Multiplying each pass by a loop gain ρ just under 1 sets the
+          fundamental's ring time directly via the <strong>decay time</strong> slider (0.3 to 30
+          seconds).
         </li>
         <li>
-          <strong>The highs die too fast for some instruments.</strong> The decay stretch S
-          weights the average toward the newer sample, which filters less and lets the upper
-          harmonics ring longer. "Bright steel" uses S = 6.
+          <strong>Over-damped treble:</strong> on brighter instruments like harpsichords or steel
+          strings, the plain 50/50 average kills high harmonics too quickly. Raising
+          <strong>decay stretch S</strong> biases the average toward the current sample,
+          weakening the lowpass filter so upper partials ring longer (<strong>bright steel</strong>
+          uses <em>S</em> = 6).
         </li>
         <li>
-          <strong>Whole samples aren't fine enough for tuning.</strong> The loop is N samples
-          plus half a sample of delay from the average, and N has to be a whole number, so
-          the loop can come out up to half a sample too long or too short. At A2 that's at
-          most 2 cents. At C6, where the loop is only 46 samples, it can be 19. Turn the
-          fractional delay off and the readout shows the error for the note you play. With it on, an all-pass filter adds the missing
-          fraction of a sample.
+          <strong>Quantized tuning:</strong> an integer buffer length <em>N</em> plus the filter's
+          half-sample lag can land up to half a sample off the desired pitch. At A2 that is at most
+          2 cents, barely noticeable; up at C6, where the whole loop is only 46 samples long, half
+          a sample throws the note up to 19 cents out of tune. Click
+          <strong>fractional delay</strong> off and play high notes to see the tuning error in the
+          readout; with it on, a one-pole all-pass filter supplies the missing fraction of a sample.
         </li>
       </ul>
       <p>
-        Pick position works like it does on a guitar. Plucking a string at a point can't
-        excite any harmonic that has a node there, so plucking at 1/k of the length removes
-        every kth harmonic. The engine does that by combing the initial noise. The pluck
-        slider runs the noise through a lowpass first, for a softer pick.
+        Two more sliders shape the pluck itself. <strong>pick position</strong> runs the initial
+        noise through a comb filter that cancels every <em>k</em>th harmonic for a pick at
+        1/<em>k</em> of the string length, reproducing the exact nodal notches from Part 1, while
+        <strong>pluck</strong> pre-filters the noise to trade a crisp plectrum snap for a soft
+        thumb.
       </p>
       <p>
-        The blend b is Karplus and Strong's own drum variation. At b = 1 the loop is the
-        string. Below 1, each sample's sign is flipped at random with probability 1 − b. At
-        ½ the loop no longer holds a pitch and you get a drum-like thud whose decay the loop
-        length sets. At 0 every sample flips on every trip, so the period doubles. The note
-        drops an octave and keeps only odd harmonics, like blowing across a bottle.
+        Finally, <strong>blend b</strong> controls Karplus and Strong's quirky percussion extension.
+        At <em>b</em> = 1 every pass keeps its sign and behaves like a string. Lower <em>b</em>
+        and each sample randomly flips sign with probability 1 − <em>b</em>. Right at
+        <strong>drum (b = ½)</strong>, random inversions break up periodic repetition completely,
+        turning the delay line into a resonant drum thud whose decay length depends on the note
+        you hit. Push all the way to <strong>bottle (b = 0)</strong> and every sample inverts on
+        every single lap, doubling the loop period: the pitch plunges an octave and retains only
+        odd harmonics, sounding uncannily like blowing across a glass bottle.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Karplus, Strong, and waveguides</span>
         <p>
-          Kevin Karplus and Alex Strong published the algorithm in the Computer Music Journal
-          in 1983. Part of its appeal was cost: it needs only additions and a shift, and
-          Strong had it running in real time on an Intel 8080A. Julius Smith went on to
-          generalise the idea into digital waveguide synthesis, where delay lines model waves
-          travelling in both directions along strings and tubes, and Yamaha licensed that from
-          Stanford for the VL1 in 1994.
+          Kevin Karplus and Alex Strong published the algorithm in the <em>Computer Music
+          Journal</em> in 1983, partly inspired by how ridiculously cheap it was to run: the core
+          averaging loop needs only additions and a bit shift, and Strong got it running in real
+          time on an 8-bit Intel 8080A. Julius Smith soon generalized the delay-line insight into
+          digital waveguide synthesis, using paired delay lines to model traveling waves in both
+          directions along strings and wind-instrument bores, technology Yamaha licensed from
+          Stanford for its physical-modeling VL1 synthesizer in 1994.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="instrument"><span class="kicker">Step 8 · Everything at once</span>The whole instrument</h2>
       <p>
-        The last figure puts it all together. The ten presets cover all three engines:
-        subtractive (bass, brass, strings, lead, whistle), FM (electric piano, bell, FM bass)
-        and the string (guitar, harp). The diagram is the signal path of whichever preset is
-        loaded, and it's live. Each module draws what it's doing at that moment: the
-        oscillator mix, the filter's response at the cutoff the engine is actually using, the
-        envelopes with a dot per voice, the operators' live modulation index, the string's
-        delay line. Cables light up with the signal going through them, and the spectrogram
-        underneath is the output.
+        Everything from the first seven steps comes together in the instrument below. Its ten
+        presets span all three engines: subtractive (<strong>bass</strong>, <strong>brass</strong>,
+        <strong>strings</strong>, <strong>lead</strong>, <strong>whistle</strong>), FM
+        (<strong>e. piano</strong>, <strong>bell</strong>, <strong>FM bass</strong>), and
+        Karplus–Strong string modeling (<strong>guitar</strong>, <strong>harp</strong>). The block
+        diagram updates automatically to draw the live signal path of whichever engine is active.
+        Every box renders live state from the audio thread: the oscillator shapes, the ladder
+        filter flexing at its real-time cutoff, active voice dots racing down the envelopes, FM
+        operator waves and live indices, or the vibrating delay ring. Cables brighten and pulse in
+        proportion to the signal passing through them, feeding into a live output spectrogram along
+        the bottom.
       </p>
 
       <div
@@ -588,92 +646,84 @@ buf[v.w] = y;</code></pre>
       ></div>
 
       <p>
-        A few presets use things from earlier steps in combination. "Bass" is one voice with
-        glide, a saw and a square an octave below it, and a resonant filter snapped open by a
-        fast filter envelope. "Whistle" has no oscillators at all: white noise through the
-        filter with the resonance just under self-oscillation, and with full keyboard
-        tracking the cutoff follows the note, so the ringing peak plays the melody. The
-        electric piano is FM with two pairs of operators: a 1:1 pair for the body of the note,
-        and a pair with the modulator at 14 times the note frequency and a very short index
-        envelope, which gives the metallic tine at the start of each note.
+        Notice how several patches combine tricks from earlier sections. <strong>bass</strong> runs
+        monophonically with glide, stacking a saw one octave down with a square two octaves down
+        (an octave below the saw) through a resonant 24 dB filter snapped open by a quick envelope.
+        <strong>whistle</strong> shuts off both oscillators altogether and blows white noise into a
+        filter poised just shy of self-oscillation with full keyboard tracking, letting the
+        ringing filter peak play the melody. <strong>e. piano</strong> wires two parallel FM pairs:
+        a 1:1 carrier/modulator pair for the warm body of the note, layered with a 1:14 pair under
+        a tiny 250 ms decay envelope that gives the bright metallic chime of a struck tine.
       </p>
       <p>
-        The sliders work across engines. Brightness moves the filter cutoff by up to three
-        octaves either way on the subtractive presets, scales the FM modulators' index on the
-        FM ones, and hardens or softens the pluck on the strings. Attack and release scale
-        every envelope in the preset by between ⅛ and 8 times. The effects come after the
-        voices: a chorus, a ping-pong delay, and the page's shared reverb.
+        The macro sliders adapt smoothly across all three engines. <strong>brightness</strong>
+        shifts the filter cutoff by up to three octaves either way on subtractive patches, scales
+        modulator index on FM patches, and hardens or softens the pluck on the strings.
+        <strong>attack</strong> and <strong>release</strong> stretch or compress every envelope in
+        the patch from ⅛× to 8×. At the end of the chain sit three shared effects: a stereo chorus,
+        a ping-pong delay, and the page's master reverb.
       </p>
       <p>
-        The voices panel shows the engine's voice allocation. Each preset has a fixed number
-        of voices, and when you play more notes than that, the engine takes over the quietest
-        voice that's already been released, or, if every voice is still held, the quietest
-        of those. The mono presets
-        use a single voice with last-note priority: hold one key, press another, let go of
-        the second, and the first comes back, gliding if the preset has glide.
+        Keep an eye on the <strong>VOICES</strong> box while you stack chords. Each preset caps
+        its polyphony; play more notes than available slots and the engine steals the quietest
+        already-released voice first, or, if every slot is still held down, the quietest held
+        voice. Monophonic presets like <strong>bass</strong> and <strong>lead</strong> run a single
+        voice with last-note priority: hold one key, tap a second key, and release the second, and
+        the pitch glides smoothly back to the first note you never let go of.
       </p>
       <details class="fold">
         <summary>How the figures share one engine</summary>
         <div class="fold-body">
           <p>
-            The engine is a single AudioWorklet processor, a plain JavaScript file the browser
-            runs on its audio thread, and every figure makes its own instance. A figure
-            sends it a patch (oscillators, filter, envelopes, LFO, operators, string settings)
-            and note messages. Every five blocks of 128 samples, about 13 ms at 48 kHz, the
-            engine posts back each voice's envelope stages and levels, the filter cutoff it's
-            using, the LFO's phase, the newest string's delay line, and short scopes of the
-            signal after the oscillators, after the filter, and at the output. That's what the
-            figures draw.
+            Every interactive figure on this page instantiates the same plain-JavaScript
+            AudioWorklet processor on the browser's audio thread. The main thread sends patch
+            updates (oscillators, filter, envelopes, LFO, FM operators, or string parameters) and
+            note events over a MessagePort. Every five render quanta (640 samples, roughly 13 ms at
+            48 kHz), the worklet posts back each voice's envelope stages and levels, live filter
+            cutoff, LFO phase, the newest string delay buffer, and short waveforms tapped after the
+            oscillators, after the filter, and at the final output.
           </p>
           <p>
-            The output passes through a peak limiter at −3 dBFS and a soft clipper before it
-            leaves the engine, and then through the site's master chain, so stacking chords or
-            sitting at full resonance can't produce painful levels. Where AudioWorklet isn't
-            available, the same file runs on the main thread and streams its output in short
-            buffers, with about 0.1 s more delay.
+            Before leaving the worklet, every figure passes through a −3 dBFS peak limiter and a
+            soft clipper (followed by the site's master bus) so dense chords or runaway resonance
+            stay comfortable on headphones. In environments without AudioWorklet support, the
+            exact same processor file runs on the main thread and streams short audio buffers with
+            about 0.1 s of extra latency.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <p>A few things I took away from building it:</p>
-      <ul>
-        <li>
-          <strong>There are two directions.</strong> Subtractive synthesis starts with too
-          much and removes it. FM starts with almost nothing and multiplies it. Both end up
-          controlling the same thing, which harmonics are present and how loud.
-        </li>
-        <li>
-          <strong>Sounds live in time.</strong> Most of what makes a patch recognisable is how
-          its spectrum changes over the note: the filter envelope on the brass, the decaying
-          index on the bell, the highs dying first on the string.
-        </li>
-        <li>
-          <strong>Digital needs band-limiting.</strong> A shape that's trivial in a circuit can
-          sound broken in code, and the fix is about what happens in the one or two samples
-          around a jump.
-        </li>
-        <li>
-          <strong>Models give you behaviour for free.</strong> Nobody told the delay line to
-          make the high harmonics die first. It follows from what the loop does.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: wavetable and granular oscillators, a full waveguide string with
-        a resonant body, all six DX7 operators and their 32 algorithms, and saving and sharing
-        patches as links.
+        Building all three engines inside one piece of code makes it hard to miss how tightly
+        these seemingly rival traditions connect. Subtractive synthesis starts with an abundance
+        of harmonics and shaves them back with filters; FM starts with pure sines and multiplies
+        new sidebands outward; Karplus–Strong fills a loop with noise and lets physics filter it
+        into a harmonic series. All three are simply different handles for steering the same
+        underlying object: which frequencies exist at each millisecond of a note.
       </p>
       <p>
-        The landscape at the top of the page is a two-oscillator subtractive patch from step
-        three with the filter envelope from step four and a little vibrato from step five. Its
-        ridges are the same measured spectrum the whole-instrument figure draws as a
-        spectrogram.
+        Time turns out to do just as much heavy lifting as static tone color. A frozen snapshot of
+        our brass patch or FM bell barely hints at what it is, yet let the filter bloom slightly
+        behind the volume or let the modulation index collapse as the note decays and your ear
+        immediately hears horn or bronze. And moving those ideas into digital code adds its own
+        craft: an edge that costs two transistors in analog hardware needs PolyBLEP math to avoid
+        aliasing, a zero-delay feedback loop to keep resonance true, and an all-pass filter to tune
+        a delay line to a fraction of a sample.
+      </p>
+      <p>
+        If I keep expanding this engine, I would love to add morphing wavetable and granular
+        oscillators, couple the Karplus–Strong delay line to a resonant guitar body model, wire up
+        all six DX7 operators with selectable algorithms, and pack custom patches into shareable
+        URLs. Meanwhile, the spectral landscape at the top of the page is built straight out of the
+        modules we just assembled: a two-oscillator subtractive patch from Step 3, shaped by the
+        envelopes of Step 4 and nudged by a touch of vibrato from Step 5.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/harmony.html">Part three, Consonance and Roughness</a>.</strong>
-        What happens when two notes sound at once, and why some pairs blend and others beat
-        and buzz.
+        What happens when two notes sound at once, and why some pairs blend cleanly while others
+        beat and grate.
       </p>
     </main>
 

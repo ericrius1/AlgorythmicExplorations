@@ -3,7 +3,7 @@
 // chords across the ring. Every few phrases the mode darkens by one step
 // (Lydian → Ionian → … → Locrian and back up), and you can watch the one
 // note that moves slide a semitone. With sound on, a drone holds C so each
-// mode's colour is audible. Tap a note to play it.
+// mode's color is audible. Tap a note to play it.
 
 import { Shell, type Demo } from "../../../lib/demoShell";
 import { unlockAudio, frameGuard } from "../../../lib/audio";
@@ -253,7 +253,7 @@ export function mountHeroRing(container: HTMLElement): Demo {
         }
       }
 
-      // melody trails: curved chords bowing toward the centre
+      // melody trails: curved chords bowing toward the center
       for (const t of trails) {
         const age = (clockT - t.born) / 4.5;
         if (t.from === t.to) continue;
@@ -293,7 +293,7 @@ export function mountHeroRing(container: HTMLElement): Demo {
         });
       }
 
-      // centre: mode name
+      // center: mode name
       const m = MODES[modeIdx];
       const fade = Math.min(1, modeT / 0.8, (MODE_SECONDS - modeT) / 0.8);
       text(ctx, m.name, cx, cy - fs * 0.2, { size: fs * 1.6, color: "#f4f6fc", align: "center", base: "middle", weight: 700, alpha: 0.35 + 0.65 * fade });

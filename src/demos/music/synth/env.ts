@@ -203,7 +203,7 @@ export async function mountEnv(container: HTMLElement): Promise<Demo> {
       g.area(pts, ly(G, 0), [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.28, col, 0.02);
       g.glowLine(pts, 2, col, 1, 0.4);
       // segment labels
-      // segment labels, centred under their segment but never overlapping
+      // segment labels, centered under their segment but never overlapping
       let right = G.box.x;
       const labs: [string, number][] = [
         [`A ${fmtTime(e.a)}`, (G.x0 + X.xa) / 2],

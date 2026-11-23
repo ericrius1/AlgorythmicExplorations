@@ -10,7 +10,7 @@
     <title>The Bonfire — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A night bonfire lit by radiance cascades: thousands of embers as lights at a fixed rendering cost, multi-bounce colour bleeding from last frame's light, and a sky that is just what the top cascade sees when its rays escape."
+      content="A night bonfire lit by 2D radiance cascades: thousands of embers casting light at a fixed rendering cost, multi-bounce color bleeding fed from the previous frame, and a sky returned whenever top-cascade rays escape."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,9 +31,9 @@
         <p class="hero-kicker">Bounced Light · Part 2</p>
         <h1>The Bonfire</h1>
         <p class="subtitle">
-          Every ember above is a light, the trees cast shadows, and the ground catches the
-          fire. The renderer from part one, with a scene where nearly everything glows.
-          Stir the embers with your cursor.
+          Hundreds of drifting embers that all cast real light and shadows onto the pines
+          and hill below, powered by the same 2D cascade renderer from part one. Drag your
+          cursor across the fire to stir the sparks.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -44,34 +44,38 @@
 
     <main>
       <p>
-        <a href="/pages/bounced-light/lava.html">Part one</a> built the whole pipeline
-        around one lamp: a distance field, a stack of radiance cascades, and a merge. This
-        part keeps that pipeline and changes the scene. The bonfire above has a flame, a log,
-        a few hundred embers, a ground, eight pines and a night sky, and I wanted to see
-        how far the same renderer goes when nearly everything in the picture is a light.
+        For decades, real-time graphics lived under a strict light budget. In a traditional
+        renderer, every point light you drop into a scene means more loops in the fragment
+        shader and another shadow map to update, so artists learn to ration lamps carefully
+        and fake swarms of sparks with unlit billboard particles. Radiance cascades flip
+        that constraint on its head. Because the solver from
+        <a href="/pages/bounced-light/lava.html">part one</a> reads illumination straight
+        out of a scene texture rather than looping over a list of lights, an outdoor clearing
+        packed with a crackling flame, hundreds of flying embers, glowing terrain, and an
+        entire sky fits inside the exact same pipeline.
       </p>
       <p>
-        It turns out three small additions are enough: a lot of moving lights, light that
-        bounces, and a sky. None of them touches the cascade code itself.
+        Getting from an enclosed lava lamp to the bonfire above takes three small additions:
+        a swarm of particle emitters, light that bounces off colored surfaces, and an
+        environment sky for rays that miss the geometry. All three plug into the edges of
+        the existing solver without touching the cascade merge itself.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="many-lights"><span class="kicker">Step 1 · A fixed cost</span>Many lights</h2>
       <p>
-        Radiance cascades never ask where the lights are. Every probe marches its rays
-        against the distance field and reads whatever emission it lands on, so a light
-        source is just a bright pixel in the scene texture. The cost depends on the size of
-        the light grid and the number of cascades. How many lights there are doesn't enter
-        into it.
+        A radiance cascade probe never maintains an array of light sources. It marches each
+        ray segment against the jump-flood distance field and picks up whatever emission is
+        painted into the scene texture at the hit point. As a result, rendering cost scales
+        only with the light grid resolution and the number of cascade levels, regardless of
+        how many separate emitters happen to be drawn into that texture.
       </p>
       <p>
-        That's not how most real-time lighting works. A forward renderer pays for every
-        light at every pixel it might touch, which is why game and film lighting artists
-        have long worked to a budget of lights. The Particle Worlds series spent six parts
-        getting around an n² between bodies, and light has the same n² (every pixel wants
-        light from every source). Radiance cascades get around it by never listing the
-        sources at all: they sample the light field the sources make, the way part five's
-        particle-mesh gravity samples a potential on a grid instead of summing pairs.
+        Forward lighting hits the same all-pairs bottleneck that dominated the
+        <em>Particle Worlds</em> series: every shaded pixel wants to know what every light
+        source contributes to it. Sampling a light field built on a grid dissolves that
+        coupling in much the same way the particle-mesh gravity solver in part five sampled
+        a gridded potential instead of summing forces between every pair of stars.
       </p>
       <div
         data-demo="sparks"
@@ -79,104 +83,113 @@
         data-hint="Drag the lights slider"
       ></div>
       <p>
-        The slider goes from 16 lights to 8,192. Watch the frame rate while you drag it: it
-        barely moves. Every spark is a light and also an obstacle, so sparks shadow each
-        other, which you can see when a dense cloud drifts behind one of the pillars. The
-        wind is the curl noise from
-        <a href="/pages/particle-worlds/part6.html">The Fluid Instrument</a>: take the
-        gradient of smooth noise and turn it a quarter turn, and you get a flow that never
-        piles up or empties out anywhere.
+        Drag the <em>lights</em> slider all the way from 16 up to 8,192 and watch how steady
+        the frame rate stays. Every spark is splatted into the scene texture as both an
+        emitter and a tiny solid occluder, so dense clusters cast subtle shadows on each
+        other as they drift around the three vertical pillars. The breeze carrying them is
+        the divergence-free curl noise from
+        <a href="/pages/particle-worlds/part6.html">The Fluid Instrument</a>: taking the
+        gradient of smooth procedural noise and rotating it ninety degrees produces swirling
+        eddies that never artificially pile particles into sinks.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="bounce"><span class="kicker">Step 2 · Last frame's light</span>Bounce</h2>
       <p>
-        Everything so far is direct light: from a source to a surface, one hop. Real rooms
-        are mostly lit by the second hop, light that hit a wall and came off it tinted. The
-        textbook way to get that is to solve a big system that couples every surface to
-        every other. I reuse the previous frame instead:
+        Up to now, every surface has received only direct light: one straight trip from an
+        emitter to a wall. Inside real rooms, a huge share of the illumination comes from
+        light that has already bounced off a floor or painted wall and picked up its tint.
+        Computing all those surface-to-surface exchanges simultaneously usually requires
+        solving a large linear system. When you already have an interactive frame loop
+        running at 60 Hz, there is a much cheaper trick: feed the previous frame's lighting
+        right back into the scene texture.
       </p>
       <pre><code>emission(x) = base_emission(x) + 2 · albedo(x) · fluence_last_frame(x)
-<span class="cm">// every surface re-emits a tinted share of the light it received a frame ago</span></code></pre>
+<span class="cm">// every surface re-emits a tinted fraction of the light that hit it one frame ago</span></code></pre>
       <p>
-        That's one texture read in the scene shader, from the cascade-0 result the previous
-        frame already paid for. On the first frame the surfaces only have direct light. On
-        the second, they glow with it, so the cascades deliver one bounce. The third frame
-        delivers two bounces, and so on. Each bounce is dimmer than the last by the albedo,
-        so the series converges, and it converges in time, at one bounce per frame. At 60
-        frames a second that's faster than you can see.
+        That costs a single extra texture lookup in the scene pass, reading from the
+        cascade-0 buffer that the previous frame already computed. Frame one delivers direct
+        light; frame two lets every lit wall glow with that light to produce a first bounce;
+        frame three adds the second bounce, and so on. Because each matte bounce multiplies
+        by an albedo below 1, the infinite sum decays geometrically and settles within a
+        fraction of a second.
       </p>
       <p>
-        The 2 is there because the fluence is an average over every direction, and half of
-        those directions point into the wall, where there's no light. A matte surface
-        re-emits what arrives from the open half, so reading the average and doubling it
-        gets the amount right. At 1 the bounce is there but too faint to notice.
+        The factor of 2 accounts for the geometry of a wall. Cascade 0 averages incoming
+        radiance over the full 360° circle, and half of those directions point straight into
+        the dark interior of the solid wall itself. Since a matte surface collects light
+        across its exposed 180° half-circle, doubling the full-circle average restores the
+        proper energy scale; leaving it at 1 produces noticeably dim bounces.
       </p>
       <p>
-        Reading a surface's light needs one detail. Inside a solid, cascade 0 only sees the
-        solid itself, so sampling the light there gives a dark, blocky rim. Every solid in
-        these scenes is a signed distance function, so I step out along the surface normal
-        to clean air and read the light there.
+        One small geometric snag appears right on a wall's boundary: inside an occluder,
+        cascade 0 only sees the solid interior, so sampling the previous fluence right at
+        the pixel gives a dark, chunky rim. Because all static shapes in these scenes are
+        defined by signed distance functions, the scene shader simply steps a short distance
+        outward along the surface normal into open air and samples the incoming light there.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Radiosity and the Cornell box</span>
         <p>
-          The textbook method is radiosity, brought to graphics by Goral, Torrance, Greenberg
-          and Battaile at Cornell in 1984. The same paper introduced the Cornell box, the
-          red-and-green-walled room that graphics papers have been rendering ever since.
-          Radiosity solves the surface-to-surface coupling as one matrix. The frame loop
-          above adds up the same series one term per frame.
+          Solving diffuse surface-to-surface light exchange as a global matrix equation is
+          known as <em>radiosity</em>, introduced to computer graphics in 1984 by Cindy
+          Goral, Kenneth Torrance, Donald Greenberg, and Bennett Battaile at Cornell. That
+          same paper debuted the Cornell box, the red-and-green-walled chamber that
+          rendering papers still test against today. Feeding last frame's fluence back into
+          the scene shader evaluates the exact same Neumann bounce series, one term per
+          frame.
         </p>
       </aside>
       <div
         data-demo="room"
-        data-title="Colour bleeding"
+        data-title="Color bleeding"
         data-hint="Move the lamp near a wall"
       ></div>
       <p>
-        The room is seen from above: a wooden floor, plaster walls, a crimson wall and a teal
-        wall, a screen in the middle, a warm lamp, and a dim blue window in the far wall.
-        The coloured walls are not lights. Turn the bounce off and you get the literal room:
-        the lamp's pool of light, a sharp-edged shadow with only the window's blue in it,
-        and dark walls. Turn it back on and carry the lamp toward a wall, and the floor and
-        the far walls take on that wall's colour, even inside the shadow. The strength
-        slider goes to 2.5. Past 1, a wall gives back more light than it receives, which no
-        real paint can do, and the colours wash out as the room fills with its own glow.
+        Look down into this top-down room: wooden floorboards, neutral plaster walls, a
+        crimson wall on the left, a teal wall on the right, a central divider, a roving warm
+        lamp, and a cool blue window along the top edge. Neither colored wall emits light of
+        its own. Toggle <em>bounce: on</em> off and the room strips down to direct light
+        alone, leaving hard dark shadows touched only by the blue window. Turn bounce back
+        on and drag your cursor to carry the lamp close to the crimson or teal wall; its
+        reflected hue washes across the floorboards and wraps right around behind the
+        divider. Pushing <em>bounce strength</em> above 1 lets surfaces return more energy
+        than they absorb, an unphysical amplifier that quickly floods the room in glowing
+        feedback.
       </p>
       <p>
-        Smooth light in an empty room is also where the cascades' flaws show most, so this
-        figure gets a light grid twice as dense as the others, and if your GPU can't keep 60
-        frames a second at that size it steps the grid down rather than dropping frames. The
-        floor reads the light through a small blur that stops at walls, which hides the last
-        of the probe pattern without softening the shadow much.
+        Wide stretches of smooth floor are also where probe-grid artifacts stand out most
+        clearly, so this figure starts on a light grid twice as dense as the others (and
+        automatically steps down a notch if your GPU dips below 60 fps, keeping motion
+        fluid). The floor shader also reads the fluence through a small edge-stopping blur
+        that smooths away faint probe structure without blurring shadows across walls.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="sky"><span class="kicker">Step 3 · Environment light</span>The sky is a cascade</h2>
       <p>
-        Daylight doesn't come from anything in the scene. It's what you see when a ray
-        leaves the scene without hitting anything, and the cascades already have a place for
-        that case. In part one, when a ray of the top cascade got to the end of its
-        interval and hadn't hit anything, it merged with darkness. Here it returns the sky
-        instead: a function of direction, dark blue overhead, warmer toward the horizon, and
-        bright where the sun is. Every probe and every shadow then picks up sky light with
-        no extra pass.
+        Outdoors, most light arrives from the sky dome rather than from objects inside the
+        clearing. Radiance cascades already leave an obvious hook for infinitely distant
+        light. In part one, any ray in the coarsest cascade that finished its interval
+        without hitting wax simply merged with black. Replacing that default with an
+        analytic sky function (deep blue overhead, warm tint near the horizon, and a bright
+        solar lobe along the sun direction) brings ambient sky light and soft tree shadows
+        into every probe for free:
       </p>
       <pre><code>if (top-cascade ray escapes):
-    radiance = sky(direction)   <span class="cm">// the light that nothing in the scene claimed</span></code></pre>
+    radiance = sky(direction)   <span class="cm">// distant sky light along any unobstructed ray</span></code></pre>
       <p>
-        It fits because the top cascade's rays are the longest ones, the light from far
-        away, and an environment map is light from infinitely far away, looked up by
-        direction. Sky light, with soft shadows under the trees and a warm band at the
-        horizon, costs one function evaluated at the top level.
+        Because the top cascade holds the finest angular resolution in the entire stack, it
+        samples a tight directional sun cleanly without needing any separate sun pass or
+        shadow map.
       </p>
       <p>
-        The display pass draws the sky behind everything too, and that took a decision. In
-        2D the "air" in the picture is the light field itself, and showing all of it at the
-        same brightness turned each tree's shadow into a dark wedge pointing at the stars.
-        So outdoors I show the light field strongly in a layer of haze near the ground and
-        in the smoke over the fire, and only faintly above that, where you mostly see the
-        sky.
+        Showing the sky in the final display pass did require one artistic call. In 2D
+        lighting demos, empty air normally visualizes the light field directly, which made
+        each pine tree cast a stark dark wedge straight up into the starry night sky. For
+        the outdoor scene, the display pass shows the light field strongly through the low
+        ground haze and the rising plume of smoke above the flames, then fades it down high
+        overhead so the night sky and stars read cleanly behind the trees.
       </p>
       <div
         data-demo="dusk"
@@ -184,21 +197,22 @@
         data-hint="Drag the time of day"
       ></div>
       <p>
-        Drag from night to day and the balance flips. At night the fire lights every
-        surface, the ground near it is fire-coloured, and the tree shadows point away from
-        the flame. By day the sun lights the scene, the shadows line up, and the fire is a
-        warm smudge. That's the reason a campfire feels different after dark, and it's the
-        same cascades either way.
+        Slide <em>time of day</em> from <em>night</em> through <em>twilight</em> and
+        <em>dusk</em> into <em>day</em> to watch the dominant light source switch hands.
+        After dark, the bonfire owns the clearing, tinting the hill warm orange and throwing
+        pine shadows outward away from the flames. By midday, the bright sky and sun
+        overpower the fire completely, aligning every shadow along the sun angle and
+        reducing the bonfire to a pale flicker.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="bonfire"><span class="kicker">Step 4 · Assembly</span>The whole bonfire</h2>
       <p>
-        Everything at once, plus the hand controller from part six of the last series.
-        Click ✋, let the camera find your hand, and your palm stirs the wind while your
-        index fingertip sheds embers. Every new ember is a light that falls on the trees,
-        the ground and the other embers, and it costs the renderer nothing it wasn't already
-        paying. The camera only switches on when you click.
+        Everything comes together below alongside the webcam hand tracker from the final
+        part of <em>Particle Worlds</em>. Click <em>✋ hands</em> if you want to play with
+        it via camera (the webcam stays completely off until you click): sweeping your palm
+        pushes the wind around the clearing while your index fingertip scatters live embers
+        that immediately cast shadows across the hill and pine trunks.
       </p>
       <div
         data-demo="fire"
@@ -206,41 +220,34 @@
         data-hint="Stir, or click ✋ for hands"
       ></div>
       <p>
-        The view button shows the same stages as in part one. <em>Scene</em> is a few
-        silhouettes and a swarm of bright dots, which is the entire input to the lighting.
-        <em>Distance field</em> shows the jump flood rippling as embers fly through it.
-        <em>Light only</em> shows only the light that travelled. Try it at night: everything
-        you see in that view arrived at its pixel from somewhere else.
+        The <em>view: final</em> button steps through the same diagnostic buffers as before,
+        plus an <em>occupancy</em> mask showing which pixels count as solid. In
+        <em>scene (what the rays see)</em> you can spot the glowing embers, flames, and
+        re-emitting terrain edges; <em>distance field</em> ripples continuously as sparks
+        shoot skyward; and <em>light only</em> at night isolates every photon that traveled
+        out of the fire and bounced off the hill.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="limits"><span class="kicker">Wrap-up</span>What's missing</h2>
+      <h2 id="limits"><span class="kicker">Wrap-up</span>What's still missing</h2>
       <p>
-        This part added a few thousand lights, repeated bounce, and an environment map,
-        with three small edits. None of them changed the march, the merge or the distance
-        field. The expensive part of the renderer doesn't care how many lights there are.
+        Going from a single enclosed lamp to thousands of drifting sparks, multi-bounce
+        color bleeding, and a full day-night sky took three compact additions without
+        altering a single line of the distance field or cascade merge. Once a renderer
+        queries a shared spatial light field instead of iterating over individual light
+        sources, piling in extra emitters stops hurting performance; feeding last frame's
+        fluence back into the scene shader turns one texture lookup into multi-bounce
+        radiosity; and hooking an environment function onto escaping top-cascade rays brings
+        in sky light with zero extra passes.
       </p>
-      <ul>
-        <li>
-          <strong>Sample the field, not the sources.</strong> Once the renderer asks what
-          each point sees, the number of lights stops mattering.
-        </li>
-        <li>
-          <strong>Last frame's answer is a cheap first guess.</strong> Feeding the light
-          back in one frame late gives multi-bounce lighting for one texture read.
-        </li>
-        <li>
-          <strong>Look for the slot the algorithm already has.</strong> The sky didn't need
-          a new pass. It's what a ray returns when it escapes.
-        </li>
-      </ul>
       <p>
-        One thing is missing, and it shows. The haze and smoke over the fire are painted in
-        by the display pass. The rays pass straight through them, so smoke never dims the
-        light behind it and never glows on its own. In this world light either travels
-        freely or stops dead. Things I'd try next: smoke that blocks some of the light,
-        embers that cool to dark grey ash, and a moon. Part three does the first of those
-        properly, with fog that absorbs and scatters light along every ray.
+        Even so, one glaring simplification gives itself away in the bonfire above. The haze
+        hugging the hill and the smoke curling above the flames are painted on during the
+        final display pass, completely invisible to the cascade rays. Light in this 2D world
+        still behaves in binary fashion: it either passes through vacuum untouched or slams
+        into an opaque solid. Next, I want to give the air real optical density, so smoke
+        and fog dim beams passing through them and scatter trapped light outward along every
+        ray.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/bounced-light/fog.html">Part three, The Fog</a>.</strong>

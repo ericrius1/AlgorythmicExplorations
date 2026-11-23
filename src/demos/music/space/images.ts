@@ -258,7 +258,7 @@ export function mountImageSources(container: HTMLElement): Demo {
         }
       }
 
-      // image sources: size and brightness by level, colour by order
+      // image sources: size and brightness by level, color by order
       const ref = images[0]?.gain[3] ?? 1;
       for (let i = images.length - 1; i >= 0; i--) {
         const m = images[i];
@@ -285,7 +285,7 @@ export function mountImageSources(container: HTMLElement): Demo {
       drawSource(g, plan.px(src), 6 * d, d, pulse);
       drawHead(g, lp, Math.PI, 9 * d, d, 0.5);
       if (!narrow) {
-        label(g, "the real room", a0.x + 6 * d, a0.y + 11 * d, 11 * d, "rgba(230,235,250,0.75)");
+        label(g, "the real room", a0.x, a0.y - 12 * d, 11 * d, "rgba(230,235,250,0.8)");
         label(g, "mirror rooms: each copy of the source is one reflection path", pad + 4 * d, pad + 10 * d, 11 * d, SC.muted);
       }
 
@@ -311,7 +311,8 @@ export function mountImageSources(container: HTMLElement): Demo {
       label(g, "dB", ex - 6 * d, ey - 9 * d, 9.5 * d, SC.muted, "right", 500, true);
       for (let t = 0; t <= tmax + 1e-9; t += 0.02) {
         const x = ex + (t / tmax) * ew;
-        label(g, `${Math.round(t * 1000)} ms`, x, ey + eh + 12 * d, 9.5 * d, SC.muted, t === 0 ? "left" : "center", 500, true);
+        const align: CanvasTextAlign = t === 0 ? "left" : t >= tmax - 1e-9 ? "right" : "center";
+        label(g, `${Math.round(t * 1000)} ms`, x, ey + eh + 12 * d, 9.5 * d, SC.muted, align, 500, true);
       }
       for (let i = images.length - 1; i >= 0; i--) {
         const m = images[i];

@@ -10,7 +10,7 @@
     <title>The Infinite Jukebox — Living Music</title>
     <meta
       name="description"
-      content="Euclidean rhythms and the world rhythms they produce, polyrhythm, swing and 1/f timing, a melody walker with rules, and a generative band that writes, arranges and mixes a new song from every seed."
+      content="Euclidean rhythms from particle-accelerator math, polyrhythms, swing and 1/f microtiming drift, rule-guided melody walks, and a generative band that writes, arranges, and mixes a fresh song from every seed."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,46 +31,50 @@
         <p class="hero-kicker">Living Music · Part 7</p>
         <h1>The Infinite Jukebox</h1>
         <p class="subtitle">
-          Rhythm from Euclid's algorithm, timing with a human wobble, melodies with memory, and a
-          band that writes a new song from every seed. The rings above are its drum patterns.
-          Tap to start it; when a song ends, it writes the next one.
+          Rhythm from Euclid's algorithm, timing with a human drift, melodies that remember what
+          they just sang, and a generative band that turns a single seed number into a full song.
+          Tap the rings above to start it; when one song wraps up, it writes the next.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        The first six parts of this series built a note, a synthesizer, consonance, a tuning, a
-        scale and a set of chords. All of that is about pitch, and none of it moves. This part
-        adds time. First rhythm: where the hits go, how two pulses combine, and how far off the
-        grid a hit can land before it stops sounding like a machine. Then melody: a walker that
-        steps around the scale under a few rules. Then a band that uses all of it to write,
-        arrange and mix a song from a single number.
+        Six essays in, we have built a vibrating note, a synthesizer, sensory consonance,
+        twelve-tone tuning, scales, and chords. Everything so far lives purely in pitch space,
+        frozen in place. Putting music into motion turns out to borrow ideas from surprising places:
+        a neutron accelerator in Tennessee, high-speed measurements of jazz drummers' wrists, and a
+        handful of statistical habits shared by folk melodies all over the world.
       </p>
       <p>
-        The rings at the top of the page are the current song's drum patterns, one ring per
-        drum, with the chord in the middle and the song's sections around the outside. Every
-        pattern on them comes out of the algorithm in step one.
+        Those concentric rings spinning at the top of the page are the drum patterns for the
+        current song, one ring per instrument, orbiting the active chord in the center with the
+        song's form traced around the outer rim. Every pattern on those rings comes straight out of
+        the algorithm in step one, and by step five the entire band (drums, bass, keys, pad, and
+        lead) comes together behind a single function called <code>writeSong(seed)</code>.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="euclid"><span class="kicker">Step 1 · Where the hits go</span>Euclid's drummer</h2>
       <p>
-        Divide a bar into <em>n</em> equal steps and put <em>k</em> drum hits on them. If
-        <em>k</em> divides <em>n</em>, the even answer is obvious: 4 hits on 16 steps is four on
-        the floor. If it doesn't, the hits can't all be the same distance apart, and the
-        question is how to spread them as evenly as the grid allows. Three hits on eight steps
-        come out as gaps of 3, 3 and 2: x..x..x. That's the <em>tresillo</em>, the Cuban
-        rhythm under a great deal of Latin and popular music.
+        Suppose you divide a bar into <em>n</em> equal ticks and want to place <em>k</em> drum
+        hits across them. When <em>k</em> divides <em>n</em> cleanly, the answer takes no thought:
+        four hits across sixteen steps gives four on the floor. When <em>k</em> doesn't divide
+        <em>n</em>, the gaps can't all match, so the interesting problem is spreading the hits as
+        evenly as the grid permits. Put three hits on eight steps and the cleanest split is gaps of
+        3, 3, and 2 (<code>x..x..x.</code>). Play that out loud and you immediately recognize the
+        Cuban <em>tresillo</em>, the backbone of huge stretches of Latin, dancehall, and pop music.
       </p>
       <p>
-        Eric Bjorklund wrote down an algorithm for this in 2003, for spacing timing pulses
-        evenly in the control system of the Spallation Neutron Source, a particle accelerator
-        at Oak Ridge. Start with <em>k</em> groups that each hold one hit and <em>n</em> −
-        <em>k</em> groups that each hold one rest. Tuck one leftover group under each group at
-        the front. Repeat with whatever is left over, until at most one leftover remains. Each
-        pass is a step of Euclid's algorithm for the greatest common divisor, run on the counts
-        of hits and rests. The figure draws every pass.
+        In 2003, computer scientist Eric Bjorklund wrote a neat little procedure for this exact
+        spacing problem while designing timing gates for the Spallation Neutron Source at Oak Ridge
+        National Laboratory. Start with <em>k</em> one-step groups containing a hit and
+        <em>n</em> − <em>k</em> one-step groups containing a rest. Pair off as many leftover groups
+        from the back as you can, tucking one onto the end of each front group. Repeat with
+        whatever remains unpaired until at most one leftover group sits at the tail. Notice what
+        the group counts do on each pass: they shrink by the exact remainder steps of Euclid's
+        ancient algorithm for the greatest common divisor. The right side of the figure below
+        traces every pass, while the circle on the left bends the final pattern into a polygon.
       </p>
 
       <div
@@ -80,26 +84,27 @@
       ></div>
 
       <p>
-        In 2005 Godfried Toussaint pointed out that this algorithm, written for an accelerator,
-        produces a long list of traditional rhythms from around the world. E(3,8) is the
-        tresillo and E(5,8) is the Cuban <em>cinquillo</em>. E(7,12) is the bell pattern of
-        much West African drumming, played on a 12-pulse cycle. E(5,12) is a clapping pattern
-        of the Venda in South Africa, and E(7,16) is a samba pattern from Brazil. The figure
-        names a pattern when it's one of the rhythms from his paper. Some only match after a turn
-        of the necklace: E(5,16) is the bossa nova pattern once you start it on the right
-        step, which is what <em>rotate</em> does. Turning the necklace
-        doesn't change the gaps, only which hit counts as the first.
+        Two years later, Godfried Toussaint noticed that Bjorklund's accelerator algorithm
+        rediscovers an astonishing catalog of traditional rhythms from around the globe. E(3,8) is
+        the Cuban tresillo and E(5,8) is the Cuban <em>cinquillo</em>. E(7,12) is the classic West
+        African bell pattern over a twelve-pulse cycle, E(5,12) matches a clapping pattern of the
+        Venda people in South Africa, and E(7,16) is a Brazilian samba pattern. Whenever your
+        slider settings land on a rhythm from Toussaint's paper, the center of the circle labels it.
+        A few traditional patterns only match once you shift which hit counts as beat one: E(5,16)
+        becomes the bossa nova clave when you turn the necklace with the <em>rotate</em> slider,
+        leaving the spacing around the circle untouched while changing where the downbeat falls.
       </p>
       <p>
-        Pick the bell pattern and read the gaps: 2, 1, 2, 2, 1, 2, 2. Rotate them and you get
-        2, 2, 1, 2, 2, 2, 1, the step pattern of the major scale from
-        <a href="/pages/living-music/scales.html">part five</a>. Seven notes spread as evenly as
-        possible over twelve semitones and seven strokes spread as evenly as possible over
-        twelve pulses are the same problem, so they have the same answer. John Clough and Jack
-        Douthett called the answers <em>maximally even</em> sets, and Jeff Pressing noticed
-        the match between the West African bell and the diatonic scale in 1983. Every
-        Euclidean rhythm has the property the figure reports below the stages: at most two gap
-        sizes, one step apart.
+        Click <em>bell pattern E(7,12)</em> and look at the gaps printed below the algorithm:
+        2, 1, 2, 2, 1, 2, 2. Rotate that sequence by two steps and you get 2, 2, 1, 2, 2, 2, 1, the
+        exact step sizes of the major scale from <a href="/pages/living-music/scales.html">part five</a>.
+        Spreading seven pitches as evenly as possible around twelve semitones and spreading seven
+        bell strokes as evenly as possible around twelve time pulses are mathematically identical
+        problems, so they produce the same object. Theorists John Clough and Jack Douthett called
+        these solutions <em>maximally even</em> sets, and Jeff Pressing pointed out the bridge
+        between the West African bell and the diatonic scale back in 1983. Every Euclidean rhythm
+        shares the signature property reported beneath the stages: at most two gap sizes, always
+        one step apart.
       </p>
       <details class="fold">
         <summary>The algorithm, as coded</summary>
@@ -117,9 +122,10 @@ while (back.length &gt; 1) {
   back = rest;
 }</code></pre>
           <p>
-            For E(3,8) that's three passes: 3 hits and 5 rests, then
-            [x.][x.][x.][.][.], then [x..][x..][x.]. The band below calls the same function
-            for its hi-hats, bells, congas and clave.
+            On E(3,8), that loop finishes in three passes: three hits and five rests, then
+            <code>[x.][x.][x.][.][.]</code>, then <code>[x..][x..][x.]</code>. The generative band
+            further down the page calls this same function for its hi-hats, bells, congas, and
+            clave.
           </p>
         </div>
       </details>
@@ -127,11 +133,12 @@ while (back.length &gt; 1) {
       <!-- ================================================================ -->
       <h2 id="poly"><span class="kicker">Step 2 · Two pulses at once</span>Three against two</h2>
       <p>
-        A Euclidean rhythm puts uneven gaps on one grid. A polyrhythm puts two even pulses on
-        one cycle that don't share a grid. Three evenly spaced beats against two evenly spaced
-        beats only line up on the downbeat. To write both down you need a grid of six, the
-        least common multiple, and on that grid the two together make a new uneven rhythm, the
-        <em>resultant</em>: gaps of 2, 1, 1 and 2.
+        Euclidean rhythms pack uneven gaps onto a single shared grid. A polyrhythm goes the other
+        way, stacking two completely even pulses inside the same cycle even though neither divides
+        the other. Play three evenly spaced hits against two evenly spaced hits and the two drums
+        only coincide on beat one. To line both pulses up on one common ruler, you need a grid of
+        six (their least common multiple), and combining both tracks on that grid weaves an uneven
+        composite rhythm called the <em>resultant</em>: gaps of 2, 1, 1, and 2.
       </p>
 
       <div
@@ -141,34 +148,41 @@ while (back.length &gt; 1) {
       ></div>
 
       <p>
-        Listen to 3 : 2 for a few cycles and try to hear each drum as the beat in turn. You can
-        flip between them, and when you can't decide, you hear the resultant as one pattern.
-        4 : 3 needs a grid of 12 and gives 3, 1, 2, 2, 1, 3. 5 : 4 needs 20, and by then the
-        resultant is hard to hold as a pattern at all. The mute buttons help: drop one drum,
-        let the other settle in as the beat, then bring the first back.
+        Let <em>3 : 2</em> loop for a few bars and try shifting your attention between the amber
+        low drum and the blue high drum. Your brain can lock onto either pulse as the main beat,
+        flipping back and forth like a Necker cube, or relax and hear the combined 2 + 1 + 1 + 2
+        phrase as one syncopated pattern. The <em>low drum</em> and <em>high drum</em> buttons act
+        as quick mutes if you want to isolate one pulse, let it settle into your head, and then
+        bring the other back in. Higher ratios get denser fast: <em>4 : 3</em> needs a grid of 12
+        (resultant 3 + 1 + 2 + 2 + 1 + 3), and by <em>5 : 4</em> (grid of 20) the composite pattern
+        starts to stretch past what most listeners can track as a single groove.
       </p>
       <p>
-        Three against two is everywhere in music on a 12-pulse cycle, because twelve splits
-        both ways: four beats of three pulses or six beats of two. The bell-groove style in the
-        band runs the seven-stroke bell from step one over a kick on four beats of three, with
-        a shaker on all twelve pulses and a conga on a rotated E(5,12).
+        Three against two shows up constantly in twelve-pulse music because twelve factors cleanly
+        into both four groups of three and six groups of two. In the generative band's 12/8 bell
+        groove style, the seven-stroke Euclidean bell rides directly over a kick hammering four
+        beats of three, with a shaker ticking all twelve subdivisions and a conga on a rotated
+        E(5,12).
       </p>
 
       <!-- ================================================================ -->
       <h2 id="feel"><span class="kicker">Step 3 · Feel</span>Swing and the human wobble</h2>
       <p>
-        So far every hit lands on the grid. People don't play that way, and two kinds of
-        departure matter. The first is deliberate. <strong>Swing</strong> delays every second
-        subdivision, so pairs of equal notes become long–short pairs. At 50% the pair is even.
-        At 67% the first note takes two thirds of the pair, a 2 : 1 ratio, the triplet feel of
-        a shuffle. The figure's swing slider runs from 50% to 75% and shows the ratio.
+        Up to now every note has landed on exact mathematical grid lines. Real musicians never hit
+        dead on the grid, and two very different kinds of offset separate a groove from a clock.
+        The first is intentional: <strong>swing</strong> pushes every second subdivision slightly
+        late, stretching even pairs of notes into long–short pairs. At 50% the pair is dead even;
+        at 67% the first note takes two-thirds of the pair (a 2:1 ratio), giving the rolling
+        triplet shuffle of jazz and blues. The <em>swing</em> slider below runs from 50% to 75% and
+        prints both the percentage and the long-to-short ratio.
       </p>
       <p>
-        Swing isn't a fixed ratio in real playing. Anders Friberg and Andreas Sundström
-        measured jazz drummers' cymbal patterns and found the swing ratio falls as the tempo
-        rises: well above 2 : 1 at slow tempos, close to even at fast ones. So the band's
-        lo-fi style, at 72 to 84 bpm, swings between 56% and 61%, and its bossa, at 124 to 136,
-        barely swings at all.
+        Even among jazz drummers, swing isn't locked to a single number. Anders Friberg and Andreas
+        Sundström measured recorded ride-cymbal patterns across tempos and found that drummers
+        swing dramatically harder at slow tempos (often well past 2:1) and straighten out toward
+        even eighths as the tempo climbs. Our generative band borrows that habit: its slow lo-fi
+        style (72 to 84 bpm) swings between 56% and 61%, while its brisk bossa style (124 to 136
+        bpm) stays almost straight.
       </p>
 
       <div
@@ -178,47 +192,56 @@ while (back.length &gt; 1) {
       ></div>
 
       <p>
-        The second departure is the small, unintended error in every hit, a few milliseconds
-        either way. Drum machines that "humanize" usually add independent random offsets, the
-        <em>random</em> setting here: every hit's error is a fresh draw, and the error plot
-        jitters. Holger Hennig and colleagues measured the timing errors of real drummers and
-        found they aren't independent. Each error is related to the ones before it, over long
-        stretches, which makes them a kind of 1/f noise: the player drifts slightly ahead for a
-        while, then slightly behind. In their listening test, people preferred music
-        humanized with long-range correlated errors to the same music with independent ones.
+        The second kind of departure is the tiny, involuntary timing fluctuation in every human
+        strike, typically a few milliseconds early or late. Most drum machines "humanize" by adding
+        independent random jitter to each hit (the <em>random</em> option under <em>JITTER</em>
+        above), where every stroke rolls a fresh die and the error graph spikes wildly up and down.
+        When physicist Holger Hennig and his colleagues analyzed recordings of real drummers,
+        however, they found that human timing errors carry memory across many bars. Each deviation
+        correlates with the ones before it as 1/f (pink) noise: a player subtly leans ahead of the
+        beat for a stretch, then gradually settles behind it. In blind listening tests, listeners
+        consistently preferred grooves humanized with 1/f drift over the exact same beats jittered
+        with uncorrelated random noise.
       </p>
       <p>
-        The <em>1/f</em> setting draws each instrument's errors from a Voss–McCartney pink
-        noise generator: seven random sources, the <em>k</em>-th redrawn every 2<sup>k</sup>
-        hits, summed. Set humanize to about 10 ms and switch between the two. The plot shows
-        the difference more clearly than the ear does at first: the random line is grass, the
-        1/f line wanders. At 25 ms both start to sound sloppy.
+        The <em>1/f</em> mode generates each drum's drift with a Voss–McCartney pink-noise
+        generator: seven random values summed together, where the <em>k</em>-th source only gets
+        redrawn every 2<sup>k</sup> hits. Push <em>humanize</em> up near 10 ms and toggle between
+        <em>random</em> and <em>1/f</em> while the groove runs. Watch the bottom trace: white noise
+        looks like jagged static, whereas 1/f noise meanders smoothly across the zero line. Crank
+        the slider up to 25 ms (or tap <em>sloppy</em>) and either mode falls apart into a drunken
+        stumble.
       </p>
       <p>
-        The band uses both kinds of departure on purpose. Each instrument in a style gets a
-        steady lean and its own jitter. In lo-fi the snare sits 14 ms late and the hi-hat 3 ms
-        early, the keys drag by 12 ms, and the jitter runs from 4 ms on the kick to 9 ms on
-        the melody. Synth-pop is tighter, with 1.5 to 4 ms of jitter and almost no lean.
+        In the full band below, each instrument gets both its own steady lean and its own 1/f
+        jitter budget tailored to the style. In lo-fi, the snare lays back 14 ms late, the keys
+        drag 12 ms behind, the hi-hat pushes 3 ms early, and jitter scales from 4 ms on the kick
+        up to 9 ms on the lead melody. Synth-pop tightens almost everything down to 1.5 to 4 ms of
+        jitter with barely any lean at all.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="melody"><span class="kicker">Step 4 · What to play</span>A walker with rules</h2>
       <p>
-        Melodies have strong statistical habits. In large collections of folk and art melodies
-        most moves are steps to a neighbouring scale note or repeats, and leaps are the
-        exception. After a leap, melodies tend to turn back the other way. David Huron's
-        <em>Sweet Anticipation</em> collects these regularities, and Paul von Hippel and Huron
-        showed that the turn after a leap is largely regression to the mean: a big leap usually
-        lands near the edge of the melody's range, where most of the available notes are back
-        the other way.
+        Just like rhythm, melodies follow surprisingly consistent statistical habits. Across huge
+        corpora of folk songs and classical themes, most consecutive notes either repeat or move
+        just one step to a neighboring scale tone, leaving larger leaps relatively rare. And when a
+        melody does make a leap, it usually reverses direction right afterward. Music cognition
+        researcher David Huron gathered many of these patterns in <em>Sweet Anticipation</em>, and
+        Paul von Hippel and Huron showed that much of that post-leap reversal comes down to simple
+        regression to the mean: a wide jump tends to carry a singer near the top or bottom of their
+        comfortable range, where most remaining notes lie back toward the middle.
       </p>
       <p>
-        So the walker below picks its next scale step at random, mostly steps, with the
-        <em>leaps</em> slider setting how often it jumps. On beats one and three,
-        <em>gravity</em> pulls it onto a note of the current chord, which is what makes the
-        line sound like it belongs over the chords. Two rules can be switched on. One makes it
-        step back after a leap. The other repeats each two-bar idea once, with the strong
-        beats moved onto the new chords, before writing a new one.
+        The melody walker below turns those habits into a small probabilistic state machine playing
+        over a looping I–V–vi–IV progression in C. At each eighth note, it chooses a scale move
+        heavily weighted toward single steps, with the <em>leaps</em> slider controlling how often
+        it risks bigger intervals. On strong beats (beats one and three), <em>gravity</em> pulls
+        the melody onto a tone of the current chord so the line stays tethered to the harmony. Two
+        toggleable rules sit on the right: <em>step back after a leap</em> biases the note after
+        any skip to reverse by one step, and <em>repeat motifs</em> takes each fresh two-bar phrase
+        and replays its rhythm and contour once more, refitting its strong beats onto the next pair
+        of chords before inventing a new idea.
       </p>
 
       <div
@@ -228,28 +251,29 @@ while (back.length &gt; 1) {
       ></div>
 
       <p>
-        Watch the bars on the right while it plays. At the default settings about 60% of the
-        moves are steps, a fifth are repeated notes, and nearly every strong beat lands on a
-        chord tone. Drop gravity to zero
-        and the line wanders through the chords without noticing them. Push leaps to the top
-        and it turns into a pattern of jumps that's hard to follow. Turn off
-        <em>repeat motifs</em> and something else goes: every phrase is new, and nothing
-        sounds like a tune. Repetition lets you guess a little of what comes next, and that
-        makes a line much easier to follow.
+        Watch the live histogram on the right while the flute plays. With the default settings,
+        roughly 60–70% of moves are single steps, around 10–15% are repeated notes, and nearly
+        every strong beat lands on a green chord tone. Drag <em>gravity</em> down to zero and the
+        tune immediately drifts untethered above the chords; push <em>leaps</em> all the way up and
+        it fractures into jagged angular jumps. Even more revealing is turning off
+        <em>repeat motifs</em>: every individual interval still obeys good melodic statistics, yet
+        without short-term repetition the ear has nothing to grab onto and the line dissolves into
+        aimless wandering.
       </p>
       <details class="fold">
         <summary>Dice music and the Illiac Suite</summary>
         <div class="fold-body">
           <p>
-            Composing by chance is old. Johann Philipp Kirnberger published a dice game for
-            writing polonaises and minuets in 1757, and the best-known one, attributed to
-            Mozart, was printed in 1792: roll two dice for each bar and look up a pre-written
-            bar in a table. In 1957 Lejaren Hiller and Leonard Isaacson used the ILLIAC
-            computer at the University of Illinois to write the <em>Illiac Suite</em> for
-            string quartet, generating notes at random and keeping the ones that passed
-            counterpoint rules. The walker here does the same thing in a smaller way. All the
-            musical knowledge is in the weights and the rules; the dice only choose among
-            what the rules allow.
+            Letting chance choose notes has a long history. Johann Philipp Kirnberger published a
+            musical dice game for assembling polonaises and minuets in 1757, and a famous 1792
+            waltz game often credited to Mozart had players roll two dice per bar to pick
+            pre-composed measures from a lookup table. Two centuries later, in 1957, Lejaren Hiller
+            and Leonard Isaacson programmed the ILLIAC I computer at the University of Illinois to
+            compose the <em>Illiac Suite</em> for string quartet, generating candidate notes at
+            random and filtering them through formal counterpoint rules. Our melody walker works in
+            that same spirit at tiny scale: the musical taste lives inside the weights, range
+            limits, and motif rules, while the random number generator explores the space those
+            constraints leave open.
           </p>
         </div>
       </details>
@@ -257,53 +281,58 @@ while (back.length &gt; 1) {
       <!-- ================================================================ -->
       <h2 id="band"><span class="kicker">Step 5 · The band</span>One number, one song</h2>
       <p>
-        The band at the top of the page and in the figure below is one program,
-        <code>writeSong(seed)</code>, plus a mixer and a scheduler. The seed feeds a small
-        random number generator, and every choice after that is a draw from it.
+        Both the song clock at the top of this essay and the open-hood band below are driven by a
+        single pure function, <code>writeSong(seed)</code>, paired with a look-ahead scheduler and
+        a small mixer. Pass in one integer seed, initialize a deterministic random number
+        generator, and every arrangement choice cascades from there:
       </p>
       <ul>
         <li>
-          <strong>Style, key and tempo.</strong> One of four styles: lo-fi, synth-pop, a 12/8
-          bell groove, or bossa. Each style has a tempo range, a swing range and a weighted list
-          of modes. Lo-fi favours major and Dorian, the bell groove Dorian and Mixolydian. The
-          tonic is any of the twelve notes.
+          <strong>Style, key, and tempo:</strong> First the generator picks one of four styles
+          (lo-fi, synth-pop, a 12/8 bell groove, or bossa), each carrying its own tempo band, swing
+          range, instrument patches, and mode weights (lo-fi favors major and Dorian, while the
+          bell groove leans toward Dorian and Mixolydian), along with any of the twelve tonics.
         </li>
         <li>
-          <strong>Form.</strong> Intro (4 bars, 8 for the bell groove), verse, chorus, verse,
-          chorus, bridge, chorus, outro (4), with 8 bars for each middle section: 56 bars in
-          all, 60 for the bell groove. Each section has an energy level, and the arrangement
-          reads it: the intro has no bass and no melody, and the final chorus has everything.
+          <strong>Form:</strong> Every song lays out an arc of intro (4 bars, or 8 for the bell
+          groove), verse, chorus, verse, chorus, bridge, chorus, and a 4-bar outro, with 8 bars for
+          each interior section (56 bars total, or 60 in the bell groove). Each section carries an
+          energy score that controls orchestration: intros hold back the bass and lead, while the
+          final chorus brings every instrument in.
         </li>
         <li>
-          <strong>Harmony.</strong> Each section draws a four-bar progression of scale degrees
-          from a bank written for its mode, so a major verse might be I–V–vi–IV and its chorus
-          IV–V–iii–vi. The outro ends on the tonic. Lo-fi and bossa add sevenths and ninths;
-          pop adds the odd sus or add9. The keys and the pad are voiced with the minimum-motion
-          search from <a href="/pages/living-music/chords.html">part six</a>, inside fixed
-          ranges, and ninth chords drop their root because the bass already has it.
+          <strong>Harmony:</strong> Verses, choruses, and bridges each draw a four-bar progression
+          from a mode-specific bank (for instance, I–V–vi–IV in a major verse followed by
+          IV–V–iii–vi in the chorus), and the outro always resolves home on the tonic. Lo-fi and
+          bossa enrich chords with sevenths and ninths; synth-pop sprinkles in sus and add9 colors.
+          Keys and pad are voiced with the minimum-motion solver from
+          <a href="/pages/living-music/chords.html">part six</a>, dropping the root on ninth chords
+          since the bass already anchors it.
         </li>
         <li>
-          <strong>Drums.</strong> Euclidean wherever the style allows: pop hats on E(11,16) to
-          E(13,16) in the busy sections, the E(7,12) bell and an E(5,12) conga in the bell
-          groove, an E(5,16) clave rotated into the bossa pattern. The last bar before a verse or
-          chorus gets a fill, and pop verses and choruses start on a crash.
+          <strong>Drums:</strong> Euclidean patterns run wherever the style calls for them: busy
+          synth-pop sections spin hi-hats on E(11,16) through E(13,16), the bell groove interlocks
+          the E(7,12) bell with a rotated E(5,12) conga, and bossa rotates E(5,16) into its clave.
+          Transition bars heading into verses or choruses trigger fills, and pop sections kick off
+          with a crash cymbal.
         </li>
         <li>
-          <strong>Bass.</strong> Roots and fifths on a pattern that follows the kick. When the chord is
-          about to change, the last note of the bar is often a semitone from the next root,
-          leading into it.
+          <strong>Bass:</strong> The bass locks onto the kick pattern using roots and fifths, often
+          sliding into a chord change via a chromatic half-step approach note on the final beat of
+          the bar.
         </li>
         <li>
-          <strong>Melody.</strong> The walker from step four, in four two-bar phrases per
-          section, in the shape A A′ B A′: an idea, the idea refitted to new chords, a second
-          idea, and the first again ending on the tonic. When a verse or chorus comes back, its
-          melody comes back too, refitted and slightly changed.
+          <strong>Melody:</strong> Each verse and chorus runs the step-four walker across four
+          two-bar phrases arranged as A A′ B A′: a fresh motif, that same motif refitted to the new
+          chords, a contrasting phrase, and a final return ending on the tonic. When a verse or
+          chorus returns later in the song, its melody comes back with small variations.
         </li>
       </ul>
       <p>
-        All of that is written up front as a list of notes on a step grid. A look-ahead
-        scheduler then plays them, adding swing, each instrument's lean and its 1/f jitter at
-        the last moment. When the outro ends, it writes the next song and carries on.
+        <code>writeSong</code> lays the entire piece down up front as timestamped events on a step
+        grid. As the song plays, a look-ahead scheduler reads ahead and injects swing, per-part
+        lean, and 1/f drift right before each event hits the audio engine. Once the outro finishes,
+        a fresh seed rolls and the next song begins without stopping the clock.
       </p>
 
       <div
@@ -313,58 +342,51 @@ while (back.length &gt; 1) {
       ></div>
 
       <p>
-        The piano roll shows a few bars around now, with notes drawn where they actually
-        sound: you can see the swing and the humanizer move them off the bar lines. Mute
-        everything but the drums and bass to hear the groove the rest sits on, or switch
-        humanize between <em>1/f</em>, <em>random</em> and <em>off</em> while it plays.
-        <em>Style</em> locks the next songs to one style.
+        The scrolling piano roll plots each note at the exact shifted instant it actually sounds,
+        so you can watch swing and 1/f humanization nudge hits slightly off the vertical beat
+        lines. Try muting everything except <em>drums</em> and <em>bass</em> under <em>PARTS</em>
+        to hear the rhythmic pocket underneath, or cycle <em>humanize</em> through <em>1/f</em>,
+        <em>random</em>, and <em>off</em> mid-song. Clicking <em>style: any</em> locks subsequent
+        songs to a single genre.
       </p>
       <p>
-        Mixing turned out to matter as much as composing. Each part goes through its own
-        channel with a level, a pan position and sends to a shared reverb (3.4 seconds long,
-        high-passed at 220 Hz going in so it doesn't muddy the low end; the bass has no send) and, for the melody, a
-        dotted-eighth delay. Every kick briefly turns down the keys and pad, by 10% in bossa
-        up to 40% in synth-pop, which keeps the low end clear and gives the pop style its
-        pumping. I set the faders by rendering each part soloed offline and measuring it. In
-        a chorus, drums, bass and melody each sit near −29 dBFS RMS, the keys 4 to 8 dB
-        under that, and the pad 10 to 13 dB under, and the whole mix peaks around −7 dBFS, well
-        under the series' master limiter.
+        Getting the mix right turned out to matter just as much as the note generation. Every track
+        feeds its own channel strip with gain, stereo panning, and auxiliary sends into a shared
+        3.4-second plate reverb (high-passed at 220 Hz on the way in so low frequencies stay clean,
+        with zero reverb send on the bass) plus a tempo-synced dotted-eighth delay on the lead. On
+        every kick drum hit, a sidechain gain briefly ducks the keys and pad (a subtle 10% dip in
+        bossa, up to a pumping 40% in synth-pop), carving out headroom for the low end.
+        To balance the faders, I rendered each part soloed offline and measured its RMS level: in a
+        full chorus, drums, bass, and lead sit near −29 dBFS RMS, keys tuck 4 to 8 dB beneath them,
+        the pad sits 10 to 13 dB down, and the combined mix peaks around −7 dBFS, well clear of the
+        series' master limiter.
       </p>
       <p>
-        Press <em>next song</em> a few times. Some seeds are better than others, and you can
-        hear which without being able to say why. The program can't: it writes songs that
-        follow its rules, and has no way of judging them.
+        Hit <em>next song</em> a handful of times and listen closely. Some seeds immediately click
+        into a hook you'd happily let loop, while others feel forgettable even though both obeyed
+        the exact same rules. That gap is the hard boundary of rule-based generation: code can
+        guarantee coherent grammar, good voice leading, and a clean mix, while still having no ear
+        for which melody actually catches.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>Even spacing on a grid is Euclid's algorithm.</strong> It produces the
-          tresillo, the West African bell and the bossa nova, and the bell is the major scale's
-          step pattern in time.
-        </li>
-        <li>
-          <strong>Two even pulses make an uneven rhythm.</strong> Three against two on a grid
-          of six is 2 + 1 + 1 + 2.
-        </li>
-        <li>
-          <strong>Timing errors should remember.</strong> Swing is a deliberate delay; human
-          error drifts, and 1/f noise imitates that better than independent random offsets.
-        </li>
-        <li>
-          <strong>A melody needs steps, chord tones on the strong beats, and repetition.</strong>
-          Without repetition there's nothing to follow.
-        </li>
-        <li>
-          <strong>Writing the song is half of it.</strong> Voicing, levels, panning, reverb and
-          ducking decide whether it sounds like a band.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>From rules to listening</h2>
       <p>
-        Things I'd try next: let the band listen to itself and keep the seeds people replay;
-        write drum fills and endings with the same walker idea used for the melody; and
-        modulate, moving a bridge to a new key along the Tonnetz from part six.
+        Building a full song from scratch exposes how many quiet layers sit behind a groove that
+        feels effortless. Euclid's algorithm spreads uneven hits across a grid and happens to
+        recover rhythms from Cuba, West Africa, and Brazil (with the West African bell turning out
+        to be the major scale's step pattern mapped into time). Stacking two even pulses creates
+        composite polyrhythms like 3 against 2; deliberate swing and 1/f correlated drift soften
+        grid-locked drums into something a human wrist might play; and a simple random walker
+        starts sounding melodic as soon as you favor steps, anchor strong beats on chord tones, and
+        repeat short motifs. Just as important, panning, reverb filtering, and sidechain ducking do
+        half the work of turning five separate synthesizers into a band occupying the same room.
+      </p>
+      <p>
+        If I kept pushing this generator further, I'd want to add real key modulations into bridges
+        using the Tonnetz moves from part six, generate drum fills and endings with a rhythmic
+        walker of their own, and let listeners vote on seeds so the generator could gradually
+        discover which combinations of rules people actually want to replay.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/accompanist.html">Part 8, The Accompanist</a>.</strong>

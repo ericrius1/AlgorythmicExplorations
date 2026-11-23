@@ -4,6 +4,7 @@
 
 import * as THREE from "three/webgpu";
 import { Shell, type Demo } from "../../lib/demoShell";
+import { pixelRatio } from "../../lib/palette";
 import { TERRAIN_DEFAULTS, buildTerrainGeometry, terrainHeight, type TerrainParams } from "../../lib/terrain/heightmap";
 import { buildGrassGeometry, makeGrassMaterial } from "../../lib/terrain/grass";
 import { gridSampler } from "../../lib/terrain/light";
@@ -117,9 +118,75 @@ export function mountBiomeMap(container: HTMLElement): Demo {
     octx.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(off, 0, 0, shell.canvas.width, shell.canvas.height);
+
+    // compact translucent color key in the bottom-left corner
+    const dpr = pixelRatio(shell.canvas);
+    const cw = shell.canvas.width, ch = shell.canvas.height;
+    const font = Math.round(10.5 * dpr);
+    ctx.font = `${font}px ui-monospace, Menlo, monospace`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const fillPill = (x: number, y: number, w: number, h: number, r: number): void => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(10, 11, 16, 0.8)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = dpr;
+      ctx.stroke();
+    };
+    const margin = 10 * dpr;
     if (showMoisture) {
+      const barW = 84 * dpr, barH = 8 * dpr, padX = 10 * dpr, gap = 7 * dpr;
+      const dryW = ctx.measureText("dry").width;
+      const wetW = ctx.measureText("wet").width;
+      const pillW = padX * 2 + dryW + gap + barW + gap + wetW;
+      const pillH = 24 * dpr;
+      const px = margin, py = ch - margin - pillH;
+      fillPill(px, py, pillW, pillH, 6 * dpr);
+      const midY = py + pillH / 2;
+      ctx.fillStyle = "rgba(220, 228, 244, 0.86)";
+      ctx.fillText("dry", px + padX, midY);
+      const bx = px + padX + dryW + gap;
+      const g = ctx.createLinearGradient(bx, 0, bx + barW, 0);
+      g.addColorStop(0, "rgb(24, 44, 70)");
+      g.addColorStop(1, "rgb(64, 154, 240)");
+      ctx.fillStyle = g;
+      ctx.fillRect(bx, midY - barH / 2, barW, barH);
+      ctx.fillStyle = "rgba(220, 228, 244, 0.86)";
+      ctx.fillText("wet", bx + barW + gap, midY);
       shell.readout.textContent = "moisture alone: darker is drier, brighter blue is wetter";
     } else {
+      const sw = 8 * dpr, swGap = 5 * dpr, itemGap = 11 * dpr, padX = 10 * dpr, padY = 6 * dpr;
+      const widths = BIOMES.map((b) => sw + swGap + ctx.measureText(b).width);
+      const singleW = padX * 2 + widths.reduce((a, b) => a + b, 0) + itemGap * (BIOMES.length - 1);
+      const twoRows = singleW > cw - margin * 2;
+      const rows = twoRows ? [BIOMES.slice(0, 3), BIOMES.slice(3)] : [BIOMES];
+      const rowH = 16 * dpr;
+      const rowWidths = rows.map((row) =>
+        padX * 2 + row.reduce((acc, b) => acc + sw + swGap + ctx.measureText(b).width, 0) + itemGap * (row.length - 1),
+      );
+      const pillW = Math.max(...rowWidths);
+      const pillH = padY * 2 + rows.length * rowH;
+      const px = margin, py = ch - margin - pillH;
+      fillPill(px, py, pillW, pillH, 6 * dpr);
+      for (let r = 0; r < rows.length; r++) {
+        let cx = px + padX;
+        const cy = py + padY + (r + 0.5) * rowH;
+        for (const b of rows[r]) {
+          const [cr, cg, cb] = palette[b];
+          ctx.fillStyle = `rgb(${cr}, ${cg}, ${cb})`;
+          ctx.fillRect(cx, cy - sw / 2, sw, sw);
+          ctx.fillStyle = "rgba(228, 234, 246, 0.88)";
+          ctx.fillText(b, cx + sw + swGap, cy);
+          cx += sw + swGap + ctx.measureText(b).width + itemGap;
+        }
+      }
       const total = RW * RH;
       shell.readout.textContent = BIOMES.map((b) => `${b} ${Math.round((counts[b] / total) * 100)}%`).join(" · ");
     }
@@ -131,10 +198,10 @@ export function mountBiomeMap(container: HTMLElement): Demo {
     max: 0.35,
     step: 0.01,
     value: -sp.moistureOffset,
-    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `drier by ${v.toFixed(2)}` : `wetter by ${(-v).toFixed(2)}`),
+    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `dry +${v.toFixed(2)}` : `wet +${(-v).toFixed(2)}`),
     onInput: (v) => { sp.moistureOffset = -v; dirty = true; },
   });
-  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}% of peak`, onInput: (v) => { sp.treeLine = v; dirty = true; } });
+  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}%`, onInput: (v) => { sp.treeLine = v; dirty = true; } });
   shell.slider({ label: "climate scale", min: 0.015, max: 0.09, step: 0.002, value: sp.moistureFreq, format: (v) => `${(1 / v).toFixed(0)} u`, onInput: (v) => { sp.moistureFreq = v; mRow = 0; } });
   const viewBtn = shell.button("show moisture", () => {
     showMoisture = !showMoisture;
@@ -312,10 +379,10 @@ export async function mountBiomePatch(container: HTMLElement): Promise<Demo> {
     max: 0.35,
     step: 0.01,
     value: -sp.moistureOffset,
-    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `drier by ${v.toFixed(2)}` : `wetter by ${(-v).toFixed(2)}`),
+    format: (v) => (Math.abs(v) < 0.005 ? "neutral" : v > 0 ? `dry +${v.toFixed(2)}` : `wet +${(-v).toFixed(2)}`),
     onInput: (v) => { sp.moistureOffset = -v; queue(false); },
   });
-  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}% of peak`, onInput: (v) => { sp.treeLine = v; queue(false); } });
+  shell.slider({ label: "tree line", min: 0.3, max: 0.62, step: 0.01, value: sp.treeLine, format: (v) => `${Math.round(v * 100)}%`, onInput: (v) => { sp.treeLine = v; queue(false); } });
   shell.button("new terrain", () => {
     tp.seed = (Math.random() * 1e6) | 0;
     sp.seed = tp.seed;

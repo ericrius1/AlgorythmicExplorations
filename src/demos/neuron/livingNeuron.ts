@@ -156,7 +156,7 @@ export async function mountLivingNeuron(container: HTMLElement, opts: LivingNeur
     {
       at: centroid((i) => morph.kind[i] === Kind.Apical && morph.p1[i * 3] < -1.25),
       text: "apical tuft",
-      off: [-30, -46],
+      off: [-48, -54],
     },
     { at: nthOf(Kind.Apical, 14), text: "apical dendrite", off: [-20, -64] },
     { at: nthOf(Kind.Basal, 40), text: "basal dendrites", off: [-60, 58], key: true },

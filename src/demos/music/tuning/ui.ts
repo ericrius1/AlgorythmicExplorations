@@ -2,6 +2,8 @@
 // toggle, and the hero's tap-to-play badge. Styles live in
 // src/styles/music-tuning.css.
 
+import { Group } from "../../../lib/kit";
+
 export interface ChipOpts<T> {
   label?: string;
   options: { value: T; text: string; title?: string }[];
@@ -73,13 +75,14 @@ export function toggle(
   labels: [string, string],
   onChange: (on: boolean) => void,
   cls = "",
-): { el: HTMLButtonElement; set(on: boolean): void; get(): boolean } {
+): { el: HTMLButtonElement; set(on: boolean): void; get(): boolean; setLabels(next: [string, string]): void } {
   const b = document.createElement("button");
   b.type = "button";
   b.className = `demo-button tn-toggle ${cls}`.trim();
   let on = false;
+  let curLabels: [string, string] = [...labels];
   const sync = (): void => {
-    b.textContent = on ? labels[1] : labels[0];
+    b.textContent = on ? curLabels[1] : curLabels[0];
     b.classList.toggle("is-on", on);
     b.setAttribute("aria-pressed", String(on));
   };
@@ -97,6 +100,10 @@ export function toggle(
       sync();
     },
     get: () => on,
+    setLabels(next: [string, string]) {
+      curLabels = [...next];
+      sync();
+    },
   };
 }
 
@@ -110,45 +117,42 @@ export function button(parent: HTMLElement, label: string, onClick: () => void, 
   return b;
 }
 
-// A labelled range input that matches the essay slider look, for figures
-// that need to set the value from code as well as from the thumb.
+// A labeled kit slider for figures that also update the value from code
+// (such as snapping to tuning landmarks or syncing with preset chips).
 export function range(
   parent: HTMLElement,
   o: { label: string; min: number; max: number; step: number; value: number; format: (v: number) => string; onInput: (v: number) => void },
-): { input: HTMLInputElement; set(v: number): void } {
+): { set(v: number): void } {
   const wrap = document.createElement("label");
   wrap.className = "demo-slider tn-range";
-  const textEl = document.createElement("span");
-  textEl.className = "demo-slider-text";
-  const name = document.createElement("span");
-  name.className = "demo-slider-name";
-  name.textContent = o.label;
-  const val = document.createElement("span");
-  val.className = "demo-slider-value";
-  textEl.append(name, val);
-  const input = document.createElement("input");
-  input.type = "range";
-  input.min = String(o.min);
-  input.max = String(o.max);
-  input.step = String(o.step);
-  const sync = (v: number): void => {
-    val.textContent = o.format(v);
-    input.style.setProperty("--fill", `${((v - o.min) / (o.max - o.min)) * 100}%`);
+  const state = { v: o.value };
+  const ctl = new Group(wrap).bind(state, "v", {
+    label: o.label,
+    min: o.min,
+    max: o.max,
+    step: o.step,
+    format: o.format,
+  });
+  const val = wrap.querySelector<HTMLInputElement>(".k-val");
+  const sizeVal = (s: string): void => {
+    if (!val) return;
+    val.style.width = `${Math.max(4, s.length) + 1.2}ch`;
   };
-  input.value = String(o.value);
-  sync(o.value);
-  input.addEventListener("input", () => {
-    const v = Number(input.value);
-    sync(v);
+  if (val) {
+    val.readOnly = true;
+    val.tabIndex = -1;
+    sizeVal(o.format(o.value));
+  }
+  ctl.on((v) => {
+    sizeVal(o.format(v));
     o.onInput(v);
   });
-  wrap.append(textEl, input);
   parent.appendChild(wrap);
   return {
-    input,
     set(v: number) {
-      input.value = String(v);
-      sync(v);
+      state.v = v;
+      ctl.refresh();
+      sizeVal(o.format(v));
     },
   };
 }

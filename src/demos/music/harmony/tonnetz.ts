@@ -27,7 +27,7 @@ import {
   voiceLead,
   mod12,
 } from "./theory";
-import { COL, clear, figureAspect, font, glow, glowPath, refresh, rgba, setActive, smooth, tapToPlay, text, view2d } from "./draw";
+import { COL, clear, figureAspect, font, glow, glowPath, refresh, rgba, roundRect, setActive, smooth, tapToPlay, text, view2d } from "./draw";
 import { Clock, bass, epiano, pad, startAudio, strip, type Inst, soon } from "./sound";
 
 interface Step {
@@ -222,7 +222,10 @@ export async function mountTonnetz(container: HTMLElement, opts: TonnetzOpts = {
     const [x, y] = toLattice(e.clientX, e.clientY);
     const target = cellAt(x, y);
     if (target.i === cur.i && target.j === cur.j && target.up === cur.up) {
-      void ensureAudio().then(() => sound([0, 1, 2]));
+      void ensureAudio().then(() => {
+        tap.hide();
+        sound([0, 1, 2]);
+      });
       return;
     }
     const op = (["P", "L", "R"] as PLR[]).find((o) => {
@@ -233,6 +236,7 @@ export async function mountTonnetz(container: HTMLElement, opts: TonnetzOpts = {
     phraseName = "";
     goTo(target, op ?? null, false);
     void ensureAudio().then(() => {
+      tap.hide();
       sound([0, 1, 2]);
       if (hero && !playing) startWalk();
     });
@@ -562,20 +566,25 @@ export async function mountTonnetz(container: HTMLElement, opts: TonnetzOpts = {
 
     // legend for the figure
     if (!hero) {
-      const lx = 14 * px;
-      let ly = h - 16 * px;
+      const boxX = 10 * px;
+      const boxW = 122 * px;
+      const boxH = 58 * px;
+      const boxY = h - boxH - 10 * px;
+      roundRect(ctx, boxX, boxY, boxW, boxH, 7 * px);
+      ctx.fillStyle = "rgba(8, 10, 16, 0.86)";
+      ctx.fill();
+      ctx.strokeStyle = rgba("#8a91a5", 0.22);
+      ctx.lineWidth = 1 * px;
+      ctx.stroke();
       ctx.font = font(px, 10.5, 600);
-      ctx.fillStyle = "rgba(8, 10, 16, 0.85)";
-      ctx.fillRect(lx - 8 * px, ly - 40 * px, 112 * px, 50 * px);
       const rows: [string, string][] = [
-        ["minor third ↘", COL.minor],
-        ["major third ↗", COL.major],
         ["perfect fifth →", "#c9d1ea"],
+        ["major third ↗", COL.major],
+        ["minor third ↘", COL.minor],
       ];
-      for (const [s, c] of rows) {
-        text(ctx, s, lx, ly, { color: c, alpha: 0.8 });
-        ly -= 16 * px;
-      }
+      rows.forEach(([s, c], idx) => {
+        text(ctx, s, boxX + 10 * px, boxY + 13 * px + idx * 16 * px, { color: c, alpha: 0.88 });
+      });
     }
   };
 

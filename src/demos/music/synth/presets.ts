@@ -177,7 +177,7 @@ export const PRESETS: Preset[] = [
   },
   {
     name: "guitar",
-    info: "Karplus–Strong: a noise burst in a tuned delay line, averaged a little on every trip round",
+    info: "Karplus–Strong: a noise burst in a tuned delay line, averaged a little on every trip around",
     patch: { mode: 2, poly: 8, velAmt: 0.4, gain: 1.7, e1: env(0.001, 0.1, 1, 0.9), ks: { stretch: 1, decay: 6, bright: 0.8, pick: 0.14, blend: 1, frac: 1 } },
     fx: { chorus: 0.1, delay: 0, reverb: 0.2 },
     riff: [

@@ -47,21 +47,41 @@ export function mountSortPipeline(el: HTMLElement): void {
     screens: 5,
     aspect: 0.66,
     steps: [
-      { at: 0, text: "18 particles in a strip of 6 cells, coloured by which cell they fall in. The goal: every cell's particles contiguous in one array, no lists, no pointers." },
-      { at: 0.14, text: "Pass 1 — histogram. Every particle atomically bumps its cell's counter. Thousands of threads can do this at once; order doesn't matter, only the totals." },
-      { at: 0.34, text: "Pass 2, the scan. Where does each cell's run start? At the total of all the counts before it. Hillis–Steele gets there in rounds: every box adds the value 1 to its left, then 2 to its left, then 4. Three rounds for six cells, and every box updates at once in each round." },
-      { at: 0.64, text: "The scan gives totals that include each cell's own count. Shift them one place right, put a zero in front, and you have where each cell's run starts." },
-      { at: 0.74, text: "Pass 3, the scatter. Each particle takes the start of its cell's run plus an atomic ticket, and copies itself there. One pass and the array is sorted." },
-      { at: 0.92, text: "Neighbours in space are now neighbours in memory. The 3×3 query reads each cell as one clean contiguous run." },
+      {
+        at: 0,
+        text: "Eighteen particles sit in a 1D strip of six cells, colored by cell. We want all the particles from each cell stored back-to-back in a single flat array, with no linked lists or pointers.",
+      },
+      {
+        at: 0.14,
+        text: "Pass 1, the histogram: every particle atomically increments its cell's counter. Thousands of GPU threads can update these counters at once because order makes no difference here.",
+      },
+      {
+        at: 0.34,
+        text: "Pass 2, the prefix sum (scan): each cell needs the total count of every cell before it. Hillis–Steele builds running totals in parallel rounds, adding the entry 1 slot left, then 2 left, then 4 left (three rounds for six cells, with every cell updating together).",
+      },
+      {
+        at: 0.64,
+        text: "Those totals still include each cell's own count. Shifting the row right by one and putting 0 in front turns them into the starting index for each cell's slice of the output array.",
+      },
+      {
+        at: 0.74,
+        text: "Pass 3, the scatter: each particle grabs its cell's starting index plus an atomic ticket counter, then copies itself straight into that slot. One parallel pass sorts the whole array.",
+      },
+      {
+        at: 0.92,
+        text: "Particles that are neighbors in space are now neighbors in memory too, so checking a cell becomes a simple contiguous slice read.",
+      },
     ],
     draw(ctx, w, h, t) {
       const mx = Math.max(56, w * 0.08);
       const stripW = w - 2 * mx;
-      const stripY = h * 0.05;
-      const stripH = h * 0.2;
+      const stripY = Math.max(22, h * 0.055);
+      const usable = Math.max(180, h - stripY - 22);
+      const stripH = usable * 0.2;
       const cw = stripW / CELLS;
 
       const pStrip = phase(t, 0, 0.1);
+      const pHistIn = phase(t, 0.12, 0.18);
       const pHist = phase(t, 0.14, 0.32);
       const pScanIn = phase(t, 0.34, 0.4);
       const pStarts = phase(t, 0.64, 0.7);
@@ -80,7 +100,7 @@ export function mountSortPipeline(el: HTMLElement): void {
       }
       ctx.strokeRect(mx, stripY, stripW, stripH);
       for (let c = 0; c < CELLS; c++) {
-        label(ctx, `cell ${c}`, mx + c * cw + cw / 2, stripY - 10, {
+        label(ctx, `cell ${c}`, mx + c * cw + cw / 2, stripY - 11, {
           color: PAL.muted,
           size: 10,
           align: "center",
@@ -90,12 +110,13 @@ export function mountSortPipeline(el: HTMLElement): void {
       ctx.restore();
 
       // --- histogram row ---
-      const histY = stripY + stripH + h * 0.06;
-      const boxH = h * 0.075;
-      if (pHist > 0 || t >= 0.32) {
+      const histY = stripY + stripH + usable * 0.048;
+      const boxH = usable * 0.082;
+      if (pHistIn > 0 || t >= 0.32) {
+        const histAlpha = t >= 0.32 ? 1 : pHistIn;
         for (let c = 0; c < CELLS; c++) {
           const shown = Math.round(counts[c] * Math.min(1, pHist * 1.6));
-          ctx.globalAlpha = Math.min(1, pHist * 2);
+          ctx.globalAlpha = histAlpha;
           ctx.strokeStyle = PAL.grid;
           ctx.strokeRect(mx + c * cw + 4, histY, cw - 8, boxH);
           label(ctx, String(shown), mx + c * cw + cw / 2, histY + boxH / 2, {
@@ -103,21 +124,22 @@ export function mountSortPipeline(el: HTMLElement): void {
             size: 13,
             align: "center",
             mono: true,
-            alpha: Math.min(1, pHist * 2),
+            alpha: histAlpha,
           });
         }
         label(ctx, "counts", mx - 8, histY + boxH / 2, {
           color: PAL.muted,
           size: 10,
           align: "right",
-          alpha: Math.min(1, pHist * 2),
+          alpha: histAlpha,
         });
         ctx.globalAlpha = 1;
       }
 
       // --- scan rounds ---
-      const scanY0 = histY + boxH + h * 0.035;
-      const rowGap = boxH + h * 0.02;
+      const scanGap = Math.max(20, usable * 0.068);
+      const scanY0 = histY + boxH + scanGap;
+      const rowGap = boxH + usable * 0.02;
       const nRounds = rounds.length - 1; // 3 add rounds
       for (let r = 1; r <= nRounds; r++) {
         const t0 = 0.4 + ((r - 1) / nRounds) * 0.24;
@@ -141,7 +163,7 @@ export function mountSortPipeline(el: HTMLElement): void {
           // Arrow from the element `off` to the left, in the row above.
           if (c >= off && pr > 0.15 && pr < 0.85) {
             const fromX = mx + (c - off) * cw + cw / 2;
-            const fromY = y - rowGap + boxH;
+            const fromY = r === 1 ? histY + boxH : y - rowGap + boxH;
             const a = phase(pr, 0.15, 0.6);
             ctx.globalAlpha = a * (1 - phase(pr, 0.7, 0.85));
             arrow(ctx, fromX, fromY, lerp(fromX, mx + c * cw + cw / 2, a), lerp(fromY, y, a), PAL.accent, 1.2, 5);
@@ -157,12 +179,16 @@ export function mountSortPipeline(el: HTMLElement): void {
         ctx.globalAlpha = 1;
       }
       if (pScanIn > 0) {
-        label(ctx, "scan: running totals in log₂ rounds", mx + stripW, scanY0 - 8, {
-          color: PAL.muted,
-          size: 10,
-          align: "right",
-          alpha: pScanIn * (1 - phase(t, 0.85, 0.95)),
-        });
+        const scanHeaderAlpha = pScanIn * (1 - phase(t, 0.72, 0.78));
+        if (scanHeaderAlpha > 0.01) {
+          label(ctx, "scan: running totals in log₂ rounds", mx + stripW - 4, histY + boxH + scanGap * 0.5, {
+            color: PAL.muted,
+            size: 10,
+            align: "right",
+            alpha: scanHeaderAlpha,
+            bg: "rgba(6,7,11,0.85)",
+          });
+        }
       }
 
       // --- starts row: the inclusive scan shifted right by one ---
@@ -198,7 +224,7 @@ export function mountSortPipeline(el: HTMLElement): void {
       }
 
       // --- output row ---
-      const outY = startsY + rowGap + h * 0.01;
+      const outY = startsY + rowGap + usable * 0.015;
       const slotW = stripW / N;
       const pOut = phase(t, 0.7, 0.76);
       if (pOut > 0) {
@@ -215,9 +241,9 @@ export function mountSortPipeline(el: HTMLElement): void {
           ctx.moveTo(x, outY - 5);
           ctx.lineTo(x, outY + boxH + 5);
           ctx.stroke();
-          label(ctx, String(starts[c]), x + 3, outY + boxH + 12, {
+          label(ctx, String(starts[c]), x + 3, outY + boxH + 13, {
             color: CELL_COLORS[c],
-            size: 9,
+            size: 10,
             mono: true,
             alpha: pOut,
           });

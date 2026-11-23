@@ -359,9 +359,9 @@ export async function mountMelodyWalk(container: HTMLElement): Promise<Demo> {
     // interval histogram
     const s = stats();
     const hx0 = narrow ? left : right + 30 * px;
-    const hy0 = narrow ? h - 70 * px : top + 10 * px;
+    const hy0 = narrow ? h - 74 * px : top + 10 * px;
     const hw = narrow ? (w - left - 12 * px) / 4 : 130 * px / 4;
-    const hh = narrow ? 44 * px : 110 * px;
+    const hh = narrow ? 40 * px : 110 * px;
     if (!narrow) text(ctx, "moves played", hx0, hy0 - 4 * px, { color: COL.muted, font: font(px, 9.5, 650) });
     const labs = ["same", "step", "3rd", "4th+"];
     s.hist.forEach((c, i) => {

@@ -104,7 +104,7 @@ export async function mountMissing(container: HTMLElement): Promise<Demo> {
     max: 7,
     step: 1,
     value: lowest,
-    format: (v) => (v === 1 ? "1 (all of them)" : `${v} (1–${v - 1} removed)`),
+    format: (v) => (v === 1 ? "1 (all)" : `${v} (no 1–${v - 1})`),
     onInput: (v) => {
       lowest = v;
       if (playing) bank.set(null, amps(), 0.05);
@@ -210,7 +210,7 @@ export async function mountMissing(container: HTMLElement): Promise<Demo> {
         align: "right",
         color: lowest > 1 ? rgba(ORANGE, 0.85) : "rgba(180,188,210,0.75)",
       });
-      text(g, "Hz", x0 - 6, y1 + 14, { size: 9, align: "right", color: "rgba(150,160,190,0.4)", mono: true });
+      text(g, "pitch", x0 - 6, y1 + 14, { size: 9, align: "right", color: "rgba(150,160,190,0.4)", mono: true });
     },
     dispose() {
       setPlaying(false);

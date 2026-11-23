@@ -23,13 +23,13 @@ export function mountPyramidLevels(container: HTMLElement): Demo {
     max: FINEST,
     step: 1,
     value: level,
-    format: (v) => `${v} (${1 << v}×${1 << v} cells)`,
+    format: (v) => `${v} (${1 << v}×${1 << v})`,
     onInput: (v) => (level = Math.round(v)),
   });
   shell.button("re-seed", () => (bodies = seedDisk(N)));
   shell.setInfo(() => {
     const dim = 1 << level;
-    return `level ${level}: ${(dim * dim).toLocaleString()} cells · each cell = mass + centre of mass`;
+    return `level ${level}: ${(dim * dim).toLocaleString()} cells · each cell = mass + center of mass`;
   });
 
   return {
@@ -85,7 +85,7 @@ export function mountPyramidLevels(container: HTMLElement): Demo {
         dim = d;
       }
 
-      // Draw occupied cells as a heat map + centre-of-mass dots.
+      // Draw occupied cells as a heat map + center-of-mass dots.
       const { width, height } = ctx.canvas;
       const s = (Math.min(width, height) / 2) * VIEW;
       const ox = width / 2;
@@ -121,7 +121,7 @@ export function mountPyramidLevels(container: HTMLElement): Demo {
         }
         ctx.stroke();
       }
-      // centres of mass
+      // centers of mass
       const dot = Math.max(1.5, Math.min(3, cellW / 6)) * dpx;
       ctx.fillStyle = "rgba(255, 120, 230, 0.95)";
       ctx.beginPath();

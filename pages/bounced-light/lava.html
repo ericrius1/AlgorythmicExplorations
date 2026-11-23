@@ -10,7 +10,7 @@
     <title>The Lava Lamp — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="A lava lamp in the browser: particle wax that carries its own temperature, turned into smooth metaballs and lit with radiance cascades, so hot wax lights and shadows the cold wax around it."
+      content="A lava lamp running in the browser: particle wax carrying its own temperature, smoothed into metaballs and lit with 2D radiance cascades so hot wax illuminates and shadows the cold wax around it."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,9 +31,10 @@
         <p class="hero-kicker">Bounced Light · Part 1</p>
         <h1>The Lava Lamp</h1>
         <p class="subtitle">
-          Wax that heats, rises, cools and sinks, lit only by itself. The lamp above is a
-          particle fluid with a temperature on every particle, and its glow is real 2D light
-          transport. Stir it with your cursor.
+          Wax that heats, swells, rises, cools, and sinks, lit entirely by its own glow.
+          Every blob comes from a 2D particle fluid carrying temperature, and all the
+          illumination and shadows come from real-time light transport. Drag through the
+          glass to stir it.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -44,175 +45,191 @@
 
     <main>
       <p>
-        In the <a href="/pages/particle-worlds/part1.html">Particle Worlds</a> series I
-        simulated a lot of matter: gravity, sand, water, dust, a slice of the cosmic web,
-        and a fluid you can play like an instrument. I never simulated light. Every pixel
-        in those six parts was a particle carrying its own colour, added on top of its
-        neighbours and then colour graded. No particle ever lit another one. The core of
-        the galaxy in part one cast no glow on its own arms.
+        Across all six parts of the
+        <a href="/pages/particle-worlds/part1.html">Particle Worlds</a> series, I simulated
+        gravity, sand, water, swirling dust, a slice of the cosmic web, and an interactive
+        fluid instrument without ever simulating light. Every bright spot in those demos was
+        just additive paint: particles carrying their own color, stacked onto a buffer and
+        tone-mapped afterward. When the core of a galaxy flared up in part one, its spiral
+        arms felt none of that light.
       </p>
       <p>
-        This series is about light, and I wanted to start small: one lamp, one room, two
-        dimensions. A lava lamp is a good first subject because it's two problems stuck
-        together. How the wax moves is a heat problem: heat goes in at the coil, comes out
-        near the cap, and buoyancy does the rest. How it looks is a light problem. The glow
-        around a rising blob, the warm wash on the cold wax above it, and the shadow a
-        sinking blob drags across the glass all come from light leaving one place and
-        landing somewhere else. So the demo simulates both.
+        To start exploring actual light transport, a lava lamp in two dimensions turns out
+        to be an ideal test bench. Two coupled problems sit inside that glass bottle. First,
+        there is a heat-driven fluid simulation: energy enters at the heating coil, leaks
+        out near the cap, and buoyancy turns those temperature differences into slow
+        convection. Second, the same material plays both roles in the lighting. Hot wax near
+        the coil glows bright amber, while cool wax sinking back down goes nearly black and
+        casts shadows across the vessel. Because lights here constantly deform, pinch in
+        two, and drift behind opaque blockers, faking the glow with radial sprites stamped
+        onto each blob falls apart immediately. The light actually has to travel through the
+        scene.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="wax"><span class="kicker">Step 1 · One number per particle</span>Wax with a temperature</h2>
       <p>
-        The fluid is the same smoothed-particle hydrodynamics (SPH) I built for water in
-        <a href="/pages/particle-worlds/part3.html">Sorting Water</a>. Particles are sorted
-        into a grid, each one sums up its neighbours to get a density, and pressure pushes
-        back wherever the crowd is denser than it wants to be. The one addition is a
-        temperature on every particle. The neighbour loop that already sums density also
-        lets heat flow between particles that touch:
+        Underneath the glow sits the same smoothed-particle hydrodynamics (SPH) solver I
+        wrote for water in
+        <a href="/pages/particle-worlds/part3.html">Sorting Water</a>. Particles get binned
+        into a uniform spatial grid, each one sums its neighbors with a smooth falloff
+        kernel to estimate local density, and pressure pushes particles apart wherever they
+        crowd too tightly. Giving the wax a temperature only requires storing one extra
+        float per particle and piggybacking heat conduction onto that same neighbor loop:
       </p>
       <pre><code>rho   += w·w              <span class="cm">// density, as before</span>
-tFlux += (T_j − T_i)·w    <span class="cm">// conduction: heat flows along the same kernel</span></code></pre>
+tFlux += (T_j − T_i)·w    <span class="cm">// conduction: heat diffuses along the same kernel</span></code></pre>
       <p>
-        Particles near the coil warm up, hottest over the middle of it. Everything loses a
-        little heat all the time, and a lot of it near the top of the vessel. What
-        makes this a lava lamp and not a pot of soup is that temperature feeds back into the
-        motion in two places:
+        Particles resting near the bottom coil pick up heat (strongest over the middle of
+        the element), while everything cools slightly all the time and sheds heat much
+        faster inside a cooling zone near the top of the bottle. Temperature then drives
+        motion in two ways:
       </p>
-      <pre><code>rest_i = ρ₀ · (1 − β·T_i)        <span class="cm">// thermal expansion: hot wax wants more room</span>
-acc.y += buoyancy·T_i − gravity   <span class="cm">// the water I don't simulate lifts what expanded</span></code></pre>
+      <pre><code>rest_i = ρ₀ · (1 − β·T_i)        <span class="cm">// thermal expansion: warmer wax prefers more room</span>
+acc.y += buoyancy·T_i − gravity   <span class="cm">// proxy for the surrounding water lifting hot wax</span></code></pre>
       <p>
-        The first line is a cheap stand-in for thermal expansion. A warmer particle is
-        happy with fewer neighbours, so a warm patch pushes outward and takes up more room.
-        Blobs swell as they heat, as real wax does. The second line is a bigger shortcut.
-        In a real lamp the wax floats in water, and buoyancy is the water reacting to the
-        wax's density. I don't simulate the water, so a force proportional to temperature
-        does its job. Cold wax sinks and hot wax rises. The water's other job, drag, is a
-        damping term on every particle's velocity, and it's what keeps the motion slow.
+        Lowering a warm particle's target rest density is a cheap approximation of thermal
+        expansion: a hot pocket wants fewer neighbors per unit area, so it pushes outward
+        and swells as it heats up. The second line is an even bigger shortcut. In a real
+        lamp, wax floats inside clear liquid, and buoyancy is that surrounding fluid pushing
+        lighter wax upward. Rather than simulating a second fluid, I apply an upward force
+        proportional to temperature and use velocity damping to stand in for the water's
+        viscous drag. Cold wax sinks, hot wax rises, and the damping keeps everything moving
+        at that sleepy lava-lamp pace.
       </p>
       <p>
-        One more force keeps the wax in one piece. Pressure only cares about crowding, not
-        about whether the fluid stays together, so a plume driven by pressure and buoyancy
-        alone tears into ragged streamers. Real wax holds together because it's one liquid
-        sitting in another, and the boundary between them costs energy. I copy that with a
-        cohesion force between pairs of particles: weakly attractive at middle distances,
-        repulsive up close. That's surface tension in particle form. Necks pinch off, small
-        blobs get absorbed by big ones, and what's left is round. The lamp near the end of
-        this page has a slider for it, and at zero the blobs fray.
+        Left with only pressure and buoyancy, though, a rising plume shreds into wispy
+        streamers. Pressure resists crowding, yet nothing pulls separated particles back
+        together. Real wax beads up because the interface between wax and water carries
+        surface tension. To imitate that at the particle level, I add a pairwise cohesion
+        force that attracts neighbors at medium range and repels them up close. Thin necks
+        now pinch off cleanly, small droplets coalesce into larger ones, and floating blobs
+        round themselves out. You can zero out the <em>surface tension</em> slider in the
+        full lamp further down the page to see how quickly the wax frays without it.
       </p>
       <div
         data-demo="temp"
-        data-title="Wax, coloured by temperature"
+        data-title="Wax, colored by temperature"
         data-hint="Drag the sliders, stir the wax"
       ></div>
       <p>
-        Give it a few seconds. Heat builds up in the pool on the floor until a patch has
-        expanded enough to lift off. It cools on the way up, and once its buoyancy drops
-        below gravity it turns around and sinks. Nothing in the code says "circulate". The
-        cycle comes out of four numbers, one per slider: heat in, lift per degree, swelling
-        per degree, and heat out.
+        Watch the pool at the bottom for a few seconds and a warm dome swells until its
+        buoyancy beats gravity and pulls a plume upward. As the plume reaches the dashed
+        cooling zone near the cap, it drops temperature, loses lift, and turns back toward
+        the floor. That whole convection cycle emerges directly from the four parameters on
+        the sliders: <em>coil heat</em>, <em>buoyancy</em>, <em>expansion β</em>, and
+        <em>cooling</em>.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="surface"><span class="kicker">Step 2 · Particles become a surface</span>Metaballs</h2>
       <p>
-        Particles are a good way for wax to move and a bad way for it to look. Wax is one
-        continuous thing. The standard fix is an implicit surface: every particle stamps a
-        smooth round bump into a low-resolution field texture, the bumps add up, and
-        everything above a threshold counts as inside. Two particles drifting toward each
-        other merge into one rounded shape before they touch, which is the look real wax
-        has and dots never will.
+        Particles make fluid motion straightforward, yet drawn as raw dots they never look
+        like continuous melted wax. Turning a particle cloud into a smooth liquid calls for
+        an implicit surface: each particle splats a soft circular bump into a low-resolution
+        field texture, those overlapping bumps sum together, and any point whose total
+        exceeds a threshold counts as inside the wax. Long before two blobs physically
+        collide, their tails add past the threshold and draw a smooth liquid bridge between
+        them.
       </p>
       <p>
-        9,000 small bumps added together are lumpy at the scale of one particle, and a hard
-        threshold turns every lump into a scallop on the edge of the wax. So before
-        anything reads the field, I blur it with a small Gaussian (two passes, nine taps
-        each). Without it the wax looks like cotton wool.
+        Even with 9,000 particles, summing individual bumps still leaves slight lumpiness at
+        the scale of single particles, which a sharp threshold turns into scalloped edges.
+        Before extracting the surface, I run a separable Gaussian blur across the field (one
+        horizontal pass and one vertical pass, nine taps each) so the contours stay glassy
+        and smooth.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Blobby molecules</span>
         <p>
-          Jim Blinn introduced the idea in 1982 to draw electron-density surfaces around
-          molecules, and called them blobby molecules. Everyone since has called them
-          metaballs.
+          Jim Blinn introduced this technique in 1982 while rendering electron-density
+          clouds around chemical bonds, originally calling them "blobby molecules." The
+          graphics community soon adopted the catchier name <em>metaballs</em>.
         </p>
       </aside>
       <p>
-        The splat carries temperature too, as a second channel, so the surface pass knows
-        the average temperature of the wax at every point. That number decides what the wax
-        is, as far as light is concerned:
+        Each particle splat deposits its weighted temperature into a second texture channel,
+        so dividing by the local field density yields the average wax temperature at any
+        pixel. From there, every point inside the wax gets an emission color and an opacity
+        for the lighting pass:
       </p>
       <pre><code>emission  = palette(T) · luminance(T)  <span class="cm">// cold: near-black plum … hot: bright amber</span>
-occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax blocks light</span></code></pre>
+occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax blocks passing rays</span></code></pre>
       <p>
-        Cold wax is an occluder. It's almost black, and you see it by what it blocks. Hot
-        wax is a light. The same blob is both at different points in its life, so the
-        lights in this scene move, split in two, and cast shadows on each other. A glow
-        sprite pasted on each blob can't do that. For that I need to move light around the
-        scene, which nothing in the earlier series did.
+        Whether a blob is glowing hot or cooled to dark plum, it blocks light behind it. The
+        same mass of wax starts out as a bright light source near the bottom coil, drifts up
+        past cooler wax, and eventually becomes a dark occluder catching warm rim light from
+        the next rising plume. To render that honestly, every pixel needs to gather light
+        from across the entire canvas while respecting whatever wax sits in the way.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="cascades"><span class="kicker">Step 3 · Light transport</span>Radiance cascades</h2>
       <p>
-        Here's the problem. For every pixel I want the light arriving from every direction,
-        with shadows, in real time. The brute-force answer is to march a few hundred rays
-        out of every pixel, every frame. That's the n² problem of light transport, and it's
-        far too slow. One observation about how light behaves makes it cheap.
+        Computing full 2D lighting with shadows in real time runs straight into a brute-force
+        wall: marching hundreds of rays out of every single pixel on every frame scales far
+        too badly to hit 60 fps. Radiance cascades sidestep that wall by taking advantage of
+        a basic geometric property of how light varies across space, often called the
+        <strong>penumbra condition</strong>.
       </p>
       <p>
-        It's called the <strong>penumbra condition</strong>. The further away a light is,
-        the more slowly its contribution changes as you move around, but the more finely
-        you need to know which direction it's in. Nearby light needs probes packed close
-        together and only a few directions each. Distant light needs lots of directions and
-        hardly any probes. One grid of probes can't do both, so radiance cascades use a
-        stack of them:
+        Light from a nearby source shifts rapidly as you move a few pixels sideways, because
+        small blockers right beside you cast crisp shadows. On the other hand, a nearby
+        source spans a wide angle, so you only need a handful of ray directions to notice
+        it. Distant light behaves in the opposite way: its brightness changes slowly from
+        spot to spot, yet a faraway bright blob occupies a narrow sliver of angle, so you
+        need densely packed ray directions to hit it reliably. Instead of forcing one grid
+        of probes to resolve both fine space and fine angles everywhere, radiance cascades
+        split the distance outward into concentric intervals across a stack of grids:
       </p>
       <pre><code>cascade 0:  probes every 2 px,   4 rays each,  covering   0 →   4 px
 cascade 1:  probes every 4 px,  16 rays each,  covering   4 →  20 px
 cascade 2:  probes every 8 px,  64 rays each,  covering  20 →  84 px
-<span class="cm">// each level: ¼ as many probes × 4 times the rays, so every cascade costs the same</span></code></pre>
+<span class="cm">// every step up: ¼ as many probes × 4× as many rays = constant cost per level</span></code></pre>
       <p>
-        Each cascade only traces a ring: short ray segments that start where the level
-        below gave up. Scroll through one probe doing it:
+        Each cascade traces only its own hollow ring of distance, starting right where the
+        finer cascade beneath it stopped. Scroll through the diagram below to watch one
+        probe build up its view of the scene across three levels and merge the results back
+        inward.
       </p>
 
       <div data-scrolly="cascade-rays"></div>
 
       <p>
-        The levels are then merged from the top down. When one of a cascade's rays hits
-        nothing, it takes the light the next level up found in the same direction,
-        interpolated between the four nearest coarser probes. Everything ends up in
-        cascade 0, which holds, for every 2×2 block of the light grid, the light arriving
-        from the whole canvas. There's no random sampling anywhere, so there's no speckle
-        to average away.
+        Once every cascade has traced its own ring, the renderer merges the stack from the
+        coarsest level back down to cascade 0. Whenever a ray finishes its interval without
+        hitting anything, it blends in the radiance found along the matching angular sector
+        in the level above, interpolated across the four nearest coarse probes. By the time
+        the merge reaches cascade 0, every 2×2 block of the light grid knows the light
+        arriving from across the whole scene, with zero Monte Carlo speckle because the ray
+        angles are completely structured.
       </p>
       <p>
-        Three refinements are worth having, the first from people who have worked on this
-        since Sannikov's write-up. Plain
-        interpolation draws faint rings around small bright lights, because the four
-        coarser probes see a nearby light from slightly different angles. The
-        <em>bilinear fix</em> traces a separate short ray from each probe to each of its
-        four parents and merges with each parent on its own, which gets rid of the rings
-        and stops light leaking through thin walls, for four times the rays. And the 4
-        directions of cascade 0 are coarse enough that a small light can slip between two
-        of them, so every frame I rotate the whole set of directions by a new angle and
-        keep a short running average of the result. Last, interpolating between coarse
-        probes leaves a faint pattern tied to where those probes sit: soft blotches the size
-        of the coarse spacing, and a cross around small lights. So every frame, each
-        cascade above 0 also shifts its whole probe grid by a new offset inside one probe
-        cell. The pattern moves with the grid, and the same running average smooths most
-        of it out. With all of that, every cascade below the top
-        traces four short rays per pixel of the light grid, so the lamp below (five cascades
-        on a desktop screen) comes to about 17. Brute force at the same quality would be thousands.
+        Three practical refinements clean up the visual artifacts that show up in a textbook
+        implementation. First, naive bilinear interpolation between four coarse probes can
+        draw faint halo rings around small bright lights and let light bleed through thin
+        walls, because the four parent probes view a nearby emitter from slightly different
+        vantage points. Using the <em>bilinear fix</em> (developed by the community after
+        Alexander Sannikov's original write-up) traces four short rays from each probe
+        directly toward its four parent probes and merges each individually, eliminating
+        both ringing and light leaks at four times the ray budget. Second, cascade 0 only
+        has four ray directions, which leaves small emitters able to slip between spokes;
+        rotating the ray directions by a fresh offset every frame and keeping a short
+        temporal running average fills those gaps smoothly. Third, interpolating from fixed
+        coarse probe grids leaves subtle stationary blotches and faint crosses around point
+        lights, so each cascade above level 0 also jitters its probe grid offset inside a
+        single cell each frame, letting the same temporal average dissolve the grid pattern.
+        Put together, every level below the top traces four short rays per light-grid pixel,
+        bringing the five-cascade desktop lamp below to roughly 17 short rays per pixel
+        instead of the thousands brute-force marching would demand.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Shipped in a game first</span>
         <p>
-          Alexander Sannikov developed radiance cascades for the lighting in
-          <em>Path of Exile 2</em> and wrote them up in 2023. If the merge looks familiar,
-          coarse levels answering for whatever the fine levels can't see, it's the same
-          idea as the Barnes–Hut tree in
+          Alexander Sannikov designed radiance cascades for the real-time lighting in
+          <em>Path of Exile 2</em> and published the technique in 2023. The core trade-off,
+          letting coarse distant summaries stand in for details that nearby grids cannot
+          afford to trace individually, echoes the Barnes–Hut tree from
           <a href="/pages/particle-worlds/part1.html">Two Falling Dots</a>.
         </p>
       </aside>
@@ -220,23 +237,29 @@ cascade 2:  probes every 8 px,  64 rays each,  covering  20 →  84 px
         <summary>Deep dive: distance fields and the jump flood</summary>
         <div class="fold-body">
           <p>
-            Two supporting pieces make it fast. The rays sphere-march against a
-            <em>distance field</em>: at every pixel, the distance to the nearest solid
-            thing, so each step along a ray can jump that far without missing anything.
-            The field is built by the <em>jump flood</em> algorithm (Rong &amp; Tan,
-            2006). Every pixel repeatedly asks neighbours at halving offsets which surface
-            pixel is the nearest one they know about. On the roughly 400×260 light grid of
-            the lamp below, that's nine passes, and afterwards every pixel knows its
-            distance to all the geometry. It's the same halving rhythm as the scan in
-            part three and the FFT in part five.
+            Two ingredients keep every ray segment cheap to march. Rather than stepping one
+            pixel at a time, each ray sphere-marches through a 2D <em>distance field</em>
+            that stores the distance from every pixel to the nearest solid surface, allowing
+            the ray to jump safely across open liquid in large strides. That distance field
+            is rebuilt every frame on the GPU using the <em>jump flood</em> algorithm (Rong
+            &amp; Tan, 2006): pixels poll neighbors at halving step sizes (256, 128, 64, ...
+            down to 1) and record the closest surface pixel they hear about. On the lamp's
+            light grid (around 400×260 pixels), nine quick passes are enough to give every
+            pixel its exact distance to the moving wax, following the same power-of-two
+            halving pattern as the prefix scan in part three and the FFT in part five of the
+            previous series.
           </p>
         </div>
       </details>
       <p>
-        This sandbox is the algorithm with nothing else in front of it. Paint lights, paint
-        walls, erase, and the shadows follow whatever you draw. The slider cuts the stack
-        of cascades short. With one cascade, light travels four pixels and stops. Each level
-        you add lets it travel four times further, for the same cost per pixel.
+        Before plugging this back into the fluid sim, you can test the lighting engine by
+        itself below. Draw colored emitters with <em>paint light</em> (cycling hues with the
+        <em>color</em> button), sketch opaque blockers with <em>paint wall</em>, or carve
+        openings with <em>erase</em>. The <em>cascades</em> slider truncates the hierarchy:
+        at 1 cascade, light stops after a tiny neighborhood around each source, and every
+        additional level stretches its reach roughly four times farther at the same cost per
+        level. Flip <em>view: final</em> to <em>view: distance field</em> to watch the jump
+        flood contour map update under your brush.
       </p>
       <div
         data-demo="paint"
@@ -247,18 +270,19 @@ cascade 2:  probes every 8 px,  64 rays each,  covering  20 →  84 px
       <!-- ================================================================ -->
       <h2 id="lamp"><span class="kicker">Step 4 · Assembly</span>The lamp</h2>
       <p>
-        Everything runs in one direction, with no loops: particles → temperature → metaball
-        field → emission and occlusion → distance field → cascades → pixels. The coil is
-        painted into the same scene texture as the wax, so it isn't a special light, just a
-        hot object. The metal base, the cap and the table are dark occluders. The glass is
-        drawn afterwards and doesn't block anything.
+        With all four stages wired together, each frame flows straight down a single GPU
+        pipeline: SPH particle step with temperature, metaball splat and Gaussian blur,
+        scene texture (emission plus occlusion), jump-flood distance field, radiance
+        cascades, and final compositing. The heating coil is drawn right into the scene
+        texture as another bright shape, while the metal base, cap, and tabletop are painted
+        as dark occluders. The glass silhouette is composited last without blocking light.
       </p>
       <p>
-        The light is computed at a fraction of the canvas resolution, because light is
-        smooth. The final pass re-reads the blurred field at every canvas pixel, so the
-        edges of the wax stay sharp, and shades each pixel with the light from the
-        cascades. It writes into a high-range buffer, and the page's bloom and tone mapping
-        take it from there.
+        Because soft illumination varies far more slowly than silhouette edges, the cascades
+        run at a fraction of the canvas resolution. The final display pass then re-samples
+        the blurred metaball field at full display resolution so every wax outline stays
+        razor-sharp, combines it with the upsampled radiance, and sends the high-dynamic-range
+        result through bloom and ACES tone mapping.
       </p>
       <div
         data-demo="lamp"
@@ -266,47 +290,38 @@ cascade 2:  probes every 8 px,  64 rays each,  covering  20 →  84 px
         data-hint="Stir it, then flip the views"
       ></div>
       <p>
-        The <em>view</em> button shows each stage of the renderer. <em>Scene</em> is what
-        the rays see: a few glowing shapes on black, which is the entire input to the
-        lighting. <em>Distance field</em> is the jump flood's contour map, rippling as blobs
-        split and merge. <em>Light only</em> leaves out the wax's own emission and shows
-        just the light that travelled: everything in that view arrived at its pixel from
-        somewhere else. Back on <em>final</em>, watch a cold blob drift past a hot one and
-        pick up a warm rim on one side. Nothing in the code draws that rim. It's the light
-        transport.
+        Clicking <em>view: final</em> cycles through the intermediate buffers.
+        <em>Scene (what the rays see)</em> reveals the stark emission-and-occlusion input
+        handed to the lighting solver. <em>Distance field</em> exposes the jump flood's
+        rippling contour bands as wax blobs merge and pull apart. <em>Light only</em> strips
+        out the wax's own emission so you see purely the light arriving from elsewhere in
+        the vessel. Switch back to <em>final</em> and follow a dark cooling blob sinking
+        past a bright rising one: the warm rim lighting along its underside comes straight
+        out of the cascade transport.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="carries-over"><span class="kicker">Wrap-up</span>What I took from it</h2>
+      <h2 id="carries-over"><span class="kicker">Wrap-up</span>What carried over</h2>
       <p>
-        A lot carried over from the matter series. The grid sort under the wax is the one
-        from part three, unchanged except that each particle grew a temperature. Splatting
-        particles into a field and reading it back is the same move as part five's mass
-        deposit onto a grid. The cascade merge is the Barnes–Hut idea from part one,
-        applied to light.
+        Surprisingly little of the fluid code had to be invented from scratch. The spatial
+        grid sort comes directly from the water solver in the previous series, with one
+        temperature float added per particle; splatting particles into a continuous field
+        mirrors the mass-deposit grid from the gravity solver; and merging coarse distant
+        light into fine local probes uses the same hierarchical intuition as Barnes–Hut.
+        What really changed was the question each shader asks: instead of only asking where
+        matter moves next, the GPU now spends most of its time asking what every point in
+        the scene can see.
       </p>
-      <ul>
-        <li>
-          <strong>A matter sim asks where things go. A light sim asks what things see.</strong>
-          The particle code barely changed. Everything new on this page is about the second
-          question.
-        </li>
-        <li>
-          <strong>Match the sampling to how the signal changes.</strong> Near light varies
-          in space and far light varies in angle. Giving each level only the detail it needs
-          is what makes the cascades cheap.
-        </li>
-        <li>
-          <strong>Light can run coarse if the display pass doesn't.</strong> The cascades
-          run at a fraction of the canvas resolution, and nobody can tell, because the edges
-          are drawn at full resolution.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: give the water a little colour so the light picks up a tint
-        on its way through, let the glass refract, and replace the buoyancy shortcut with a
-        real second fluid. Part two keeps the cascades and changes the scene: thousands of
-        moving lights, light that bounces, and a sky.
+        Matching the sampling structure to the signal is what made that affordable here.
+        Near light changes sharply in space, far light changes sharply in angle, and keeping
+        the cascades on a coarse grid while redrawing geometry edges at full canvas
+        resolution hides the low-res lighting almost completely. If I came back to polish
+        this lamp further, I would tint the liquid so light picks up color as it travels,
+        add refraction along the glass walls, and replace the temperature-buoyancy shortcut
+        with a true two-fluid sim. First, though, I want to see how far these same 2D
+        cascades can stretch when a scene fills up with thousands of moving lights, bouncing
+        wall colors, and an open sky.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/bounced-light/bonfire.html">Part two, The Bonfire</a>.</strong>

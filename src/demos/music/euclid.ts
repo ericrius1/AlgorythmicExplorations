@@ -115,7 +115,7 @@ export async function mountEuclid(container: HTMLElement): Promise<Demo> {
   const guard = frameGuard(() => {
     if (clock.isRunning) stop();
   });
-  const tap = tapToPlay(container, "Tap to play", () => void start(), 0.5);
+  const tap = tapToPlay(container, "Tap to play", () => void start(), 0.84);
   canvas.addEventListener("pointerdown", () => {
     if (clock.isRunning) stop();
     else void start();
@@ -155,6 +155,10 @@ export async function mountEuclid(container: HTMLElement): Promise<Demo> {
         kSlider.dispatchEvent(new Event("input"));
       }
       rotSlider.max = String(n - 1);
+      if (rot >= n) {
+        rot = 0;
+        rotSlider.value = "0";
+      }
       rebuild();
       markPreset(null);
     },
@@ -327,12 +331,13 @@ export async function mountEuclid(container: HTMLElement): Promise<Demo> {
     // ---- Bjorklund's stages ----
     const x0 = narrow ? 16 * px : w * 0.56;
     const x1 = w - 16 * px;
-    const top = narrow ? h * 0.47 : h * 0.12;
+    const top = narrow ? h * 0.47 : h * 0.11;
     const bottom = h - 18 * px;
     text(ctx, "Bjorklund's algorithm", x0, top - 4 * px, { color: COL.muted, font: font(px, 10, 650) });
     const rows = stages.length;
-    const rowH = Math.min(46 * px, (bottom - top - (narrow ? 120 : 26) * px) / Math.max(rows, 1));
-    const cell = Math.min((x1 - x0) / n, rowH * 0.62);
+    const rowH = Math.min(44 * px, (bottom - top - (narrow ? 124 : 112) * px) / Math.max(rows, 1));
+    const cell = Math.max(8 * px, Math.min((x1 - x0) / n, rowH - 13 * px, rowH * 0.62));
+    const sideRoom = x1 - x0 - n * cell > 74 * px;
     stages.forEach((st, r) => {
       const y = top + 18 * px + r * rowH;
       let x = x0;
@@ -359,7 +364,10 @@ export async function mountEuclid(container: HTMLElement): Promise<Demo> {
       const groups = st.length;
       const kinds = new Set(st.map((g) => g.join(""))).size;
       const note = r === 0 ? `${k} hits, ${n - k} rests` : last ? (kinds <= 2 ? "done" : "") : `${groups} groups`;
-      if (!narrow || r === 0 || last) text(ctx, note, x1, y - 6 * px, { color: COL.dim, align: "right", font: font(px, 9, 600) });
+      if (note && (!narrow || r === 0 || last)) {
+        const ny = sideRoom ? y + cell / 2 : y - 6 * px;
+        text(ctx, note, x1, ny, { color: COL.dim, align: "right", font: font(px, 9, 600) });
+      }
     });
     // the finished pattern, rotated, with the playhead
     const yF = top + 18 * px + rows * rowH + 4 * px;

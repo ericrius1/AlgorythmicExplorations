@@ -33,6 +33,13 @@ export function mountChunkDiagram(container: HTMLElement): Demo {
 
   const heading = (): number => Math.sin(t * 0.21) * 1.2;
 
+  // start with the initial ring already built so the concentric LOD bands read immediately
+  for (let dj = -ring; dj <= ring; dj++) {
+    for (let di = -ring; di <= ring; di++) {
+      chunks.set(`${di},${dj}`, { ci: di, cj: dj, lod: lodClass(Math.max(Math.abs(di), Math.abs(dj))), flash: 0 });
+    }
+  }
+
   const step = (dt: number): void => {
     t += dt;
     camX += Math.cos(heading()) * speed * dt;
@@ -123,6 +130,52 @@ export function mountChunkDiagram(container: HTMLElement): Demo {
     ctx.lineTo(w / 2 + Math.cos(hd) * px * 1.4, h / 2 + Math.sin(hd) * px * 1.4);
     ctx.stroke();
 
+    // compact LOD legend in the left margin (or top bar if narrow)
+    const legendItems: { color: string; alpha: number; outline?: string; label: string; short: string }[] = [
+      { color: COLORS[0], alpha: 0.85, label: "full (48²)", short: "full" },
+      { color: COLORS[1], alpha: 0.55, label: "half (24²)", short: "half" },
+      { color: COLORS[2], alpha: 0.42, label: "quarter (12²)", short: "1/4" },
+      { color: "#ffffff", alpha: 0.9, label: "building", short: "build" },
+      { color: "rgba(150, 120, 230, 0.25)", alpha: 1, outline: "rgba(150, 120, 230, 0.5)", label: "backdrop", short: "far" },
+    ];
+    const sw = 9 * dpr;
+    ctx.font = `${Math.round(10.5 * dpr)}px ui-monospace, Menlo, monospace`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const leftMargin = w / 2 - (ring + 1) * px;
+    if (leftMargin > 118 * dpr) {
+      let ly = 18 * dpr;
+      const lx = 14 * dpr;
+      for (const item of legendItems) {
+        ctx.fillStyle = "#0a0b10";
+        ctx.fillRect(lx, ly - sw / 2, sw, sw);
+        ctx.globalAlpha = item.alpha;
+        ctx.fillStyle = item.color;
+        ctx.fillRect(lx, ly - sw / 2, sw, sw);
+        ctx.globalAlpha = 1;
+        if (item.outline) {
+          ctx.strokeStyle = item.outline;
+          ctx.lineWidth = dpr;
+          ctx.strokeRect(lx + 0.5 * dpr, ly - sw / 2 + 0.5 * dpr, sw - dpr, sw - dpr);
+        }
+        ctx.fillStyle = "rgba(176, 190, 218, 0.78)";
+        ctx.fillText(item.label, lx + sw + 7 * dpr, ly);
+        ly += 18 * dpr;
+      }
+    } else {
+      let lx = 12 * dpr;
+      const ly = 14 * dpr;
+      for (const item of legendItems) {
+        ctx.globalAlpha = item.alpha;
+        ctx.fillStyle = item.color;
+        ctx.fillRect(lx, ly - sw / 2, sw, sw);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(176, 190, 218, 0.78)";
+        ctx.fillText(item.short, lx + sw + 4 * dpr, ly);
+        lx += sw + 4 * dpr + ctx.measureText(item.short).width + 10 * dpr;
+      }
+    }
+
     const all = chunks.size * vertsOf(0);
     shell.readout.textContent =
       `${chunks.size} chunks: ${counts[0]} full, ${counts[1]} half, ${counts[2]} quarter · ` +
@@ -130,7 +183,7 @@ export function mountChunkDiagram(container: HTMLElement): Demo {
   };
 
   shell.slider({ label: "view radius", min: 2, max: 7, step: 1, value: ring, format: (v) => `${v} chunks`, onInput: (v) => { ring = v; } });
-  shell.slider({ label: "flight speed", min: 0.3, max: 5, step: 0.1, value: speed, format: (v) => `${v.toFixed(1)} chunks/s`, onInput: (v) => { speed = v; } });
+  shell.slider({ label: "flight speed", min: 0.3, max: 5, step: 0.1, value: speed, format: (v) => `${v.toFixed(1)} ch/s`, onInput: (v) => { speed = v; } });
   shell.slider({ label: "builds per frame", min: 1, max: 8, step: 1, value: perFrame, onInput: (v) => { perFrame = v; } });
 
   let last = performance.now();
@@ -219,7 +272,7 @@ export async function mountInfiniteFlight(container: HTMLElement): Promise<Demo>
   });
   const tintBtn = shell.button("LOD tint", () => {
     world.showLodTint = !world.showLodTint;
-    tintBtn.textContent = world.showLodTint ? "natural colour" : "LOD tint";
+    tintBtn.textContent = world.showLodTint ? "natural color" : "LOD tint";
   });
   shell.setInfo(() => {
     const s = world.stats;

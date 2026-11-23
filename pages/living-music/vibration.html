@@ -10,7 +10,7 @@
     <title>The Anatomy of a Note — Living Music</title>
     <meta
       name="description"
-      content="What a musical note is made of: pitch, loudness, and timbre, taken apart with a playable harp, an oscilloscope, a pluckable and bowable string, an additive synth, a formant voice, the missing fundamental, and a Shepard tone."
+      content="Pitch, loudness, and timbre from the physics up: a playable harmonic harp, an oscilloscope, a pluckable and bowable string, an additive synthesizer, a formant voice, the missing fundamental, and a Shepard tone."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Living Music · Part 1</p>
         <h1>The Anatomy of a Note</h1>
         <p class="subtitle">
-          Pitch, loudness, and timbre, taken apart. The harp above has eight strings tuned to the
-          harmonics of one low A. Drag across them to play.
+          Eight strings tuned to the harmonics of one low A, and the hidden physics inside every
+          musical sound. Drag across the harp above to play.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,40 +43,41 @@
 
     <main>
       <p>
-        The harp at the top of this page has eight strings at 110, 220, 330, and so on up to
-        880 Hz. They're all the same string, under the same tension, cut to lengths of 1, ½, ⅓
-        down to ⅛. That's why the bottom ends trace a curve. Tap it to turn the sound on, then
-        drag across the strings (or press the keys 1 to 8). Under each string a trace falls
-        away showing how much sound there is at that string's frequency. Pluck the longest
-        string and traces start falling under the other seven too, even though you didn't
-        touch them. By the end of this article you'll know why.
+        Tap the harp above to turn audio on, then pluck the longest string on the left (or press
+        the <code>1</code> key; keys <code>1</code> through <code>8</code> play all eight strings,
+        or you can drag straight across them). Watch the glowing ribbons falling beneath the
+        strings. Each ribbon measures how much sound energy exists right now at that string's own
+        frequency. You only touched string 1, tuned to 110 Hz, yet ribbons immediately wake up and
+        fall beneath strings 2 through 8 as well.
       </p>
       <p>
-        This series works its way up to music theory from the physics of sound. Scales,
-        chords, and keys make a lot more sense once you know what a single note is made of,
-        so that's where it starts. A note has three properties your ear cares about: how high
-        it is, how loud it is, and what it sounds like. Each one has a physical cause, and
-        each figure below lets you change one of them while you listen.
+        All eight strings share the same gauge and tension, cut to fractions of 1, ½, ⅓, down to
+        ⅛ of the longest length, which is why their bottom anchor points sweep upward in a curve
+        and why their pitches climb in exact multiples: 110, 220, 330, all the way to 880 Hz. That
+        sympathetic cascade under the untouched strings is the central clue to how music works. A
+        single musical note turns out to be a small crowd of vibrations happening at once. Before
+        this series builds up to synthesizers, harmony, scales, and chords, we need to see what a
+        single note is actually made of: how high it sounds, how loud it is, and what gives it its
+        distinct character.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="pitch"><span class="kicker">Step 1 · A rate</span>Pitch and loudness</h2>
       <p>
-        Sound is a pressure wave in the air. A note is a pressure wave that repeats. Whatever
-        made it pushed the air, and pushed it again, on a steady schedule, and the number of
-        repeats per second is its <strong>frequency</strong>, measured in hertz. Frequency is
-        what you hear as pitch.
+        Sound travels through air as tiny ripples of pressure. When something pushes the air
+        back and forth on a regular schedule, your ear hears a definite pitch, and the number of
+        complete cycles per second is its <strong>frequency</strong>, measured in hertz (Hz).
       </p>
-      <pre><code>110 Hz   <span class="cm">// the A string on a guitar</span>
-220 Hz   <span class="cm">// the A one octave up</span>
+      <pre><code>110 Hz   <span class="cm">// the open A string on a guitar</span>
+220 Hz   <span class="cm">// the A one octave higher</span>
 440 Hz   <span class="cm">// the A an orchestra tunes to</span></code></pre>
       <p>
-        The figure below is an oscilloscope wired to one oscillator. It shows 20 ms of what the
-        oscillator is playing, held still so the shape doesn't scroll. The bracket marks one
-        period, the time for one repeat: 4.55 ms at the starting 220 Hz. Press play and drag
-        the frequency slider (55 Hz to 1760 Hz). The pitch climbs and the waves pack closer
-        together. The level slider runs from −50 to −10 dB and changes only the height of the
-        wave.
+        Below is a live oscilloscope connected to a single oscillator, freezing a 20 ms slice of
+        the pressure wave so you can inspect its shape. At the starting pitch of 220 Hz, the orange
+        bracket marks one full cycle, or period, lasting 4.55 ms. Hit <strong>play</strong> and
+        sweep the <strong>frequency</strong> slider between 55 and 1760 Hz: as the pitch climbs,
+        the waves pack tightly together and the period shrinks. Moving the <strong>level</strong>
+        slider between −50 and −10 dB changes only how tall the wave reaches.
       </p>
 
       <div
@@ -86,53 +87,58 @@
       ></div>
 
       <p>
-        Then try the four shape buttons. The pitch stays where it is, but the sound changes
-        from smooth (sine) to hollow (triangle and square) to bright and buzzy (sawtooth). The
-        strip under the scope explains it. It puts the same sound on a frequency axis that
-        spans everything people hear, 20 Hz to 20 kHz, with one bar for each component. A
-        sine has one bar. The other shapes have a whole row of them at 2, 3, 4… times the
-        frequency you set. Those extra bars are the subject of the rest of this article.
+        While the tone is running, click through the four waveform buttons: <strong>sine</strong>,
+        <strong>triangle</strong>, <strong>square</strong>, and <strong>sawtooth</strong>. The
+        pitch stays locked where you left it, yet the voice shifts from glassy and smooth, to
+        woody and hollow, to bright and buzzing. The strip beneath the scope lays the same sound
+        out across the full range of human hearing, from 20 Hz to 20 kHz, with one glowing bar per
+        frequency component. The sine wave puts up a single solitary bar. The other three shapes
+        light up whole rows of extra bars at 2, 3, 4, and higher multiples of the fundamental
+        frequency. Those extra bars account for almost everything that separates one instrument
+        from another.
       </p>
       <p>
-        Two things about hearing are worth knowing before going on. First, the ear hears pitch
-        as ratios. 110 to 220 Hz sounds like the same size of step as 220 to 440 Hz, because
-        each one doubles the frequency, and a doubling is what musicians call an octave. Human
-        hearing spans about ten octaves, from roughly 20 Hz to 20 kHz (less as you get older).
-        Second, loudness works on ratios too. Decibels measure the ratio of two amplitudes on a
-        log scale: −20 dB is an amplitude of 0.1, −40 dB is 0.01. A sound has to go up by about
-        10 dB to seem twice as loud.
+        Notice how both sliders behave logarithmically, because human hearing works in ratios.
+        Jumping from 110 to 220 Hz feels like the same musical leap as jumping from 220 to 440 Hz,
+        even though the second jump adds twice as many hertz: every doubling is one octave, and
+        healthy ears span roughly ten of them, from around 20 Hz to 20 kHz (the ceiling creeps
+        downward with age). Loudness compresses the same way. Decibels express amplitude ratios
+        on a log scale, so −20 dB corresponds to an amplitude of 0.1 and −40 dB to 0.01, and a
+        signal generally needs about a 10 dB boost before it feels twice as loud.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Counting vibrations by eye</span>
         <p>
-          Nobody could measure a frequency directly until the 1600s. Marin Mersenne, a French
-          friar, worked out how a string's pitch depends on its length, tension, and weight
-          (published in <em>Harmonie universelle</em>, 1636), using strings long and heavy
-          enough that he could count their swings by eye. Then he used those laws to
-          extrapolate to strings short enough to sing. Galileo reached the same laws around
-          the same time. Mersenne's first law is the one the harp uses: halve the length and
-          the frequency doubles.
+          For centuries nobody had a way to count hundreds of oscillations per second directly. In
+          the early 1600s, the French friar Marin Mersenne solved it with patience and very long
+          strings. By stretching heavy cords far enough to swing slowly, he could count their
+          cycles by eye, deduce how pitch scales with length, tension, and mass (published in his
+          1636 <em>Harmonie universelle</em>), and extrapolate down to singing strings. Galileo
+          arrived at the same relationships around the same time. Mersenne's first law (cut a
+          string's length in half and its frequency doubles) is what shapes the curved harp at the
+          top of this page.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="string"><span class="kicker">Step 2 · One string</span>Standing waves</h2>
       <p>
-        A string tied down at both ends can't vibrate any way it likes. The only shapes that
-        keep their form as they move are the ones that fit a whole number of half-waves
-        between the ends: one hump, two humps, three. These are the string's
-        <strong>modes</strong>, or standing waves. Mode <em>n</em> has the shape
-        sin(<em>n</em>π<em>x</em>), and because a shorter wave on the same string moves back
-        and forth faster, it vibrates at <em>n</em> times the frequency of the first one.
-        Any motion the string makes, however messy, is a sum of these modes.
+        Pin a string firmly at both ends and its geometry immediately limits how it can move. The
+        only self-sustaining vibration shapes are waves that hit zero at both anchors: a single
+        broad arch, two opposing half-waves with a still point in the center, three arches with
+        two still points, and so on. Physicists call these shapes <strong>modes</strong>, or
+        standing waves. Mode <em>n</em> follows the curve sin(<em>n</em>π<em>x</em>), and because
+        shorter ripples shuttle back and forth across the string faster, mode <em>n</em> oscillates
+        at exactly <em>n</em> times the rate of the first mode. Any messy kink or wiggle you put
+        into the string decomposes into a sum of these modes.
       </p>
       <p>
-        That is how the figure below works. Grab the string anywhere, pull it, and let go. At
-        the moment you release, it works out how much of each of the first 24 modes is in the
-        shape you made, then lets each mode swing and fade on its own. The picture you see
-        and the sound you hear come from the same numbers. The picture runs slowed down so
-        that the fundamental always swings at 1.25 times a second (88× slower than the sound
-        at the default 110 Hz). A real string at that pitch is a blur.
+        That modal math drives both the picture and the audio in the string below. Grab the string
+        anywhere along its length, pull it aside, and let go. At release, the simulation projects
+        your triangular shape onto the first 24 standing-wave modes and lets each one swing and
+        decay on its own clock. Because a real string vibrating at 110 Hz is just a faint blur to
+        our eyes, the drawing runs in slow motion so the fundamental always rocks at 1.25 cycles
+        per second (88× slower than the sound at the default pitch).
       </p>
 
       <div
@@ -142,45 +148,56 @@
       ></div>
 
       <p>
-        The bars under the string are the recipe you're hearing, one bar per harmonic. Press
-        "pluck at ½" and every even bar goes dark: a pluck in the middle sits on the node of
-        every even mode, so none of them get started. "At ⅕" removes harmonics 5, 10, and 15.
-        "Near the end" plucks at 1/14 of the length and lights nearly every bar, and the same
-        string at the same pitch sounds thin and twangy. Guitarists use this all the time.
-        Picking near the bridge sounds bright, picking over the soundhole sounds round.
+        The 16 bars beneath the string display the live harmonic recipe reaching your ears. Try
+        the preset buttons to see how strongly pluck position colors the tone. Clicking
+        <strong>pluck at ½</strong> blanks out every even-numbered bar: pulling right at the
+        midpoint forces the string to move at the exact spot where modes 2, 4, 6, and every other
+        even mode have a stationary node, so none of them can get started. Clicking
+        <strong>at ⅕</strong> wipes out harmonics 5, 10, and 15. Clicking
+        <strong>near the end</strong> plucks at 1/14 of the length, energizing almost every bar
+        and turning the exact same 110 Hz note thin and twangy. Guitarists exploit this by
+        instinct: picking over the soundhole yields a warm, round tone, while picking right back
+        by the bridge sounds sharp and metallic.
       </p>
       <pre><code><span class="cm">// what the bridge hears from mode n after a pluck at p (0..1 along the string)</span>
 const heard = (p: number, n: number): number =&gt; Math.sin(n * Math.PI * p) / n;</code></pre>
       <p>
-        The 1/<em>n</em> comes from two effects. A pluck is a triangle, and a triangle's share
-        of mode <em>n</em> falls off as 1/<em>n</em>². But the sound doesn't come from the
-        string's position. It comes from the force the string puts on the bridge, which goes
-        with its slope at the end, and that brings back a factor of <em>n</em>.
+        Notice that the heard amplitude falls off as 1/<em>n</em> rather than 1/<em>n</em>².
+        Decomposing a triangle shape into sines gives displacement amplitudes proportional to
+        1/<em>n</em>², which drops off quickly. What actually drives the wooden top of a guitar or
+        harp, however, is the sideways force the string exerts on the bridge, which depends on the
+        string's angle (its spatial slope) at the anchor. Taking the derivative of
+        sin(<em>n</em>π<em>x</em>) multiplies each mode by <em>n</em>, cancelling one power of
+        <em>n</em> and restoring a bright 1/<em>n</em> spectrum.
       </p>
       <p>
-        Now switch to "bow (hold)" and press on the string. A bow does something different. It
-        grips the string, drags it along, lets it slip back, and grips it again, once per
-        period. The result is called Helmholtz motion: a single sharp corner racing around
-        the string inside a parabola-shaped outline, which you can see in the figure. It puts
-        every harmonic in at 1/<em>n</em>, wherever you bow, which makes a sawtooth at the
-        bridge. That's why a bowed violin string sounds so much buzzier than a plucked one.
+        Switch the mode toggle to <strong>bow (hold)</strong> and press down on the string. A
+        rosined bow operates on a completely different cycle: it catches the string, drags it
+        sideways until tension overwhelms static friction, lets it snap back, and grabs it again
+        once every period. That stick-slip cycle establishes what is known as Helmholtz motion: a
+        single crisp corner racing back and forth along the string inside a smooth parabolic
+        envelope, traced by the dashed orange outline above. Wherever you set the bow down, that
+        traveling kink injects every harmonic at 1/<em>n</em>, delivering a pure sawtooth force to
+        the bridge and giving a bowed violin its unmistakable bite.
       </p>
       <details class="fold">
         <summary>Deep dive: why the bow's corner goes round and round</summary>
         <div class="fold-body">
           <p>
-            Hermann von Helmholtz worked this out in the 1860s by watching a violin string
-            through a vibration microscope. He found that each point of the string moves at
-            two constant speeds: slowly with the bow, then quickly back the other way. The only
-            motion that does that everywhere at once is a kink travelling around the string,
-            with straight segments on either side. As a sum of modes it's
-            Σ sin(<em>n</em>π<em>x</em>)·sin(<em>n</em>ωt)/<em>n</em>², which is what the
-            figure draws while you hold the bow down.
+            Hermann von Helmholtz worked this out in the 1860s by squinting at a bowed violin string
+            through a vibration microscope. He noticed that any given point on the string moves at
+            just two constant speeds: gliding slowly along with the bow hair, then zipping rapidly
+            back the other way. The only geometric shape that moves like that at every point
+            simultaneously is a sharp V-shaped kink traveling around a parabolic envelope, with
+            straight string segments stretching to both anchors. Written as a modal sum, it is
+            Σ sin(<em>n</em>π<em>x</em>)·sin(<em>n</em>ωt)/<em>n</em>², which is the exact sum
+            drawn above while you hold the bow down.
           </p>
           <p>
-            Real bowing is messier. Too little pressure and the string slips twice a period
-            (the "surface sound" of a beginner); too much and it scratches. The model here is
-            the ideal version that a good player is aiming for.
+            Real violin bowing is far touchier than this clean ideal. Too little bow weight lets
+            the string slip twice per cycle (producing that airy beginner "surface sound"), while
+            pressing too hard breaks the cycle into a gritty scratch. Good string players spend
+            years learning to stay inside the narrow window where Helmholtz motion locks in.
           </p>
         </div>
       </details>
@@ -188,19 +205,22 @@ const heard = (p: number, n: number): number =&gt; Math.sin(n * Math.PI * p) / n
       <!-- ================================================================ -->
       <h2 id="harmonics"><span class="kicker">Step 3 · The hidden score</span>The harmonic series</h2>
       <p>
-        So a plucked or bowed string plays all of its modes at once. A 110 Hz note is also
-        sounding at 220, 330, 440, 550 Hz and up. These frequencies are the
-        <strong>harmonic series</strong>, each one is a <em>harmonic</em> (or partial), and
-        the first one is the <em>fundamental</em>. Most pitched instruments make sounds with
-        this structure: strings, the human voice, and every wind instrument.
+        Because a plucked or bowed string vibrates in all its standing-wave modes simultaneously,
+        a single 110 Hz note is also quietly ringing at 220, 330, 440, 550 Hz, and beyond. That
+        whole-number ladder of frequencies is the <strong>harmonic series</strong>. Each rung is a
+        <em>harmonic</em> (or partial), and the lowest one is the <em>fundamental</em>. Strings,
+        brass horns, woodwinds, and the human vocal folds all naturally generate sounds built on
+        this integer grid.
       </p>
       <p>
-        The next figure is one A2 built from its first 16 harmonics, each a sine wave, laid
-        over a piano keyboard on the same log axis. Press play and you hear one note. Then tap
-        a rung. That harmonic gets 9 dB louder for about a second and drops back into the
-        blend. Once you've heard it on its own, you can usually keep picking it out of the
-        steady tone. "Climb the ladder" goes up all 16, one every 0.6 s, which sounds a bit
-        like overtone singing.
+        Here is one steady A2 assembled from its first 16 sine harmonics, mapped onto a piano
+        keyboard along a logarithmic pitch axis. Start the tone with <strong>play A2</strong> and
+        your brain fuses all 16 sines into a single rich note. Tap any rung and that harmonic
+        swells by 9 dB for about a second before sinking back into the mixture. Oddly enough,
+        once your ear locks onto an individual overtone during that spotlight, you can often keep
+        hearing it float inside the blend even after it drops back down. Pressing
+        <strong>climb the ladder</strong> steps up through all 16 rungs at 0.6 s intervals,
+        producing a shimmering melody very close to overtone singing.
       </p>
 
       <div
@@ -210,36 +230,40 @@ const heard = (p: number, n: number): number =&gt; Math.sin(n * Math.PI * p) / n
       ></div>
 
       <p>
-        Look at which keys light up. Harmonics 2, 4, 8, and 16 are A's, each an octave higher.
-        Harmonic 3 is an E, a fifth above A3, and harmonic 5 is a C♯, the major third. The
-        bottom of the ladder spells out an A major chord, and that's a big part of why the
-        major chord sounds so settled, a point the later parts of the series come back to.
-        The higher harmonics don't land on the keys as neatly. Harmonic 5 is 14 cents flat of
-        the piano's C♯ (a cent is a hundredth of a semitone), and harmonic 7 is 31 cents flat
-        of G, far enough that no piano key matches it. The keyboard is a compromise, and part
-        four is about why.
+        Check which piano keys glow beneath the lower rungs. Harmonics 1, 2, 4, 8, and 16 are all
+        A's separated by octaves. Harmonic 3 lands on E, a fifth above A3, and harmonic 5 lands on
+        C♯, the major third. Right near the bottom of one single vibrating string, nature spells
+        out an A major triad, a coincidence that echoes through centuries of Western harmony.
+        Higher up, though, the series drifts off the keyboard grid. Harmonic 5 sits 14 cents flat
+        of a modern piano's C♯ (a cent is one hundredth of a semitone), and harmonic 7 lands 31
+        cents flat of G, far enough into the crack between keys that standard pianos can't play it.
+        We'll dig into why keyboards had to bend these ratios in Part 4.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Helmholtz and the glass spheres</span>
         <p>
-          Hermann von Helmholtz showed that timbre is a recipe of harmonics in the 1850s with
-          no electronics at all. He used a graded set of hollow glass and brass spheres, each
-          with a small neck that fit into his ear. Each one resonates at a single frequency,
-          so holding them up one by one while an instrument played let him hear its harmonics
-          one at a time. The spheres are now called Helmholtz resonators, and his 1863 book
-          <em>On the Sensations of Tone</em> is still worth reading.
+          In the 1850s, long before spectrum analyzers or microphones existed, Helmholtz proved
+          that musical timbre is a mix of harmonics using nothing more than blown glass and brass.
+          He had a series of hollow spheres crafted in graded sizes, each with an opening on one
+          side and a small tapered neck on the other designed to fit snugly into his ear. Each
+          sphere resonated at a single narrow frequency. By holding them up to his ear one after
+          another while a violin or organ played, he could isolate individual harmonics out of the
+          air. Those tuned bulbs are still called Helmholtz resonators, and his 1863 treatise
+          <em>On the Sensations of Tone</em> remains astonishingly fresh.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="additive"><span class="kicker">Step 4 · Recipes</span>Building a timbre from sines</h2>
       <p>
-        If every note is a stack of sines, you should be able to build any note by stacking
-        sines yourself. In 1822 Joseph Fourier showed that any repeating wave can be written
-        that way: one sine at the repeat frequency and others at whole-number multiples of
-        it, each with its own amplitude and phase. The figure below is that idea with 16
-        harmonics. Drag across the bars to draw a recipe, and the curve above shows two
-        periods of the sum.
+        If vibrating objects naturally split into stacks of sine waves, the reverse should work
+        too: you ought to be able to invent any steady timbre just by adding sine waves together.
+        In 1822, while studying how heat flows through metal, Joseph Fourier proved that any
+        repeating waveform can be expressed as a sum of sines at whole-number multiples of the
+        repeat rate, each with its own amplitude and starting offset (phase). Below is a
+        16-harmonic additive synthesizer wired directly to that theorem. Drag across the bars to
+        paint your own harmonic recipe, and watch the curve above trace two full cycles of the
+        resulting sum.
       </p>
 
       <div
@@ -249,62 +273,65 @@ const heard = (p: number, n: number): number =&gt; Math.sin(n * Math.PI * p) / n
       ></div>
 
       <p>
-        The presets are the same shapes the oscilloscope played, built by hand:
+        The presets reconstruct the classic oscilloscope shapes from Step 1 by hand, using simple
+        formulas for each harmonic's amplitude and phase:
       </p>
-      <pre><code><span class="cm">// [amplitude, phase] of harmonic n; a phase of π is a minus sign</span>
+      <pre><code><span class="cm">// [amplitude, phase] of harmonic n; a phase of π flips the sign</span>
 sawtooth: (n) =&gt; [1 / n, n % 2 ? 0 : Math.PI],
 square: (n) =&gt; [n % 2 ? 1 / n : 0, 0],
 triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],</code></pre>
       <p>
-        A square wave is the odd harmonics alone. A clarinet's low register is short on even
-        harmonics for a related reason (a cylindrical tube closed at one end favours odd
-        modes), and you can hear the family resemblance. The organ preset is a drawbar
-        registration: harmonics 1, 2, 3, 4, 5, and 8, which are the 8′, 4′, 2⅔′, 2′, 1⅗′ and 1′
-        drawbars on a Hammond. The level stays at the same RMS whatever you draw, so the
-        recipe changes the sound's colour without making it louder. And nothing you draw
-        changes the pitch. The pitch belongs to the spacing of the harmonics, 110 Hz apart,
-        however much of each there is.
+        A square wave contains only odd harmonics, which gives it a hollow, woody bite very close
+        to a clarinet's low register (a cylindrical pipe closed at one end favors odd standing
+        waves for a closely related reason). The <strong>organ</strong> preset mimics a classic
+        Hammond drawbar registration using harmonics 1, 2, 3, 4, 5, and 8 (the 8′, 4′, 2⅔′, 2′,
+        1⅗′, and 1′ drawbars). Behind the scenes, the synth keeps total RMS output constant as you
+        draw, so changing the bars shifts the tone color while keeping overall loudness steady.
+        Pitch stays anchored too (even if you click <strong>drop the fundamental</strong> to zero
+        out bar 1), because the spacing between neighboring harmonics remains 110 Hz.
       </p>
       <p>
-        Now press "scramble phases". Every harmonic gets shifted in time by a random amount,
-        and the curve turns into something unrecognisable. The sound barely changes. Your ear
-        mostly measures how much of each frequency there is and largely ignores how they line
-        up, an observation known as Ohm's acoustic law. It isn't the whole story (at low
-        pitches with many harmonics you can sometimes hear a phase change as a different
-        buzz), but it's why the bars predict the sound so much better than the shape of the
-        wave does.
+        Click <strong>scramble phases</strong> while a sawtooth or square wave is sounding. Every
+        tiny clock dial under the bars spins to a random starting angle, and the waveform above
+        collapses into an unrecognizable jagged scribble. Listen closely, though: the sound
+        scarcely budges. Your inner ear behaves much more like a frequency-magnitude detector than
+        an oscilloscope, an empirical rule known as Ohm's acoustic law. Phase can occasionally
+        become audible on very low, buzzy pitches with dozens of harmonics, yet in everyday
+        listening the bar heights predict what you hear far better than the time-domain waveform
+        ever does.
       </p>
       <p>
-        It also explains why a flute and a violin playing the same A4 sound nothing alike.
-        The flute's recipe is mostly fundamental with a few
-        weak harmonics, plus breath noise. The violin's is the bowed sawtooth from the string
-        figure, passed through a wooden body that boosts some frequency ranges and cuts
-        others. They also start differently. A flute note breathes in, a violin note starts
-        with a scratch from the bow, and a lot of what you recognise happens in those first
-        tens of milliseconds.
+        All of this explains why a flute and a violin playing the same A4 sound worlds apart. A
+        flute's spectrum is mostly fundamental with a handful of gentle upper harmonics and a wisp
+        of breath noise. A violin starts with the bright sawtooth of a bowed string and filters it
+        through a carved wooden box that amplifies certain frequency bands and damps others. Their
+        beginnings differ just as sharply: a flute note blooms out of air, whereas a violin note
+        opens with a brief rosin scratch, and our brains rely heavily on those first few tens of
+        milliseconds to name an instrument.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="vowels"><span class="kicker">Step 5 · Resonance</span>A voice from a buzz</h2>
       <p>
-        That wooden body raises an important point. Some of what shapes a timbre stays put in
-        frequency while the pitch moves. Your voice is the clearest example. Your vocal folds
-        make a buzz with every harmonic in it, falling at about 6 dB per octave by the time it
-        leaves your lips. Your throat and mouth then act as a set of resonant filters that
-        boost whatever harmonics land near their resonant frequencies. These resonances are
-        called <strong>formants</strong>. Move your tongue and jaw and the formants move, and
-        that's how you make different vowels. Change pitch and the harmonics move under
-        formants that stay where they are. Describing speech as a source and a filter became
-        standard with Gunnar Fant's 1960 book on the acoustics of speech.
+        That wooden violin body points to an acoustic mechanism that shapes both instruments and
+        human speech: resonances fixed in frequency. When you sing or speak a vowel, your vocal
+        folds clap together to produce a raw harmonic buzz containing every integer harmonic,
+        rolling off at roughly 6 dB per octave by the time it radiates past your lips. Your
+        throat, mouth, and nasal cavities act as a chain of resonant chambers that boost whichever
+        harmonics happen to fall near their resonant peaks, called <strong>formants</strong>.
+        Reshaping your tongue and jaw slides those formant peaks to new frequencies, turning one
+        vowel into another, while singing up and down a scale moves the underlying harmonic comb
+        beneath formants that stay put. Gunnar Fant codified this source-filter view of speech in
+        his 1960 book, and it still underpins speech acoustics today.
       </p>
       <p>
-        The figure below is a small formant synthesizer. A buzz at 120 Hz runs through four
-        resonant filters in a row, the way Dennis Klatt's cascade synthesizer models the vocal
-        tract, with a little vibrato (5.3 Hz) so it sounds less mechanical. The chart on the
-        left is the vowel space. Up and down is the first formant, F1, which goes up as your
-        jaw opens. Left to right is F2, which is high when your tongue is at the front of your
-        mouth ("ee") and low when it's at the back ("oo"). The nine vowels are placed at the
-        average formants Peterson and Barney measured for adult men in 1952.
+        The synthesizer below builds a vocal tract directly from that recipe: a 120 Hz harmonic
+        buzz (with a gentle 5.3 Hz vibrato to take the robotic edge off) feeds through four
+        resonant filters wired in series, following Dennis Klatt's cascade formant model. The box
+        on the left plots the first two formants in the standard phonetic vowel layout. Moving
+        down opens your jaw and raises F1; moving left pushes your tongue toward the front of your
+        mouth and raises F2 ("heed" sits high-left, while "who'd" sits high-right). The nine
+        targets mark the adult male averages Gordon Peterson and Harold Barney measured in 1952.
       </p>
 
       <div
@@ -314,24 +341,26 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
       ></div>
 
       <p>
-        Drag the dot from "father" to "heed" and watch the right side. The harmonics stay
-        120 Hz apart, and only the peaks of the curve move. Then leave the dot alone and drag
-        the pitch slider (80 to 600 Hz). Now the harmonics spread out and the curve stays
-        still. At high pitches the harmonics are so far apart that they can miss the formant
-        peaks entirely, and the vowels start to blur together. This is why the words of a
-        soprano's highest notes are hard to make out, and why trained sopranos open their jaw
-        on high notes to move F1 up next to the fundamental. "Sing ah · ee · oo" glides
-        between three vowels, 1.1 s each.
+        Tap <strong>voice</strong> and drag the glowing dot from "father" up to "heed" while
+        watching the spectrum on the right. The vertical harmonic lines stay parked 120 Hz apart
+        while the blue formant hills slide over them, lighting up different clusters of harmonics.
+        Then leave the vowel alone and sweep the <strong>pitch</strong> slider from 80 up to 600
+        Hz. Now the blue hills stay frozen while the harmonic comb stretches apart underneath. By
+        the time pitch climbs into soprano territory, the harmonics stand so far apart that they
+        can straddle a formant peak and miss it completely, making sung vowels blur into one
+        another. Trained operatic sopranos actually solve this physically on high notes by
+        dropping their jaw wide to pull F1 up onto the fundamental, trading crisp diction for a
+        ringing, effortless projection. Clicking <strong>sing ah · ee · oo</strong> glides slowly
+        across three corners of the vowel space, spending 1.1 seconds on each.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="missing"><span class="kicker">Step 6 · Pitch is a guess</span>The missing fundamental</h2>
       <p>
-        So far the pitch of a note has been the frequency of its first harmonic. The next
-        figure shows that it isn't that simple. It plays the opening of Beethoven's "Ode to
-        Joy" in C, with each note built from 12 harmonics. The picture is a score made of
-        those harmonics, scrolling past: every note is a stack of bars at 1, 2, 3… times its
-        frequency.
+        Up to now, it has been easy to equate a note's pitch with the frequency of its first
+        harmonic. Reality is sneakier. Below, the opening phrase of Beethoven's "Ode to Joy" loops
+        in C, with every note built from 12 harmonics. Each horizontal stack of colored bars on
+        the scrolling score shows one note's harmonic ladder at 1, 2, 3, … 12 times its fundamental.
       </p>
 
       <div
@@ -341,42 +370,51 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
       ></div>
 
       <p>
-        Raise the slider while the tune plays. At 2, every fundamental is gone. At 7, the
-        first six harmonics of every note are gone, and nothing below 916 Hz is playing at
-        all. The tone gets thinner and brighter (the level is held constant), but the melody
-        stays at the same pitch, down to the C3 at 131 Hz. Your ear notices that what's left
-        is spaced 131 Hz apart and reports the pitch that spacing implies, even with no
-        energy there. This is called the <strong>missing fundamental</strong> or residue
-        pitch. It's how a phone speaker that can't reproduce anything below a few hundred
-        hertz still lets you follow a bass line.
+        Start playback and slowly slide <strong>lowest harmonic kept</strong> upward. At
+        <code>2</code>, every fundamental vanishes completely. Push all the way to <code>7</code>
+        and the bottom six harmonics of every note are stripped out; the lowest frequency
+        physically leaving your speaker is now 916 Hz. The tone grows thin and tinny (overall
+        loudness stays normalized), yet the melody refuses to jump upward. It keeps humming right
+        down at C3 (131 Hz), marked by the dashed orange line where zero acoustic energy exists.
+        Your auditory system spots that the surviving partials are spaced 131 Hz apart and
+        reconstructs the <strong>missing fundamental</strong> (or residue pitch) that would
+        produce that spacing. That single trick of perception is why tiny laptop and phone
+        speakers, which physically cannot push air below a few hundred hertz, still let you follow
+        a bass guitar line.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Seebeck, Ohm, and Schouten</span>
         <p>
-          In the 1840s August Seebeck played sirens with patterns of holes and heard pitches
-          that had no matching component in the sound. Georg Ohm, of the acoustic law above,
-          argued that this had to be an illusion of some kind, and Helmholtz mostly sided with
-          Ohm. A century later, Jan Schouten's experiments with electronically generated tones
-          (around 1940) showed Seebeck had been right: the ear forms a pitch from the
-          pattern of the higher harmonics. How the brain does it is still being worked out.
+          In the 1840s, the German physicist August Seebeck spun acoustic sirens perforated with
+          carefully spaced hole patterns and insisted he could hear pitches whose frequencies were
+          completely absent from the Fourier spectrum. Georg Ohm, the same physicist behind Ohm's
+          acoustic law, argued Seebeck must be mishearing something, and Helmholtz largely agreed
+          with Ohm. Almost a century later, around 1940, Jan Schouten settled the debate with
+          electronic tone generators: Seebeck had been right all along. The brain infers pitch
+          from the collective pattern of upper harmonics, and neuroscientists are still unpacking
+          the exact circuits that do it.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="shepard"><span class="kicker">Step 7 · Two kinds of high</span>A staircase that never ends</h2>
       <p>
-        The ladder figure showed that notes an octave apart sound alike. Musicians give them
-        the same letter, and the figures on this page draw them in the same colour.
-        So pitch has two parts. One is how high the note is. The other is which note it is,
-        called its <strong>chroma</strong> or pitch class, which comes back around every
-        octave. You can draw that as a helix: going around is chroma, going up is height.
+        Back in the harmonic ladder, you saw that notes separated by an octave share the same
+        letter name and color because our ears perceive them as versions of the same note. That
+        means pitch actually has two distinct dimensions: raw <em>height</em> (low rumble versus
+        high squeak) and <em>chroma</em> (which pitch class a note belongs to, cycling through C,
+        C♯, D, and back around every octave). Put both together and pitch wraps into a
+        three-dimensional helix: moving around the circle changes chroma, while climbing vertically
+        changes height.
       </p>
       <p>
-        In 1964 Roger Shepard built a tone that has chroma and no height. It's nine sine
-        waves, each an octave apart (here from C1 at 33 Hz up to 16.7 kHz), under a fixed
-        bell-shaped loudness curve on a log-frequency axis. All nine rise one semitone at a
-        time. The top one fades out as it climbs off the curve, and a new one fades in at the
-        bottom, so after twelve steps the sound is the same as where it started.
+        In 1964, psychologist Roger Shepard designed an auditory illusion that turns the chroma
+        wheel while holding overall height completely still. It stacks nine pure sine waves spaced
+        exact octaves apart (here spanning C1 at 33 Hz up to 16.7 kHz) underneath a fixed,
+        bell-shaped loudness curve on a log-frequency axis. All nine sines step upward together
+        one semitone at a time. Whenever the highest partial climbs past the top of the bell curve
+        and fades to silence, a fresh partial fades in quietly at the bottom, so after twelve
+        steps the spectrum lands back in the exact configuration where it began.
       </p>
 
       <div
@@ -386,54 +424,45 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
       ></div>
 
       <p>
-        Play it and it seems to rise forever. On the helix all nine components sit on one
-        spoke: the spoke turns, which is the chroma changing, but the stack never goes up.
-        "Steps" moves a semitone every 0.42 s, in discrete steps like Shepard's. "Glide" is the
-        continuous version Jean-Claude Risset made a few years later, rising an eighth of an
-        octave per second. Run it long enough and the readout below the figure will tell you
-        it has climbed several octaves while the components still span the same range. Your
-        ear tracks the chroma step by step and has nothing to tell it the height hasn't
-        changed.
+        Hit <strong>play</strong> and listen to the endless climb (you can also reverse it with
+        <strong>down</strong>). On the helix to the left, all nine partials line up along one
+        vertical spoke; as the tone steps, the spoke rotates around the ring of pitch classes,
+        carrying your ear smoothly from C to C♯ to D, while the center of gravity of the glowing
+        dots stays anchored right in the middle of the bell curve. <strong>steps (Shepard)</strong>
+        advances one semitone every 0.42 seconds, just like Shepard's original tape. Switching to
+        <strong>glide (Risset)</strong> plays Jean-Claude Risset's continuous version from a few
+        years later, sliding upward at an eighth of an octave per second. Leave it running for a
+        minute and watch the readout count multiple octaves of apparent climb while every sine
+        wave stays trapped between 33 Hz and 16.7 kHz.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What a note is</h2>
-      <ul>
-        <li>
-          <strong>Pitch is a repetition rate</strong>, and the ear hears it in ratios. A
-          doubling is an octave, whatever frequency you start from.
-        </li>
-        <li>
-          <strong>Timbre is mostly a recipe of harmonics.</strong> Strings, pipes, and voices
-          make harmonics at whole-number multiples of the fundamental, and the mix of them
-          (plus resonances fixed in frequency, plus the attack) is what tells instruments
-          apart.
-        </li>
-        <li>
-          <strong>Where you excite a string decides the recipe.</strong> A pluck at ½ removes
-          every even harmonic. A bow puts them all in.
-        </li>
-        <li>
-          <strong>Pitch is an inference.</strong> Take away the fundamental and you still hear
-          it. Keep the chroma moving with no change in height and you hear a pitch that rises
-          forever.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Inside one sound</h2>
       <p>
-        Things I'd try next: a sung vowel with consonants (formant transitions are what make a
-        "b" different from a "d"); the inharmonic overtones of a drum skin, where the modes
-        aren't whole-number multiples at all; and a figure that records your own voice and
-        shows its harmonics and formants live.
+        Taken together, these seven experiments dismantle the naive idea that a note is just a
+        single frequency. Pitch begins as a repetition rate heard in ratios, yet our brains infer
+        it from the whole harmonic spacing, even when the fundamental is stripped out or the
+        octaves loop back on themselves like an Escher staircase. Timbre emerges from the
+        harmonic recipe a vibrating body emits (reshaped by where you pluck or bow it), sculpted
+        further by fixed physical resonances like a violin's spruce belly or the shifting shape of
+        your mouth, and stamped by the first few milliseconds of attack.
       </p>
       <p>
-        The harp at the top is still there. Pluck the low A string and watch the traces fall
-        under strings 2 to 8. Those strings are tuned to its harmonics, so the sound of one
-        string includes all the others.
+        There are plenty of rabbit holes left to poke at here: consonant transitions, where rapid
+        formant glides tell a "b" apart from a "d"; stretched membranes like drumheads, whose
+        two-dimensional modes break clean integer ratios altogether; or a live microphone view so
+        you could sing into the page and watch your own harmonics march under your own formants.
+      </p>
+      <p>
+        That also settles the puzzle from the eight-string harp at the top of the page. Because
+        strings 2 through 8 are tuned to the harmonic series of string 1, every time that single
+        low string vibrates, its standing-wave modes pour acoustic energy straight into the
+        frequencies of all seven strings beside it.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/synth.html">Part two, The Synthesizer</a>.</strong>
-        Oscillators, filters, and envelopes: what you can build once you know what a note is
-        made of.
+        Oscillators, filters, envelopes, FM, and physical delay lines: building playable
+        instruments from scratch once you know what a note is made of.
       </p>
     </main>
 

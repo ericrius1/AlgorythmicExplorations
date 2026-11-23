@@ -233,8 +233,8 @@ export async function mountVoiceLoop(container: HTMLElement): Promise<Demo> {
     clear(v, "#0b0d16", "#06070b");
     const now = performance.now();
 
-    const fnW = narrow ? 0 : 170 * px;
-    const left = (narrow ? 50 : 44) * px;
+    const fnW = narrow ? 0 : 182 * px;
+    const left = (narrow ? 54 : 58) * px;
     const right = w - fnW - 16 * px;
     const top = (narrow ? 96 : 22) * px;
     const metersH = (narrow ? 64 : 70) * px;
@@ -350,7 +350,7 @@ export async function mountVoiceLoop(container: HTMLElement): Promise<Demo> {
 
     // the function cycle
     const cur = slots[slots.length - 1].def.fn;
-    const fx = narrow ? w / 2 : w - fnW / 2 - 8 * px;
+    const fx = narrow ? w / 2 : w - fnW / 2 - 12 * px;
     const fy = narrow ? 50 * px : h * 0.36;
     const R = (narrow ? 34 : 52) * px;
     const pos: Record<Fn, [number, number]> = narrow

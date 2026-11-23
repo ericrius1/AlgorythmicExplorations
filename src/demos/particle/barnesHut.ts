@@ -50,7 +50,10 @@ export function mountBarnesHut(container: HTMLElement): Demo {
     value: theta,
     onInput: (v) => (theta = v),
   });
-  shell.button("toggle full tree", () => (showTree = !showTree));
+  const treeBtn = shell.button("full tree: off", () => {
+    showTree = !showTree;
+    treeBtn.textContent = showTree ? "full tree: on" : "full tree: off";
+  });
   shell.button("re-seed", () => (bodies = seedDisk(N)));
   shell.setInfo(
     () =>

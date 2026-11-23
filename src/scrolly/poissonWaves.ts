@@ -35,20 +35,20 @@ export function mountPoissonWaves(el: HTMLElement): void {
     screens: 5,
     aspect: 0.72,
     steps: [
-      { at: 0, text: "A lumpy density field ρ(x) along one line of the box. Poisson's equation asks: what potential φ has this as its curvature? In position space, every point couples to every point." },
-      { at: 0.14, text: "Change alphabets. The FFT rewrites the same curve as a sum of sine waves — here four of them, k = 1, 2, 4, 8 ripples per box. Nothing is lost; this is the identical object, re-spelled." },
-      { at: 0.42, text: "Now solve. A sine wave passes through ∇² unchanged in shape, just scaled by −k². So per wave, the equation is one division: φₖ = −ρₖ / k². Watch the high frequencies flatten — gravity cares about bulk, not detail." },
-      { at: 0.68, text: "Inverse FFT: sum the scaled waves back up. The jagged density became a smooth potential — the deep well sits under the biggest mass concentration." },
-      { at: 0.86, text: "Forces are the downhill direction, F = −∇φ: difference neighbouring cells and you're done. A 262,144-unknown system, solved by elementwise division." },
+      { at: 0, text: "A lumpy density slice ρ(x) across the box. Poisson's equation asks which potential φ(x) has this curve as its curvature, and in position space every point depends on every other point." },
+      { at: 0.16, text: "The FFT rewrites the same curve as a stack of sine waves: here four frequencies, k = 1, 2, 4, and 8 cycles per box, carrying the exact same information in frequency space." },
+      { at: 0.4, text: "Each sine wave passes through the Laplacian unchanged in shape, only multiplied by −k². Solving Poisson's equation becomes dividing each wave by −k², flipping its sign and flattening the short ripples." },
+      { at: 0.68, text: "An inverse FFT sums the scaled waves back together. Because high frequencies were heavily damped, the jagged density turns into a smooth potential whose deepest valley sits under the densest mass." },
+      { at: 0.86, text: "Taking finite differences between neighboring cells gives the downhill force F = −∇φ. A 262,144-unknown system solved by elementwise division." },
     ],
     draw(ctx, w, h, t) {
-      const mx = Math.max(20, w * 0.06);
+      const mx = Math.max(52, w * 0.08);
       const plotW = w - 2 * mx;
       const SAMPLES = 160;
 
       const pRho = phase(t, 0, 0.12);
-      const pSplit = phase(t, 0.14, 0.4);
-      const pDiv = phase(t, 0.42, 0.66);
+      const pSplit = phase(t, 0.16, 0.38);
+      const pDiv = phase(t, 0.4, 0.64);
       const pSum = phase(t, 0.68, 0.84);
       const pForce = phase(t, 0.86, 0.98);
 
@@ -105,20 +105,19 @@ export function mountPoissonWaves(el: HTMLElement): void {
       label(ctx, "density  ρ(x)", mx, rhoY - rhoAmp - 10, { color: PAL.text, size: 12, alpha: pRho });
 
       // Component lanes: each wave slides from the density lane to its own
-      // lane during pSplit, then its amplitude shrinks by 1/k² during pDiv,
-      // then it slides down to the potential lane (negated) during pSum.
+      // lane during pSplit, flips sign and shrinks by -1/k² during pDiv,
+      // then slides down to combine into the potential lane during pSum.
       WAVES.forEach((wv, i) => {
-        const stag = phase(pSplit, i * 0.12, i * 0.12 + 0.6);
+        const stag = phase(pSplit, i * 0.1, i * 0.1 + 0.55);
         if (stag <= 0) return;
         const laneY = laneTop + i * laneGap;
-        const divK = phase(pDiv, i * 0.1, i * 0.1 + 0.55);
-        const amp = lerp(wv.amp, wv.amp / (wv.k * wv.k), divK);
-        const sign = lerp(1, -1, pSum); // φ flips sign (−1/k²)
+        const divK = phase(pDiv, i * 0.08, i * 0.08 + 0.52);
+        const ampSigned = lerp(wv.amp, -wv.amp / (wv.k * wv.k), divK);
         const yMid = lerp(rhoY, lerp(laneY, phiY, pSum), stag);
         const scale = lerp(rhoAmp, lerp(laneAmp / 0.45, phiAmp, pSum), stag);
         const alpha = stag * lerp(1, 0.0, phase(pSum, 0.75, 1));
         drawCurve(
-          (x) => sign * amp * Math.sin(wv.k * Math.PI * 2 * x + wv.phi),
+          (x) => ampSigned * Math.sin(wv.k * Math.PI * 2 * x + wv.phi),
           yMid,
           scale,
           wv.color,
@@ -126,16 +125,18 @@ export function mountPoissonWaves(el: HTMLElement): void {
           1.6,
         );
         if (pSum < 0.4) {
-          label(ctx, `k = ${wv.k}`, mx - 6, laneY, {
+          label(ctx, `k = ${wv.k}`, mx - 8, laneY, {
             color: wv.color,
             size: 11,
             align: "right",
             mono: true,
             alpha: stag * (1 - phase(pSum, 0, 0.4)),
           });
-          // amplitude + division annotation
+          // amplitude + signed division annotation
           const ampText =
-            divK > 0.3 ? `÷ ${wv.k * wv.k} → ${(wv.amp / (wv.k * wv.k)).toFixed(3)}` : `amp ${wv.amp.toFixed(2)}`;
+            divK > 0.3
+              ? `÷ (−${wv.k * wv.k}) → −${(wv.amp / (wv.k * wv.k)).toFixed(3)}`
+              : `amp ${wv.amp.toFixed(2)}`;
           label(ctx, ampText, mx + plotW, laneY - laneAmp - 8, {
             color: divK > 0.3 ? PAL.warm : PAL.muted,
             size: 10,

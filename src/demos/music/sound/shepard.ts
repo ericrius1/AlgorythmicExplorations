@@ -22,7 +22,7 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
   let dir: "up" | "down" = "up";
   let mode: "glide" | "steps" = "steps";
   let phi = 0; // position in octaves, mod 1
-  let travelled = 0; // octaves since play
+  let traveled = 0; // octaves since play
   let playing = false;
   let stepClock = 0;
 
@@ -45,7 +45,7 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
     playing = on;
     const t = now();
     if (on) {
-      travelled = 0;
+      traveled = 0;
       stepClock = 0;
       oscs = [];
       gains = [];
@@ -97,7 +97,7 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
     dir,
     (d) => {
       dir = d;
-      travelled = 0;
+      traveled = 0;
     },
   );
 
@@ -112,7 +112,7 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
 
   shell.setInfo(() =>
     playing
-      ? `pitch class ${pcName()} · ${dir === "up" ? "climbed" : "fallen"} ${Math.abs(travelled).toFixed(1)} octaves so far · the components still span ${Math.round(FMIN)} Hz – ${(FMIN * Math.pow(2, K) / 1000).toFixed(1)} kHz`
+      ? `pitch class ${pcName()} · ${dir === "up" ? "climbed" : "fallen"} ${Math.abs(traveled).toFixed(1)} octaves so far · the components still span ${Math.round(FMIN)} Hz – ${(FMIN * Math.pow(2, K) / 1000).toFixed(1)} kHz`
       : `${K} sines an octave apart, under one fixed envelope`,
   );
 
@@ -131,13 +131,13 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
       const speed = playing ? 1 : 0.35;
       if (mode === "glide") {
         phi += sgn * GLIDE_OCT_S * dt * speed;
-        if (playing) travelled += sgn * GLIDE_OCT_S * dt;
+        if (playing) traveled += sgn * GLIDE_OCT_S * dt;
       } else {
         stepClock += dt * speed;
         if (stepClock >= STEP_S) {
           stepClock -= STEP_S;
           phi += sgn / 12;
-          if (playing) travelled += sgn / 12;
+          if (playing) traveled += sgn / 12;
           instant = true;
         }
       }
@@ -167,9 +167,9 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
 
       // ---- the pitch helix ----
       const hx = narrow ? W / 2 : W * 0.26;
-      const R = narrow ? Math.min(W * 0.3, 110) : Math.min(W * 0.17, 130);
-      const hTop = narrow ? 52 : 60;
-      const hBot = narrow ? H * 0.52 : H - 40;
+      const R = narrow ? Math.min(W * 0.29, 105) : Math.min(W * 0.165, 126);
+      const hTop = narrow ? 66 : 78;
+      const hBot = narrow ? H * 0.53 : H - 28;
       const turn = (hBot - hTop - R * 0.7) / K; // height per octave
       const P = (oct: number): [number, number, number] => {
         const th = 2 * Math.PI * (oct - Math.floor(oct));
@@ -191,12 +191,13 @@ export async function mountShepard(container: HTMLElement): Promise<Demo> {
         }
         glowStroke(g, path, [122, 162, 255], 0.9, front ? 0.32 : 0.12);
       }
-      // pitch class names around the top turn
+      // pitch class names floating cleanly above the top turn
+      const haloCy = narrow ? 38 : 44;
+      const haloRy = narrow ? 20 : 24;
       for (let i = 0; i < 12; i++) {
         const th = (2 * Math.PI * i) / 12;
-        const x = hx + (R + 16) * Math.sin(th);
-        // a ring just above the top turn, never closer than 16 px to the edge
-        const y = Math.max(16, hTop + R * 0.2 + (R * 0.32 + 8) * Math.cos(th) - 14);
+        const x = hx + (R + 12) * Math.sin(th);
+        const y = Math.max(15, haloCy + haloRy * Math.cos(th));
         const on = Math.round(chroma() * 12) % 12 === i;
         text(g, NOTE[i], x, y, {
           size: on ? 12.5 : 10,

@@ -1,5 +1,5 @@
 // Canvas 2D drawing for the sound figures: a Retina-aware stage on top of the
-// shared demo Shell, additive "glow" strokes, the harmonic colour code, text
+// shared demo Shell, additive "glow" strokes, the harmonic color code, text
 // labels, and the "tap to play" pill. Canvas 2D (not WebGPU) so every figure
 // works in every browser, with crisp text labels.
 
@@ -33,8 +33,8 @@ export function hsl(h: number, s: number, l: number): RGB {
   return [f(0) * 255, f(8) * 255, f(4) * 255];
 }
 
-// The colour code used across these figures: hue is pitch class. Notes an
-// octave apart share a colour, so harmonics 1, 2, 4, 8 are all gold, 3 and 6
+// The color code used across these figures: hue is pitch class. Notes an
+// octave apart share a color, so harmonics 1, 2, 4, 8 are all gold, 3 and 6
 // share a blue, and so on. `chroma` is the fractional part of log2(f).
 export function chromaRgb(chroma: number, light = 0.66): RGB {
   const c = chroma - Math.floor(chroma);
@@ -251,7 +251,7 @@ export function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: 
 
 // ---- tap to play ---------------------------------------------------------------------
 
-// A centred pill over the canvas that says how to start the sound. Hidden
+// A centered pill over the canvas that says how to start the sound. Hidden
 // while sound is playing; comes back when it stops (e.g. scrolled away).
 export class PlayPill {
   readonly el: HTMLButtonElement;
@@ -260,7 +260,7 @@ export class PlayPill {
     this.el.type = "button";
     this.el.className = `ms-pill ms-pill-${typeof where === "string" ? where : "at"}`;
     if (typeof where !== "string") {
-      // centre of the pill at a fraction of the canvas
+      // center of the pill at a fraction of the canvas
       this.el.style.left = `${where[0] * 100}%`;
       this.el.style.top = `${where[1] * 100}%`;
     }

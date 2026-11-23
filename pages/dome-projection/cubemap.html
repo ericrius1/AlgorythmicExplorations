@@ -10,7 +10,7 @@
     <title>Six Square Cameras — Dome Projection</title>
     <meta
       name="description"
-      content="Part three of a series on dome projection: storing a dome as cubemap faces instead of a fisheye, how each lookup works, what each format costs to render, and how to choose between them."
+      content="Part three of a series on dome projection: storing a dome sky as cubemap faces instead of a circular fisheye, how both direction lookups work, what each costs to render, and when to pick each format."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Dome Projection · Part 3</p>
         <h1>Six Square Cameras</h1>
         <p class="subtitle">
-          A cubemap stores the same directions as a fisheye, as ordinary 90-degree camera
-          images. Which one to use depends on what's expensive.
+          Why real-time 3D engines pack a dome sky into 90-degree cube faces instead of
+          drawing a fisheye directly, and how the two formats convert into each other.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,31 +43,33 @@
 
     <main>
       <p>
-        <a href="/pages/dome-projection/fisheye.html">Part two</a> described a fisheye
-        master as a lookup table for directions. A cubemap is another lookup table for the
-        same directions. Put six cameras at the centre of the dome, each with a 90-degree
-        field of view: one pointing up, one down, and four around the horizon. Their square
-        images together cover every direction once.
+        Try asking a standard 3D rasterizer to draw a 180-degree fisheye directly and you
+        hit a brick wall right away: straight edges in 3D space curve dramatically across a
+        fisheye disk, and GPU triangle rasterizers only draw straight lines between
+        vertices. The time-tested workaround is to bolt six ordinary 90-degree perspective
+        cameras back-to-back at the center of the dome (one straight up, one straight down,
+        and four facing around the horizon) so their square images tile the entire sphere
+        without any curved projection math at all.
       </p>
       <p>
-        In the hero, each face of that cube is tinted and drawn with its own grid, and the
-        bright lines are the cube's edges, where one camera's view ends and the next one's
-        begins. One face at a time lights up, the way a renderer draws them, one after
-        another.
+        Up in the hero banner, each face of that cube gets its own subtle tint and square
+        grid, with bright borders along the cube edges where one camera's frustum hands off
+        to the next. Notice how one face brightens at a time in sequence, mimicking the
+        pass-by-pass loop a real-time engine runs to fill a cubemap.
       </p>
       <p>
-        The choice between the two formats changes the render path, the preview, the
-        calibration and the frame budget. A fisheye is usually how fulldome video is
-        delivered. A cubemap is often the easier thing for a realtime 3D engine to render.
-        Plenty of dome systems use both.
+        Picking between a circular fisheye from
+        <a href="/pages/dome-projection/fisheye.html">part two</a> and a cubemap shapes your
+        entire render path, preview workflow, and frame budget. Planetariums overwhelmingly
+        exchange finished movies as fisheyes, while real-time 3D engines usually render to
+        cubemaps first; plenty of production pipelines keep both around at different stages.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="addresses"><span class="kicker">Step 1 · Same direction</span>Two addresses for one direction</h2>
+      <h2 id="addresses"><span class="kicker">Step 1 · Same direction</span>Two ways to index a unit vector</h2>
       <p>
-        Start from the direction, not the image format. To find the colour at a point on
-        the dome, take the direction from the dome centre to that point, then ask either
-        image for it:
+        Because both formats store the exact same hemisphere of directions, every lookup
+        begins from the 3D vector pointing out from the dome center:
       </p>
       <pre><code>dir = normalize(domePoint - domeCenter)
 
@@ -80,10 +82,10 @@ cubemap lookup:
   face = the axis where |dir| is largest
   st   = the other two components ÷ that largest one   <span class="cm">// each −1..1</span></code></pre>
       <p>
-        The cubemap lookup has no trigonometry at all: find the biggest component, divide
-        the other two by it, and you have a position on that face. GPUs do this inside the
-        texture unit, so sampling a cubemap by direction costs about the same as sampling a
-        flat texture.
+        Look at how lean the cubemap math is: zero inverse trig, just find whichever
+        component has the biggest magnitude and divide the other two by it. GPU texture
+        units execute that lookup directly in silicon, so sampling a cubemap by 3D direction
+        runs at essentially the same speed as sampling an ordinary 2D image.
       </p>
 
       <div
@@ -93,73 +95,78 @@ cubemap lookup:
       ></div>
 
       <p>
-        Both layouts in the figure are filled with the same test pattern. The cross on the
-        right is the five faces a dome needs: the top face in the middle, and each side face
-        folded out from the edge it shares with the top, so it reads the same way round as
-        the fisheye. Only the inner half of each side face is above the horizon; the dimmed
-        halves would be the floor. Drag a point in either layout and the other follows.
+        Both sides above display the identical ring-and-meridian dome pattern. On the right,
+        the five cube faces needed for an upper hemisphere unfold into a cross: the zenith
+        face (<code>+Z</code>) sits in the middle with the four horizon faces hinged along
+        its edges, matching the compass orientation of the fisheye on the left. Since the
+        lower half of each side face looks below the horizon (the floor of the theater),
+        those regions appear dimmed. Drag either handle, or jump straight to the
+        <em>zenith</em> or <em>horizon</em>, to watch the two coordinate systems stay synced.
       </p>
       <p>
-        Near the zenith the two agree closely. Toward the horizon the cube stretches the
-        pattern, because a 90-degree perspective camera spreads its edges over more pixels
-        than its centre: halfway along each edge of a face, a degree of travel toward the
-        edge covers twice as many pixels as it does in the middle. The readout under the
-        figure shows the face and the two divided components the lookup would use.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2 id="fisheye"><span class="kicker">Step 2 · Fisheye</span>When delivery matters</h2>
-      <p>
-        A fisheye master stores the whole dome in one image. It's the standard way to
-        deliver fulldome video: a planetarium's playback and calibration system takes one
-        master and maps it onto whatever projectors that room happens to have. It's easy to
-        preview on a monitor and easy to record.
-      </p>
-      <p>
-        The costs: the centre is a singular point, the seam at <em>φ</em> = 0 needs the care
-        from part one, and pixel density changes across the image with the lens law. And a
-        rasterizer can't draw a true fisheye directly, because straight edges in the scene
-        become curves in the image and triangles can't bend. So a realtime renderer either
-        ray traces the fisheye, the way part two's hero does in one fragment shader, bends
-        each vertex and subdivides finely enough to hide the error, or renders something
-        else first and converts.
+        Near the zenith the rings look nearly circular in both layouts, while out toward the
+        edges of a cube face the grid stretches noticeably. A flat 90-degree perspective
+        camera spends pixels unevenly across angle: halfway along any face edge, a single
+        degree of angular travel spans twice as many pixels as it does right at the face
+        center. You can see the active face and its two perspective ratios updating live in
+        the readout underneath.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="cubemap"><span class="kicker">Step 3 · Cubemap</span>When rendering the scene is the hard part</h2>
+      <h2 id="fisheye"><span class="kicker">Step 2 · Fisheye</span>Built for delivery and playback</h2>
       <p>
-        Each face is an ordinary perspective camera with a 90-degree field of view, the one
-        thing every engine already knows how to draw. Shadows, culling, level of detail,
-        materials and most effects work per face without changes. A dome needs the top face
-        and the upper halves of the four side faces: five renders, where a full sphere would
-        need six.
+        Packing the whole hemisphere into a single square image is why fulldome video
+        standardized on the fisheye master. You can hand one video file to any planetarium,
+        preview the whole sky on a normal monitor, and let the theater's own playback rig
+        remap that single stream onto however many projectors hang on its walls.
       </p>
       <p>
-        The costs are the number of renders and the seams between them. Five scene renders
-        is a lot more work than one, even though the side faces only need their top halves
-        drawn, which a scissor rectangle handles. And anything that works in screen space,
-        like bloom, motion blur, temporal antialiasing or ambient occlusion, can stop dead at
-        a face edge, because each face is processed without knowing what's on its
-        neighbour.
+        Drawing a fisheye cleanly in real time takes extra effort, though. You inherit the
+        zenith singularity and azimuth seam from part one, pixel density varies with the
+        chosen lens law, and standard rasterization refuses to curve long triangle edges.
+        Real-time fisheye generators therefore have to either ray trace the scene directly
+        (the way part two's hero works in a single fragment shader), bend vertices in a
+        vertex shader over densely tessellated meshes to hide chord error, or render an
+        intermediate cubemap first and convert it.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="cubemap"><span class="kicker">Step 3 · Cubemap</span>Built for 3D engines</h2>
+      <p>
+        Every face of a cubemap is just an ordinary 90-degree pinhole camera, which means
+        every existing feature of a 3D engine (frustum culling, shadow cascades, level of
+        detail, PBR shaders, particle systems) works right out of the box without custom
+        projection hacks. Better still, a hemisphere only needs the top face plus the upper
+        halves of the four side faces: five render passes instead of six, with a scissor
+        rectangle trimming the unused lower halves.
+      </p>
+      <p>
+        That convenience comes with two familiar headaches. First, rendering the scene five
+        times per frame multiplies geometry submission and per-pass overhead dramatically.
+        Second, any post-processing pass that depends on neighboring screen pixels (bloom,
+        screen-space ambient occlusion, motion blur, temporal antialiasing) hits an abrupt
+        wall at every cube edge because each face only knows about its own pixels, often
+        leaving faint brightness steps right where two faces meet.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Cube maps, 1986</span>
         <p>
-          Ned Greene introduced cube environment maps in a 1986 paper, as a way to store
-          everything visible from one point: six perspective images on the faces of a cube,
-          read back by direction, mainly for reflections. Hardware caught up more than a
-          decade later. Consumer GPUs started sampling cube maps around 1999, and they became
-          part of core OpenGL in version 1.3, in 2001.
+          Ned Greene introduced cube environment maps in a 1986 paper as a way to capture
+          every incoming light direction at a point using six perspective projections,
+          mainly for reflections on curved surfaces. Graphics hardware took more than a
+          decade to catch up: consumer GPUs gained dedicated cubemap texture sampling around
+          1999, and OpenGL folded it into the core specification with version 1.3 in 2001.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="conversion"><span class="kicker">Step 4 · Conversion</span>Where the extra pass goes</h2>
+      <h2 id="conversion"><span class="kicker">Step 4 · Conversion</span>Combining both in one pipeline</h2>
       <p>
-        The two formats are often two stages of one pipeline. A realtime scene renders to a
-        cubemap, then one pass resamples the cubemap into a fisheye for recording or venue
-        playback. The same cubemap can also be sampled straight from each projector's
-        calibration pass:
+        Because converting from a cubemap to a fisheye is just a single full-screen texture
+        lookup per pixel, many real-time dome rigs treat them as adjacent steps in one
+        pipeline: render the 3D world into five cube faces, then either resample to a
+        fisheye for recording and touring playback, or read the cubemap directly inside each
+        projector's calibration pass.
       </p>
       <pre><code>cubemap → fisheye:
   for each fisheye pixel:
@@ -176,114 +183,116 @@ cubemap → projector:
     dir   = calibratedPixelToDirection(pixel)
     color = sampleCube(dir)</code></pre>
       <p>
-        The last path skips the fisheye, but not the texture: the projector pass samples the
-        cube instead. A conversion pass is one texture read per output pixel, which is small
-        next to rendering a scene.
+        Skipping the intermediate fisheye in that third route eliminates one resampling
+        pass (and one round of texture filtering blur) when you already control the
+        projector outputs. Even when you do convert, a full-screen lookup pass is tiny next
+        to shading complex 3D geometry.
       </p>
       <p>
-        The heroes in this series use a cubemap the same way. The Milky Way and the nebulae
-        are slow noise, too expensive to evaluate for every pixel of every frame, so they're
-        baked once into a cubemap with 512-pixel faces, and the main pass reads it by
-        direction. The stars are computed fresh each frame so they stay sharp at any
-        resolution.
+        The planetarium heroes across this very series lean on a cubemap for the exact same
+        reason. Computing the layered 3D noise for the Milky Way and faint nebulae on every
+        pixel of every frame would bog down mid-range GPUs, so at startup the shader bakes
+        those diffuse clouds once into a 512×512-per-face cubemap. Each animation frame
+        simply samples that cube by direction and adds procedural stars on top so pinpoint
+        stars stay sharp at any screen resolution.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="choosing"><span class="kicker">Step 5 · Choosing</span>Pick the expensive part</h2>
+      <h2 id="choosing"><span class="kicker">Step 5 · Choosing</span>Matching the format to the bottleneck</h2>
       <section class="dome-case-list" aria-label="When to choose a fisheye or a cubemap">
         <article class="dome-case">
           <h3>A film for festivals or touring domes</h3>
           <p>
             <strong class="better-fisheye">Fisheye.</strong>
-            The file has to travel, and every venue's system can map a domemaster through
-            its own calibration without knowing anything about your scene.
+            When a finished file has to travel between venues, a standard equidistant
+            domemaster lets every theater plug it straight into its own calibration rig.
           </p>
         </article>
         <article class="dome-case">
-          <h3>A realtime 3D world with meshes, shadows and particles</h3>
+          <h3>A real-time 3D world with meshes, shadows, and particles</h3>
           <p>
             <strong class="better-cubemap">Cubemap first.</strong>
-            Five 90-degree cameras match how the engine already renders. Convert to a
-            fisheye afterwards, or sample the cube in the projector pass.
+            Five 90-degree perspective cameras keep the entire rendering engine intact. You
+            can resample to a fisheye at the end or sample the cube straight in each
+            projector pass.
           </p>
         </article>
         <article class="dome-case">
           <h3>One projector with a fisheye lens</h3>
           <p>
             <strong class="better-fisheye">Fisheye.</strong>
-            The projector already wants the circular image. A cubemap only adds a
-            conversion step, unless your engine has an easier time rendering one.
+            The optical hardware already expects a circular frame. Going through a cubemap
+            only makes sense if your engine needs standard pinhole cameras to render the
+            scene.
           </p>
         </article>
         <article class="dome-case">
           <h3>A heavy shader that covers the whole dome</h3>
           <p>
             <strong class="better-fisheye">Fisheye, ray traced.</strong>
-            If the effect can compute a colour from a direction in one pass, render the
-            fisheye directly. A cubemap would run it over five faces with overlapping
-            borders and more pixels than the circle needs.
+            If a fragment shader can evaluate a color straight from a direction vector in
+            one pass, rendering the circular fisheye directly avoids shading extra corner
+            pixels across five cube faces.
           </p>
         </article>
         <article class="dome-case">
           <h3>Video plates and live 3D layers together</h3>
           <p>
             <strong class="better-hybrid">Both.</strong>
-            Pre-rendered material often arrives as fisheye or equirectangular video while
-            the live layers render to a cube. Composite by direction, in whichever format
-            loses the least detail, and output what the room needs.
+            Pre-rendered backdrops typically show up as fisheye or equirectangular video
+            while live foreground objects render into a cubemap. Composite everything by
+            direction vector, then output whatever the venue expects.
           </p>
         </article>
       </section>
 
       <!-- ================================================================ -->
-      <h2 id="debugging"><span class="kicker">Step 6 · Debugging</span>What breaks differently</h2>
+      <h2 id="debugging"><span class="kicker">Step 6 · Debugging</span>Catching flipped faces and bad seams</h2>
       <p>
-        Fisheye mistakes are radial: rings bunch up, spacing feels wrong toward the edge,
-        the centre pinches, or the seam opens. Cubemap mistakes happen at face boundaries:
-        edges don't match, a face is flipped or rotated, or a screen-space effect stops at a
-        face edge. So each format wants its own test pattern:
+        Each representation fails in its own signature way. Fisheye errors show up radially:
+        bunched elevation rings, pinched zenith spokes, or a split azimuth seam. Cubemap
+        errors show up right along the 90-degree borders: mismatched face orientations, an
+        upside-down side panel, or a bright bloom seam stopping dead at an edge. Designing
+        a dedicated test pattern for whichever format you are debugging catches those bugs
+        in seconds:
       </p>
       <pre><code>fisheye test pattern:
-  azimuth labels round the circle
+  azimuth labels around the circle
   rings at known zenith angles
-  a visible seam and a centre mark
+  a visible seam and a center mark
 
 cubemap test pattern:
-  a name on every face
+  a bold name on every face
   an arrow showing each face's up direction
-  labels that cross face borders
-  a horizon line around the four side faces</code></pre>
+  labels straddling face borders
+  a crisp horizon line across the four side faces</code></pre>
       <p>
-        Test with labels before testing with art. A detailed nebula can hide a flipped face
-        right up until the show is in the room.
+        Always verify the rig with ugly labeled grids before loading finished art. A dense
+        starfield or swirling nebula can easily disguise a mirrored cube face until
+        someone tries reading a planet label during dress rehearsal.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>The direction is the contract.</strong> A fisheye and a cubemap are two
-          ways of storing it, and either can be converted to the other with one lookup per
-          pixel.
-        </li>
-        <li>
-          <strong>A cube face is a normal camera.</strong> That's the whole reason to use
-          one: everything the engine already does keeps working.
-        </li>
-        <li>
-          <strong>Choose by cost.</strong> Delivery favours the fisheye, rendering a 3D
-          scene favours the cube, and plenty of pipelines use both.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>From one sky to multiple projectors</h2>
       <p>
-        Things I'd try next: render the hero's sky into an actual cubemap face by face and
-        show the five images next to the dome, so the seams in screen-space effects are
-        visible instead of described.
+        Both fisheyes and cubemaps are just containers for the same 3D direction vectors,
+        and swapping between them costs a single texture fetch per pixel. Choosing between
+        them comes down to where your work sits: delivery pipelines lean toward a single
+        fisheye frame, rasterized 3D worlds lean toward standard 90-degree cube cameras, and
+        hybrid setups comfortably mix the two. If I were extending Figure 1, I would render
+        the hero's live starfield into five actual cubemap render targets side by side and
+        turn on a per-face bloom pass so those cube-edge seams become impossible to miss.
+      </p>
+      <p>
+        Up to now we have pretended the dome receives one clean seamless image all by
+        itself. Once a theater grows larger than a small inflatable tent, though, one
+        projector can no longer light the entire ceiling, and multiple overlapping beams
+        have to stitch that master back together in physical space.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/dome-projection/show.html">Part 4, The Dome Show</a>.</strong>
-        Several projectors share one dome: each needs a calibrated view, a warp to the real
-        surface, and a blend where it overlaps its neighbours.
+        Splitting a master across multiple projectors: projector cameras, measured warp
+        meshes, gamma-correct edge blending, and matching black levels.
       </p>
     </main>
 

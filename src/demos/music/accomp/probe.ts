@@ -202,6 +202,7 @@ export function mountProbeTest(container: HTMLElement): Demo {
         g.fillText(l, x + bw / 2, sy + bh * 0.68);
       });
       g.textAlign = "left";
+      const twoRow = W / s < 680;
       const msg =
         phase === "idle"
           ? "Each question: a cadence in C, then one note. Rate the note."
@@ -211,14 +212,43 @@ export function mountProbeTest(container: HTMLElement): Demo {
               ? `Question ${trial + 1} of 12 · how well did that note fit?`
               : "Your profile (amber) against the one measured in 1982 (blue).";
       g.fillStyle = "rgba(220,226,245,0.85)";
-      g.font = font(13 * s, 600);
-      g.fillText(msg, sx + 5 * (bw + 6 * s) + 26 * s, sy + bh * 0.68);
+      g.font = font((twoRow ? 11.5 : 13) * s, 600);
+      if (twoRow) g.fillText(msg, sx, sy + bh + 18 * s);
+      else g.fillText(msg, sx + 5 * (bw + 6 * s) + 26 * s, sy + bh * 0.68);
 
       // ---- bars: the published profile, and yours ----
       const px = 40 * s;
-      const py = sy + bh + 34 * s;
+      const py = sy + bh + (twoRow ? 50 : 38) * s;
       const pw = W - px - 18 * s;
       const ph = H - py - 34 * s;
+      // chart legend above top-right of the bars
+      {
+        const ly = py - 12 * s;
+        g.font = font(10 * s, 600);
+        g.textAlign = "right";
+        const rx = px + pw;
+        const t1 = "your ratings";
+        const w1 = g.measureText(t1).width;
+        g.fillStyle = "rgba(220,226,245,0.78)";
+        g.fillText(t1, rx, ly);
+        g.fillStyle = rgba(C.comp, 0.95);
+        g.beginPath();
+        g.arc(rx - w1 - 9 * s, ly - 3.5 * s, 3.5 * s, 0, Math.PI * 2);
+        g.fill();
+
+        const x2 = rx - w1 - 24 * s;
+        const t2 = "1982 average";
+        const w2 = g.measureText(t2).width;
+        g.fillStyle = "rgba(220,226,245,0.72)";
+        g.fillText(t2, x2, ly);
+        g.fillStyle = rgba(C.accent, 0.16);
+        g.strokeStyle = rgba(C.accent, 0.85);
+        g.lineWidth = s;
+        roundRect(g, x2 - w2 - 13 * s, ly - 8 * s, 8 * s, 9 * s, 2 * s);
+        g.fill();
+        g.stroke();
+        g.textAlign = "left";
+      }
       const colW = pw / 12;
       const yOf = (v: number): number => py + ph - ((v - 1) / 6) * ph;
       g.strokeStyle = "rgba(170,180,220,0.1)";
@@ -235,6 +265,7 @@ export function mountProbeTest(container: HTMLElement): Demo {
       }
       const prof = profile();
       const probeNow = phase === "playing" || phase === "rate" ? order[trial] : -1;
+      const inScale = mode === "minor" ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
       for (let pc = 0; pc < 12; pc++) {
         const x = px + pc * colW;
         const cx = x + colW / 2;
@@ -261,10 +292,10 @@ export function mountProbeTest(container: HTMLElement): Demo {
           g.strokeRect(x + 2 * s, py - 6 * s, colW - 4 * s, ph + 6 * s);
           g.setLineDash([]);
         }
-        g.fillStyle = [0, 2, 4, 5, 7, 9, 11].includes(pc) ? "rgba(225,232,250,0.9)" : "rgba(170,180,210,0.6)";
+        g.fillStyle = inScale.includes(pc) ? "rgba(225,232,250,0.9)" : "rgba(170,180,210,0.55)";
         g.font = font(11 * s, 650);
         g.textAlign = "center";
-        g.fillText(mode === "minor" && pc === 3 ? "E♭" : NAMES[pc], cx, py + ph + 18 * s);
+        g.fillText(NAMES[pc], cx, py + ph + 18 * s);
       }
       g.textAlign = "left";
       // connect your dots

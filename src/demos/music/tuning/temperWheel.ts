@@ -1,7 +1,7 @@
-// Fig. 3 of Part 4: six ways to hide the comma. The twelve keys sit round
-// the circle of fifths. Each arc between neighbours is one fifth, labelled
+// Fig. 3 of Part 4: six ways to hide the comma. The twelve keys sit around
+// the circle of fifths. Each arc between neighbors is one fifth, labeled
 // with how far it was shaved from pure (the wolf glows red). Each key is
-// coloured by its major third: green is pure, orange is equal temperament's
+// colored by its major third: green is pure, orange is equal temperament's
 // +13.7¢, red and magenta are worse. Click a key to hear its major triad in
 // that tuning, or tour all twelve.
 
@@ -159,7 +159,7 @@ export function mountTemperWheel(container: HTMLElement): Demo {
 
       glow(ctx, cx, cy, R * 1.3, [40, 52, 96], 0.2);
 
-      // fifths: arcs between neighbours, labelled with their tempering
+      // fifths: arcs between neighbors, labeled with their tempering
       for (let i = 0; i < 12; i++) {
         const dev = shown.fifth[i] - FIFTH;
         const wolf = Math.abs(dev) > 10;
@@ -195,19 +195,19 @@ export function mountTemperWheel(container: HTMLElement): Demo {
       }
       if (!narrow) text(ctx, "fifths, ¢ from pure", cx, cy - R - 44, { size: 10.5, color: COL.dim, align: "center" });
 
-      // thirds: bars pointing inward from each key, coloured by error
+      // thirds: bars pointing inward from each key, colored by error
       for (let i = 0; i < 12; i++) {
         const d3 = shown.third[i] - MAJ3;
         const col = heat(d3 / 36);
         const r0 = R - (narrow ? 17 : 21);
-        const len = Math.max(0, Math.min(1, d3 / 45)) * R * 0.5;
+        const len = Math.max(0, Math.min(1, d3 / 45)) * R * 0.39;
         const [ax, ay] = clock(cx, cy, r0, i / 12);
         const [bx, by] = clock(cx, cy, r0 - len, i / 12);
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
         glowStroke(ctx, col, 0.85, narrow ? 3 : 4);
-        const [tx, ty] = clock(cx, cy, r0 - len - (narrow ? 11 : 13), i / 12);
+        const [tx, ty] = clock(cx, cy, r0 - len - (narrow ? 10 : 12), i / 12);
         text(ctx, Math.abs(d3) < 0.05 ? "0" : signed(d3, 1), tx, ty, {
           size: narrow ? 8.5 : 9.5,
           color: rgba(mixRgb(col, [255, 255, 255], 0.3), 0.95),
@@ -234,9 +234,9 @@ export function mountTemperWheel(container: HTMLElement): Demo {
         text(ctx, CIRCLE[i], x, y + 0.5, { size: narrow ? 10.5 : 12, color: "#f4f6fc", align: "center", base: "middle", weight: 700 });
       }
 
-      // centre: name and year
-      text(ctx, temp.short, cx, cy - 6, { size: narrow ? 12 : 14, color: COL.text, align: "center", weight: 700 });
-      text(ctx, temp.year, cx, cy + 12, { size: 10.5, color: COL.dim, align: "center" });
+      // center: name and year
+      text(ctx, temp.short, cx, cy - 8, { size: narrow ? 12 : 14, color: COL.text, align: "center", weight: 700 });
+      text(ctx, temp.year, cx, cy + 10, { size: 10.5, color: COL.dim, align: "center" });
 
       // ---- detail panel ----
       const px = narrow ? 18 : w * 0.66;

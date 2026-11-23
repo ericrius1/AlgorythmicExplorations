@@ -152,9 +152,9 @@ export async function mountRcPaint(container: HTMLElement): Promise<Demo> {
   modeBtns.light = shell.button("paint light", () => setMode("light"));
   modeBtns.wall = shell.button("paint wall", () => setMode("wall"));
   modeBtns.erase = shell.button("erase", () => setMode("erase"));
-  const colorBtn = shell.button(`colour: ${LIGHT_COLORS[0].name}`, () => {
+  const colorBtn = shell.button(`color: ${LIGHT_COLORS[0].name}`, () => {
     colorIdx = (colorIdx + 1) % LIGHT_COLORS.length;
-    colorBtn.textContent = `colour: ${LIGHT_COLORS[colorIdx].name}`;
+    colorBtn.textContent = `color: ${LIGHT_COLORS[colorIdx].name}`;
     setMode("light");
   });
   shell.slider({

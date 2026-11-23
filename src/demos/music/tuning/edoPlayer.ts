@@ -1,7 +1,7 @@
 // Fig. 5 of Part 4: play other divisions. The ring is one period (an octave,
 // or for Bohlen–Pierce the 3:1 "tritave") cut into equal steps; the pure
 // intervals sit outside it at their true angles, joined to the nearest step
-// and coloured by the miss. Underneath is a keyboard with one key per step:
+// and colored by the miss. Underneath is a keyboard with one key per step:
 // tap or drag across it, or play the scale and chords the system is good at.
 
 import { Shell, type Demo } from "../../../lib/demoShell";
@@ -285,12 +285,15 @@ export function mountEdoPlayer(container: HTMLElement): Demo {
       // ---- detail table (wide screens) ----
       if (!narrow) {
         const tx0 = w * 0.53;
+        const tw = w - tx0 - 18;
         let ty = 40;
         text(ctx, sys.name, tx0, ty, { size: 16, color: "#f4f6fc", weight: 700 });
-        text(ctx, `one step = ${step.toFixed(2)}¢`, tx0 + 170, ty, { size: 11, color: COL.dim, mono: true });
+        text(ctx, `one step = ${step.toFixed(2)}¢`, tx0 + tw, ty, { size: 11, color: COL.dim, align: "right", mono: true });
         ty += 26;
-        const cols = [tx0, tx0 + 74, tx0 + 160, tx0 + 230, tx0 + 320];
-        ["pure", "cents", "step", "step ¢", "miss"].forEach((s, i) => text(ctx, s, cols[i], ty, { size: 10, color: COL.dim }));
+        const cols = [tx0, tx0 + tw * 0.21, tx0 + tw * 0.45, tx0 + tw * 0.64, tx0 + tw];
+        ["pure", "cents", "step", "step ¢", "miss"].forEach((s, i) =>
+          text(ctx, s, cols[i], ty, { size: 10, color: COL.dim, align: i === 4 ? "right" : "left" }),
+        );
         ty += 6;
         for (const tg of sys.targets) {
           ty += 19;
@@ -301,7 +304,7 @@ export function mountEdoPlayer(container: HTMLElement): Demo {
           text(ctx, tg.c.toFixed(1), cols[1], ty, { size: 11, color: COL.dim, mono: true });
           text(ctx, String(s), cols[2], ty, { size: 11, color: COL.text, mono: true });
           text(ctx, (s * step).toFixed(1), cols[3], ty, { size: 11, color: COL.dim, mono: true });
-          text(ctx, `${signed(e, 1)}¢`, cols[4], ty, { size: 11, color: rgba(col, 1), mono: true, weight: 600 });
+          text(ctx, `${signed(e, 1)}¢`, cols[4], ty, { size: 11, color: rgba(col, 1), align: "right", mono: true, weight: 600 });
         }
       }
 
@@ -332,10 +335,12 @@ export function mountEdoPlayer(container: HTMLElement): Demo {
           text(ctx, String(s), x + kw / 2, ky1 - 8, { size: Math.min(10, kw * 0.6), color: sc ? "#2a2f42" : "#9aa2c0", align: "center", mono: true });
         }
         if (lab) {
-          text(ctx, lab, x + kw / 2, ky0 - 7, {
+          const align: CanvasTextAlign = s === 0 ? "left" : s === sys.n ? "right" : "center";
+          const lx = s === 0 ? x : s === sys.n ? x + kw : x + kw / 2;
+          text(ctx, lab, lx, ky0 - 7, {
             size: narrow ? 8.5 : 9.5,
             color: "#cfdcff",
-            align: "center",
+            align,
             weight: 650,
             alpha: kw < 10 && lab.length > 3 && !narrow ? 0.85 : 1,
           });

@@ -5,7 +5,7 @@
 import { mountScrolly, PAL, rng, phase, arrow, label } from "../lib/scrolly";
 
 export function mountTwoStructures(el: HTMLElement): void {
-  // A dusty ring around a star, in unit coords centred at (0.5, 0.5).
+  // A dusty ring around a star, in unit coords centered at (0.5, 0.5).
   const rand = rng(23);
   const px: number[] = [];
   const py: number[] = [];
@@ -18,12 +18,14 @@ export function mountTwoStructures(el: HTMLElement): void {
     px.push(0.5 + Math.cos(a) * r);
     py.push(0.5 + Math.sin(a) * r * 0.92);
   }
-  // The focus grain, on the ring at the right, with a few true neighbours.
+  // The focus grain, on the ring at the right, with close neighbors clustered
+  // slightly below-left so their contact push angles cleanly up-right against
+  // the inward pull of gravity.
   const gx = 0.5 + ringR;
   const gy = 0.5;
   for (let i = 0; i < 7; i++) {
-    px.push(gx + (rand() - 0.5) * 0.045);
-    py.push(gy + (rand() - 0.5) * 0.045);
+    px.push(gx - 0.003 + (rand() - 0.5) * 0.022);
+    py.push(gy + 0.015 + (rand() - 0.5) * 0.018);
   }
   const N = px.length;
 
@@ -81,10 +83,10 @@ export function mountTwoStructures(el: HTMLElement): void {
     screens: 4,
     aspect: 0.62,
     steps: [
-      { at: 0, text: "A ring of dust around a star. Follow one grain (blue). Each substep it needs two answers: the pull of the whole ring, and the shove of whatever it's touching." },
-      { at: 0.18, text: "Far field — the pyramid. Distant stretches of ring collapse into single point masses (orange), part one's tree walk. The star isn't even in the buffer: one analytic GM/r² term." },
-      { at: 0.48, text: "Near field — the hash grid. Cells one grain-diameter wide; only the 3×3 block around the grain is searched. Touching neighbours push back, and the dashpot in that push bleeds off energy." },
-      { at: 0.78, text: "One kernel asks both structures, adds the arrows, integrates. The structures never talk to each other — they don't even use the same cell size." },
+      { at: 0, text: "A ring of dust orbiting a star. Watch the blue grain: on every substep it needs the gravitational pull of the whole ring and the contact push of whichever grains are touching it." },
+      { at: 0.18, text: "Far field from the mass pyramid. Distant arcs of the ring collapse into single orange point masses during the tree walk, while the central star adds one analytic GM/r² pull." },
+      { at: 0.45, text: "Near field from the hash grid. Each cell is one grain diameter wide, so the kernel only checks the 3×3 block around the grain. Touching neighbors push back, and the dashpot bleeds off impact energy." },
+      { at: 0.74, text: "One force kernel reads both structures, adds the two vectors, and integrates. The pyramid and the hash grid stay completely independent and even use different cell sizes." },
     ],
     draw(ctx, w, h, t) {
       const m = 10;
@@ -95,9 +97,11 @@ export function mountTwoStructures(el: HTMLElement): void {
       const Y = (y: number): number => oy + y * S;
 
       const pIn = phase(t, 0, 0.1);
-      const pFar = phase(t, 0.18, 0.46);
-      const pNear = phase(t, 0.48, 0.76);
-      const pSum = phase(t, 0.78, 0.97);
+      const pFar = phase(t, 0.18, 0.42);
+      const pNearGrid = phase(t, 0.44, 0.52);
+      const pNearArrows = phase(t, 0.5, 0.7);
+      const pNear = phase(t, 0.44, 0.7);
+      const pSum = phase(t, 0.74, 0.89);
 
       // Star.
       ctx.save();
@@ -133,7 +137,7 @@ export function mountTwoStructures(el: HTMLElement): void {
         fyv += ((f.cy - gy) / d) * fmag;
 
         ctx.save();
-        ctx.globalAlpha = 0.7 * k * (1 - 0.7 * pSum);
+        ctx.globalAlpha = 0.7 * k * (1 - 0.72 * pSum);
         ctx.strokeStyle = PAL.warm;
         ctx.lineWidth = 1;
         ctx.strokeRect(X(f.boxX), Y(f.boxY), f.boxW * S, f.boxH * S);
@@ -141,7 +145,7 @@ export function mountTwoStructures(el: HTMLElement): void {
         ctx.beginPath();
         ctx.arc(X(f.cx), Y(f.cy), 2 + 2.2 * k * Math.sqrt(f.count / 80), 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 0.4 * k * (1 - 0.7 * pSum);
+        ctx.globalAlpha = 0.4 * k * (1 - 0.72 * pSum);
         ctx.strokeStyle = PAL.warm;
         ctx.setLineDash([3, 5]);
         ctx.beginPath();
@@ -159,32 +163,30 @@ export function mountTwoStructures(el: HTMLElement): void {
       // --- near field ---
       let nxv = 0;
       let nyv = 0;
-      if (pNear > 0) {
-        const c0x = Math.floor(gx / cellW) * cellW;
-        const c0y = Math.floor(gy / cellW) * cellW;
+      const c0x = Math.floor(gx / cellW) * cellW;
+      const c0y = Math.floor(gy / cellW) * cellW;
+      if (pNearGrid > 0) {
         ctx.save();
+        ctx.globalAlpha = 0.82 * pNearGrid * (1 - 0.55 * pSum);
+        ctx.strokeStyle = PAL.accent;
+        ctx.lineWidth = 1;
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
-            const k = phase(pNear, 0, 0.4);
-            ctx.globalAlpha = 0.8 * k * (1 - 0.5 * pSum);
-            ctx.strokeStyle = PAL.accent;
-            ctx.lineWidth = 1;
             ctx.strokeRect(X(c0x + dx * cellW), Y(c0y + dy * cellW), cellW * S, cellW * S);
           }
         }
         ctx.restore();
 
-        // Contact arrows from actual close neighbours.
-        const kA = phase(pNear, 0.4, 1);
+        // Contact arrows from actual close neighbors.
         for (let i = 0; i < N; i++) {
           const d = Math.hypot(px[i] - gx, py[i] - gy);
           if (d < 1e-6 || d > 0.028) continue;
           const push = (0.028 - d) / 0.028;
           nxv -= ((px[i] - gx) / d) * push * 3;
           nyv -= ((py[i] - gy) / d) * push * 3;
-          if (kA > 0) {
+          if (pNearArrows > 0) {
             ctx.save();
-            ctx.globalAlpha = kA * (1 - 0.5 * pSum);
+            ctx.globalAlpha = pNearArrows * (1 - 0.65 * pSum);
             ctx.fillStyle = PAL.red;
             ctx.beginPath();
             ctx.arc(X(px[i]), Y(py[i]), 2.6, 0, Math.PI * 2);
@@ -203,15 +205,15 @@ export function mountTwoStructures(el: HTMLElement): void {
         return [(vx / len) * L, (vy / len) * L];
       };
       if (pSum > 0) {
-        const L = S * 0.13;
+        const L = S * 0.16;
         const [ax, ay] = norm(fxv, fyv, L * pSum);
-        const [bx2, by2] = norm(nxv, nyv, L * 0.7 * pSum);
+        const [bx2, by2] = norm(nxv, nyv, L * 0.78 * pSum);
         // component arrows from the grain
-        arrow(ctx, X(gx), Y(gy), X(gx) + ax, Y(gy) + ay, PAL.warm, 2, 7);
-        arrow(ctx, X(gx), Y(gy), X(gx) + bx2, Y(gy) + by2, PAL.red, 2, 7);
+        arrow(ctx, X(gx), Y(gy), X(gx) + ax, Y(gy) + ay, PAL.warm, 2.2, 7.5);
+        arrow(ctx, X(gx), Y(gy), X(gx) + bx2, Y(gy) + by2, PAL.red, 2.2, 7.5);
         // parallelogram sum
         ctx.save();
-        ctx.globalAlpha = 0.35 * pSum;
+        ctx.globalAlpha = 0.4 * pSum;
         ctx.strokeStyle = PAL.muted;
         ctx.setLineDash([3, 4]);
         ctx.beginPath();
@@ -222,8 +224,46 @@ export function mountTwoStructures(el: HTMLElement): void {
         ctx.stroke();
         ctx.restore();
         arrow(ctx, X(gx), Y(gy), X(gx) + ax + bx2, Y(gy) + ay + by2, "#ffffff", 2.6, 9);
-        label(ctx, "gravity (pyramid)", X(gx) + ax + 6, Y(gy) + ay + 10, { color: PAL.warm, size: 10, alpha: pSum });
-        label(ctx, "contact (grid)", X(gx) + bx2 + 6, Y(gy) + by2 - 8, { color: PAL.red, size: 10, alpha: pSum });
+
+        const lblAlpha = phase(pSum, 0.35, 0.85);
+        if (lblAlpha > 0) {
+          const pill = "rgba(6, 7, 11, 0.86)";
+          const boxLeft = X(c0x - cellW);
+          const boxRight = X(c0x + 2 * cellW);
+          // Gravity points left into the open interior of the ring.
+          const gravX = Math.min(boxLeft - 10, X(gx) + ax - 8);
+          label(ctx, "gravity (pyramid)", gravX, Y(gy) + ay + 16, {
+            color: PAL.warm,
+            size: 11,
+            align: "right",
+            alpha: lblAlpha,
+            bg: pill,
+          });
+          // Contact points up-right into clear space outside the ring.
+          const contactRightX = Math.max(boxRight + 10, X(gx) + bx2 + 8);
+          const fitsRight = contactRightX + 94 < w - 8;
+          label(
+            ctx,
+            "contact (grid)",
+            fitsRight ? contactRightX : w - 12,
+            fitsRight ? Y(gy) + by2 : Y(gy) + by2 - 16,
+            {
+              color: PAL.red,
+              size: 11,
+              align: fitsRight ? "left" : "right",
+              alpha: lblAlpha,
+              bg: pill,
+            },
+          );
+          // Resultant points up-left above the parallelogram.
+          label(ctx, "net force", X(gx) + ax + bx2 - 8, Y(gy) + ay + by2 - 14, {
+            color: "#ffffff",
+            size: 11,
+            align: "right",
+            alpha: lblAlpha,
+            bg: pill,
+          });
+        }
       }
 
       // Focus grain on top.

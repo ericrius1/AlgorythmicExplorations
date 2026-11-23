@@ -161,7 +161,7 @@ export async function mountVowels(container: HTMLElement): Promise<Demo> {
   const toggle = (): void => {
     void unlockAudio().then(() => setPlaying(!playing));
   };
-  const pill = new PlayPill(stage, "Tap to hear the voice", toggle, stage.narrow ? [0.5, 0.3] : [0.27, 0.5]);
+  const pill = new PlayPill(stage, "Tap to hear the voice", toggle, stage.narrow ? [0.5, 0.72] : [0.76, 0.34]);
   const syncPlay = playButton(stage, ["▶ voice", "■ stop"], toggle);
 
   // ---- "ah – ee – oo" ------------------------------------------------------------------
@@ -321,7 +321,7 @@ export async function mountVowels(container: HTMLElement): Promise<Demo> {
       g.restore();
       text(g, "front", pad.x + 4, pad.y - 8, { size: 9.5, color: "rgba(150,160,190,0.6)" });
       text(g, "back", pad.x + pad.w - 4, pad.y - 8, { size: 9.5, align: "right", color: "rgba(150,160,190,0.6)" });
-      text(g, "F2 →", pad.x + pad.w / 2, pad.y + pad.h + 15, { size: 9.5, align: "center", color: "rgba(150,160,190,0.6)", mono: true });
+      text(g, "← F2", pad.x + pad.w / 2, pad.y + pad.h + 15, { size: 9.5, align: "center", color: "rgba(150,160,190,0.6)", mono: true });
       g.save();
       g.translate(pad.x - 12, pad.y + pad.h / 2);
       g.rotate(-Math.PI / 2);
@@ -401,7 +401,7 @@ export async function mountVowels(container: HTMLElement): Promise<Demo> {
         const y = sy(db) - 10;
         text(g, `F${i + 1}`, x, Math.max(spec.y + 10, y), { size: 10.5, align: "center", color: "rgba(160,190,255,0.95)", weight: 700, mono: true });
       });
-      if (!narrow) text(g, `${Math.round(f0)} Hz apart`, sx(f0 * 2) + 6, spec.y + spec.h - 8, { size: 9.5, color: rgba(ORANGE, 0.7), mono: true });
+      if (!narrow) text(g, `${Math.round(f0)} Hz apart`, spec.x + spec.w - 4, spec.y + 14, { size: 9.5, align: "right", color: rgba(ORANGE, 0.78), mono: true });
     },
     dispose() {
       setPlaying(false);

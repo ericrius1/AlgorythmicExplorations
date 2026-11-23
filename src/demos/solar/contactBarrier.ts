@@ -385,10 +385,10 @@ export async function mountContactBarrier(container: HTMLElement): Promise<Demo>
           marker: [offset, r ? r.keep * 100 : modelP(offset) * 100],
           xTicks: [-0.3, -0.15, 0, 0.15, 0.3],
         });
-        hudLabel(stage, [X0 + 0.25, -HY, 0], "perovskite valence band", [-10, 22], "rgba(150, 240, 200, 0.85)");
-        hudLabel(stage, [(X1 + X2) / 2, -HY, -offset * ESCALE], offset < 0 ? "the monolayer: a step up" : offset > 0 ? "the monolayer: a drop" : "the monolayer: lined up", [10, -30], "rgba(225, 215, 255, 0.9)");
-        hudLabel(stage, [X3 - 0.2, -HY, -offset * ESCALE], "electrode: holes out", [10, 22], "rgba(200, 210, 235, 0.8)");
-        hudLabel(stage, [X0 + 0.4, HY, 0.62], "conduction band, 1.68 eV up (drawn closer): electrons leave the other way", [10, -12], "rgba(140, 200, 255, 0.7)");
+        hudLabel(stage, [X0 + 0.25, -HY, 0], "perovskite valence band", [-10, 26], "rgba(150, 240, 200, 0.9)");
+        hudLabel(stage, [(X1 + X2) / 2, -HY, -offset * ESCALE], offset < 0 ? "monolayer: step up" : offset > 0 ? "monolayer: energy drop" : "monolayer: aligned", [0, -48], "rgba(225, 215, 255, 0.95)");
+        hudLabel(stage, [X3 - 0.2, -HY, -offset * ESCALE], "electrode: holes out", [12, -46], "rgba(200, 210, 235, 0.9)");
+        hudLabel(stage, [X0 + 0.4, HY, 0.62], "conduction band (electrons leave the other way)", [10, -14], "rgba(140, 200, 255, 0.85)");
       }
       shell.tick();
     },

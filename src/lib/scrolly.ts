@@ -32,10 +32,45 @@ export function mountScrolly(container: HTMLElement, spec: ScrollySpec): void {
 
   const progress = document.createElement("div");
   progress.className = "scrolly-progress";
+  progress.title = "Click or drag to scrub";
+  const track = document.createElement("div");
+  track.className = "scrolly-progress-track";
   const fill = document.createElement("div");
   fill.className = "scrolly-progress-fill";
-  progress.appendChild(fill);
+  track.appendChild(fill);
+  for (let i = 1; i < spec.steps.length; i++) {
+    const tick = document.createElement("span");
+    tick.className = "scrolly-progress-tick";
+    tick.style.left = `${(spec.steps[i].at * 100).toFixed(1)}%`;
+    track.appendChild(tick);
+  }
+  progress.appendChild(track);
   stage.appendChild(progress);
+
+  const scrubToClientX = (clientX: number): void => {
+    const r = track.getBoundingClientRect();
+    if (r.width <= 0) return;
+    const frac = clamp01((clientX - r.left) / r.width);
+    const rect = container.getBoundingClientRect();
+    const span = rect.height - window.innerHeight;
+    if (span <= 0) return;
+    const topDoc = rect.top + window.scrollY;
+    window.scrollTo({ top: topDoc + frac * span, behavior: "instant" as ScrollBehavior });
+  };
+  let scrubbing = false;
+  progress.addEventListener("pointerdown", (e) => {
+    scrubbing = true;
+    progress.setPointerCapture(e.pointerId);
+    scrubToClientX(e.clientX);
+  });
+  progress.addEventListener("pointermove", (e) => {
+    if (scrubbing) scrubToClientX(e.clientX);
+  });
+  const endScrub = (): void => {
+    scrubbing = false;
+  };
+  progress.addEventListener("pointerup", endScrub);
+  progress.addEventListener("pointercancel", endScrub);
 
   const caption = document.createElement("p");
   caption.className = "scrolly-caption";
@@ -83,7 +118,7 @@ export function mountScrolly(container: HTMLElement, spec: ScrollySpec): void {
   let t = -1; // force first draw
   let stepIdx = -1;
 
-  const hint = ` <span class="scrolly-hint">— scroll to advance, scroll up to rewind</span>`;
+  const hint = ` <span class="scrolly-hint">— scroll or scrub the bar to step through</span>`;
 
   const render = (force = false): void => {
     const target = rawProgress();
@@ -232,17 +267,29 @@ export function label(
   text: string,
   x: number,
   y: number,
-  opts: { color?: string; size?: number; align?: CanvasTextAlign; alpha?: number; mono?: boolean } = {},
+  opts: { color?: string; size?: number; align?: CanvasTextAlign; alpha?: number; mono?: boolean; bg?: string } = {},
 ): void {
   ctx.save();
   ctx.globalAlpha = opts.alpha ?? 1;
-  ctx.fillStyle = opts.color ?? PAL.text;
   ctx.textAlign = opts.align ?? "left";
   ctx.textBaseline = "middle";
   const size = opts.size ?? 12;
   ctx.font = opts.mono
     ? `${size}px ui-monospace, Menlo, monospace`
     : `600 ${size}px ui-sans-serif, system-ui, sans-serif`;
+  if (opts.bg) {
+    const m = ctx.measureText(text);
+    const padX = 5;
+    const padY = 3;
+    const tw = m.width;
+    const align = opts.align ?? "left";
+    const bx = align === "center" ? x - tw / 2 - padX : align === "right" ? x - tw - padX : x - padX;
+    ctx.fillStyle = opts.bg;
+    ctx.beginPath();
+    ctx.roundRect(bx, y - size / 2 - padY, tw + padX * 2, size + padY * 2, 4);
+    ctx.fill();
+  }
+  ctx.fillStyle = opts.color ?? PAL.text;
   ctx.fillText(text, x, y);
   ctx.restore();
 }

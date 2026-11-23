@@ -25,8 +25,8 @@ export function mountBladeAnatomy(container: HTMLElement): Demo {
   // the blade in world units, as grass.ts builds it: 0.26 tall, 0.024 wide
   const HEIGHT = 0.26, WIDTH = 0.024, FLEX = 1.25, STRENGTH = 0.5;
 
-  // centreline at fraction t up the blade, in world units (x sideways, y up)
-  const centre = (t: number, gust: number): [number, number] => {
+  // centerline at fraction t up the blade, in world units (x sideways, y up)
+  const center = (t: number, gust: number): [number, number] => {
     const sway = windOn ? (gust * 0.5 + 0.62) * STRENGTH * t * t * FLEX * HEIGHT : 0;
     const x = lean * t * t * HEIGHT + sway;
     const y = t * HEIGHT - lean * lean * t * t * 0.3 * HEIGHT - 0.45 * sway * sway;
@@ -52,29 +52,17 @@ export function mountBladeAnatomy(container: HTMLElement): Demo {
     ctx.lineTo(w * 0.92, rootY);
     ctx.stroke();
 
-    // the ideal curve, ghosted
-    ctx.strokeStyle = "rgba(150, 168, 210, 0.45)";
-    ctx.setLineDash([4 * dpr, 4 * dpr]);
-    ctx.lineWidth = 1.5 * dpr;
-    ctx.beginPath();
-    for (let i = 0; i <= 60; i++) {
-      const [x, y] = toPx(centre(i / 60, gust));
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
     // the ribbon the GPU draws: a pair of vertices per row, one at the tip
     const left: [number, number][] = [], right: [number, number][] = [];
     for (let r = 0; r <= segments; r++) {
       const t = r / segments;
-      const c = centre(t, gust);
+      const c = center(t, gust);
       const halfW = (WIDTH * (1 - t * 0.85)) / 2;
       // widen the drawing 3× so the triangles are visible at this scale
       left.push(toPx([c[0] - halfW * 3, c[1]]));
       right.push(toPx([c[0] + halfW * 3, c[1]]));
     }
-    const tip = toPx(centre(1, gust));
+    const tip = toPx(center(1, gust));
     const grad = ctx.createLinearGradient(0, rootY, 0, tip[1]);
     grad.addColorStop(0, "#2f4a1c");
     grad.addColorStop(1, "#9fd067");
@@ -102,6 +90,18 @@ export function mountBladeAnatomy(container: HTMLElement): Demo {
     ctx.lineTo(tip[0], tip[1]); ctx.lineTo(left[lr][0], left[lr][1]);
     ctx.stroke();
 
+    // the ideal parabolic centerline, drawn over the ribbon so the chord deviation reads clearly
+    ctx.strokeStyle = "rgba(225, 236, 255, 0.72)";
+    ctx.setLineDash([5 * dpr, 4 * dpr]);
+    ctx.lineWidth = 1.6 * dpr;
+    ctx.beginPath();
+    for (let i = 0; i <= 60; i++) {
+      const [x, y] = toPx(center(i / 60, gust));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     // the vertices
     ctx.fillStyle = "#e9eef4";
     const dots = [...left.slice(0, segments), ...right.slice(0, segments), tip];
@@ -117,7 +117,7 @@ export function mountBladeAnatomy(container: HTMLElement): Demo {
     ctx.textBaseline = "top";
     // narrow canvases (phones) get the short form of each label
     const narrow = ctx.measureText("sideways bend ∝ t²: stiff at the root, loose at the tip").width > shell.canvas.width - 28 * dpr;
-    const tipPct = (centre(1, gust)[1] / HEIGHT * 100).toFixed(0);
+    const tipPct = (center(1, gust)[1] / HEIGHT * 100).toFixed(0);
     ctx.fillText(narrow ? "bend ∝ t²: stiff root, loose tip" : "sideways bend ∝ t²: stiff at the root, loose at the tip", 14 * dpr, 12 * dpr);
     ctx.fillText(narrow ? `tip height ${tipPct}% of length` : `tip height ${tipPct}% of the blade's length`, 14 * dpr, 32 * dpr);
 

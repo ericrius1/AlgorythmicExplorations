@@ -10,7 +10,7 @@
     <title>The Dome Show — Dome Projection</title>
     <meta
       name="description"
-      content="Part four of a series on dome projection: several projectors on one dome, modelled as projector cameras, corrected with warp meshes, and edge-blended in light rather than pixel values, with black levels matched."
+      content="Part four of a series on dome projection: coordinating multiple projectors on one dome using projector camera models, measured warp meshes, gamma-correct edge blending, and matched black levels."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Dome Projection · Part 4</p>
         <h1>The Dome Show</h1>
         <p class="subtitle">
-          Several projectors share one dome. Each needs a calibrated view, a warp to the real
-          surface, and a blend where it overlaps its neighbours.
+          How multiple projectors split up a single planetarium ceiling without leaving
+          double lines, dark overlap bands, or glowing seams in black skies.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,87 +43,102 @@
 
     <main>
       <p>
-        <a href="/pages/dome-projection/fisheye.html">Part two</a> gave every point on the
-        dome a source direction, and <a href="/pages/dome-projection/cubemap.html">part
-        three</a> two ways of storing the image. A real room adds a physical question: which
-        projector puts each point on the dome, and how does its image line up with the one
-        beside it? Domes much bigger than a few metres usually use several projectors, each
-        covering part of the surface, with overlaps between them.
+        Once a dome gets larger than a few meters across, a single projector runs out of
+        both brightness and pixel density. Real planetariums solve that by ringing the cove
+        with several projectors, each throwing across the room to illuminate one wedge of
+        the hemisphere with a deliberate strip of overlap into its neighbors. In
+        <a href="/pages/dome-projection/fisheye.html">part two</a> and
+        <a href="/pages/dome-projection/cubemap.html">part three</a> we built clean ways to
+        store a whole sky; now we have to split that sky across physical hardware so nobody
+        in the audience can spot where one projector stops and the next begins.
       </p>
       <p>
-        In the hero, three projectors sit on the rim of the dome, each throwing its image
-        across to cover the far third, with a band of overlap into its neighbours. For a few
-        seconds every projector just adds its whole picture, tinted in its own colour, and
-        the overlaps come out brighter where two images pile up. Then the blend fades in and
-        the seams disappear into one sky.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2 id="cameras"><span class="kicker">Step 1 · Projector cameras</span>Model each projector as a camera</h2>
-      <p>
-        A projector camera is a model of one physical projector: where it's mounted, which
-        way it points, and the shape of its lens. Run it backwards and it tells you, for
-        every pixel the projector can show, which ray leaves the lens. Follow that ray to the
-        dome, take the direction from the dome centre, and you know which part of the master
-        that pixel should show. That's the chain from part two, once per projector.
-      </p>
-      <pre><code>projector pose  → where it is and which way it faces
-projector lens  → which ray each of its pixels sends out
-dome surface    → where each ray lands
-coverage        → which projectors reach each point of the dome</code></pre>
-      <p>
-        Modelling the projector first keeps the rest grounded. The warp and the blend that
-        follow are corrections to a specific physical view, not effects floating over the
-        dome.
+        Watch the hero banner cycle between raw and blended output. Three projectors sit
+        around the rim, each casting a tinted image across to the opposite third of the
+        dome. While unblended, every overlap zone glows noticeably brighter where two beams
+        stack on top of each other. Once the edge blend fades in, those bright bands melt
+        away and the starfield and polar grid run uninterrupted overhead.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="warp"><span class="kicker">Step 2 · Warp</span>Calibration meshes</h2>
+      <h2 id="cameras"><span class="kicker">Step 1 · Projector cameras</span>Treating each projector like a camera in reverse</h2>
       <p>
-        A model is never exact. Mounts sag, lenses distort, and the dome isn't a perfect
-        hemisphere. So measurement corrects the model, through a warp mesh laid over each
-        projector's image. Each vertex stores where in the master that point of the
-        projector's image should sample, and moving a vertex bends the image until the test
-        grid lands where it belongs on the real dome. Between vertices the GPU interpolates.
+        Optically, a projector is just a camera running light backward. Start by modeling
+        each physical unit as a camera: where it sits on the rim, which direction it aims,
+        and the field of view and shift of its lens. Trace a ray outward through each pixel
+        of the projector's chip until it hits the dome hemisphere, compute that point's
+        direction from the dome center, and sample the fisheye or cubemap master there. That
+        is the exact inverse chain from part two, evaluated once per projector:
+      </p>
+      <pre><code>projector pose  → where it is mounted and which way it aims
+projector lens  → which ray each chip pixel sends out
+dome surface    → where that ray hits the ceiling
+coverage        → which projectors reach each region of the dome</code></pre>
+      <p>
+        Building this physical camera model first gives you a clean baseline for every
+        channel before you touch a single calibration handle, tying every downstream warp
+        and mask to real room geometry.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="warp"><span class="kicker">Step 2 · Warp</span>Measured calibration meshes</h2>
+      <p>
+        No physical theater matches its architectural blueprints down to the millimeter.
+        Ceiling trusses sag a hair, mounts drift over months, lenses introduce barrel or
+        pincushion distortion, and the dome itself is rarely an exact mathematical sphere.
+        To close that gap, each projector runs its output through a fine 2D <em>warp mesh</em>.
+        Each vertex in the mesh holds the exact coordinate in the dome master that ought to
+        land at that projector pixel, and the GPU interpolates smoothly across every
+        triangle between control points:
       </p>
       <pre><code>projector output pixel
   → the warp-mesh triangle it falls in
   → interpolated master uv
   → sample the fisheye or cubemap master</code></pre>
       <p>
-        The measuring is usually done with a camera: show patterns, photograph the dome,
-        solve for each projector's mesh. Ramesh Raskar, Michael Brown and colleagues at UNC
-        showed camera-based registration of overlapping projectors in 1999, and automatic
-        dome calibration systems work on the same principle. Get the geometry right before
-        touching the blend. A soft blend can't hide two copies of a line that should be
-        one, as the figure in the next step shows.
+        Dragging mesh vertices by eye works for tiny setups, though modern planetariums
+        almost always automate the measurement with wide-angle cameras. Each projector
+        flashes structured test patterns onto the ceiling, cameras photograph where every
+        dot actually lands, and a solver computes each channel's warp mesh automatically.
+        Ramesh Raskar, Michael Brown, and their colleagues at UNC pioneered camera-based
+        multi-projector registration back in 1999, and commercial dome autocalibration rigs
+        still follow that blueprint. Either way, geometry has to lock down first: as you can
+        test in the next figure, no amount of feathering can disguise a grid line drawn in
+        two slightly different places at once.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="blend"><span class="kicker">Step 3 · Blend</span>Overlaps, gamma and black</h2>
+      <h2 id="blend"><span class="kicker">Step 3 · Blend</span>Why overlaps turn dark, and why black turns gray</h2>
       <p>
-        Neighbouring projectors overlap on purpose, because no physical edge lines up
-        perfectly. Across the overlap projector A fades down while B fades up, and the total
-        should look like one projector. Two details decide whether it does.
+        Projectors overlap intentionally because trying to butt two physical light cones
+        edge-to-edge leaves either a razor-sharp dark crack or a bright sliver the moment a
+        mount shifts by a fraction of a degree. Across the shared overlap band, projector A
+        ramps smoothly down to zero while projector B ramps smoothly up to full output so
+        their combined light stays flat. Getting that transition genuinely invisible runs
+        into two physical realities of projector optics.
       </p>
       <p>
-        The first is gamma. A projector doesn't turn pixel values into light in a straight
-        line: the light it puts out is roughly the value raised to the power 2.2. So if each
-        projector ramps its pixel values down linearly, halfway across the overlap each one
-        sends 0.5, which comes out as 0.5<sup>2.2</sup> ≈ 0.22 of its full light, and the
-        two together make 44%, a dark band. The ramp has to happen in light, which means
-        sending ramp<sup>1/2.2</sup> instead.
+        First is gamma. Projectors respond nonlinearly to encoded pixel values: the light
+        leaving the lens scales roughly as the pixel value raised to the power 2.2. If you
+        ramp the raw pixel values linearly across the overlap, both projectors send 0.5 at
+        the midpoint. Each beam emits only 0.5<sup>2.2</sup> ≈ 0.22 of full white, so the
+        sum hits just 44%, carving an obvious dark bruise right down the seam. To make the
+        <em>light</em> ramp linearly, you have to apply the inverse gamma curve and feed
+        each projector <code>ramp^(1/2.2)</code> instead:
       </p>
-      <pre><code>light = value ^ 2.2                     <span class="cm">// roughly what a projector does</span>
+      <pre><code>light = value ^ 2.2                     <span class="cm">// rough projector electro-optical curve</span>
 
-ramp the values:  0.5^2.2 + 0.5^2.2             = 0.44   <span class="cm">// dark band</span>
-ramp the light:   (0.5^(1/2.2))^2.2 * 2         = 1.0    <span class="cm">// seamless</span></code></pre>
+ramp the values:  0.5^2.2 + 0.5^2.2             = 0.44   <span class="cm">// dark seam band</span>
+ramp the light:   (0.5^(1/2.2))^2.2 * 2         = 1.0    <span class="cm">// flat brightness</span></code></pre>
       <p>
-        The second is black. A projector can't send less light than its own black level,
-        and where two overlap, their blacks add up, so a dark scene shows a grey band right
-        where the blend is. Turning the overlap down can't fix that, because it's already
-        sending zero. The fix is to raise the black of everything outside the overlap to
-        match, which costs a little contrast everywhere.
+        Second is projector black level. Even when you send pure RGB (0, 0, 0), a projector
+        lamp still leaks a faint glow through the imaging chip onto the dome. Inside an
+        overlap zone, two projectors leak onto the same patch of ceiling, doubling the dark
+        floor and painting a pale gray stripe straight across night skies. You cannot dim
+        the overlap any further because both channels are already commanding zero; the only
+        way to erase the stripe is black-level uplift, raising the darkest black everywhere
+        <em>outside</em> the overlap to match the double floor, trading away a small bit of
+        contrast in exchange for a uniform dark sky.
       </p>
 
       <div
@@ -133,74 +148,75 @@ ramp the light:   (0.5^(1/2.2))^2.2 * 2         = 1.0    <span class="cm">// sea
       ></div>
 
       <p>
-        The strip at the top is what the audience sees: a bright-to-dark ramp with grid lines
-        on it above a band of pure black, lit by projector A from the left and B from the
-        right. Under it, the blue and orange curves are the light each projector puts out
-        for white content, and the white curve is their total. With no blend the overlap is
-        twice as bright. Ramping the pixel values sags to 44% in the middle, and ramping the
-        light stays flat at 100%. Then raise the black level and watch the black band, and
-        add some misalignment to watch the grid lines double inside the overlap, where both
-        projectors draw them.
+        The simulated strip above shows what an audience sees across a bright-to-dark gray
+        grid sitting over a strip of pure black along the bottom, lit by projector A on the
+        left and projector B on the right. Below it, the blue and orange curves plot each
+        projector's physical light output for full white, while the white curve traces their
+        sum. Switch between <em>no blend</em> (a blazing 200% stripe), <em>ramp the pixel
+        values</em> (sagging down to 44% at the midpoint), and <em>ramp the light</em>
+        (holding flat at 100%). Then push <em>black level</em> up to watch the double-black
+        band jump out along the dark bottom strip, and nudge <em>misalignment</em> upward to
+        see how even a modest registration slip splits grid lines into blurry doubles right
+        through the blend zone.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · 2.2 is an approximation</span>
+        <span class="note-label">Aside · 2.2 is only a starting point</span>
         <p>
-          Real projectors don't follow a single power law, and two units of the same model
-          rarely match each other. Good blending measures each projector's actual
-          response with a camera or a meter and builds its ramp from that curve. 2.2 is the
-          sRGB-ish starting point, and it's close enough to show why the band appears.
+          Real projection hardware rarely follows a clean single-exponent power law, and
+          even two units of the same model fresh out of the box drift slightly apart as
+          lamps or lasers age. Serious calibration setups measure each projector's actual
+          luminance curve with a camera or photometer and build per-channel lookup ramps
+          from those readings; 2.2 is just the standard sRGB ballpark that explains why
+          naive linear blending fails so dramatically.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="matching"><span class="kicker">Step 4 · Matching</span>Colour, focus and test patterns</h2>
+      <h2 id="matching"><span class="kicker">Step 4 · Matching</span>Color, focus, and calibration order</h2>
       <p>
-        Lining up the geometry is only the first thing the eye catches. Two projectors can
-        agree on where every line goes and still disagree on brightness, black level, focus
-        or white point. That's why calibration uses dull images before pretty ones:
+        Once the lines align and the blend stays flat across gray ramps, your eye moves on
+        to subtler mismatches: one projector leaning slightly warmer green while its
+        neighbor tilts cool blue, or slightly softer focus toward one corner of the lens.
+        Technicians work through plain diagnostic images in a strict order:
       </p>
-      <pre><code>rings and meridians   → geometry and seams
-grey ramps            → gamma, brightness and black level
-solid colour fields   → white point, projector to projector
-small text            → focus</code></pre>
+      <pre><code>rings and meridians   → geometry and warp registration
+gray ramps            → gamma, brightness, and black level
+solid color fields    → white point and color matching across channels
+small text            → optical focus across each lens</code></pre>
       <p>
-        Calibrate in the order the eye notices mistakes: line positions first, then
-        brightness in the overlaps, then colour. A soft blend can't hide a bad mesh, and
-        colour correction can't hide a bright stripe. If a flat grey field shows a band in
-        the overlap, it's the blend or the black level, and no amount of work on the artwork
-        will fix it.
+        Fixing them in that exact sequence saves endless chasing of symptoms. Feathering a
+        blend never heals double lines from a loose warp mesh, and tweaking color matrices
+        never removes a mid-tone dip from bad gamma. Whenever a uniform gray dome shows a
+        visible band inside the overlap, the culprit is always the blend curve or black
+        floor rather than the show content.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>The whole loop</h2>
-      <p>A working dome show runs the same loop every frame:</p>
-      <pre><code>render or load one seamless dome image
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Closing the projection loop</h2>
+      <p>Every frame of a finished dome playback system repeats the same compact pipeline:</p>
+      <pre><code>render or decode one seamless dome image
 for each projector:
   sample the image through its calibrated warp mesh
-  apply its blend, black-level and colour correction
+  apply its light-linear blend, black-level uplift, and color correction
 display, measure, adjust, repeat</code></pre>
-      <ul>
-        <li>
-          <strong>Model the projector, then correct the model.</strong> The camera gets you
-          close, and the measured warp mesh gets you the rest of the way.
-        </li>
-        <li>
-          <strong>Blend in light, not in pixel values.</strong> Otherwise every overlap is a
-          dark band.
-        </li>
-        <li>
-          <strong>Black adds up.</strong> Overlaps lift the floor, and the only fix is to
-          lift it everywhere else to match.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: a version of the figure with a camera in it, solving the warp
-        from a photographed grid, since that's the step that makes calibration practical.
+        Getting a multi-projector dome to disappear around an audience takes a physical
+        camera model refined by measured warp meshes, edge ramps shaped in real light rather
+        than encoded pixels, and raised black levels so dark scenes stay seamless. A great
+        next experiment for Figure 1 would be adding a virtual calibration camera aimed back
+        at the strip, snapping distorted grids and solving the warp automatically from
+        detected corners.
+      </p>
+      <p>
+        Everything above assumes a single finished dome master already exists before the
+        projector passes run. When the visuals are generated live every frame in Three.js or
+        WebGPU, though, you face one more architectural choice: render a shared master
+        first, or point a separate 3D camera down each projector's throat directly.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/dome-projection/realtime.html">Part 5, Dome-Native Three.js</a>.</strong>
-        Rendering a live scene for all of this: one shared master, or one render per
-        projector camera, and where the frame time goes in each.
+        Comparing a shared live dome master against direct per-projector scene renders, and
+        counting where every millisecond of GPU work actually goes.
       </p>
     </main>
 

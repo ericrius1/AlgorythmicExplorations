@@ -321,7 +321,7 @@ export async function mountPatch(container: HTMLElement): Promise<Demo> {
     const p = PRESETS[preset].patch;
     if (p.mode === 0) {
       const f = clamp((p.flt?.cut ?? 2400) * Math.pow(2, 3 * v), 30, 16000);
-      return `cutoff ${f >= 1000 ? `${(f / 1000).toFixed(1)}k` : Math.round(f)}`;
+      return fmtHz(f);
     }
     if (p.mode === 1) return `index ×${Math.pow(2, 1.5 * v).toFixed(2)}`;
     return `pluck ${clamp((p.ks?.bright ?? 0.85) * Math.pow(2, 1.5 * v), 0.05, 1).toFixed(2)}`;
@@ -394,7 +394,7 @@ export async function mountPatch(container: HTMLElement): Promise<Demo> {
   const colBuf = new Uint8ClampedArray(SG_ROWS * 4);
   const fbuf = new Float32Array(4096);
   const rowBins: [number, number][] = [];
-  const colour = (t: number, o: number): void => {
+  const color = (t: number, o: number): void => {
     const [r, gg, b] = heatRgb(t);
     const k = Math.min(1, t * 2.2);
     colBuf[o] = r * k;
@@ -557,7 +557,7 @@ export async function mountPatch(container: HTMLElement): Promise<Demo> {
             const [lo, hi] = rowBins[r];
             for (let i = lo; i <= hi && i < fbuf.length; i++) m = Math.max(m, fbuf[i]);
           }
-          colour(clamp((m + 100) / 80, 0, 1), (SG_ROWS - 1 - r) * 4);
+          color(clamp((m + 100) / 80, 0, 1), (SG_ROWS - 1 - r) * 4);
         }
         img.push(colBuf);
       }
@@ -694,7 +694,14 @@ export async function mountPatch(container: HTMLElement): Promise<Demo> {
             const a = r.lvl > 0.01 ? 0.35 + 0.65 * Math.min(1, r.lvl) : 0;
             for (let s = 0; s <= 48; s++) {
               const t = (s / 48) * 2;
-              const y0 = r.wave < 0 ? Math.sin(s * 12.9898 + Math.floor(flow * 20)) * 0.8 : oscNaive(r.wave, t - Math.floor(t), clamp(r.pw + lfoPw, 0.02, 0.98));
+              let y0: number;
+              if (r.wave < 0) {
+                const seed = r.lvl > 0.01 ? Math.floor(flow * 18) : 0;
+                const h = Math.sin(s * 127.1 + seed * 311.7) * 43758.5453;
+                y0 = ((h - Math.floor(h)) * 2 - 1) * 0.85;
+              } else {
+                y0 = oscNaive(r.wave, t - Math.floor(t), clamp(r.pw + lfoPw, 0.02, 0.98));
+              }
               pts.push(gx0 + (s / 48) * gw, mid - y0 * (rh * 0.32));
             }
             if (a > 0) g.line(pts, 1.3, [COL.audio[0] * (0.6 + on), COL.audio[1] * (0.6 + on), COL.audio[2] * (0.6 + on)], a);

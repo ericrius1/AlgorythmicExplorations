@@ -142,10 +142,22 @@ export function mountBhWalk(el: HTMLElement): void {
     screens: 4,
     aspect: 0.62,
     steps: [
-      { at: 0, text: `One body wants to know its force. The exact answer takes a line to each of the other ${N} bodies. In the galaxy at the top of the page it's 40,000 lines, for every body, every step.` },
-      { at: 0.2, text: "Build the quadtree: any square holding more than one body splits into four, and so on down. Each cell stores its total mass and centre of mass." },
-      { at: 0.42, text: "Now walk it from the top. Each cell gets one test: is its width less than θ times its distance? If so the whole cell becomes one point mass (orange dot, one arrow). Far cells pass easily. Near ones get split open." },
-      { at: 0.78, text: `What's left: ${accepted.length} cluster terms plus ${exact.length} nearby bodies done exactly, ${terms} terms instead of ${N}. The white arrow is their sum, and it's ${errPct.toFixed(1)}% off the exact force.` },
+      {
+        at: 0,
+        text: `Start with one body trying to find the net gravitational pull on it. The exact answer sums forces from all ${N} other bodies individually. In the 40,000-body galaxy at the top of the page, that would mean 40,000 terms for every body on every step.`,
+      },
+      {
+        at: 0.2,
+        text: "Next, build a quadtree by splitting any square holding more than one body into four smaller squares, repeating down the hierarchy. Each cell records its total mass and center of mass.",
+      },
+      {
+        at: 0.42,
+        text: "Now walk the tree from the root. At each cell, check whether its width is smaller than θ times its distance from the test body. Distant cells pass and collapse into a single point mass (orange dot, one arrow); closer cells fail and open up into their four children.",
+      },
+      {
+        at: 0.78,
+        text: `When the walk finishes, ${accepted.length} distant clusters plus ${exact.length} nearby bodies done individually give ${terms} force terms instead of ${N}. The white arrow is their combined pull, within ${errPct.toFixed(1)}% of the exact sum.`,
+      },
     ],
     draw(ctx, w, h, t) {
       const m = 14;
@@ -288,9 +300,84 @@ export function mountBhWalk(el: HTMLElement): void {
         shown = Math.round(lerp(naive, terms, done / Math.max(1, accepted.length)));
         if (remaining === 0) shown = terms;
       }
-      label(ctx, `force terms: ${shown}`, w - 16, 22, { color: PAL.warm, size: 13, align: "right", mono: true });
+      label(ctx, `force terms: ${shown}`, w - 16, 22, {
+        color: PAL.warm,
+        size: 13,
+        align: "right",
+        mono: true,
+        bg: "rgba(6,7,11,0.82)",
+      });
       if (t > 0.42) {
-        label(ctx, `θ = ${THETA}`, w - 16, 40, { color: PAL.muted, size: 11, align: "right", mono: true });
+        label(ctx, `θ = ${THETA}`, w - 16, 42, {
+          color: PAL.muted,
+          size: 11,
+          align: "right",
+          mono: true,
+          bg: "rgba(6,7,11,0.82)",
+        });
+      }
+
+      // Compact legend in the top-left corner, revealing symbols as they appear.
+      const legendItems: { kind: "body" | "cluster" | "exact" | "net"; text: string; alpha: number }[] = [
+        { kind: "body", text: "test body", alpha: 0.9 },
+      ];
+      if (pWalk > 0.02) {
+        legendItems.push({ kind: "cluster", text: "cluster COM", alpha: Math.min(1, pWalk * 4) });
+      }
+      if (pWalk > 0.6) {
+        legendItems.push({ kind: "exact", text: "exact neighbor", alpha: phase(pWalk, 0.6, 0.85) });
+      }
+      if (pSum > 0.02) {
+        legendItems.push({ kind: "net", text: "net force", alpha: Math.min(1, pSum * 3) });
+      }
+      if (legendItems.length > 1) {
+        const lx = 14;
+        const ly0 = 16;
+        const rowH = 18;
+        const boxW = 114;
+        const boxH = legendItems.length * rowH + 10;
+        ctx.save();
+        ctx.fillStyle = "rgba(6,7,11,0.82)";
+        ctx.beginPath();
+        ctx.roundRect(lx - 4, ly0 - 8, boxW, boxH, 5);
+        ctx.fill();
+        legendItems.forEach((item, idx) => {
+          const y = ly0 + 5 + idx * rowH;
+          ctx.globalAlpha = item.alpha;
+          if (item.kind === "body") {
+            ctx.fillStyle = PAL.accent;
+            ctx.beginPath();
+            ctx.arc(lx + 7, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          } else if (item.kind === "cluster") {
+            ctx.fillStyle = PAL.warm;
+            ctx.beginPath();
+            ctx.arc(lx + 7, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (item.kind === "exact") {
+            ctx.strokeStyle = PAL.accent;
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(lx + 2, y);
+            ctx.lineTo(lx + 11, y);
+            ctx.stroke();
+            ctx.fillStyle = PAL.dot;
+            ctx.beginPath();
+            ctx.arc(lx + 11, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (item.kind === "net") {
+            arrow(ctx, lx + 1, y, lx + 14, y, "#ffffff", 2, 5);
+          }
+          label(ctx, item.text, lx + 20, y, {
+            color: item.kind === "net" ? "#ffffff" : PAL.muted,
+            size: 10.5,
+            alpha: item.alpha,
+          });
+        });
+        ctx.restore();
       }
     },
   });

@@ -228,7 +228,8 @@ export function mountBands(container: HTMLElement): Demo {
       }
       for (let i = 0; i <= 4; i++) {
         const t = (tSpan * i) / 4;
-        label(g, `${t < 1 ? Math.round(t * 1000) + " ms" : t + " s"}`, px0 + (i / 4) * pw, py0 + ph + 12 * d, 9 * d, SC.muted, "center", 500, true);
+        const align: CanvasTextAlign = i === 0 ? "left" : i === 4 ? "right" : "center";
+        label(g, `${t < 1 ? Math.round(t * 1000) + " ms" : t + " s"}`, px0 + (i / 4) * pw, py0 + ph + 12 * d, 9 * d, SC.muted, align, 500, true);
       }
       curves.forEach((c, b) => {
         g.strokeStyle = SC.bands[b];
@@ -255,33 +256,36 @@ export function mountBands(container: HTMLElement): Demo {
       g.fillStyle = "#0b0d14";
       roundRect(g, bx0, by0, bw, bh, 8 * d);
       g.fill();
-      label(g, "T60 per band", bx0 + 12 * d, by0 + 12 * d, 10.5 * d, SC.muted);
-      const tTop = Math.max(...T, ...measured.filter((v) => isFinite(v))) * 1.15;
+      label(g, "T60 per band (s)", bx0 + 12 * d, by0 + 13 * d, 10.5 * d, SC.muted);
+      label(g, "bars: Eyring · white: measured", bx0 + 12 * d, by0 + 27 * d, 9 * d, SC.muted, "left", 500);
+      const tTop = Math.max(...T, ...measured.filter((v) => isFinite(v))) * 1.18;
       const one = (bw - 24 * d) / 6;
       const baseY = by0 + bh - 20 * d;
-      const hh = bh - 56 * d;
+      const hh = bh - 68 * d;
       for (let b = 0; b < 6; b++) {
         const x = bx0 + 12 * d + b * one;
         const h = (T[b] / tTop) * hh;
+        const barTop = baseY - h;
         g.fillStyle = SC.bands[b];
         g.globalAlpha = 0.85;
-        g.fillRect(x + one * 0.18, baseY - h, one * 0.64, h);
+        g.fillRect(x + one * 0.18, barTop, one * 0.64, h);
         g.globalAlpha = 1;
         const m = measured[b];
+        let tickY = Infinity;
         if (isFinite(m)) {
-          const y = baseY - (m / tTop) * hh;
+          tickY = baseY - (m / tTop) * hh;
           g.strokeStyle = "#fff";
           g.lineWidth = 2 * d;
           g.beginPath();
-          g.moveTo(x + one * 0.1, y);
-          g.lineTo(x + one * 0.9, y);
+          g.moveTo(x + one * 0.1, tickY);
+          g.lineTo(x + one * 0.9, tickY);
           g.stroke();
         }
-        label(g, T[b].toFixed(T[b] < 1 ? 2 : 1), x + one / 2, baseY - h - 9 * d, 9 * d, SC.text, "center", 600, true);
+        // Keep the value label clear of the white tick when measured sits just above the bar.
+        const labelY = Math.max(by0 + 40 * d, tickY < barTop && barTop - tickY < 17 * d ? tickY - 9 * d : barTop - 9 * d);
+        label(g, T[b].toFixed(T[b] < 1 ? 2 : 1), x + one / 2, labelY, 9 * d, SC.text, "center", 600, true);
         label(g, BAND_NAMES[b], x + one / 2, baseY + 10 * d, 9 * d, SC.muted, "center", 500, true);
       }
-      label(g, "bars: Eyring  ·  white: measured", bx0 + bw - 10 * d, by0 + 12 * d, 9 * d, SC.muted, "right", 500);
-      label(g, "seconds", bx0 + 12 * d, by0 + 28 * d, 9 * d, SC.muted, "left", 500, true);
     },
   };
 }

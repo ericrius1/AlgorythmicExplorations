@@ -159,7 +159,7 @@ export async function mountFm(container: HTMLElement): Promise<Demo> {
       const a = Math.abs(ln.amp);
       if (a < 0.004) continue;
       const x = spec.x + (h / maxH) * spec.w;
-      const y = base - a * (spec.h - 12);
+      const y = base - a * (spec.h - 26);
       const col: [number, number, number] = ln.reflected
         ? [1.3, 0.4, 0.7]
         : ln.n === 0
@@ -186,6 +186,7 @@ export async function mountFm(container: HTMLElement): Promise<Demo> {
 
     // ---- waveform ----
     panel(g, wave, "waveform", "");
+    g.text("modulator (scaled)", wave.x + wave.w - 2, wave.y - 8, { size: 9.5, align: "right", color: "rgba(120,230,170,0.78)" });
     const wm = wave.y + wave.h / 2;
     g.seg(wave.x, wm, wave.x + wave.w, wm, 1, C.grid, 0.5);
     const span = 3 / f0;
@@ -200,7 +201,6 @@ export async function mountFm(container: HTMLElement): Promise<Demo> {
     }
     g.line(mpts, 1, [0.4, 1.0, 0.7], 0.5);
     g.glowLine(pts, 1.5, [0.55, 0.75, 1.3], 1, 0.3);
-    g.text("modulator (scaled)", wave.x + wave.w - 4, wave.y + 13, { size: 9.5, align: "right", color: "rgba(120,230,170,0.7)" });
 
     // ---- Bessel functions ----
     panel(g, bBox, "Bessel functions Jₙ(I)", "");
@@ -229,7 +229,13 @@ export async function mountFm(container: HTMLElement): Promise<Demo> {
     // where the carrier vanishes
     const z = 2.4048;
     g.dot(ix(z), jy(0), 3, [1.3, 1.05, 0.55], 0.9);
-    if (!narrow) g.text("J₀ = 0: no carrier", ix(z) + 6, jy(0) + 14, { size: 9.5, color: "#ffd58f" });
+    if (!narrow) {
+      const zLab = "J₀ = 0: no carrier";
+      const zx = ix(z) + 6;
+      const zy = jy(0) + 14;
+      g.rect(zx - 3, zy - 10, g.textWidth(zLab, 9.5) + 6, 13, [0.012, 0.015, 0.025], 0.85);
+      g.text(zLab, zx, zy, { size: 9.5, color: "#ffd58f" });
+    }
     // cursor: set index (faint) and the live one
     g.seg(ix(Math.min(I, I_MAX)), bBox.y, ix(Math.min(I, I_MAX)), bBox.y + bBox.h, 1, [0.6, 0.6, 0.8], 0.5);
     const cx = ix(Math.min(nowI, I_MAX));

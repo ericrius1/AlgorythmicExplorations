@@ -46,6 +46,7 @@ export function mountEars(container: HTMLElement): Demo {
   let soundOn = false;
   let last = performance.now();
   let center: P2 = { x: 0, y: 0 };
+  let orbitR = 100;
 
   const buffer = (k: Snd): AudioBuffer => {
     if (!bufs[k]) {
@@ -116,10 +117,7 @@ export function mountEars(container: HTMLElement): Demo {
     cv,
     () => [
       {
-        pos: () => {
-          const r = Math.min(cv.width * 0.2, cv.height * 0.36);
-          return { x: center.x + r * Math.sin(az), y: center.y - r * Math.cos(az) };
-        },
+        pos: () => ({ x: center.x + orbitR * Math.sin(az), y: center.y - orbitR * Math.cos(az) }),
         move: (p) => {
           az = Math.atan2(p.x - center.x, -(p.y - center.y));
           if (orbit) {
@@ -156,7 +154,6 @@ export function mountEars(container: HTMLElement): Demo {
   return {
     frame() {
       guard.pulse();
-      shell.tick();
       const now = performance.now();
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
@@ -165,6 +162,7 @@ export function mountEars(container: HTMLElement): Demo {
         if (az > Math.PI) az -= 2 * Math.PI;
         if (soundOn) panner?.set(az, mode, 0.05);
       }
+      shell.tick();
       const d = ui(cv);
       const Wc = cv.width;
       const Hc = cv.height;
@@ -176,6 +174,7 @@ export function mountEars(container: HTMLElement): Demo {
       const topH = narrow ? Hc * 0.58 : Hc;
       center = { x: leftW / 2, y: topH / 2 + 6 * d };
       const R = Math.min(leftW * 0.4, topH * 0.36);
+      orbitR = R;
       const a = R * 0.34; // drawn head radius
       const s = Math.sin(az);
       const u = { x: Math.sin(az), y: -Math.cos(az) }; // toward the source, on screen
@@ -198,8 +197,14 @@ export function mountEars(container: HTMLElement): Demo {
         g.arc(ghost.x, ghost.y, 8 * d, 0, Math.PI * 2);
         g.stroke();
         g.setLineDash([]);
-        const gx = ghost.x + (ghost.x >= center.x ? 14 : -14) * d;
-        label(g, "same cues", gx, ghost.y, 9 * d, rgba(SC.src, 0.75), ghost.x >= center.x ? "left" : "right");
+        if (Math.abs(Math.sin(ghostAz)) > 0.45) {
+          const gx = ghost.x + (ghost.x >= center.x ? -13 : 13) * d;
+          const gy = ghost.y + (ghost.y >= center.y ? 6 : -6) * d;
+          label(g, "same cues", gx, gy, 9 * d, rgba(SC.src, 0.78), ghost.x >= center.x ? "right" : "left");
+        } else {
+          const gy = ghost.y + (ghost.y < center.y ? 16 : -16) * d;
+          label(g, "same cues", ghost.x, gy, 9 * d, rgba(SC.src, 0.78), "center");
+        }
       }
 
       // rays: straight to the near ear; to the far ear, tangent to the head and around it
@@ -341,7 +346,7 @@ export function mountEars(container: HTMLElement): Demo {
         g.stroke();
         g.globalAlpha = 1;
       }
-      label(g, mode === "pan" ? "plain pan: only the level changes, the same at every frequency" : `head radius ${(HEAD_RADIUS * 100).toFixed(2)} cm`, gx0 + gw, gy0 + 6 * d, 9 * d, SC.muted, "right", 500);
+      label(g, mode === "pan" ? "plain pan: flat across frequency, no delay" : `head radius ${(HEAD_RADIUS * 100).toFixed(2)} cm`, gx0 + gw, gy0 + 6 * d, 9 * d, SC.muted, "right", 500);
     },
   };
 }

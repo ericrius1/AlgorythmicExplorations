@@ -1,4 +1,4 @@
-// Shared colouring for the flat maps in this series: an elevation ramp
+// Shared coloring for the flat maps in this series: an elevation ramp
 // (dark low ground to pale peaks) times a hillshade lit from the upper left,
 // the way printed relief maps are drawn.
 
@@ -23,7 +23,7 @@ export function rampRgb(t: number): [number, number, number] {
   return [244, 240, 232];
 }
 
-// Lambert shading of the height grid from the north-west, 45° up, relative
+// Lambert shading of the height grid from the northwest, 45° up, relative
 // to flat ground (flat = 1). `cellOverAmp` converts grid steps into slope.
 const L = (() => {
   const x = -0.5, y = 0.7071, z = -0.5;

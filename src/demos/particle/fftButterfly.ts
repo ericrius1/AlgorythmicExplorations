@@ -105,7 +105,7 @@ export function mountFftButterfly(container: HTMLElement): Demo {
   const ctx = shell.canvas.getContext("2d")!;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  let stage = 0; // highlighted butterfly layer, cycles
+  let stage = 1; // highlighted butterfly layer, cycles 1..STAGES
   let clock = 0;
   let logN = 12;
   let race = runRace(1 << logN);
@@ -141,7 +141,7 @@ export function mountFftButterfly(container: HTMLElement): Demo {
       clock++;
       if (clock > 70) {
         clock = 0;
-        stage = (stage + 1) % (STAGES + 1);
+        stage = (stage % STAGES) + 1;
       }
       const { width: w, height: h } = ctx.canvas;
       ctx.fillStyle = "#06070b";
@@ -175,12 +175,6 @@ export function mountFftButterfly(container: HTMLElement): Demo {
           ctx.lineTo(colX(partner), y1); // crossed pair
           ctx.stroke();
         }
-        if (active) {
-          ctx.fillStyle = "rgba(255, 205, 80, 0.9)";
-          ctx.textAlign = "left";
-          ctx.fillText(`layer ${s + 1}: pairs ${span} apart — all 8 butterflies at once`, margin, y0 - 4 * dpr);
-          ctx.textAlign = "center";
-        }
       }
       // nodes
       for (let s = 0; s <= STAGES; s++) {
@@ -195,6 +189,12 @@ export function mountFftButterfly(container: HTMLElement): Demo {
       ctx.fillStyle = "rgba(138, 145, 165, 0.9)";
       ctx.textAlign = "left";
       ctx.fillText("16 numbers in", margin, layerTop - 16 * dpr);
+      const activeSpan = NV >> stage;
+      ctx.fillStyle = "rgba(255, 205, 80, 0.92)";
+      ctx.textAlign = "right";
+      ctx.fillText(`layer ${stage}: pairs ${activeSpan} apart — 8 butterflies in parallel`, w - margin, layerTop - 16 * dpr);
+      ctx.fillStyle = "rgba(138, 145, 165, 0.9)";
+      ctx.textAlign = "left";
       ctx.fillText("16 frequencies out — 4 layers, every value touched once per layer", margin, layerTop + STAGES * layerGap + 16 * dpr);
 
       // ---- the race -----------------------------------------------------------
@@ -205,6 +205,10 @@ export function mountFftButterfly(container: HTMLElement): Demo {
       ctx.textAlign = "left";
       ctx.fillStyle = "rgba(215, 219, 230, 0.85)";
       ctx.fillText(`direct DFT — n² ${race.extrapolated ? "(measured at 2,048, scaled)" : ""}`, margin, raceTop - 4 * dpr);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "rgba(138, 145, 165, 0.75)";
+      ctx.fillText("log scale", w - margin, raceTop - 4 * dpr);
+      ctx.textAlign = "left";
       ctx.fillStyle = "rgba(255, 107, 107, 0.8)";
       ctx.fillRect(margin, raceTop, barW(race.dftMs), barH);
       ctx.fillStyle = "rgba(215, 219, 230, 0.95)";

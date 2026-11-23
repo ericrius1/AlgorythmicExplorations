@@ -10,7 +10,7 @@
 import { Shell, type Demo } from "../../../lib/demoShell";
 import { unlockAudio, frameGuard } from "../../../lib/audio";
 import { CHAIN_SCALES, FIFTH, MAJ3, mod, type ChainScale } from "./theory";
-import { COL, Surface, approach, dot, glow, hex, label, mixRgb, pcColor, rgba, roundRect, signed, text, type RGB } from "./draw";
+import { COL, Surface, approach, dot, glow, hex, mixRgb, pcColor, rgba, roundRect, signed, text, type RGB } from "./draw";
 import { Sound, type Held } from "./sound";
 import { button, chips, range, tapBadge, toggle } from "./ui";
 
@@ -48,12 +48,22 @@ export function mountExplorer(container: HTMLElement): Demo {
   const shown = new Array(8).fill(0);
 
   const n = (): number => scale.q.length;
-  // pitch of scale degree d (0 = tonic, can exceed n for upper octaves), cents
+  // pitch of scale degree d (0 = tonic, can exceed n for upper octaves), cents.
+  // Use fixed octave folding per chain position so notes move continuously across
+  // the full 7-equal..5-equal range (e.g. degree 7 reaches 1200¢ at 5-equal
+  // instead of wrapping down to 0¢).
   const pitch = (d: number): number => {
     const len = n();
     const oct = Math.floor(d / len);
     const q = scale.q[mod(d, len)];
-    return mod(q * fifth, 1200) + 1200 * oct;
+    const inOct = q * fifth - 1200 * Math.floor((q * 7) / 12);
+    return inOct + 1200 * oct;
+  };
+  let shownReady = false;
+  const syncShown = (): void => {
+    const len = n();
+    for (let d = 0; d <= len; d++) shown[d] = pitch(d);
+    shownReady = true;
   };
   const freq = (d: number): number => 261.6256 * Math.pow(2, pitch(d) / 1200);
 
@@ -127,6 +137,7 @@ export function mountExplorer(container: HTMLElement): Demo {
     wide: true,
     onChange: (id) => {
       scale = CHAIN_SCALES.find((s) => s.id === id)!;
+      syncShown();
       silence();
       rebuildChordButtons();
     },
@@ -141,7 +152,14 @@ export function mountExplorer(container: HTMLElement): Demo {
   shell.controls.appendChild(chordRow);
   const rebuildChordButtons = (): void => {
     chordRow.replaceChildren();
-    if (n() < 7) return;
+    if (n() < 7) {
+      const note = document.createElement("span");
+      note.className = "tn-chips-label";
+      note.style.alignSelf = "center";
+      note.textContent = "chord buttons require a 7-note mode";
+      chordRow.appendChild(note);
+      return;
+    }
     for (let d = 0; d < 7; d++) {
       button(chordRow, `${ROMAN[d]}`, () =>
         go(() => {
@@ -225,7 +243,8 @@ export function mountExplorer(container: HTMLElement): Demo {
         else flash.set(k, nv);
       }
       const len = n();
-      for (let d = 0; d <= len; d++) shown[d] = approach(shown[d] || pitch(d), pitch(d), 14, dt);
+      if (!shownReady) syncShown();
+      for (let d = 0; d <= len; d++) shown[d] = approach(shown[d], pitch(d), 14, dt);
 
       surf.fit();
       const { ctx, w, h } = surf;
@@ -291,12 +310,21 @@ export function mountExplorer(container: HTMLElement): Demo {
         const x = DX(d.f);
         ctx.fillStyle = "rgba(200, 210, 240, 0.5)";
         ctx.fillRect(x - 0.5, dialY - 7, 1, 14);
-        // on a phone 12-equal and Pythagorean are 13 px apart, so Pythagorean drops a row
         const lower = d.name === "31-equal" || d.name === "53-equal" || (narrow && d.name === "Pythagorean");
-        const align: CanvasTextAlign = i === 0 ? "left" : i === DETENTS.length - 1 ? "right" : d.name === "¼-comma" || (d.name === "Pythagorean" && !lower) ? "right" : lower ? "left" : "center";
+        const align: CanvasTextAlign =
+          i === 0
+            ? "left"
+            : i === DETENTS.length - 1
+              ? "right"
+              : d.name === "19-equal"
+                ? "right"
+                : d.name === "¼-comma" || (d.name === "Pythagorean" && !lower)
+                  ? "left"
+                  : "center";
+        const offset = align === "left" ? -2 : align === "right" ? 2 : 0;
         const near = Math.abs(d.f - fifth) < 0.05;
         if (!narrow || [0, 2, 4, 6, 7].includes(i))
-          text(ctx, d.name, x + (align === "left" ? -2 : align === "right" ? 2 : 0), dialY + (lower ? 32 : 20), {
+          text(ctx, d.name, x + offset, dialY + (lower ? 32 : 20), {
             size: narrow ? 8.5 : 9.5,
             color: near ? "#ffd9a0" : COL.dim,
             align,
@@ -344,7 +372,6 @@ export function mountExplorer(container: HTMLElement): Demo {
         if (d < KEYS.length && !narrow) text(ctx, KEY_LABELS[d], px + 7, py + 13, { size: 9, color: "#7a8199", mono: true });
         pads.push({ x0: px, x1: px + pw, y0: py, y1: py + ph, d });
       }
-      if (len < 7) label(ctx, "chord buttons need a seven-note mode", w / 2, padTop - 16, { size: 10 });
     },
     dispose() {
       silence();

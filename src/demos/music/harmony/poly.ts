@@ -128,6 +128,8 @@ export async function mountPoly(container: HTMLElement): Promise<Demo> {
       clock.start(Math.round(ph * L));
     }
     for (const [btn, px, py] of pBtns) setActive(btn, px === a && py === b);
+    const lab = tap.el.querySelector<HTMLSpanElement>(".mh-tap-label");
+    if (lab) lab.textContent = `Tap to play ${a} against ${b}`;
   }
   set(a, b);
 
@@ -140,7 +142,9 @@ export async function mountPoly(container: HTMLElement): Promise<Demo> {
   shell.setInfo(() => {
     const r = resultant();
     const gaps = r.map((u, i) => (r[i + 1] ?? L) - u);
-    return `${a} against ${b} · grid of ${L} · together only on the downbeat${gcd(a, b) > 1 ? ` and ${gcd(a, b) - 1} more time${gcd(a, b) > 2 ? "s" : ""}` : ""} · resultant ${gaps.join("+")}`;
+    const g = gcd(a, b);
+    const meet = g === 1 ? "together only on the downbeat" : `together ${g} times per cycle`;
+    return `${a} against ${b} · grid of ${L} · ${meet} · resultant ${gaps.join("+")}`;
   });
 
   // ---- drawing -----------------------------------------------------------------------------------

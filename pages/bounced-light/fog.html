@@ -10,7 +10,7 @@
     <title>The Fog — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Fog in 2D radiance cascades: Beer–Lambert extinction along every ray, fog that glows with last frame's light, and light shafts in a misty pine forest that come from lit fog next to shadowed fog."
+      content="Volumetric fog inside 2D radiance cascades: Beer–Lambert extinction along every ray, in-scattering driven by last frame's light, and sunlit shafts through a misty pine forest."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,9 +31,9 @@
         <p class="hero-kicker">Bounced Light · Part 3</p>
         <h1>The Fog</h1>
         <p class="subtitle">
-          A low sun, a stand of pines, and mist. Nothing draws the shafts of light between
-          the trees: they're fog the sun reaches, next to fog it doesn't. Move your cursor
-          through the scene to breathe in some smoke.
+          A low morning sun breaking through pines and ground mist. Those shafts between the
+          trunks emerge wherever sunlit fog borders shadowed fog. Drag across the forest to
+          puff extra smoke into the beams.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -44,37 +44,45 @@
 
     <main>
       <p>
-        In <a href="/pages/bounced-light/bonfire.html">part two</a> a ray either travelled
-        freely or stopped dead. There was nothing in between: no haze, no glow caught in
-        smoke, no shafts through the trees. Real air is the in-between. Every metre of fog
-        takes a little of the light passing through it, and everything in this part follows
-        from modelling that. The rendering term is <em>participating media</em>: any volume
-        that does something to the light going through it.
+        In <a href="/pages/bounced-light/bonfire.html">part two</a>, every pixel in the
+        lighting pass fell into one of two camps: either completely empty vacuum or an
+        opaque wall. The smoke curling above the flames was painted on afterward during the
+        display pass, so cascade rays flew straight through it without dimming or lighting
+        it up. Real air sits in the messy middle ground. Suspended water droplets, dust, and
+        smoke constantly siphon a small fraction of light out of every passing beam and
+        deflect part of it off in new directions. Graphics papers call that a
+        <em>participating medium</em>, meaning the space between objects actively modifies
+        the light traveling through it.
       </p>
       <p>
-        The pipeline stays the same as in parts one and two: distance field, cascades,
-        merge. Fog arrives as one new texture and a few lines inside the ray march:
-        absorption and scattering become two new terms in the sum every ray was already
-        doing.
+        Adding fog to our 2D radiance cascades keeps the jump-flood distance field, the
+        probe hierarchy, and the top-down merge completely intact. All it takes is one extra
+        texture describing the mist and a couple of bookkeeping lines tucked inside the ray
+        march itself.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="extinction"><span class="kicker">Step 1 · Extinction</span>Fog takes a fraction</h2>
       <p>
-        Send a ray through fog of density ρ. Over each short stretch Δs, a fixed fraction of
-        whatever light is left gets absorbed or knocked off course. A fixed fraction per
-        step adds up to a decaying exponential, which is the Beer–Lambert law:
+        Picture a ray slicing through mist of local density ρ. Over any short stretch Δs,
+        droplets remove a fixed percentage of whatever radiance remains in the beam, either
+        absorbing it as heat or knocking photons sideways out of the ray. Compounding a
+        fixed percentage loss step after step produces an exponential decay known as the
+        Beer–Lambert law:
       </p>
-      <pre><code>T *= exp(−σ · ρ · Δs)   <span class="cm">// each segment keeps a fraction of the light</span></code></pre>
+      <pre><code>T *= exp(−σ · ρ · Δs)   <span class="cm">// transmittance shrinks across each marched step</span></code></pre>
       <p>
-        The march from part one needs very little else. Each ray already moves through the
-        scene in leaps sized by the distance field. Now every leap also samples the fog
-        texture and multiplies a running transmittance <code>T</code> down. Fog varies
-        smoothly, so I cap each leap at about a twelfth of the cascade's interval, which
-        keeps the fog sampled even across open space. Whatever the ray ends up with (a hot
-        surface, the merge with the cascade above, the sky) arrives dimmed by the fog it
-        crossed. The hierarchy composes on its own: each cascade dims only its own interval,
-        and the merge multiplies in the rest.
+        Because the cascade shader already marches rays forward in leaps governed by the
+        distance field, tracking extinction only takes a running transmittance variable
+        <code>T</code> initialized to 1. One small tweak keeps large open rooms accurate:
+        since fog density can vary across empty air where the distance field would otherwise
+        permit a giant leap, each step is capped at roughly a twelfth of its cascade
+        interval so the march always samples the fog texture along the way. Whatever a ray
+        ultimately gathers (a glowing lamp, a bounced wall, the cascade merge above it, or
+        the open sky) gets multiplied by <code>T</code>. Better still, the cascade hierarchy
+        composes transmittance automatically: each level dims only its own ring of distance,
+        and multiplying by the parent level's transmittance during the merge accounts for
+        everything farther out.
       </p>
       <div
         data-demo="halo"
@@ -82,51 +90,51 @@
         data-hint="Carry the lamp around"
       ></div>
       <p>
-        Slide <em>scatter</em> to zero first. That's extinction alone. Thicken the fog and
-        the room just gets darker, and the lamp's shadow goes soft and murky. It looks like
-        smoked glass. Real fog around a lamp glows. The light taken out of a
-        beam has to go somewhere, and so far I've only removed it.
+        Pull the <em>scatter</em> slider all the way down to 0 to isolate pure extinction.
+        Thickening the <em>fog</em> now darkens the entire room and softens the lamp's reach
+        like peering through smoked glass, because light is being removed from rays without
+        putting any of it back into the air. Dragging <em>scatter</em> back up brings out
+        the bright glowing halo around the bulb.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="in-scatter"><span class="kicker">Step 2 · In-scattering</span>Where the light goes</h2>
       <p>
-        Light that fog takes out of a beam meets one of two fates. Some is absorbed and
-        becomes heat. In fog, most of it is scattered: bounced off a droplet into a new
-        direction, where it becomes part of some other ray. So every bit of lit fog is a
-        faint light, giving back a share of the light it sits in. To make fog glow, a ray
-        has to pick up that share from every bit of fog it crosses:
+        When a beam loses energy inside mist, only a sliver turns into heat; most of those
+        photons bounce off water droplets into fresh directions and join other rays crossing
+        that same spot. From any passing ray's point of view, every illuminated patch of fog
+        acts like a soft volumetric glow proportional to the light bathing it:
       </p>
-      <pre><code>J      = fluence_last_frame(x)            <span class="cm">// how much light this bit of fog sits in</span>
-a      = 1 − exp(−σ · ρ · Δs)             <span class="cm">// the fraction this segment takes out</span>
-inscat += T · J · scatter · a               <span class="cm">// …and the same fraction of J it gives back</span>
+      <pre><code>J      = fluence_last_frame(x)            <span class="cm">// incoming light bathing this spot in the fog</span>
+a      = 1 − exp(−σ · ρ · Δs)             <span class="cm">// fraction extinguished across this step</span>
+inscat += T · J · scatter · a               <span class="cm">// fraction scattered back along the ray</span>
 T      *= 1 − a</code></pre>
       <p>
-        The first line is the question the cascades already answer: how much light reaches
-        this point? They answered it one frame ago. That's part two's frame loop again,
-        aimed at the air instead of the walls. The fog's glow is last frame's light, the
-        cascades carry that glow around, and next frame the fog glows with the result.
-        Surfaces that re-emit light gave multiple bounces for one texture read. Fog that
-        re-emits light gives multiple scattering at the same price, one more order per
-        frame. <em>Scatter</em> is the fraction of the stolen light that comes back out, so
-        at 1 or below the fog never makes light out of nothing.
+        Conveniently, we already have an answer for <code>J</code>: the cascade-0 fluence
+        computed one frame earlier. It is the exact same temporal feedback loop that gave us
+        multi-bounce wall color in part two, now applied to the air itself. On frame one,
+        direct sunlight illuminates the mist; on frame two, that glowing mist radiates light
+        into neighboring pockets of fog, giving second-order scattering; frame three adds
+        the third order, and so on. Keeping the <em>scatter</em> albedo at or below 1
+        guarantees the medium never invents energy, so the sum converges cleanly.
       </p>
       <p>
-        Look closely at the halo with scatter turned up and you can see the bookkeeping. A
-        small bright source is hard for the coarse cascade-0 directions, and the glow is
-        last frame's light, so a lamp that moves fast leaves a faint tail. Glowing fog
-        magnifies details that were invisible when only walls were lit. Rotating the ray
-        directions every frame and averaging the last few frames is what keeps the halo
-        round, and the lamp stays fat on purpose.
+        Glowing air does make every sampling imperfection far easier to spot than diffuse
+        walls did. Because cascade 0 only fires four coarse directions per probe, a tiny
+        emitter can leave subtle radial spokes in the halo, and reading last frame's fluence
+        causes a rapidly whipped lamp to drag a faint glowing comet tail behind it. Rotating
+        the ray angles each frame, blending over a short temporal history, and keeping the
+        lamp generously sized keep the halo smooth and round.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Crepuscular rays</span>
         <p>
-          Shafts like these are called crepuscular rays, from the Latin for twilight.
-          Nothing is emitted along the beam. The sun lights all the fog it can reach,
-          something in the way keeps it from some of the fog, and what you see is the
-          boundary between lit air and unlit air. A light shaft is a shadow seen from the
-          side.
+          Those dramatic beams slicing through clouds or forest canopies are called
+          <em>crepuscular rays</em>, from the Latin word for twilight. Nothing physically
+          shoots extra light along the bright bands: sunlight floods all the mist it can
+          reach, tree crowns or clouds carve dark shadow tunnels through that mist, and from
+          the side you read the sharp contrast between lit and shadowed air as glowing
+          shafts.
         </p>
       </aside>
       <div
@@ -135,28 +143,33 @@ T      *= 1 − a</code></pre>
         data-hint="Lower the sun, blow smoke in"
       ></div>
       <p>
-        Sunlight through two slits in a wall. Nothing here draws the shafts. The sky from
-        part two comes in through the gaps, the fog it reaches glows by the formula above,
-        and the fog in the wall's shadow stays dark. Lower the sun and the shafts swing down
-        and turn warmer. Thicken the fog and they get brighter while the room behind them
-        gets darker: the same σ does both, because the fog that scatters light toward you is
-        also dimming everything else. Blow smoke with your cursor and a puff lights up only
-        while it's inside a shaft.
+        Here, the same directional sky from part two shines through two openings in the left
+        wall. No geometry draws the beams; the rays passing through the slits light up the
+        fog in their path while the wall shields the air above and below them. Lowering
+        <em>sun height</em> swings the shafts steeper across the floor and warms the solar
+        tint. Raising <em>fog</em> brightens the illuminated beams right up to the point
+        where extinction starts dimming the far corner of the room, since the same density
+        both scatters light toward you and blocks light behind it. Sweep your cursor across
+        the dark room to inject puffs of smoke: each plume stays dark in shadow and flares
+        warm gold the moment it drifts across a sunlit shaft.
       </p>
       <details class="fold">
         <summary>Deep dive: the phase function I left out</summary>
         <div class="fold-body">
           <p>
-            This fog scatters equally in all directions, an <em>isotropic phase
-            function</em>. Real droplets mostly deflect light by a few degrees, which is why
-            looking toward a low sun through mist is blinding and looking away is just grey.
-            The standard model is the Henyey–Greenstein function, published in 1941 for dust
-            between the stars, with one parameter g for how strongly scattering favours the
-            forward direction. The cascades could carry it, but the glow texture would have
-            to store direction as well as brightness. In a flat world seen from outside the
-            plane it buys very little, and the isotropic version keeps the glow to one
-            texture read. The glare around the sun in the hero is painted into the sky
-            backdrop for that reason.
+            The equations above assume <em>isotropic scattering</em>, sending deflected
+            light out equally in all directions. Real mist droplets strongly favor forward
+            scattering (deflecting most photons by just a few degrees), which is why staring
+            toward a low sun through morning fog creates a blinding silver glare while
+            looking away from the sun reveals dull gray mist. Graphics renderers typically
+            model this with the Henyey–Greenstein phase function (published in 1941 for
+            interstellar dust), controlled by a single asymmetry parameter g. Supporting
+            directional scattering inside radiance cascades would require storing angular
+            moments in the media texture rather than a single RGB brightness. In a 2D slice
+            viewed orthogonally from outside the plane, forward glare matters far less than
+            in 3D, so keeping scattering isotropic buys clean single-lookup performance; the
+            extra halo around the sun disk in the hero backdrop is painted directly into the
+            sky layer.
           </p>
         </div>
       </details>
@@ -164,11 +177,12 @@ T      *= 1 − a</code></pre>
       <!-- ================================================================ -->
       <h2 id="forest"><span class="kicker">Step 3 · Assembly</span>The forest</h2>
       <p>
-        Everything together. The morning sky is the top cascade's merge, as in part two.
-        The mist is densest at the ground and thins with height (one exponential, as in a
-        real atmosphere), with a thinner haze above it so the gaps between the crowns have
-        something for the sun to light. A slowly drifting noise field keeps it patchy. The
-        far row of pines is backdrop only: it's drawn, but the light never sees it.
+        Putting the directional morning sky, solid pine silhouettes, and volumetric mist
+        together yields the forest below. Ground mist falls off exponentially with altitude
+        just like a thin real atmosphere, topped with lighter upper haze so the gaps between
+        tree crowns catch beams from the low sun, while slow-drifting procedural noise keeps
+        the density uneven. The pale row of distant trees is purely a backdrop layer behind
+        the lighting plane.
       </p>
       <div
         data-demo="forest"
@@ -176,47 +190,38 @@ T      *= 1 − a</code></pre>
         data-hint="Drag the sliders, flip the views"
       ></div>
       <p>
-        The views have one new entry. <em>Fog density</em> shows the media texture itself:
-        the mist bank, your smoke puffs, the clearer air above. Flip between it and
-        <em>final</em> and you can see who does what. The density is made up by me, the glow
-        is computed, and the same bank of mist is gold where the sun reaches it and grey a
-        couple of trunks over.
+        Adjusting <em>mist height</em> lifts or lowers the dense ground bank, while
+        <em>view: final</em> cycles through the diagnostic buffers including a new
+        <em>fog density</em> view showing the raw media texture (the stratified mist bank,
+        drifting noise, and any smoke puffs you breathe in with your cursor). Switching back
+        and forth between <em>fog density</em> and <em>final</em> separates what I authored
+        from what the cascades solved: a single uniform band of mist turns bright gold where
+        sunlight slips between two pines and drops to cool gray a trunk width away.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="flatland"><span class="kicker">Wrap-up</span>Leaving the plane</h2>
       <p>
-        The renderer now has lights in any number, things that block them, coloured
-        multi-bounce, a sky, and air that absorbs and scatters. In two dimensions, that's
-        most of what light does.
+        Our 2D cascade renderer now handles arbitrary numbers of moving emitters, colored
+        multi-bounce walls, an environment sky, and air that simultaneously absorbs and
+        scatters light, all built by adding a couple of lines inside the ray march and
+        reusing last frame's fluence one more time. If I kept extending this 2D world, I
+        would store a few directional coefficients in the fog texture for forward-peaked
+        glare, give the mist wavelength-dependent absorption so thick fog shifts hue with
+        distance, and hook real light-blocking smoke onto part two's bonfire.
       </p>
-      <ul>
-        <li>
-          <strong>Fog is a new term, not a new pass.</strong> Extinction and in-scattering
-          are two more lines in the march every ray was already doing.
-        </li>
-        <li>
-          <strong>The frame loop keeps paying off.</strong> Last frame's light gave bounce
-          in part two and gives multiple scattering here, for one texture read each.
-        </li>
-        <li>
-          <strong>Light shafts are shadows.</strong> They come from lit fog next to unlit
-          fog, so they appear wherever something blocks the sun.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: a phase function stored in a few directional terms, so mist
-        toward the sun glares and mist away from it doesn't; coloured fog that absorbs
-        some wavelengths more than others; and smoke from part two's fire that blocks its
-        own light. The bigger limit is the plane itself. Every scene so far is a floor plan,
-        and the camera floats outside it. Doing 3D the obvious way, with a voxel distance
-        field and cascades over a volume, multiplies every texture in this series by a third
-        axis. Part four takes a different route: the distance field stops being something
-        stored in a texture and becomes a function the rays evaluate.
+        At this point, though, the real bottleneck is living inside a two-dimensional slice.
+        Every scene across these first three parts has been a flat floor plan or vertical
+        cross-section viewed from outside. Porting this exact texture-based strategy to 3D
+        means replacing 2D textures with 3D voxel volumes, cubing memory consumption and
+        jump-flood rebuild costs overnight. So in part four I am stepping into 3D by
+        dropping the stored distance texture altogether and writing the distance field as a
+        pure math function evaluated directly by every ray.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/bounced-light/flatland.html">Part four, Leaving Flatland</a>.</strong>
-        3D distance fields, sphere tracing, surface normals and soft shadows.
+        3D distance fields, sphere tracing, surface normals, and soft shadows.
       </p>
     </main>
 

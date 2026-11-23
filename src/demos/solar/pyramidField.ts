@@ -432,13 +432,13 @@ export async function mountPyramidField(container: HTMLElement): Promise<Demo> {
       text(stage, "REFLECTED", 14 * s, 22 * u, 10, "rgba(160, 175, 210, 0.7)");
       text(stage, r !== null ? `${(r * 100).toFixed(1)}%` : "counting…", 14 * s, 52 * u, 28, "#9fd8ff", 700);
       text(stage, height < 0.05 ? "a flat face: one chance to bounce away" : "photons that bounce off one facet try the next", 14 * s, 70 * u, 10.5, "rgba(190, 200, 225, 0.75)", 500);
-      const bx = c ? 14 * s : stage.hud.width * 0.6;
+      const bx = stage.hud.width * (c ? 0.52 : 0.6);
       text(stage, "LEFT BARE", bx, 22 * u, 10, "rgba(160, 175, 210, 0.7)");
-      text(stage, conformal ? "0%" : `${(bareShare() * 100).toFixed(0)}%`, bx, 52 * u + (c ? 40 * u : 0), 28, bareShare() > 0.02 ? "#ff8a6a" : "#5fe0a8", 700);
-      text(stage, conformal ? "evaporated first: every facet coated" : bareShare() > 0.005 ? "tips through a levelled film: shunts" : "the film covers every tip", bx, 70 * u + (c ? 40 * u : 0), 10.5, "rgba(190, 200, 225, 0.75)", 500);
+      text(stage, conformal ? "0%" : `${(bareShare() * 100).toFixed(0)}%`, bx, 52 * u, 28, bareShare() > 0.02 ? "#ff8a6a" : "#5fe0a8", 700);
+      text(stage, conformal ? "evaporated first: every facet coated" : bareShare() > 0.005 ? "tips through a leveled film: shunts" : "the film covers every tip", bx, 70 * u, 10.5, "rgba(190, 200, 225, 0.75)", 500);
       if (!c && height > 0.05) {
         hudLabel(stage, [F * 0.55, -F * 0.8, 0.02], "54.7° facets of silicon", [16, 22], "rgba(160, 190, 255, 0.85)");
-        if (!conformal) hudLabel(stage, [-F * 0.45, -F * 0.8, level], "the film, levelled in the valleys", [-14, 26], "rgba(150, 240, 200, 0.85)");
+        if (!conformal) hudLabel(stage, [-F * 0.45, -F * 0.8, level], "the film, leveled in the valleys", [-14, 26], "rgba(150, 240, 200, 0.85)");
       }
       shell.tick();
     },

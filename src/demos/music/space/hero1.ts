@@ -13,7 +13,7 @@ import { clapSamples, sampleRate } from "./sound";
 import { Plan, RoomVoice, SC, dragger, drawHead, irBuffer, label, monoBuffer, playGate, rgba, stage, ui, type P2, narrowScreen } from "./kit";
 
 const ROOM: Room = { L: 12, W: 7, H: 4, surf: ["brick", "glass", "wood", "plaster", "woodfloor", "plaster"] };
-const CELL = 0.03; // metres per wave cell
+const CELL = 0.03; // meters per wave cell
 const WAVE_SPEED = Math.sqrt(0.42); // cells per step
 const STEPS_PER_S = 270; // simulation steps per second of page time
 
@@ -187,7 +187,7 @@ export function mountSpaceHero(container: HTMLElement): Demo {
       }
       g.stroke();
 
-      // walls, coloured by material
+      // walls, colored by material
       const walls: [number, number, number, number, string][] = [
         [a.x, a.y, a.x, a.y + rh, ROOM.surf[0]],
         [a.x + rw, a.y, a.x + rw, a.y + rh, ROOM.surf[1]],
@@ -223,12 +223,12 @@ export function mountSpaceHero(container: HTMLElement): Demo {
       g.restore();
 
       // the first few paths of each clap light up as the slowed wavefront reaches them
-      const metresPerS = WAVE_SPEED * STEPS_PER_S * CELL;
+      const metersPerS = WAVE_SPEED * STEPS_PER_S * CELL;
       for (const c of claps) {
-        const r = (now - c.t0) * metresPerS;
+        const r = (now - c.t0) * metersPerS;
         for (let i = 0; i < c.paths.length; i++) {
           const p = c.paths[i];
-          const since = (r - p.len) / metresPerS;
+          const since = (r - p.len) / metersPerS;
           if (since < 0 || since > 1.6) continue;
           const alpha = Math.exp(-since * 2.2) * (i === 0 ? 0.9 : 0.6);
           g.strokeStyle = rgba(SC.ray, alpha);
@@ -257,9 +257,9 @@ export function mountSpaceHero(container: HTMLElement): Demo {
       // listener, with a ring when any wavefront passes the ears
       let hit = 0;
       for (const c of claps) {
-        const r = (now - c.t0) * metresPerS;
+        const r = (now - c.t0) * metersPerS;
         for (const p of c.paths) {
-          const since = (r - p.len) / metresPerS;
+          const since = (r - p.len) / metersPerS;
           if (since >= 0 && since < 0.25) hit = Math.max(hit, 1 - since / 0.25);
         }
       }

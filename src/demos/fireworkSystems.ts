@@ -175,7 +175,7 @@ export function mountCommandBudget(container: HTMLElement): Demo {
   const shell = new Shell(container, narrow ? 0.95 : 0.5);
   const state = { bursts: 12, sparks: 50000 };
   // A shell is more than its sparks: the explosion command also expands into
-  // the centre flash, crackle, embers and smoke (see spawnClassic).
+  // the center flash, crackle, embers and smoke (see spawnClassic).
   const extras = 1 + Math.round(11 * 11 * 0.34) + 64 + 30;
 
   shell.slider({
@@ -234,19 +234,20 @@ export function mountCommandBudget(container: HTMLElement): Demo {
         ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
         ctx.fill();
         const xe = xOf(value);
-        const g = ctx.createLinearGradient(x0, 0, xe, 0);
+        const barW = Math.max(bh, xe - x0);
+        const g = ctx.createLinearGradient(x0, 0, x0 + barW, 0);
         g.addColorStop(0, glow);
         g.addColorStop(1, color);
         ctx.save();
         ctx.shadowColor = color;
         ctx.shadowBlur = 14;
-        roundRect(ctx, x0, y - bh / 2, Math.max(bh, xe - x0), bh, bh / 2);
+        roundRect(ctx, x0, y - bh / 2, barW, bh, bh / 2);
         ctx.fillStyle = g;
         ctx.fill();
         ctx.restore();
         const label2 = formatBytes(value);
-        const inside = xe - x0 > 110;
-        text(ctx, label2, inside ? xe - 10 : xe + 8, y, {
+        const inside = barW > 110;
+        text(ctx, label2, inside ? x0 + barW - 10 : x0 + barW + 8, y, {
           size: small ? 11 : 13,
           mono: true,
           color: inside ? "#0b0d14" : color,
@@ -336,6 +337,7 @@ export function mountLiveCompaction(container: HTMLElement): Demo {
   let readIsA = true;
   let phase = 0;
   let paused = false;
+  let stepOnce = false;
   let overflow = 0;
 
   // One simulated frame: age everything, hand survivors slots in the order
@@ -367,17 +369,24 @@ export function mountLiveCompaction(container: HTMLElement): Demo {
   };
   plan();
 
-  shell.button("pause", () => {
-    paused = !paused;
+  const pauseButton = shell.button("pause", () => {
+    if (stepOnce) {
+      stepOnce = false;
+      paused = false;
+    } else {
+      paused = !paused;
+    }
     pauseButton.textContent = paused ? "play" : "pause";
   });
-  const pauseButton = shell.controls.lastElementChild as HTMLButtonElement;
   shell.button("next frame", () => {
-    paused = true;
-    pauseButton.textContent = "play";
+    if (stepOnce || phase > 0.05) {
+      commit();
+      plan();
+    }
     phase = 0;
-    commit();
-    plan();
+    paused = false;
+    stepOnce = true;
+    pauseButton.textContent = "play";
   });
   shell.setInfo(
     () =>
@@ -396,6 +405,11 @@ export function mountLiveCompaction(container: HTMLElement): Demo {
           phase = 0;
           commit();
           plan();
+          if (stepOnce) {
+            stepOnce = false;
+            paused = true;
+            pauseButton.textContent = "play";
+          }
         }
       }
       const { ctx, w, h } = begin(shell.canvas);
@@ -442,6 +456,34 @@ export function mountLiveCompaction(container: HTMLElement): Demo {
       };
       frame(yA, "buffer A", readIsA ? "read · last frame" : "write · this frame", !readIsA, false);
       frame(yB, "buffer B", readIsA ? "write · this frame" : "read · last frame", readIsA, true);
+
+      // compact legend in the open top-right above buffer A
+      if (!small) {
+        const ky = yA - 16;
+        const ks = 10;
+        const kx2 = w - padX;
+        text(ctx, "new emit", kx2, ky, { size: 11, color: C.muted, align: "right" });
+        const box2x = kx2 - 64;
+        roundRect(ctx, box2x, ky - ks / 2, ks, ks, 2);
+        ctx.fillStyle = "rgba(122, 162, 255, 0.35)";
+        ctx.fill();
+        ctx.strokeStyle = C.green;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        const kx1 = box2x - 16;
+        text(ctx, "expired", kx1, ky, { size: 11, color: C.muted, align: "right" });
+        const box1x = kx1 - 56;
+        roundRect(ctx, box1x, ky - ks / 2, ks, ks, 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 133, 133, 0.85)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(box1x + 2, ky - ks / 2 + 2);
+        ctx.lineTo(box1x + ks - 2, ky + ks / 2 - 2);
+        ctx.stroke();
+      }
 
       const pDie = ease(phase / 0.3);
       const pMove = ease((phase - 0.3) / 0.4);
@@ -569,6 +611,18 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
   let pass = 0;
   let auto = true;
   let clock = 0;
+  let hoveredPass = -1;
+  let playButton!: HTMLButtonElement;
+  const setAuto = (next: boolean): void => {
+    auto = next;
+    clock = 0;
+    if (playButton) playButton.textContent = auto ? "pause" : "play";
+  };
+  const selectPass = (idx: number): void => {
+    pass = clamp(Math.round(idx), 0, passes.length - 1);
+    setAuto(false);
+    slider.value = String(pass);
+  };
   const slider = shell.slider({
     label: "pass",
     min: 0,
@@ -578,14 +632,47 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
     format: (v) => passes[Math.round(v)].full,
     onInput: (v) => {
       pass = Math.round(v);
-      auto = false;
+      setAuto(false);
     },
   });
-  shell.button("play", () => {
-    auto = true;
-    clock = 0;
+  playButton = shell.button("pause", () => setAuto(!auto));
+  shell.setInfo(() => (auto ? "playing · click a pass or drag the slider to inspect" : `${passes[pass].full} · paused`));
+
+  const layout = (w: number, h: number) => {
+    const small = w < 520;
+    const labelW = small ? 84 : 150;
+    const x0 = small ? 10 : w * 0.05;
+    const x1 = w - (small ? 10 : w * 0.05);
+    const colW = (x1 - x0 - labelW) / passes.length;
+    const y0 = h * (small ? 0.09 : 0.13);
+    const rowH = (h * (small ? 0.56 : 0.6)) / resources.length;
+    return { small, labelW, x0, x1, colW, y0, rowH };
+  };
+  const hitPass = (e: PointerEvent): number => {
+    const rect = shell.canvas.getBoundingClientRect();
+    const w = shell.canvas.clientWidth || rect.width;
+    const h = shell.canvas.clientHeight || rect.height;
+    const x = ((e.clientX - rect.left) / Math.max(rect.width, 1)) * w;
+    const y = ((e.clientY - rect.top) / Math.max(rect.height, 1)) * h;
+    const L = layout(w, h);
+    const colStart = L.x0 + L.labelW;
+    if (x < colStart || x > L.x1) return -1;
+    if (y < L.y0 - (L.small ? 18 : 22) || y > L.y0 + 8 + L.rowH * resources.length) return -1;
+    return clamp(Math.floor((x - colStart) / L.colW), 0, passes.length - 1);
+  };
+  shell.canvas.addEventListener("pointermove", (e) => {
+    hoveredPass = hitPass(e);
+    shell.canvas.style.cursor = hoveredPass >= 0 ? "pointer" : "default";
   });
-  shell.setInfo(() => (auto ? "playing · drag the slider to stop on a pass" : `${passes[pass].full}`));
+  shell.canvas.addEventListener("pointerleave", () => {
+    hoveredPass = -1;
+    shell.canvas.style.cursor = "default";
+  });
+  shell.canvas.addEventListener("pointerdown", (e) => {
+    const idx = hitPass(e);
+    if (idx >= 0) selectPass(idx);
+  });
+
   let last = performance.now();
 
   return {
@@ -599,18 +686,21 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
           clock = 0;
           pass = (pass + 1) % passes.length;
           slider.value = String(pass);
-          slider.dispatchEvent(new Event("input"));
-          auto = true;
         }
       }
       const { ctx, w, h } = begin(shell.canvas);
-      const small = w < 520;
-      const labelW = small ? 84 : 150;
-      const x0 = small ? 10 : w * 0.05;
-      const x1 = w - (small ? 10 : w * 0.05);
-      const colW = (x1 - x0 - labelW) / passes.length;
-      const y0 = h * (small ? 0.09 : 0.13);
-      const rowH = (h * (small ? 0.6 : 0.62)) / resources.length;
+      const { small, labelW, x0, x1, colW, y0, rowH } = layout(w, h);
+
+      // subtle hover highlight for clickable pass columns
+      if (hoveredPass >= 0 && hoveredPass !== pass) {
+        const hhx = x0 + labelW + hoveredPass * colW;
+        roundRect(ctx, hhx + 2, y0 - (small ? 16 : 20), colW - 4, rowH * resources.length + (small ? 22 : 28), 8);
+        ctx.fillStyle = "rgba(122, 162, 255, 0.045)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(122, 162, 255, 0.2)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
 
       // column headers and the highlighted pass
       const hx = x0 + labelW + pass * colW;
@@ -620,6 +710,28 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
       ctx.strokeStyle = "rgba(122, 162, 255, 0.55)";
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      // R / W badge key in the open header corner (or top-right above on narrow screens)
+      const drawKeyBadge = (bx: number, by: number, color: string, letter: string, word: string): void => {
+        const r = small ? 5 : 6.5;
+        ctx.beginPath();
+        ctx.arc(bx + r, by, r, 0, TAU);
+        ctx.fillStyle = "rgba(255,255,255,0.09)";
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        text(ctx, letter, bx + r, by + 0.5, { size: small ? 7.5 : 9, align: "center", weight: 700, color });
+        text(ctx, word, bx + r * 2 + 5, by, { size: small ? 9.5 : 11, color: C.muted, weight: 500 });
+      };
+      if (!small) {
+        drawKeyBadge(x0, y0 - 6, C.blue, "R", "read");
+        drawKeyBadge(x0 + 58, y0 - 6, C.amber, "W", "write");
+      } else {
+        drawKeyBadge(x0, h * 0.94, C.blue, "R", "read");
+        drawKeyBadge(x0 + 54, h * 0.94, C.amber, "W", "write");
+      }
+
       const short = ["CPU", "begin", "sim", "emit", "finish", "draw"];
       passes.forEach((p, i) => {
         text(ctx, small ? short[i] : p.name, x0 + labelW + (i + 0.5) * colW, y0 - 6, {
@@ -676,10 +788,12 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
         });
       });
 
-      // what the highlighted pass does, wrapped to the canvas
-      const desc = `${passes[pass].full}: ${passes[pass].what}`;
-      ctx.font = `${small ? 11 : 13}px ${SANS}`;
-      const words = desc.split(" ");
+      // what the highlighted pass does, wrapped cleanly with uniform contrast
+      const titleY = h * (small ? 0.72 : 0.81);
+      text(ctx, passes[pass].full, x0, titleY, { size: small ? 11.5 : 13, mono: true, weight: 600, color: C.blue });
+      const descSize = small ? 11 : 13;
+      ctx.font = `400 ${descSize}px ${SANS}`;
+      const words = passes[pass].what.split(" ");
       const lines: string[] = [];
       let cur = "";
       for (const word of words) {
@@ -690,8 +804,9 @@ export function mountPipelineGraph(container: HTMLElement): Demo {
         } else cur = next;
       }
       lines.push(cur);
+      const lineStep = small ? 15 : 19;
       lines.slice(0, 4).forEach((l, i) => {
-        text(ctx, l, x0, h * (small ? 0.78 : 0.84) + i * (small ? 15 : 18), { size: small ? 11 : 13, color: i === 0 ? C.text : C.muted });
+        text(ctx, l, x0, titleY + (small ? 17 : 21) + i * lineStep, { size: descSize, weight: 400, color: C.text });
       });
       shell.tick();
     },
@@ -768,10 +883,11 @@ export function mountCapacityMap(container: HTMLElement): Demo {
       const seg = (from: number, size: number, color: string, label: string, sub: string): void => {
         const x = x0 + from * scale;
         const sw = size * scale;
+        const dw = Math.min(x1 - (x + 1), Math.max(3, sw - 2));
         const g = ctx.createLinearGradient(0, y, 0, y + bh);
         g.addColorStop(0, color);
         g.addColorStop(1, color + "99");
-        roundRect(ctx, x + 1, y, sw - 2, bh, 6);
+        roundRect(ctx, x + 1, y, dw, bh, Math.min(6, dw / 2));
         ctx.fillStyle = g;
         ctx.globalAlpha = 0.85;
         ctx.fill();

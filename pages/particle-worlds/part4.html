@@ -10,7 +10,7 @@
     <title>Worlds from Dust — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Dust that attracts, collides and sticks: part one's gravity pyramid and part three's sorted grid, made unbounded with a spatial hash, running over the same particles on the GPU."
+      content="Dust that pulls, bumps, and sticks: pairing part one's gravity pyramid with part three's sorted grid—made unbounded through spatial hashing—over a single GPU particle buffer."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,9 +31,9 @@
         <p class="hero-kicker">Particle Worlds · Part 4</p>
         <h1>Worlds from Dust</h1>
         <p class="subtitle">
-          A ring of 20,000 dust grains around a star, with gravity from part one's pyramid
-          and collisions from part three's grid. Stir it with your cursor and watch it
-          settle back.
+          20,000 dust grains orbiting a star, pulled together by part one's gravity pyramid
+          and knocked into clumps by part three's contact grid. Drag your cursor through the
+          ring to stir it up.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -44,98 +44,107 @@
 
     <main>
       <p>
-        <a href="/pages/particle-worlds/part1.html">Part one</a> built a structure for the
-        <em>far field</em>: a pyramid of summed-up mass, because in a galaxy distant stars
-        only matter in bulk. <a href="/pages/particle-worlds/part3.html">Part three</a>
-        built one for the <em>near field</em>: a sorted grid of buckets, because a drop of
-        water only feels what's touching it. Nothing stops one simulation from using both,
-        with gravity from the pyramid and contacts from the grid. That gets you dust that
-        attracts, collides and sticks, which is roughly how planets start.
+        Drop a cloud of dust into empty space with gravity turned on and you might expect it
+        to collapse into a rock. It won't. Every grain accelerates toward the center, rushes
+        straight past it, and climbs right back out the far side. Without something to bump
+        into and bleed off kinetic energy, a gravitational cloud just breathes in and out
+        forever.
       </p>
       <p>
-        The ring at the top of the page is 20,000 dust grains on nearly circular orbits
-        around a star. Every grain pulls on every other grain through part one's pyramid,
-        and pushes on the grains it's actually touching through part three's sort. Left
-        alone, the ring grows clumps, and the clumps collide and grow into moonlets. It's
-        a simplified 2D version of how planetesimals form.
-      </p>
-      <p>
-        Getting there means seeing why gravity on its own can't build anything solid,
-        getting part three's grid out of its box, and running both structures over the
-        same particles every step.
+        Making dust actually build something takes two different kinds of bookkeeping at
+        once. <a href="/pages/particle-worlds/part1.html">Part one</a> built a mass pyramid
+        for the <em>far field</em>, where distant stars only matter in bulk.
+        <a href="/pages/particle-worlds/part3.html">Part three</a> built a sorted grid for
+        the <em>near field</em>, where liquid particles only care about whatever is right
+        against them. Run both structures over the same particles every substep and you get
+        dust that attracts from across the disk, collides on contact, and sticks into
+        growing knots. That is what is happening in the ring at the top of the page: 20,000
+        grains on nearly circular orbits around a star, curdling into spiral streaks and
+        tightening into moonlets in a simplified 2D sketch of planetesimal formation.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="collisionless"><span class="kicker">Step 1 · No surfaces</span>Gravity alone can't build a planet</h2>
+      <h2 id="collisionless"><span class="kicker">Step 1 · No surfaces</span>Why gravity alone stays ghostly</h2>
       <p>
-        Part one introduced <em>softening</em> as a fix for dividing by zero. It also has a
-        physical meaning: it says bodies have no surface. Inside the softening length,
-        gravity fades out instead of blowing up, and two particles aimed straight at each
-        other pass through like ghosts. For a galaxy that's correct. Stars are so small
-        compared to the distances between them that when two galaxies collide, almost no
-        stars actually hit each other. Astronomers call systems like that
+        Back in part one, we added <em>softening</em> to gravity so two bodies passing right
+        over each other wouldn't divide by zero and fling off to infinity. Softening also
+        sneaks in a physical assumption: particles have no solid surface. Once two bodies
+        get inside the softening radius, the pull tapers off and they glide straight through
+        each other like ghosts. For a galaxy, that's completely faithful. Stars are tiny
+        next to the gulf between them, so when two whole galaxies merge, direct stellar
+        collisions almost never happen. Astronomers call a system like that
         <em>collisionless</em>.
       </p>
       <p>
-        Planets don't form that way. Here's a cold, slowly spinning disc of 20,000 dust
-        grains with gravity and nothing else:
+        A dusty nursery around a young star behaves very differently. Watch what happens to
+        a cold, gently spinning disk of 20,000 dust grains when gravity runs by itself, and
+        then click <em>both</em> to turn contact forces on:
       </p>
 
       <div
         data-demo="ghosts"
         data-title="Gravity only"
-        data-hint="Watch it fall, then press both"
+        data-hint="Watch it rebound, then press both"
       ></div>
 
       <p>
-        The cloud falls inward, overshoots, and swells back out. Gravity is a conservative
-        force, so whatever energy the fall gains, the rebound hands back. A cloud with
-        nothing but gravity has no way to get rid of the energy of its own collapse, so
-        however long you leave it, it stays a loose cloud and never becomes anything solid.
-        Press <em>both</em> to turn on contacts and the same cloud does something a galaxy
-        can't. That needs part three's grid, and first the grid has to get out of its box.
+        With only gravity active, the disk falls inward, crowds through the middle, and
+        expands right back out. Gravity is conservative: every bit of kinetic energy gained
+        on the way down goes straight into climbing back up the potential well on the other
+        side. No matter how long you wait, the cloud stays a loose swarm because it has no
+        way to shed the energy of its own collapse. Switching to <em>both</em> adds solid
+        contacts with damping, and the swarm finally packs down into a dense spinning body.
+        To make those contacts work out in open space, though, part three's grid needs one
+        big upgrade first.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="hash"><span class="kicker">Step 2 · Open space</span>A grid with no walls</h2>
+      <h2 id="hash"><span class="kicker">Step 2 · Open space</span>Taking the grid out of its walls</h2>
       <p>
-        Part three's grid depended on a fixed box. Each cell's index came from its position
-        inside the box, and the box is what kept the number of cells finite. The water tank
-        had walls anyway, so that cost nothing. A collapsing dust cloud is in open space,
-        though, and an orbiting ring throws the odd grain a long way out. Covering that with
-        a dense grid means choosing between a huge box, with millions of counters for empty
-        space, and a tight box that particles escape from.
+        Part three's contact grid relied on a fixed tank. Every cell got an array index from
+        its coordinates inside that tank, and the walls guaranteed the array stayed finite.
+        That worked cleanly for water sloshing inside a box, since the tank was part of the
+        scene anyway. A collapsing dust cloud or an orbiting ring sits in open space, where
+        close encounters occasionally kick a stray grain far out into the dark. Covering
+        open space with a flat grid forces an ugly choice: allocate millions of empty cells
+        for space nobody visits, or draw a tight box and watch escaping grains fall off the
+        edge of the array.
       </p>
       <p>
-        A <em>spatial hash</em> keeps the cells and drops the box. A cell is still a pair
-        of integers, which column and which row, but now anywhere in the infinite plane.
-        Those two integers get hashed into a fixed-size table of buckets:
+        <em>Spatial hashing</em> keeps the fixed-size cells and throws away the walls. Each
+        cell is still just a pair of integer coordinates, column and row, anywhere across
+        the entire plane. Instead of indexing directly into a 2D array, we hash those two
+        integers into a fixed table of buckets:
       </p>
       <pre><code>fn bucketOf(c: vec2i) -&gt; u32 {
   let h = (u32(c.x) * 0x9E3779B1u) ^ (u32(c.y) * 0x85EBCA77u);
   return h &amp; (TABLE - 1u);   <span class="cm">// TABLE is a power of two</span>
 }</code></pre>
       <p>
-        At the default 20,000 grains the table has 65,536 buckets, and the demo switches to
-        262,144 and then 1,048,576 as you add grains. Nothing else in part three's pipeline
-        changes. The histogram counts particles per bucket, the scan turns the counts into
-        start positions, and the scatter groups particles by bucket.
+        For the default 20,000 grains, the table holds 65,536 buckets, scaling up to
+        262,144 and 1,048,576 when you push the grain slider higher. Everything else from
+        part three's sorting pipeline carries straight over: count grains per bucket, prefix-sum
+        the counts into bucket offsets, and scatter the particles into contiguous runs.
       </p>
       <p>
-        The cost is that unrelated cells, possibly far apart, sometimes land in the same
-        bucket, so the 3×3 neighbour search picks up <em>impostors</em>. That doesn't
-        matter, because the force pass already measures the distance to every candidate. A
-        real neighbour passes the distance test and a grain from the far side of the ring
-        doesn't, so the check that was already there throws impostors out. The one thing
-        to watch is that two of the nine cells can hash to the same bucket. The kernel
-        removes duplicate buckets before searching, or it would count those contacts twice.
+        Folding an infinite plane into a finite table creates one side effect: distant,
+        unrelated cells occasionally land in the same bucket. When a grain checks its 3×3
+        neighborhood, it pulls in a few <em>impostors</em> from elsewhere in the disk. That
+        turns out to be harmless because the contact loop already checks the exact distance
+        to every candidate. Real touching neighbors pass that distance test and distant
+        strangers fail it immediately. The only trap is duplicate buckets inside the 3×3
+        window itself: if two of the nine nearby cells hash to the same bucket, searching
+        that bucket twice would double-count every contact inside it, so the kernel skips
+        any bucket it has already seen.
       </p>
       <p>
-        The demo below makes the impostors visible. It's part three's pile of 3,500 discs,
-        but its 24×24 = 576 cells share a hash table that starts at a deliberately tiny 128
-        buckets. Yellow is the 3×3 window around your cursor. Red cells are unrelated cells
-        that happen to share one of its buckets, and red discs are the impostors the
-        distance test throws away. Slide the table size up and the red gets rare.
+        You can see those hash collisions directly below. It's the same 3,500-disk pile from
+        part three on a 24×24 grid (576 cells), intentionally squeezed into a tiny 128-bucket
+        table so collisions are everywhere. Move your cursor over the pile to aim the yellow
+        3×3 query window; the red cells are far-off cells sharing one of its buckets, and the
+        red disks are the impostors the distance check throws away. The query window stays
+        where you leave it when you move down to drag the <em>hash table buckets</em> slider,
+        so you can watch the red thin out as the table grows.
       </p>
 
       <div
@@ -147,137 +156,147 @@
       <aside class="note">
         <span class="note-label">Aside · Hashing, 1953</span>
         <p>
-          In January 1953 Hans Peter Luhn, a researcher at IBM, wrote an internal memo
-          suggesting that records be stored in numbered buckets computed from their keys,
-          with records that land in the same bucket chained together. Arnold Dumey gave the
-          first published description of hashing in 1956, and Knuth's history of the idea
-          credits Luhn with it. Luhn's name is also on the check digit at the end of your
-          credit card number, the Luhn algorithm, which he patented in 1960.
+          In January 1953, IBM researcher Hans Peter Luhn circulated an internal memo
+          proposing that records be filed into numbered buckets calculated directly from
+          their keys, with colliding records chained together inside the bucket. Arnold
+          Dumey published the first open paper on the technique in 1956, and Knuth later
+          traced priority back to Luhn's memo. Luhn's name also lives on the check-digit
+          formula at the end of credit card numbers, which he patented in 1960.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="one-buffer"><span class="kicker">Step 3 · One buffer</span>Two structures, one buffer</h2>
+      <h2 id="one-buffer"><span class="kicker">Step 3 · One buffer</span>Two data structures over the same memory</h2>
       <p>
-        Putting the two together was mostly plumbing. Part three's sort reorders the
-        particles every substep, so grain #4,071 is a different grain after each shuffle.
-        Part one's solver kept each body's mass in a separate array, indexed by body number.
-        Bolt the two together without thinking and the masses stay put while the particles
-        move, so after every substep each grain has some other grain's mass.
+        Once the grid is unbounded, wiring gravity and contacts together runs straight into
+        a subtle memory bug. Part three's counting sort permutes the particle buffer every
+        substep so particles in the same bucket sit side by side in memory. After one
+        shuffle, grain #4,071 is a completely different grain. Part one's galaxy solver stored
+        each body's mass in a separate array looked up by index. Hook the two solvers
+        together naively and the particles move around while the mass array sits still,
+        handing every grain someone else's mass four times a frame.
       </p>
       <p>
-        The usual fix is to sort the masses along with the particles (a key–value sort, one
-        more array to shuffle). I went with something simpler: <strong>every grain weighs
-        the same</strong>. Dust doesn't need the variety a galaxy does. If all the masses
-        are equal, reordering the particles can't change the gravity, so the pyramid just
-        counts grains per cell and the mass buffer goes away. The total mass of the dust is
-        fixed, and the grain-count slider only changes how finely it's divided up.
+        You could sort the mass array alongside the positions and velocities, turning it
+        into a key–value sort with one more buffer to shuffle. Instead, I changed the
+        problem: <strong>every dust grain gets the same mass</strong>. Uniform grains are
+        plenty for a dust disk, and if every particle weighs the same, permuting the buffer
+        has zero effect on gravity. The mass array disappears completely, and the pyramid
+        simply counts how many grains fall into each cell. The total mass of the dust stays
+        fixed while the <em>grains</em> slider controls how finely that mass is sliced up.
       </p>
-      <p>With that, both structures run every substep over the same buffer:</p>
+      <p>With uniform masses, both structures run back to back over one ping-ponged particle buffer:</p>
       <pre><code>sort     → count, scan ×3, scatter                     <span class="cm">// part three's hash sort: 5 dispatches</span>
 pyramid  → clear, bounds, scatter, resolve, reduce ×8  <span class="cm">// part one's pyramid: 12 dispatches</span>
-force    → tree walk + 9 cells, integrate              <span class="cm">// new: 1 dispatch</span></code></pre>
+force    → tree walk + 9 cells, integrate              <span class="cm">// combined kernel: 1 dispatch</span></code></pre>
       <p>
-        That's 18 dispatches a substep and four substeps a frame. Here's what the force
-        kernel sees, one structure at a time:
+        That works out to 18 compute dispatches per substep, running four substeps per
+        frame. Scroll through the diagram below to see what the force kernel asks of each
+        structure for a single grain in the ring:
       </p>
 
       <div data-scrolly="two-structures"></div>
 
       <p>
-        The two structures aren't the same size, and they shouldn't be. The pyramid is
-        256×256 at its finest level and refits its root box to the cloud every substep,
-        because gravity needs to see everything. The hash cells stay one grain diameter
-        wide, because contacts happen at the scale of a grain. The force kernel is the only
-        place they meet: walk the pyramid for the pull of the whole cloud, check the nine
-        cells around the grain for anything it's touching, add the two, and integrate. The
-        force pass runs on the freshly sorted buffer, so a grain's contact neighbours are
-        also its neighbours in memory.
+        Keeping the two structures separate lets each one work at its own natural scale. The
+        gravity pyramid has a 256×256 base and refits its root bounding box to the whole
+        cloud every substep so long-range pulls always cover everything. The hash grid keeps
+        its cells fixed to a single grain diameter, matching the tiny range where two grains
+        can actually touch. They meet only inside the final force shader, which walks the
+        pyramid for gravity, checks nine hashed buckets for contacts, sums the two
+        accelerations, and integrates. Because the force pass runs on the freshly sorted
+        buffer, a grain's physical contact neighbors are also sitting right next to it in
+        GPU memory.
       </p>
       <p>
-        The star isn't in the buffer at all. It's one analytic GM/r² term in the force
-        kernel, the same way part two's dome was a force term rather than something stored
-        with the particles. There's also a soft leash past a fixed radius that pulls stray
-        grains back. Without it, one grain thrown far out would stretch the pyramid's root
-        box and make every cell coarser.
+        The central star doesn't even live in the particle buffer; it's one analytic
+        <code>GM/r²</code> term added inside the force kernel, much like the dome in part
+        two was an analytic surface rather than extra geometry. There is also a gentle
+        confining pull past a fixed outer radius so a single ejected grain can't fly off to
+        infinity and stretch the pyramid's root box into uselessly coarse cells.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · How the research codes do it</span>
+        <span class="note-label">Aside · How research codes do it</span>
         <p>
-          Planetary scientists use the same skeleton. In 2000 Derek Richardson and
-          colleagues adapted <em>pkdgrav</em>, a parallel tree code first written for
-          cosmology, to follow around a million planetesimals in 3D, detecting and resolving
-          collisions as it went. Their code has better integrators and realistic collision
-          outcomes, but it's still a tree for gravity plus a neighbour search for contacts,
-          every step.
+          Planetary scientists build their production codes on the exact same pairing. In
+          2000, Derek Richardson and colleagues adapted <em>pkdgrav</em>, a parallel
+          cosmology tree code, to track around a million colliding planetesimals in 3D.
+          Their integrator is far more accurate and their collision model handles bounces,
+          mergers, and shattering, yet every timestep still boils down to a tree walk for
+          gravity paired with a local neighbor search for contacts.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="dissipation"><span class="kicker">Step 4 · Dissipation</span>Collisions that lose energy</h2>
+      <h2 id="dissipation"><span class="kicker">Step 4 · Dissipation</span>Collisions that bleed energy</h2>
       <p>
-        The data structures don't supply the last piece. Here's the collapsing cloud again.
-        Try all three buttons:
+        Even with both data structures wired up, one physical ingredient is still doing the
+        real heavy lifting. Watch the collapsing cloud again and compare all three physics
+        modes, <em>gravity only</em>, <em>contacts only</em>, and <em>both</em>, along with
+        the <em>stickiness</em> slider:
       </p>
 
       <div
         data-demo="collapse"
         data-title="Gravity plus contacts"
-        data-hint="Try all three buttons"
+        data-hint="Try all three buttons and slide stickiness"
       ></div>
 
       <p>
-        <em>Gravity only</em> is the ghost cloud from Step 1. <em>Contacts only</em> is a
-        handful of marbles in space: the cloud spins apart, because nothing holds it
-        together. <em>Both</em> collapses and stays collapsed. Grains pile onto grains and
-        the swirl tightens into a dense, slowly spinning clump. That's a planetesimal.
+        In <em>gravity only</em> mode, the cloud rebounds endlessly like before. In
+        <em>contacts only</em> mode, it behaves like loose marbles in zero gravity: the
+        initial spin flings the whole disk outward because nothing binds it together. Turn on
+        <em>both</em> and the grains pile onto one another, shed their infall speed, and
+        settle into a compact, slowly rotating planetesimal.
       </p>
       <p>
-        The difference comes from one term in the contact force. The contact model is the
-        same as part three's sand, a <em>spring–dashpot</em>. The spring pushes overlapping
-        grains apart. The dashpot is a damper, like a piston pushed through oil, and it
-        resists the two grains moving toward or away from each other:
+        The piece that lets it settle is a single line inside the contact force. Just like
+        part three's sand, each overlapping pair interacts through a
+        <em>spring–dashpot</em>: a stiff spring pushes overlapping grains apart, and a
+        dashpot (like a shock absorber moving through thick oil) damps their relative speed
+        along the contact normal:
       </p>
       <pre><code>acc += nrm * (dia - r) * P.stiffness;   <span class="cm">// spring: push apart by the overlap</span>
-let vn = dot(vel - parts[k].zw, nrm);   <span class="cm">// how fast the pair closes or separates</span>
-acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: take some of that away</span></code></pre>
+let vn = dot(vel - parts[k].zw, nrm);   <span class="cm">// relative speed along the contact normal</span>
+acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: bleed off part of that speed</span></code></pre>
       <p>
-        The dashpot makes every collision inelastic. Each bump turns a little of the
-        ordered falling motion into nothing (in real dust it would become heat). The
-        <em>stickiness</em> slider is the damping coefficient, from 0 to 80 with 30 as the
-        default. Since the dashpot also resists grains moving apart, turning it up makes
-        them tend to stay stuck together. Slide it to zero and the collisions become
-        elastic: gravity plus perfectly bouncy contacts still conserves energy, so the
-        collapse turns into a bouncing swarm instead of a clump. Stars in a galaxy have no
-        way to shed energy like this, which is why galaxies stay puffy. Dust does, and
-        that's what lets it settle into something solid.
+        That damping term makes every bump inelastic, draining kinetic energy out of the
+        collapse (in real dust, that energy radiates away as heat). The <em>stickiness</em>
+        slider directly controls <code>P.damping</code> from 0 to 80, starting at 30. Because
+        the dashpot opposes separation as well as approach, higher damping makes grains cling
+        together once they meet. Drag <em>stickiness</em> all the way down to zero and the
+        collisions become elastic: gravity plus perfectly bouncy spheres still conserves
+        energy, turning the planetesimal back into a jittering swarm that refuses to pack
+        down. Stars in a galaxy lack this energy sink, so galaxies stay puffy; colliding dust
+        grains have it, which is why rocky worlds can condense at all.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Newton's pendulums and Safronov's book</span>
+        <span class="note-label">Aside · Newton's pendulums and Safronov's monograph</span>
         <p>
-          Newton measured this property for the <em>Principia</em>. He swung pendulum balls
-          of different materials into each other and recorded how much of their closing
-          speed survived the bounce: about 5/9 for tightly wound wool, about 15/16 for
-          glass. That ratio is now called the coefficient of restitution, and turning up
-          stickiness turns it down.
+          Isaac Newton measured bounciness for the <em>Principia</em> by swinging pairs of
+          pendulums made of different materials into each other and recording what fraction
+          of their closing speed survived impact: around 5/9 for tightly wound wool, and
+          around 15/16 for glass. Today we call that ratio the coefficient of restitution,
+          and turning up <em>stickiness</em> turns it down.
         </p>
         <p>
-          The theory that planets grow this way, with dust settling, colliding and sticking
-          and the bigger bodies sweeping up the rest, was worked out largely by Viktor
-          Safronov in Moscow in the 1950s and 60s. He collected it in a Russian monograph
-          in 1969. A NASA translation followed in 1972, and that's how most Western
-          planetary scientists came to know it. It became the basis of the standard picture
-          of planetesimal growth, and simulations like this one still follow its loop.
+          The modern picture of planets assembling from dust—grains settling, colliding,
+          sticking, and larger bodies sweeping up their neighborhoods—was worked out largely
+          by Viktor Safronov in Moscow during the 1950s and 1960s. He published it as a
+          Russian monograph in 1969, and NASA's 1972 English translation brought his theory to
+          Western planetary science, where it became the foundation of planetesimal growth
+          models.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="disk"><span class="kicker">Step 5 · The disk</span>A ring of dust</h2>
+      <h2 id="disk"><span class="kicker">Step 5 · The disk</span>Gravity against shear in an orbiting ring</h2>
       <p>
-        The collapsing cloud is planet formation on easy mode, since the only way to go is
-        in. A more realistic nursery is a rotating disk, where angular momentum resists
-        collapse. Here's the ring from the top of the page with the controls showing. The
-        grains slider goes from 10,000 to 150,000.
+        A nearly stationary cloud is planet formation on easy mode, since every grain wants
+        to fall toward the same point. Real planets grow inside a rotating disk where
+        angular momentum fights collapse at every radius. Below is the hero simulation with
+        all its controls exposed, including a <em>grains</em> slider that runs from 10,000 up
+        to 150,000.
       </p>
 
       <div
@@ -287,75 +306,73 @@ acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: take some o
       ></div>
 
       <p>
-        What fights clumping in a disk is <em>shear</em>. Inner grains orbit faster than
-        outer ones, so any clump that starts to form gets smeared into an arc as its inner
-        edge pulls ahead of its outer edge. Watch the first few seconds: the ring doesn't
-        clump evenly. It grows tight spiral streaks where self-gravity pulls material
-        together while shear stretches it out. Where enough grains crowd together, a knot
-        condenses out of a streak, collisions damp its internal motion, and it becomes a
-        moonlet. From then on it sweeps its lane, scattering or absorbing what it meets.
+        Inside an orbiting ring, <em>shear</em> works relentlessly against clumping. Grains
+        closer to the star move faster than grains farther out, so any little overdensity
+        gets stretched into a tilted arc as its inner edge races ahead of its outer edge.
+        Watch the first few seconds after pressing <em>re-seed</em>: instead of condensing
+        into neat round dots right away, the ring breaks into tight trailing spiral streaks
+        where self-gravity pulls dust together while orbital shear smears it out. Whenever a
+        streak grows dense enough, inelastic collisions cool its interior faster than shear
+        can rip it apart, and a bound moonlet snaps together. Once formed, each moonlet
+        clears material along its lane, scattering some grains and absorbing others.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Saturn's rings do this</span>
+        <span class="note-label">Aside · Self-gravity wakes in Saturn's rings</span>
         <p>
-          Planetary scientists call the late stage of this <em>oligarchic growth</em>, a
-          name from Eiichiro Kokubo and Shigeru Ida's 1998 simulations. Those followed up to
-          4,000 planetesimals, on special-purpose hardware from the same Tokyo project as
-          part one's GRAPE machines. The slider above goes to 150,000.
+          Planetary scientists refer to this late stage, where a few dominant bodies sweep
+          up smaller neighbors, as <em>oligarchic growth</em>, a term coined in Eiichiro
+          Kokubo and Shigeru Ida's 1998 simulations. Their runs tracked up to 4,000
+          planetesimals using dedicated gravity hardware from the same Tokyo GRAPE project
+          we met in part one. On a modern laptop GPU, the slider above handles 150,000.
         </p>
         <p>
-          Saturn's A ring runs a version of the experiment where we can watch. It's a sheet
-          of colliding ice particles whose self-gravity keeps trying to build clumps while
-          shear keeps tearing them apart. Cassini saw both outcomes: <em>self-gravity
-          wakes</em>, short-lived elongated clumps like the streaks above, and moonlets
-          about a hundred metres across that stay intact and stir up propeller-shaped
-          disturbances in the ring around them.
+          Saturn's A ring performs a live version of this tug-of-war right in our backyard.
+          Its ice particles keep trying to clump under self-gravity while orbital shear
+          keeps pulling the clumps apart. The Cassini spacecraft spotted both sides of the
+          balance: fleeting diagonal bands called <em>self-gravity wakes</em>, looking much
+          like the streaks above, alongside intact moonlets roughly a hundred meters across
+          that carve propeller-shaped wakes through the surrounding ring.
         </p>
       </aside>
       <p>
-        This leaves a lot out. Real planet formation is 3D. Real dust sits in gas, which
-        drains orbits through drag and, through the <em>streaming instability</em>, herds
-        grains into clumps. Real collisions can shatter grains as well as stick them. The
-        dust here is also much heavier relative to its star than in any real disk (in the
-        code's units the dust totals 0.12 and the star 0.066), which makes self-gravity far
-        stronger than it would be. The skeleton matches the research codes, though: a tree
-        for the far field, a sorted grid for the near field, and collisions that lose
-        energy. Each missing piece is one more force or one more sorted array.
+        Plenty of real astrophysics is missing here. Real protoplanetary disks are 3D and
+        filled with gas, which drags grains inward and herds them into clumps through the
+        <em>streaming instability</em>. High-speed impacts can also shatter bodies instead of
+        growing them. And to make clumping happen in seconds rather than millennia, the dust
+        ring here is wildly massive compared to its star (in simulation units, total dust
+        mass is 0.12 against a star of 0.066), cranking self-gravity way up. Even with those
+        shortcuts, the core engine has the same anatomy as research accretion codes: a tree
+        for the far field, a spatial hash for the near field, and dissipative contacts in
+        between.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>Structures compose.</strong> The pyramid and the hash grid never talk to
-          each other. Each answers one question, "what does everything far away add up to?"
-          or "what am I touching?", and the force kernel asks both.
-        </li>
-        <li>
-          <strong>Dissipation is what lets things settle.</strong> Gravity conserves
-          energy, so a cloud with nothing else can clump but can't become solid. One damping
-          term in the contact force is enough to turn clouds into planetesimals and rings
-          into moonlets.
-        </li>
-        <li>
-          <strong>Change the data so the structures can't disagree.</strong> The sort
-          reorders particles, and gravity used to look masses up by index. Making every
-          grain identical removed the problem instead of managing it, the same kind of move
-          as part one's pointer-free tree.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>How two structures stay out of each other's way</h2>
       <p>
-        Things I'd try next: a third coordinate, which both structures take the same way
-        part two's octree did, to turn the ring into a 3D disk; letting colliding grains
-        merge, which needs particles to disappear and masses to vary, so stream compaction
-        and a key–value radix sort (both built on scans); gas drag, which is one more force;
-        and longer timesteps or multirate integration, since real accretion takes an
-        enormous number of orbits and this page squeezes it into seconds.
+        What surprised me most while building this page is how little the two halves had to
+        know about each other. The gravity pyramid and the spatial hash never share a cell
+        size, never share an indexing scheme, and never even communicate; one answers "what
+        does everything far away add up to?" while the other answers "what is pressing
+        against me right now?", and the force kernel simply sums the two vectors. Getting
+        them to coexist cleanly came down to removing a conflict in the data itself: giving
+        every grain the same mass made the sort's shuffling invisible to gravity, deleting an
+        entire bookkeeping pass in the process. And on the physics side, all the machinery
+        only produced solid clumps once a single damping line let collisions shed energy.
+      </p>
+      <p>
+        There are plenty of obvious next steps if you wanted to push this closer to a real
+        planetary disk. Both the pyramid and the spatial hash generalize straight to 3D,
+        just as part two turned the quadtree into an octree. Allowing grains to actually
+        merge into heavier bodies would bring varying masses back, which means tracking a
+        mass field through a key–value radix sort and compacting merged particles out of the
+        buffer (both built on the prefix scan from part three). Adding gas drag is one extra
+        force term, and real accretion over thousands of orbits calls for longer or multirate
+        timesteps instead of squeezing millions of years into ten seconds.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/particle-worlds/part5.html">Part five, Gravity in Frequency Space</a>.</strong>
-        Gravity solved with an FFT, Poisson's equation reduced to one division per wave,
-        and a cosmic web grown from small ripples.
+        Solving gravity with a GPU FFT, turning Poisson's equation into elementwise division,
+        and growing a cosmic web out of faint ripples.
       </p>
     </main>
 

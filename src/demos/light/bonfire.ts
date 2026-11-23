@@ -335,11 +335,13 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
       onInput: (v) => (bounce = v),
     });
   }
+  const formatTimeOfDay = (v: number): string =>
+    v < 0.25 ? "night" : v < 0.45 ? "twilight" : v < 0.62 ? "dusk" : v < 0.85 ? "morning" : "day";
   if (opts.mode === "dusk") {
     shell.slider({
       label: "time of day",
       min: 0, max: 1, step: 0.01, value: timeOfDay,
-      format: (v) => (v < 0.25 ? "night" : v < 0.45 ? "late dusk" : v < 0.62 ? "dusk" : v < 0.85 ? "morning" : "day"),
+      format: formatTimeOfDay,
       onInput: (v) => (timeOfDay = v),
     });
   }
@@ -363,6 +365,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     shell.slider({
       label: "time of day",
       min: 0, max: 1, step: 0.01, value: timeOfDay,
+      format: formatTimeOfDay,
       onInput: (v) => (timeOfDay = v),
     });
     shell.button("view: final", function () {
@@ -404,7 +407,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
     f.set([emit2[0], emit2[1], emit2On, glow], 20);
     f.set([rc.fluence.probes[0], rc.fluence.probes[1], modeNum, 1], 24); // emitBoost 1: rays see raw emission
     // the backdrop the display draws behind the air (fire scene): the sky's
-    // colours, dimmed — the air glow and the stars sit on top of it
+    // colors, dimmed — the air glow and the stars sit on top of it
     const k = skyAt(timeOfDay);
     f.set([...k.zenith.map((c) => c * 0.55), 0], 28);
     f.set([...k.horizon.map((c) => c * 0.55), 0], 32);
@@ -444,7 +447,7 @@ export async function mountBonfire(container: HTMLElement, opts: BonfireOptions)
 
       // the bounce room's lamp wanders when nobody is holding it
       if (modeNum === 2 && (lastPointer === 0 || now - lastPointer > 2500)) {
-        // wide enough to visit both coloured walls
+        // wide enough to visit both colored walls
         const ex = 1 / viewScale[0] - 0.42;
         stir = [ex * Math.sin(time * 0.33 + 4.2), 0.5 * Math.sin(time * 0.21 + 4.0)];
         stirVel = [0, 0];

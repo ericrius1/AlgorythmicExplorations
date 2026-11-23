@@ -162,8 +162,22 @@ export function mountCommaLab(container: HTMLElement): Demo {
     },
   });
 
+  const primaryHits = (hs: Hit[]): Hit[] => {
+    const seen = new Set<string>();
+    const first: Hit[] = [];
+    const rest: Hit[] = [];
+    for (const h of hs) {
+      const key = `${h.a}-${h.b}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        first.push(h);
+      } else rest.push(h);
+    }
+    return [...first, ...rest];
+  };
+
   shell.setInfo(() => {
-    const hs = hits().filter((h) => h.i + h.j <= 12);
+    const hs = primaryHits(hits().filter((h) => h.i + h.j <= 12));
     if (!hs.length) return "no harmonics close enough to beat";
     const main = hs.slice(0, 3).map((h) => {
       const n = noteNames();
@@ -230,7 +244,7 @@ export function mountCommaLab(container: HTMLElement): Demo {
       // ---- harmonic ladders ----
       const padL = narrow ? 34 : 64;
       const padR = 18;
-      const top = 34;
+      const top = 38;
       const ladderH = h * (narrow ? 0.5 : 0.56);
       const fMin = rootHz() * 0.88;
       const fMax = rootHz() * 8.6;
@@ -249,7 +263,14 @@ export function mountCommaLab(container: HTMLElement): Demo {
         ctx.moveTo(x, top - 8);
         ctx.lineTo(x, ladderH + 4);
         ctx.stroke();
-        text(ctx, `${Math.round(hz)} Hz`, x + 3, top - 12, { size: 9.5, color: COL.dim, mono: true, alpha: 0.7 });
+        const flipRight = o === 3 || x + 52 > w - 6;
+        text(ctx, `${Math.round(hz)} Hz`, flipRight ? x - 4 : x + 3, top - 14, {
+          size: 9.5,
+          color: COL.dim,
+          align: flipRight ? "right" : "left",
+          mono: true,
+          alpha: 0.7,
+        });
       }
 
       for (let r = 0; r < rows; r++) {
@@ -276,13 +297,16 @@ export function mountCommaLab(container: HTMLElement): Demo {
           ctx.lineTo(x, y + hh);
           ctx.stroke();
           glow(ctx, x, y, hh * 1.6, col, 0.18);
-          if (rowH > 34 || k <= 3)
-            text(ctx, String(k), x, y + hh + 11, { size: 9, color: rgba(col, 0.7), align: "center", mono: true });
+          if (rowH > 34 || k <= 3) {
+            const numY = r === 0 ? y - hh - 5 : y + hh + 11;
+            text(ctx, String(k), x, numY, { size: 9, color: rgba(col, 0.7), align: "center", mono: true });
+          }
         }
       }
 
       // collisions: connectors and beat lamps
       lamps = [];
+      const labeledPairs = new Set<string>();
       for (const hit of hs) {
         if (hit.fa > fMax || hit.fb > fMax) continue;
         const xa = X(hit.fa);
@@ -304,9 +328,18 @@ export function mountCommaLab(container: HTMLElement): Demo {
         const pulse = locked ? 1 : 0.72 + 0.28 * Math.cos(2 * Math.PI * hit.rate * t);
         dot(ctx, mx, my, 3.2, col, pulse, 4.5);
         lamps.push({ x: mx, y: my, hit });
-        if (hit.i + hit.j <= 9 || rows === 2) {
+        const pairKey = `${hit.a}-${hit.b}`;
+        const isFirstForPair = !labeledPairs.has(pairKey);
+        const isPinned = pinned && pinned.a === hit.a && pinned.b === hit.b && pinned.i === hit.i && pinned.j === hit.j;
+        if (isFirstForPair || isPinned || (rows === 2 && hit.i + hit.j <= 9)) {
+          labeledPairs.add(pairKey);
           const s = locked ? "0" : hit.rate.toFixed(hit.rate < 2 ? 2 : 1);
-          label(ctx, `${s}/s`, mx, my - 13, { size: 9.5, mono: true, color: rgba(mixRgb(col, [255, 255, 255], 0.4), 1) });
+          const pillColor = rgba(mixRgb(col, [255, 255, 255], 0.4), 1);
+          if (mx > w - 62) {
+            label(ctx, `${s}/s`, mx - 12, my, { size: 9.5, mono: true, align: "right", color: pillColor });
+          } else {
+            label(ctx, `${s}/s`, mx, my - 13, { size: 9.5, mono: true, color: pillColor });
+          }
         }
       }
 
@@ -362,7 +395,7 @@ export function mountCommaLab(container: HTMLElement): Demo {
           : `${names[main.a]}×${main.i} vs ${names[main.b]}×${main.j}: ${main.rate.toFixed(main.rate < 2 ? 2 : 1)} swells per second`;
         text(ctx, desc, ex0, ey0 - 8, { size: 10.5, color: rgba(mixRgb(col, [255, 255, 255], 0.35), 1), mono: true });
         text(ctx, "one second →", ex1, ey1 + 14, { size: 9.5, color: COL.dim, align: "right" });
-        text(ctx, "click a lamp to show a different pair", ex0, ey1 + 14, { size: 9.5, color: COL.dim });
+        text(ctx, "click a glowing dot to inspect that pair", ex0, ey1 + 14, { size: 9.5, color: COL.dim });
       }
     },
     dispose() {

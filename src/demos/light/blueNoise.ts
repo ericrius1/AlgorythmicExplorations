@@ -3,7 +3,7 @@
 //
 // The path tracers use it to rotate their sample sequences per pixel
 // (Cranley–Patterson rotation). Each pixel still averages correctly, but
-// neighbouring pixels get very different samples, so the leftover error looks
+// neighboring pixels get very different samples, so the leftover error looks
 // like fine, even grain instead of blotches.
 
 const N = 64;

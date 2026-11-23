@@ -10,7 +10,7 @@
     <title>How Neurons Signal — Spark &amp; Signal</title>
     <meta
       name="description"
-      content="A neuron built from the ions up, simulated live on the GPU: hundreds of thousands of ions setting the resting potential, stochastic channels firing a spike, a myelinated axon racing a bare one, glutamate crossing a synapse, and twenty thousand neurons wired into a patch of cortex."
+      content="Building a neuron from the ions up on the GPU: resting voltage from random-walking salt ions, stochastic Hodgkin–Huxley spikes, myelinated vs. bare axons, glutamate crossing a synapse, and twenty thousand neurons wired into a patch of cortex."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,479 +31,499 @@
         <p class="hero-kicker">Spark &amp; Signal · Part 1</p>
         <h1>How Neurons Signal</h1>
         <p class="subtitle">
-          From a single ion to twenty thousand neurons, simulated live. The cell above is
-          listening to its inputs and firing on your GPU right now.
+          From salty water on both sides of a thin membrane up to twenty thousand cells firing together,
+          all running live on your GPU.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        The neuron at the top of this page is a simulation, not an animation. Its shape is
-        split into about six hundred short segments, and each segment is a patch of
-        membrane running the Hodgkin–Huxley equations: a voltage, a few channels opening
-        and closing, current leaking to its neighbours. Synaptic input rains onto the
-        little spines on its branches. Usually that input just makes the branches flicker.
-        Every so often enough of it lines up, the cell fires, and the simulation clock drops
-        to about 1/2,500 of real time so you can watch the spike leave.
+        Watch the neuron overhead for a few seconds and you'll catch it catching fire. Most of the time,
+        tiny synaptic inputs patter onto the spines along its branches and die out as faint purple
+        ripples. Then, every few seconds, enough inputs land close enough in time to push the cell over
+        the edge. The simulation automatically drops into bullet time (about 1/2,500 of real speed) so
+        you can actually watch the spike ignite at the base of the axon and tear down its length.
       </p>
       <p>
-        Everything you can see is made of particles, up to about 900,000 depending on your
-        screen. The membrane glows with its own voltage. Bright streaks inside the branches
-        are current flowing along them. The amber sparks are sodium ions pouring in and the
-        cyan ones are potassium pouring out, drawn wherever the model's channels are open.
+        Nothing up there is keyframed. The cell is divided into roughly six hundred short cylindrical
+        compartments, each running the Hodgkin–Huxley equations, trading electrical current with its
+        neighbors on every tick. Everything visible is drawn out of particles (up to about 900,000
+        depending on your display). The membrane itself shifts color with local voltage, bright streaks
+        inside the branches trace axial current, amber sparks mark sodium rushing inward, and cyan
+        sparks mark potassium pouring back out wherever ion channels open.
       </p>
       <p>
-        This article takes that cell apart and builds it back up, one layer of physics at a
-        time: where the voltage comes from, how a spike happens, how it travels, how it
-        crosses to the next cell, and what twenty thousand of them do once they're wired
-        together. Each step has a live simulation you can poke at.
+        What I want to do here is pull that whole cell apart into its working pieces and put it back
+        together from the bottom up: how a bag of salt water holds a voltage in the first place, how
+        voltage-sensitive pores turn that stored charge into an all-or-nothing pulse, how myelin lets
+        that pulse outrun a bare wire, how electricity turns into a puff of molecules at a synapse, and
+        what happens when you wire twenty thousand of these things together into a miniature slab of
+        cortex.
       </p>
       <aside class="note">
-        <span class="note-label">Colour key · used in every figure</span>
+        <span class="note-label">Color key · shared across every figure</span>
         <p>
-          <strong>Indigo</strong> is membrane at rest, brightening through
-          <strong>violet</strong> as it depolarizes and running <strong>orange to white</strong>
+          <strong>Indigo</strong> marks membrane sitting at rest, shifting through
+          <strong>violet</strong> as it depolarizes and flaring <strong>orange to white</strong>
           during a spike. <strong>Amber</strong> is Na⁺, <strong>cyan</strong> is K⁺,
-          <strong>green</strong> is glutamate (the main excitatory transmitter) and
+          <strong>green</strong> is glutamate (the main excitatory transmitter), and
           <strong>magenta</strong> is GABA (the main inhibitory one).
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="anatomy"><span class="kicker">Prologue · The parts</span>One cell, end to end</h2>
+      <h2 id="anatomy"><span class="kicker">Prologue · Anatomy</span>Four jobs along one cell</h2>
       <p>
-        A neuron is a signalling pipeline with four stages, and they line up along its
-        shape. The <strong>dendrites</strong> collect input: thousands of synapses, most of
-        them on spines, each nudging the local voltage up or down by a fraction of a
-        millivolt. Those nudges spread toward the <strong>soma</strong>, the cell body, and
-        fade as they go. At the start of the axon sits a short stretch packed with sodium
-        channels, the <strong>initial segment</strong>. This is where the cell decides. If
-        the summed input pushes it past threshold, it fires an all-or-none spike, and the
-        <strong>axon</strong> carries that spike, unchanged, to the <strong>terminals</strong>,
-        where it becomes a chemical message to the next cell.
+        Before zooming down to individual ions, it helps to see the whole layout at once, because a
+        neuron's geometry maps almost directly onto how a signal moves through it. The
+        <strong>dendrites</strong> are the listening antenna: thousands of synapses sit along their
+        branches (mostly on tiny mushroom-shaped spines), each nudging the local voltage up or down by
+        a fraction of a millivolt. Those small bumps spread passively toward the <strong>soma</strong>
+        (the cell body) and weaken as they go. Right where the axon leaves the soma sits a short,
+        densely packed strip of sodium channels called the <strong>initial segment</strong>. If the
+        combined signals arriving there cross threshold, the cell fires a full-sized spike, and the
+        <strong>axon</strong> carries it all the way to the <strong>axon terminals</strong> without
+        losing strength, where it gets handed off chemically to the next cell.
       </p>
 
-      <div data-demo="anatomy" data-title="A living neuron" data-hint="Drag to turn · click a branch"></div>
+      <div data-demo="anatomy" data-title="A living neuron" data-hint="Drag to orbit · click a branch"></div>
 
       <p>
-        Things to try. Click a branch near the tip of the apical tuft, then one close to the
-        soma. The scope shows the soma's voltage, and the distant input arrives there
-        smaller and later, because charge leaks out through the membrane of a thin branch
-        as it travels down it.
-        Click the axon and the spike starts right there and runs both ways at once, back
-        into the cell body and out toward the terminals. Turn the synaptic input down to 2
-        and the cell goes quiet. Turn it up to 10 and it fires again and again.
+        Try poking different parts of the tree while keeping an eye on the soma voltage trace in the
+        bottom right. Clicking out near the tip of the apical tuft sends a whisper down the long trunk
+        that arrives at the soma smaller and later than a click right next to the cell body, because
+        current leaks out across the membrane along the way. Clicking straight on the axon triggers a
+        spike on the spot, and because axons conduct equally well in either direction when freshly
+        rested, you'll see it race both forward toward the terminals and backward into the soma. You can
+        also pull the synaptic input slider down near 2 to quiet the background chatter, or push it up to
+        10 and watch the cell fire steadily on its own.
       </p>
       <p>
-        The magenta flashes on the soma are inhibitory synapses. They tend to cluster on
-        or near the cell body, which gives them the last word: an inhibitory input there
-        can cancel excitation from anywhere in the tree.
+        If you spot occasional magenta flashes right on the soma, those are inhibitory synapses. Real
+        neurons tend to pack inhibitory inputs close to the cell body and initial segment for a very
+        practical reason: sitting right next to the trigger gives them veto power over excitation coming
+        in from anywhere out in the dendritic tree.
       </p>
       <details class="fold">
-        <summary>How the model is built</summary>
+        <summary>How the branching model is built and solved</summary>
         <div class="fold-body">
           <p>
-            The shape is grown procedurally: a persistent random walk for each branch, a
-            tapering apical trunk with oblique side branches, a tuft that forks three
-            times, a skirt of basal dendrites, and an axon that alternates myelin with
-            nodes before splitting into a terminal arbor. Each segment's membrane gets the
-            channels its job calls for. Dendrites are mostly passive. The initial segment
-            and the nodes of Ranvier carry many times the sodium channel density of the
-            soma.
+            The tree is generated procedurally from persistent random walks: a tapering apical trunk
+            with oblique side branches, a top tuft that forks three times, a skirt of basal dendrites
+            around the soma, and a myelinated axon alternating wrapped internodes with bare nodes of
+            Ranvier before branching into terminals. Different regions get different channel densities:
+            dendrites are mostly passive cable, while the initial segment and nodes of Ranvier are
+            crammed with many times the sodium channel density of the soma.
           </p>
           <p>
-            Each time step solves the whole tree at once using an implicit (backward
-            Euler) method, which stays stable no matter how tightly the segments are
-            coupled. Michael Hines noticed in 1984 that if every segment's parent is
-            numbered before it, that solve takes one sweep from the leaves to the root and
-            one sweep back. It costs about as much as visiting every segment twice, and
-            it's still how the NEURON simulator works today.
+            On every time step, the whole tree is solved simultaneously with an implicit backward Euler
+            step so tight electrical coupling between tiny neighboring compartments never blows up.
+            Michael Hines worked out in 1984 that if you number every parent compartment ahead of its
+            children, solving the resulting branched linear system takes just two linear passes: one
+            sweep inward from the branch tips to the root, and one sweep back out. It scales linearly
+            with the number of compartments and is still the backbone of the NEURON simulator today.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="battery"><span class="kicker">Step 1 · The battery</span>Where −70 mV comes from</h2>
+      <h2 id="battery"><span class="kicker">Step 1 · Resting potential</span>Where −70 mV comes from</h2>
       <p>
-        A neuron sits at about 70 millivolts negative inside, relative to the fluid
-        around it. That voltage is stored energy, and every signal in the nervous system is
-        a controlled release of it. It comes from two facts about the salt water on either
-        side of the membrane.
+        Even when a neuron is doing absolutely nothing, its interior sits around 70 millivolts negative
+        compared to the fluid outside. That voltage is the battery that powers everything else in the
+        nervous system, and you don't need any exotic biology to explain where it comes from: just two
+        facts about the salt water on either side of the cell membrane.
       </p>
-      <pre><code><span class="cm">// typical mammalian neuron, mM</span>
+      <pre><code><span class="cm">// typical mammalian neuron concentrations, mM</span>
            inside   outside
 K⁺          140        5
 Na⁺          12      145
 Cl⁻          10      110
 A⁻ (proteins, can't cross)  ~140 inside</code></pre>
       <p>
-        First, the concentrations are lopsided: potassium is concentrated inside the cell
-        and sodium outside it. Second, the membrane at rest is leaky to potassium and
-        almost sealed to everything else. Potassium channels let K⁺ through about a
-        thousand times more easily than Na⁺.
+        First, the salt concentrations are deliberately skewed: potassium (K⁺) is crowded inside the
+        cell, while sodium (Na⁺) is crowded outside. Second, at rest the membrane is fairly leaky to
+        potassium and nearly watertight to everything else. Potassium leak channels let K⁺ slip across
+        roughly a thousand times more readily than Na⁺.
       </p>
       <p>
-        So potassium wanders out, down its concentration gradient. Each K⁺ that leaves takes
-        a positive charge with it and leaves an unpaired negative charge (mostly the big
-        protein anions, which can't follow) behind. The inside goes negative, and that
-        negative voltage starts pulling potassium back in. The voltage keeps falling until
-        the pull of the voltage exactly balances the push of the gradient. For potassium,
-        that balance point is the <strong>Nernst potential</strong>:
+        Left alone, potassium ions simply wander down their concentration gradient and out of the cell.
+        Every K⁺ that escapes carries a positive charge out with it, leaving an unmatched negative
+        charge (mostly large protein molecules that are far too big to slip through the membrane)
+        trapped inside. As negative charge builds up on the inner face of the membrane, it starts
+        pulling positively charged potassium ions back in. Eventually the inward electrical pull
+        balances the outward crowd pressure, and net flow stops. For potassium alone, that equilibrium
+        is given by the <strong>Nernst potential</strong>:
       </p>
       <pre><code>E = (kT / ze) · ln(c_outside / c_inside)
 E_K  = 26.7 mV · ln(5 / 140)   ≈ −89 mV     <span class="cm">// at 37 °C</span>
 E_Na = 26.7 mV · ln(145 / 12)  ≈ +66 mV</code></pre>
       <p>
-        The figure below runs this from scratch. It has 240,000 ions, each one a GPU
-        particle doing its own random walk, on either side of a patch of membrane. The only
-        way across is through a channel of the right kind. When an ion tries to cross, the
-        simulation applies Boltzmann's rule: downhill against the voltage it always goes,
-        uphill it goes with probability e<sup>−zeV/kT</sup>. The membrane potential is never
-        set anywhere. It's the net charge that has crossed, divided by the membrane's
-        capacitance, recounted every step.
+        Below, 240,000 simulated ions run that experiment from scratch on the GPU. Each particle does an
+        independent random walk on its side of the membrane and can only cross when it bumps into a
+        channel of its own kind. Whenever an ion attempts to pass through, the shader flips a weighted
+        coin using Boltzmann's rule: moving downhill with the electric field always succeeds, while
+        climbing uphill succeeds with probability e<sup>−zeV/kT</sup>. Nothing in the code hardcodes
+        −70 mV. The voltage is literally recounted every frame by tallying the net charge that has
+        crossed the membrane and dividing by its capacitance.
       </p>
 
       <div data-demo="ions-rest" data-title="Where −70 mV comes from" data-hint="Drag the channel sliders"></div>
 
       <p>
-        Press <strong>reset</strong> and watch it start from 0 mV. Potassium flares cyan as
-        it streams out through the cyan channels, the voltage drops fast, and within a
-        second or two it levels off around −75 mV, give or take the noise. It doesn't reach E<sub>K</sub> because a
-        few sodium leak channels (the amber rings) let Na⁺ trickle in and pull the voltage
-        back up. The resting potential is a tug of war between the two, weighted by how
-        many channels each ion has.
+        Hit <strong>reset</strong> to zero the voltage and watch the battery charge itself from scratch.
+        A burst of cyan potassium ions streams outward through the open cyan pores, the voltage plunges,
+        and within a second or two it settles around −75 mV (bouncing slightly with random crossings).
+        Notice it stops shy of E<sub>K</sub> (−89 mV) because a handful of amber sodium leak channels
+        let a trickle of Na⁺ sneak inward, tugging the voltage back upward. Where the cell comes to rest
+        is simply a tug-of-war between those two gradients, weighted by how many pores each ion gets.
       </p>
       <p>
-        Now look at the concentration readout. While the voltage falls by 70 mV, the
-        potassium inside barely changes. It takes about 150 ions, out of more than fifty
-        thousand, to charge the membrane. In a real cell the fraction is smaller still,
-        roughly a few ions in every hundred thousand. The membrane is a very thin capacitor,
-        and charging it to −70 mV doesn't use up the battery.
+        Keep an eye on the concentration numbers at top left while you reset. Even as the voltage swings
+        by more than 70 mV, the internal potassium concentration barely twitches. Charging this whole
+        patch takes only about 150 ions out of more than fifty thousand; in a real cell the proportion
+        is tinier still, on the order of a few ions per hundred thousand. Because a lipid membrane is so
+        thin, it takes almost no ions at all to build a hefty voltage across it, which means charging
+        the membrane barely dents the salt reserves.
       </p>
       <p>
-        Things to try. Drag the K⁺ leak channels to zero and the cell drifts up toward
-        E<sub>Na</sub>. Raise the Na⁺ leak and the resting potential creeps toward zero.
-        Turn the pump off and nothing happens at first, but the concentration readout starts
-        to drift: sodium builds up inside, potassium drains out, and the voltage slowly
-        rises. Push the ion count up to a million and the voltage trace gets steadier,
-        because each individual crossing moves it less.
+        You can bend the tug-of-war in either direction with the sliders. Closing all the K⁺ leak
+        channels lets sodium win and pulls the voltage upward toward E<sub>Na</sub>; cranking Na⁺ leak
+        channels up drags rest toward zero. If you switch the pump off, nothing dramatic happens right
+        away, yet over time the concentrations start to bleed together: sodium creeps up inside,
+        potassium drains away, and the resting voltage slowly collapses. And if you turn the ion count
+        up toward a million, the jittery trace smooths right out because any single ion crossing counts
+        for a smaller slice of the voltage.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · The pump</span>
+        <span class="note-label">Aside · Why your brain burns so many calories</span>
         <p>
-          The violet rings are Na⁺/K⁺ pumps. Each cycle spends one ATP to carry three Na⁺
-          out and two K⁺ in, against both gradients. Leaks never stop, so the pumps never
-          stop either. By some estimates they account for about half of the brain's energy
-          use. Because each cycle moves one net positive charge out, the pump also makes the
-          inside a few millivolts more negative on its own.
+          Those violet rings embedded in the membrane are Na⁺/K⁺ pumps. Every cycle burns one molecule
+          of ATP to haul three Na⁺ ions back out and two K⁺ ions back in, pushing both uphill against
+          their gradients. Because the leak channels never fully close, the pumps run nonstop for your
+          entire life, by some estimates accounting for roughly half of the brain's total energy budget.
+          And because each cycle ships one net positive charge outward, the pump directly contributes a
+          few extra negative millivolts to the resting potential on its own.
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: how many ions is −70 mV?</summary>
+        <summary>Deep dive: how few ions does it take to make −70 mV?</summary>
         <div class="fold-body">
           <p>
-            A cell membrane is two layers of lipid about 5 nm thick: an insulator between
-            two salt solutions, so a capacitor, at about 1 µF per cm². Charging it to 70 mV
-            takes Q = CV ≈ 7 × 10⁻⁸ coulombs per cm², which is about 4,400 ions on every
-            square micrometre. A square micrometre of cytoplasm one micrometre deep holds
-            about 80 million potassium ions.
+            A cell membrane is a double layer of lipid molecules roughly 5 nanometers thick, an
+            insulator sandwiched between two salty conductors, giving it a capacitance of about
+            1 µF/cm². Charging that capacitor to 70 mV requires Q = CV ≈ 7 × 10⁻⁸ coulombs per square
+            centimeter, which works out to around 4,400 excess ions per square micrometer. Meanwhile, a
+            cubic micrometer of cytoplasm just underneath holds roughly 80 million potassium ions.
           </p>
           <p>
-            In the figure, the membrane's capacitance is the one constant that turns "net
-            charge that crossed" into millivolts. A real patch this size would hold
-            millions of times more ions, so relative to the ions it has, the figure's
-            capacitance is huge, and each crossing moves the voltage by about half a
-            millivolt. That's why you can watch individual ions change it, and why the
-            trace is noisy. A real membrane averages over billions of ions and looks
-            smooth.
+            In the simulation above, capacitance is the single scaling constant converting "net ions
+            crossed" into millivolts. Since a GPU buffer can hold hundreds of thousands of particles
+            rather than trillions, each crossing here nudges the voltage by roughly half a millivolt, big
+            enough to watch single-ion noise in action, whereas a real membrane averages over billions
+            of ions and looks glass-smooth.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="spike"><span class="kicker">Step 2 · The spike</span>Opening the floodgates</h2>
+      <h2 id="spike"><span class="kicker">Step 2 · Action potential</span>Opening the floodgates</h2>
       <p>
-        The resting potential is a stored state. The action potential is the release:
-        about a millisecond in which the membrane briefly lets sodium flood in and then lets
-        potassium rush out. It needs two new kinds of channel, both <em>voltage-gated</em>:
-        they open and close depending on the voltage across them.
+        Once you have a charged membrane sitting at −70 mV, firing an <strong>action potential</strong>
+        means pulling off a controlled one-millisecond short circuit: briefly throwing open the doors to sodium
+        so the voltage rockets positive, then slamming them shut and opening potassium to yank it right
+        back down. Doing that automatically requires two kinds of <em>voltage-gated</em> ion channels
+        whose probability of opening depends on the voltage across them.
       </p>
       <p>
-        Hodgkin and Huxley worked out how these channels behave in 1952, more than twenty
-        years before anyone could record a single one. Their model gives each channel a few independent
-        "gates". Each gate flips open or shut at random, at rates that depend on voltage. A
-        sodium channel has three fast <em>m</em> gates, which open when the membrane
-        depolarizes, and one slow <em>h</em> gate, which <em>closes</em> when it depolarizes.
-        It conducts only while all four are open. A potassium channel has four slow
-        <em>n</em> gates. That small difference in timing is the whole trick.
+        In 1952 (more than twenty years before patch-clamp recordings let anyone observe a single channel
+        molecule), Alan Hodgkin and Andrew Huxley deduced the kinetics of these pores from squid giant
+        axons. In their picture, each channel is guarded by a handful of independent molecular gates
+        that snap open or closed randomly at voltage-dependent rates. A sodium channel has three fast
+        <em>m</em> gates that open when the cell depolarizes, plus one slower <em>h</em> gate that
+        <em>closes</em> when it depolarizes; sodium can only pass when all four are open at once. A
+        potassium channel is simpler, with four slow <em>n</em> gates that open on depolarization. That
+        mismatch in gate speed is what creates the entire spike waveform.
       </p>
 
       <div data-demo="ions-spike" data-title="A spike, one ion at a time" data-hint="Press stimulate"></div>
 
       <p>
-        This is the same patch of membrane with voltage-gated channels added: 1,600 sodium
-        channels and 480 potassium channels, in clusters of eight, each with its own coin-
-        flipping gates. Press <strong>stimulate</strong>. The electrode (the glass needle)
-        pushes the voltage up by about 20 mV. That's enough for a few sodium channels' m
-        gates to all land open. Na⁺ floods in through them, which depolarizes the membrane
-        further, which opens more m gates. That loop is the spike. The voltage shoots past
-        zero toward E<sub>Na</sub>, peaking around +50 mV.
+        This figure takes the same patch of membrane and adds 1,600 voltage-gated sodium channels and
+        480 potassium channels (organized in clusters of eight, which is why the sliders show 200 and
+        60 clusters), each flipping its own stochastic gates every step. Press
+        <strong>stimulate</strong> to inject a quick pulse of positive charge through the glass
+        electrode. Raising the voltage by about 20 mV is enough for a few sodium channels to catch all
+        three of their fast <em>m</em> gates open simultaneously. Na⁺ rushes inward, driving the
+        voltage higher still, which flips open even more <em>m</em> gates in an explosive positive
+        feedback loop. The membrane shoots past 0 mV toward E<sub>Na</sub>, peaking near +50 mV.
       </p>
       <p>
-        Two slower things end it. The h gates close and lock the sodium channels shut, and
-        the n gates open the potassium channels. K⁺ pours out (watch the cyan flares
-        replace the amber ones) and drags the voltage back down, past rest, into a brief
-        undershoot. The whole thing plays in slow motion here, at about a
-        thousandth of real speed.
+        Almost immediately, the slower gates catch up and shut the party down. The sodium <em>h</em>
+        gates swing closed, blocking further Na⁺ entry even while the voltage is still high, and the
+        potassium <em>n</em> gates swing open. Cyan flares of K⁺ take over from the amber sodium rush,
+        pulling the voltage rapidly back down past rest into a brief undershoot before the gates relax.
+        Everything plays roughly a thousand times slower than real life so you can follow the two waves
+        swapping places.
       </p>
       <pre><code>threshold         ≈ 15 mV above rest
-peak              ≈ +40 to +50 mV       <span class="cm">// heading for E_Na, never reaching it</span>
-undershoot        ≈ −90 mV              <span class="cm">// heading for E_K</span>
+peak              ≈ +40 to +50 mV       <span class="cm">// chasing E_Na, cut short by h gates</span>
+undershoot        ≈ −90 mV              <span class="cm">// chasing E_K</span>
 duration          ≈ 1 ms
-refractory period ≈ 1–2 ms              <span class="cm">// while the h gates recover</span></code></pre>
+refractory period ≈ 1–2 ms              <span class="cm">// until h gates reset</span></code></pre>
       <p>
-        Things to try. Lower the stimulus until nothing happens. Below threshold the kick
-        just decays away. Above it you get a full spike every time, the same height no
-        matter how far above. That's what <strong>all-or-none</strong> means, and it's why
-        a spike can be treated as a bit. Press stimulate twice in quick succession: the
-        second press does nothing while the h gates are still closed. Set the sodium
-        channels to zero and the cell can't fire at all. Set the potassium channels to zero
-        and it still fires, but it can only recover slowly, through the leak.
+        Play with the sliders to test the edge cases. Dial the stimulus down below threshold and the
+        small bump simply fizzles back to rest; nudge it just above threshold and you get the exact same
+        full-height spike whether the kick was barely enough or twice as big. That
+        <strong>all-or-none</strong> behavior is why neuroscientists can treat spikes almost like clean
+        digital pulses. Try hitting <strong>stimulate</strong> twice quickly: while the <em>h</em> gates
+        are still locked shut during the refractory period, the second kick can't trigger another spike.
+        You can also see each channel's job directly by zeroing it out. Drop the Na⁺ channels to zero and
+        the patch goes completely mute; drop the K⁺ channels to zero and it still spikes, then creeps
+        painfully slowly back down through the ordinary leak channels.
       </p>
       <details class="fold">
-        <summary>What's exact and what's a shortcut</summary>
+        <summary>What's emergent here, and where I took a shortcut</summary>
         <div class="fold-body">
           <p>
-            The resting figure is fully emergent: every crossing is a particle passing a
-            Boltzmann test. With voltage-gated channels, a second constraint shows up.
-            Ions in this box diffuse far more slowly, relative to the channels, than real
-            ions do, and channels starve. So here each open channel issues "tickets" at the
-            rate Hodgkin and Huxley's current law gives, I = γ(V − E), and nearby ions of
-            the right kind claim them and cross. The current has the right size and
-            direction at every voltage. The ions carrying it are real particles, taken from
-            right next to that channel. The voltage is still nothing but counted charge.
+            In the resting-potential figure, every ion crossing comes purely from Brownian particles
+            bumping into pores and passing a Boltzmann coin flip. Once you add thousands of
+            voltage-gated channels, a scaling issue pops up: ions in a simulated box diffuse far more
+            slowly relative to channel throughput than real ions in warm water, so open channels starve
+            for particles right outside their mouths. To keep the current accurate, each open channel
+            here issues crossing "tickets" at Hodgkin and Huxley's exact rate I = γ(V − E), and nearby
+            particles of the right species claim them and cross. Real ions carry the current from the
+            spot right next to each channel, and the voltage is still strictly counted charge.
           </p>
           <p>
-            The gates run 3× faster than Hodgkin and Huxley's numbers, which were measured
-            in squid at 6 °C, and their voltage dependence is shifted to sit the same
-            distance above this patch's resting potential as it does above theirs. Each
-            spike here moves far more ions, relative to the box, than a real one would, so
-            the top and bottom walls stand in for the rest of the cell and the fluid around
-            it: an ion that reaches them may be swapped for whichever ion that side is
-            short of, the way a real cell's huge interior keeps its concentrations steady.
+            I also ran the gate kinetics 3× faster than Hodgkin and Huxley's raw constants (which were
+            measured in squid axons chilled to 6 °C) and shifted their threshold curves to match this
+            patch's resting potential. Finally, because firing a full spike in a tiny simulated box
+            would noticeably drain its salt supply, the top and bottom boundaries act like the huge
+            reservoir of a real cell and extracellular fluid, swapping ions that hit the walls back to
+            baseline concentrations.
           </p>
         </div>
       </details>
       <aside class="note">
-        <span class="note-label">Aside · Channel noise</span>
+        <span class="note-label">Aside · Noisy pores</span>
         <p>
-          With a few thousand channels flipping at random, the voltage trace never quite
-          sits still. Real neurons have this noise too. In very small cells and thin axons
-          a handful of channels opening by chance can fire a spike nobody asked for. More
-          channels average it out, which is one reason thin axons are expensive to make
-          reliable.
+          When only a few thousand protein channels are flipping randomly, thermal noise shows up right
+          on the voltage trace. Real cells deal with the same physics: in very small neurons or
+          razor-thin axons, a handful of sodium channels popping open by sheer chance can occasionally
+          kick off an unsolicited spike. Packing in more channels averages that noise down, which is one
+          reason biology hits a lower limit on how skinny a reliable wire can be.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="travel"><span class="kicker">Step 3 · The wire</span>How a spike travels</h2>
+      <h2 id="travel"><span class="kicker">Step 3 · Conduction</span>How a spike travels</h2>
       <p>
-        A spike at one spot on an axon doesn't stay put. The sodium pouring in at the
-        firing patch spreads along the inside of the axon as current (the bright streaks
-        in these figures) and charges the patch next door. When that patch reaches
-        threshold it fires too, and passes the current on. The spike rebuilds itself at
-        every step, which is how it can travel a metre without fading.
+        A spike firing at one spot on an axon immediately disturbs its neighbors. All that positively
+        charged sodium pouring into the active patch flows sideways down the salty core of the axon
+        (the bright streaks traveling inside the tube) and charges up the adjacent stretch of membrane.
+        As soon as that neighboring patch crosses threshold, its own sodium channels blow open and
+        amplify the pulse back to full height. Because the spike rebuilds itself fresh at every stop, it
+        can travel a full meter down your leg without getting any weaker.
       </p>
       <p>
-        It only goes forward because the membrane behind it is
-        <strong>refractory</strong>: its sodium channels are still inactivated. Fresh
-        membrane is ahead and spent membrane is behind.
+        Why doesn't the wave wash backward and bounce back and forth forever? Because the membrane it
+        just left behind is still <strong>refractory</strong>, with its sodium <em>h</em> gates locked
+        shut. Fresh, excitable membrane lies ahead while spent membrane trails behind, forcing the pulse
+        to move strictly forward.
       </p>
 
       <div data-demo="axon-race" data-title="The race" data-hint="Click an axon to fire it anywhere"></div>
 
       <p>
-        Both axons are the same thickness and get the same kick at the same moment. The top
-        one is bare membrane, so the spike has to regenerate patch by patch all the way
-        along. The bottom one is wrapped in <strong>myelin</strong>, layers of fatty
-        membrane that cut the capacitance and leak underneath by thirty to fifty times, with
-        bare <strong>nodes of Ranvier</strong> in the gaps. Current from a firing node
-        hardly charges or leaks out of the wrapped stretch, so it reaches the next node
-        almost immediately. The spike jumps from node to node. This is called
-        <em>saltatory</em> conduction, from the Latin for "to leap".
+        The race above puts two identical-diameter axons side by side and kicks them at the same
+        instant. The top fiber is bare membrane, so the action potential has to painstakingly recharge
+        and regenerate every tiny patch from start to finish. The bottom fiber is wrapped in
+        <strong>myelin</strong>, tightly wound sheaths of fatty glial membrane that slash both the
+        capacitance and the electrical leak underneath by a factor of thirty to fifty, interrupted every
+        so often by bare gaps called <strong>nodes of Ranvier</strong>. When one node fires, current
+        barely wastes time charging or leaking out of the insulated segment, so it zips almost
+        instantly to the next node and triggers it instead. Physiologists call this
+        <em>saltatory conduction</em>, from the Latin word for leaping.
       </p>
       <p>
-        Here the myelinated axon wins by about five to one. In a body the gap is bigger:
-        thin bare axons conduct at about 1 m/s, and large myelinated ones at up to 120
-        m/s. Myelin is why a vertebrate can be big and still react quickly. Multiple
-        sclerosis is the immune system stripping it off. Spikes slow, smear out in time, or
-        fail at the damaged stretches.
+        In this simulation the myelinated axon finishes roughly five times faster. In real animals the
+        advantage is even starker: thin unmyelinated fibers plod along near 1 m/s, while thick
+        myelinated motor axons hit up to 120 m/s, fast enough for a large vertebrate to catch itself
+        before hitting the ground. In multiple sclerosis, the immune system strips patches of that
+        insulation away, leaking current out of the exposed segments so signals slow down, jitter in
+        time, or stall out entirely.
       </p>
       <p>
-        Things to try. Click the middle of the bare axon: two spikes leave, one each way.
-        Click near both ends in quick succession and the two spikes run into each other in
-        the middle and both disappear, because each one runs into membrane the other has
-        just left refractory. Drag the slow-motion slider right to speed the race up.
+        You can click anywhere along either axon to inject a spike mid-flight. Click dead center on the
+        bare fiber and two waves split apart in opposite directions; then quickly click near both ends
+        and watch two oncoming spikes slam into each other and vanish completely, because each hits the dead
+        refractory wake of the other and has nowhere left to go. Slide <strong>slow motion</strong> to
+        the right if you want to speed the race up.
       </p>
       <details class="fold">
         <summary>Deep dive: the cable equation</summary>
         <div class="fold-body">
           <p>
-            Treat the axon as a leaky pipe. Current flows along the inside through the
-            cytoplasm's resistance and leaks out through the membrane. A voltage bump with
-            no channels to regenerate it spreads out and decays over a distance λ, the
-            <em>length constant</em>, which grows with the square root of the axon's
-            radius. It also takes time to charge each patch, set by the membrane time
+            Electrically, a bare axon behaves like a leaky garden hose. Current flows down the
+            interior against the cytoplasm's resistance and leaks outward across the membrane. Without
+            active channels, a local voltage bump spreads out and fades exponentially over a
+            characteristic <em>length constant</em> λ, which scales with the square root of the axon's
+            radius. Meanwhile, each patch takes time to charge up, governed by the membrane time
             constant τ = RC.
           </p>
           <p>
-            A bare axon's speed scales roughly as λ/τ, so it only grows with the square
-            root of thickness. The squid's way out was a giant axon half a millimetre
-            across. Myelin is the vertebrate solution: lowering C makes τ tiny under the
-            wrapping, so speed grows in proportion to thickness instead, and a nerve can
-            stay thin.
+            A bare axon's conduction speed goes roughly as λ/τ, meaning it improves only with the
+            square root of radius: to go 10× faster, a bare nerve has to be 100× thicker. Squid paid that
+            tax with a single giant escape axon half a millimeter wide. Vertebrates found a better deal
+            with myelin: slashing C shrinks τ across the wrapped stretches so conduction speed scales
+            linearly with diameter, letting thousands of fast fibers fit inside a nerve no thicker than
+            a thread.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="synapse"><span class="kicker">Step 4 · The gap</span>Across the synapse</h2>
+      <h2 id="synapse"><span class="kicker">Step 4 · Chemical handoff</span>Across the synapse</h2>
       <p>
-        Most neurons don't touch. At the end of the axon, the spike reaches a swelling
-        called a bouton, separated from the next cell by a cleft about 20 nanometres wide.
-        No current crosses that gap. The signal crosses as chemistry instead.
+        Most neurons never actually fuse together. At the far tip of an axon, the spike arrives at a
+        swollen terminal called a <strong>bouton</strong>, separated from the receiving cell by a
+        fluid-filled gap (the synaptic cleft) only about 20 nanometers wide. Electrical current can't
+        meaningfully jump that salty gap, so the nervous system switches mediums and sends a burst of
+        molecules instead.
       </p>
       <p>
-        When the spike depolarizes the bouton, voltage-gated <strong>calcium</strong>
-        channels at the active zone open, and Ca²⁺ rushes in (the pale yellow sparks).
-        Calcium is the trigger: it lets the <strong>vesicles</strong> docked at the
-        membrane fuse with it and dump their contents, a few thousand molecules of
-        glutamate each, into the cleft. Glutamate diffuses across in microseconds and
-        binds receptors on the other side. Each one that binds opens a channel, Na⁺ flows
-        into the next cell, and its voltage rises a little. That rise is an
-        <strong>EPSP</strong>, an excitatory postsynaptic potential.
+        When the incoming spike depolarizes the bouton, voltage-gated <strong>calcium</strong> channels
+        snap open at the active zone and Ca²⁺ floods inside (watch for the pale yellow sparks). Calcium
+        is the molecular green light: it triggers tiny bubbles of membrane called
+        <strong>vesicles</strong>, already docked at the surface, to fuse with the outer wall and dump
+        their cargo (a few thousand molecules of glutamate each) straight into the cleft. Glutamate
+        diffuses across 20 nanometers in microseconds and latches onto receptor proteins waiting on the
+        receiving dendritic spine. Each bound receptor opens an ion pore, letting Na⁺ trickle into the
+        next cell and nudging its voltage upward in a small bump called an <strong>EPSP</strong>
+        (excitatory postsynaptic potential).
       </p>
 
       <div data-demo="synapse3d" data-title="Across the gap" data-hint="Press burst of 5"></div>
 
       <p>
-        Every green point here is one glutamate molecule doing its own random walk on the
-        GPU, about fifty thousand in all. They start packed into vesicles, are released
-        into the cleft, and may stick to a receptor. They let go a moment later and are
-        gone once they wander out of the cleft, where in a real brain transporters on the
-        surrounding glia would mop them up. The cleft is drawn hundreds of times too wide,
-        or you couldn't see into it.
+        Every green dot above is an individual glutamate molecule performing a 3D random walk on the
+        GPU, about fifty thousand molecules packed into 36 vesicles. After a vesicle pops open, its
+        molecules scatter across the gap, briefly bind and unbind from receptors on the far face, and
+        eventually drift out of the cleft (where nearby glial cells would vacuum them back up in a real
+        brain). The gap is drawn hundreds of times wider than real life just so you can see inside it.
       </p>
       <p>
-        One spike releases a few vesicles and produces one EPSP, which fades. One isn't
-        enough to fire the next cell. Press <strong>burst of 5</strong>: the releases come
-        faster than each EPSP can fade, they stack (<em>temporal summation</em>), and the
-        next cell crosses threshold. Set the release probability to 10% and many spikes
-        release nothing at all. Real synapses fail like this a lot of the time. Fewer
-        receptors make a weaker synapse. Adding receptors is one of the main ways
-        synapses strengthen when an animal learns, which is the subject of part two.
+        Press <strong>presynaptic spike</strong> once and you'll see a few vesicles release and produce
+        a modest voltage bump on the postsynaptic scope, not nearly enough to make the receiving neuron
+        fire on its own. Now press <strong>burst of 5</strong>: the spikes arrive faster than each EPSP
+        can fade away, so they pile on top of one another (<em>temporal summation</em>) until the next
+        cell crosses threshold and fires. Try dragging <strong>release probability</strong> down toward
+        10% and firing single spikes: most of them release zero vesicles at all. Real cortical synapses
+        are surprisingly unreliable like this. Lowering the <strong>receptors</strong> slider weakens
+        each response proportionally, and changing how many receptors sit in that tiny patch is one of
+        the primary physical knobs the brain turns when you learn something new.
       </p>
       <pre><code>cleft width             ≈ 20 nm
 glutamate per vesicle   ≈ 2,000–5,000 molecules   <span class="cm">// 1,400 here</span>
 release probability     ≈ 0.1–0.5 per spike, per site
-one EPSP                ≈ 0.2–1 mV                <span class="cm">// far bigger here, so you can see it</span>
+one EPSP                ≈ 0.2–1 mV                <span class="cm">// scaled up here so you can see it</span>
 synaptic delay          ≈ 0.5 ms</code></pre>
       <aside class="note">
-        <span class="note-label">Aside · Glutamate and GABA</span>
+        <span class="note-label">Aside · Glutamate, GABA, and everything else</span>
         <p>
-          Almost all fast excitation in the brain uses glutamate. Almost all fast
-          inhibition uses GABA, whose receptors let in chloride and hold the membrane below
-          threshold. Dopamine, serotonin, acetylcholine and the rest act more slowly, mostly
-          by changing how strongly these fast synapses respond. Caffeine, alcohol,
-          anaesthetics and antidepressants all work somewhere in this machinery.
+          Almost all fast point-to-point excitation in the brain runs on glutamate, and almost all fast
+          inhibition runs on GABA, whose receptors open chloride pores that pin the membrane below
+          threshold. The famous neuromodulators (dopamine, serotonin, acetylcholine, norepinephrine) work
+          mostly on slower timescales, tuning how excitable cells are and how eagerly those fast
+          synapses respond. Caffeine, alcohol, general anesthetics, and antidepressants all intervene
+          somewhere along this chemical machinery.
         </p>
       </aside>
       <details class="fold">
-        <summary>Deep dive: quanta</summary>
+        <summary>Deep dive: Bernard Katz and quantal release</summary>
         <div class="fold-body">
           <p>
-            In the 1950s Bernard Katz noticed that a frog's neuromuscular junction, left
-            alone, produced tiny voltage blips of nearly the same size, and that evoked
-            responses came in whole multiples of that size. Transmitter is released in
-            packets: one vesicle, one quantum. The release-probability slider is his
-            picture directly: each docked vesicle is a coin flip, and the EPSP counts the
-            heads.
+            In the 1950s, Bernard Katz recorded from a frog's neuromuscular junction while nothing was
+            stimulating it and noticed tiny spontaneous voltage blips, all almost identical in height.
+            When he did stimulate the nerve weakly, the responses came out as whole-number multiples of
+            that same tiny blip: 0×, 1×, 2×, 3×. He realized neurotransmitter wasn't leaking smoothly
+            through a faucet; it was being dumped in fixed packets, one vesicle per quantum. The
+            release-probability slider implements his exact model: every docked vesicle flips an
+            independent coin, and the EPSP counts how many came up heads.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="network"><span class="kicker">Step 5 · The crowd</span>Twenty thousand neurons</h2>
+      <h2 id="network"><span class="kicker">Step 5 · Cortical circuits</span>Twenty thousand neurons</h2>
       <p>
-        One neuron is a decision. A network of them is where computation happens. The last
-        figure is a slab of cortex: twenty thousand neurons, four in five excitatory and one
-        in five inhibitory, each wired to a hundred neighbours with delays that grow with
-        distance. That's two million synapses, all simulated on the GPU each step.
+        A single neuron is mostly a threshold detector. Interesting behavior shows up when thousands of
+        them feed back into one another. The final simulation below wires up a small patch of cortex:
+        twenty thousand neurons (80% excitatory, 20% inhibitory), each connected to a hundred nearby
+        neighbors with transmission delays proportional to distance. That works out to two million live
+        synapses evaluated every step on the GPU.
       </p>
       <p>
-        To afford that, each neuron is simplified to a <strong>leaky integrate-and-fire</strong>
-        model. It keeps the logic of the last four sections and drops the detail. Input adds
-        to the voltage, the voltage leaks back toward rest, crossing threshold means a
-        spike, and a spike means a reset and a brief refractory pause. Every spike adds its
-        weight into each target's input after that connection's delay. The streaks are
-        spikes in flight along a sample of the connections.
+        Running full branching Hodgkin–Huxley cables for twenty thousand cells at once would melt a
+        browser tab, so each cell here is stripped down to a <strong>leaky integrate-and-fire</strong>
+        unit that keeps the core logic of everything above: incoming spikes nudge the voltage up or
+        down, voltage leaks passively toward rest, crossing threshold emits a spike, and firing resets
+        the cell for a brief refractory pause. The bright arcs flashing across the slab show spikes in
+        flight along a sample of the wiring.
       </p>
 
       <div data-demo="cortex" data-title="Twenty thousand neurons" data-hint="Drag inhibition below 4"></div>
 
       <p>
-        At the default settings the network is <strong>balanced</strong>. Each cell gets a
-        flood of excitation and a matching flood of inhibition, and fires when the two
-        happen to tip its way. The raster looks like static: every cell fires now and then,
-        irregularly, never in step with the rest. That is what healthy cortex looks like
-        too, and Nicolas Brunel's 2000 analysis of exactly this kind of network shows why
-        it settles there.
+        At the starting settings, the slab sits in what theoretical neuroscientists call a
+        <strong>balanced state</strong>. Every cell is constantly hit by a heavy barrage of excitatory
+        spikes paired with a slightly stronger barrage of inhibitory ones, and it only fires when random
+        fluctuations momentarily tip the sum over threshold. Look at the spike raster on the right: it
+        looks like quiet TV static, with cells firing irregularly and out of step with one another.
+        Healthy awake cortex looks much the same, and Nicolas Brunel's classic 2000 paper worked
+        out the exact phase diagram for why sparse networks settle into this asynchronous hum.
       </p>
       <p>
-        Now drag the inhibition down. Around 4×, where inhibition stops outweighing the
-        cells' excitatory input, the balance breaks. Firing rises, waves of synchronized
-        activity sweep the slab, and below 3× it runs away: almost every cell fires as fast
-        as its refractory period allows. That is a seizure in miniature. In epilepsy,
-        something has pushed a real circuit across the same line. Click anywhere to kick a
-        region and watch how far the burst spreads before inhibition reins it in.
+        Now pull the <strong>inhibition</strong> slider down. Right around 4×—the point where the 20%
+        inhibitory population stops counterbalancing the 80% excitatory majority—stability cracks.
+        Firing rates surge, rhythmic waves of synchronized bursts start rolling across the slab, and
+        below 3× the whole network locks into runaway epileptic firing, every cell slamming out spikes
+        as fast as its refractory period lets it. You can also click anywhere on the tissue to poke a
+        local patch and watch how sharply strong inhibition snuffs out the ripple before it can spread.
       </p>
       <details class="fold">
-        <summary>Deep dive: why balance makes noise</summary>
+        <summary>Deep dive: why deterministic circuits look noisy</summary>
         <div class="fold-body">
           <p>
-            Each neuron's mean input, excitation minus inhibition, sits just below
-            threshold. Fluctuations around that mean push it over at random moments, so
-            spikes come out irregular even though every rule in the model is
-            deterministic apart from the outside input. The randomness is produced by the
-            network. Strong inhibition also tracks excitation quickly, so any wave of
-            synchrony gets cancelled before it builds. Weaken it and nothing cancels the
-            waves.
+            In the balanced regime, each neuron's average net input (excitation minus inhibition) hovers
+            just below firing threshold. Spikes only happen when transient coincidences bump it over the
+            line, so the spike trains come out looking Poisson-random even though every internal rule in
+            the network is deterministic. Strong, fast inhibition also shadows every upward swing in
+            excitation within milliseconds, canceling incipient waves of synchrony before they can
+            snowball. Dial that feedback down and nothing stops the positive loop anymore.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="pipeline"><span class="kicker">Epilogue</span>The pipeline</h2>
+      <h2 id="pipeline"><span class="kicker">Putting it together</span>The full relay</h2>
       <p>
-        Put together, a neural signal is a chain of conversions, each with its own physics:
+        Step back and look at what a single thought or sensation actually travels through: a repeating
+        relay that flips back and forth between analog sums, digital pulses, and diffusing chemistry:
       </p>
-      <pre><code>dendrites   graded potentials       <span class="cm">// analog: summing many small inputs</span>
+      <pre><code>dendrites   graded potentials       <span class="cm">// analog: summing many tiny inputs</span>
 soma / AIS  threshold               <span class="cm">// analog → digital</span>
-axon        action potential        <span class="cm">// digital, regenerated at every patch or node</span>
+axon        action potential        <span class="cm">// digital, rebuilt at every patch or node</span>
 synapse     transmitter release     <span class="cm">// digital → chemical → analog again</span>
 next cell   repeat</code></pre>
       <p>
-        Every sensation you've ever had came through that chain. The figures above are
-        simplified, but the mechanism in them is the real one: ions on either side of a
-        thin film, channels that open with voltage, current that spreads, molecules that
-        cross a gap.
-      </p>
-      <p>
-        A lot was left out. Real dendrites have their own channels and can produce local
-        spikes. Glia feed neurons, insulate them and clean up after them. Neuromodulators
-        retune whole circuits over minutes and hours. And synapses change with use, which
-        is the biggest omission of all.
+        The figures on this page obviously strip away plenty of real biology. Living dendrites carry
+        active channels of their own and can fire local dendritic spikes; glial cells do far more than
+        wrap myelin and mop up spare glutamate; neuromodulators quietly reshape whole circuits over
+        minutes and hours. Biggest of all, none of the two million synapses in the last figure change
+        strength with experience yet—and synaptic plasticity is where memory and learning actually live.
       </p>
       <p class="continue">
         <strong>Next: Part two, The Synapse That Learns.</strong> Long-term potentiation,

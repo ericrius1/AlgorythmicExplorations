@@ -31,8 +31,9 @@
         <p class="hero-kicker">Strange Matter · Part 2</p>
         <h1>The Crown</h1>
         <p class="subtitle">
-          The field over this pool is the same everywhere, so it doesn't pull on anything. The
-          spikes grow because every particle is a small magnet acting on its neighbours.
+          The field over this pool is the same everywhere, so it puts no net pull on anything.
+          The spikes still grow because every particle becomes a tiny magnet acting on its
+          neighbors.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,58 +44,61 @@
 
     <main>
       <p>
-        <a href="/pages/strange-matter/ferro.html">Part one</a> grew one spike at a time under a
-        moving magnet. It couldn't make the thing ferrofluid is famous for, the Rosensweig
-        crown, where a whole surface breaks into evenly spaced spikes at once. Its particles
-        were pushed around by the magnet but never became magnets themselves. In real
-        ferrofluid the grains line up with the applied field and make fields of their own, and
-        the crown comes from those grains acting on each other.
+        In <a href="/pages/strange-matter/ferro.html">Part 1</a>, a spike only rose because the
+        bar magnet had a steep field gradient pulling oil up toward its pole. Remove that
+        gradient by flooding the dish with a completely uniform vertical field, and Part 1's pool
+        would sit dead flat: when ∇H = 0, an external field exerts zero net force anywhere. Yet a
+        real dish of ferrofluid placed inside a uniform field still erupts into the classic
+        Rosensweig crown of evenly spaced spikes. The missing ingredient is mutual magnetization.
+        Inside a real pool, the magnetite grains line up with the applied field and start
+        broadcasting magnetic fields of their own, so particles begin pulling and pushing directly
+        on their neighbors.
       </p>
       <p>
-        This article adds that, following Shao, Huang and Michels'
+        To bring that behavior into our browser sim, I followed Shao, Huang, and Michels'
         <a href="https://doi.org/10.1109/TVCG.2022.3211414">"A Current Loop Model for the Fast
-        Simulation of Ferrofluids"</a> (2022). The paper gives me the two things I needed: a way
-        to work out every particle's magnetic moment, and a pair force that pulls inward at the
-        surface where the classic Kelvin force pushes outward. One of the demos below has a
-        button that swaps between the two.
-      </p>
-      <p>
-        The simulation is still a 2D cross-section, 20,000 particles in the figures and 24,000
-        in the pool above. In the hero, moving your cursor over the pool adds one more magnet.
+        Simulation of Ferrofluids"</a> (2022). Their formulation supplies the two pieces Part 1
+        lacked: a self-consistent way to compute every particle's magnetic moment, and a pairwise
+        force model that pulls inward along the surface instead of blasting outer particles away
+        the way the textbook Kelvin force does. We stay in a 2D cross-section for now, running
+        20,000 particles in the interactive figures below and 24,000 in the wide pool at the top
+        (where moving your cursor drops an extra magnet over the crown).
       </p>
       <aside class="note">
         <span class="note-label">Aside · Three papers from one group</span>
         <p>
-          The method comes out of a run of papers from Dominik Michels' group at KAUST. In 2019
-          Huang, Hädrich and Michels simulated ferrofluid spikes from first principles with SPH
-          particles and the Kelvin force. In 2020 Huang and Michels did it again with only the
-          surface, using a boundary element method. The 2022 paper goes back to particles and
-          changes the force model, which is what lets it use faster pressure solvers.
+          This technique comes out of a trilogy of papers from Dominik Michels' group at KAUST.
+          In 2019, Huang, Hädrich, and Michels simulated large-scale ferrofluid spikes from first
+          principles using SPH particles and the Kelvin force. In 2020, Huang and Michels tried a
+          completely different angle, tracking only the outer skin with a boundary element method.
+          Their 2022 paper returned to particles and swapped in the current loop force model,
+          making it stable enough to pair with fast, large-step incompressible fluid solvers.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="moments"><span class="kicker">Step 1 · Becoming a magnet</span>The moment problem</h2>
       <p>
-        How strongly a ferrofluid responds to a field comes down to one number, its
-        <em>susceptibility</em> χ. Put it in a field H and it magnetizes to M = χH. In the
-        simulation that means every particle carries a small arrow, its magnetic moment
-        <strong>m</strong>, next to its position and velocity.
+        How eagerly a ferrofluid magnetizes boils down to a single material parameter, its
+        magnetic <em>susceptibility</em> χ. Drop the liquid into an external field H and it
+        develops magnetization M = χH. In particle terms, every SPH particle now carries a tiny
+        arrow alongside its position and velocity: its magnetic moment <strong>m</strong>.
       </p>
       <p>
-        The catch is that the field a particle feels is the applied field <em>plus the field of
-        every other particle's moment</em>, and those moments are unknown too. Each particle's
-        answer depends on all the others. Written out, it's a linear system with one unknown
+        The twist is that a particle never sees the external field in isolation. It experiences
+        the applied field <em>plus</em> the combined magnetic field generated by every other
+        particle's moment, and all of those moments are unknown too. Each particle's answer
+        depends on every neighbor around it, forming a coupled linear system with one unknown
         vector per particle:
       </p>
-      <pre><code>m_i = κ · B(r_i),   κ = χ / (1 + χ)      <span class="cm">// each moment follows the local field…</span>
-B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which is set by all the other moments</span></code></pre>
+      <pre><code>m_i = κ · B(r_i),   κ = χ / (1 + χ)      <span class="cm">// each moment aligns with the local field…</span>
+B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which sums the fields of all other moments</span></code></pre>
       <p>
-        The field of one particle isn't the textbook point dipole, which blows up at zero
-        distance. It's a <em>smoothed</em> dipole: the field of a moment spread over the
-        particle's SPH kernel, the same smearing SPH applies to everything else. Far away it's
-        the ordinary dipole. Up close it stays finite, so two overlapping particles feel a
-        smooth, well-defined field and there's no softening constant to tune.
+        Rather than treating each particle as a singular point dipole whose field blows up at
+        zero distance, we smear each moment over the particle's SPH smoothing kernel to obtain a
+        <em>smoothed</em> dipole. Beyond the kernel radius it behaves like an ordinary point
+        dipole; up close, two overlapping particles feel a finite, well-behaved field with no
+        arbitrary softening constant to hand-tune.
       </p>
 
       <div
@@ -104,33 +108,36 @@ B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which is set by a
       ></div>
 
       <p>
-        Each arrow is one particle's moment, drawn for every sixth particle so they don't pile
-        up. Longer and more orange means stronger. Bring the cursor near and the arrows under it
-        swing toward it and brighten. The cursor is one more smoothed dipole, a big one. The
-        arrows don't point straight at it, though. Each one follows the <em>sum</em> of the
-        applied field and its neighbours' fields, so particles stacked in a column reinforce
-        each other and the column's arrows run brightest. That's a feedback loop: a column
-        magnetizes itself more strongly, which pulls it together harder. The κ = χ/(1+χ)
-        factor is what keeps it from running away.
+        Above, every sixth particle renders as a tapered arrow aligned with its magnetic moment,
+        growing longer and shifting from dim blue toward bright orange as its magnetization
+        climbs. As the uniform field ramps up over the first second and a half, faint columns
+        begin to glow inside the pool; move your cursor close to drop in a stronger smoothed
+        dipole and watch the arrows beneath it bend toward the pole and flare brighter. Notice
+        that arrows never point strictly at the cursor. Each one tracks the sum of the external
+        field and its neighbors' dipoles, so vertically stacked particles amplify each other's
+        field and shine hottest along the spine of every spike. Left unchecked, that mutual
+        reinforcement would blow up to infinity; the demagnetization factor κ = χ / (1 + χ) keeps
+        the feedback loop bounded.
       </p>
       <details class="fold">
         <summary>The smoothed dipole, in 2D</summary>
         <div class="fold-body">
           <p>
-            The 2019 paper derives the smoothed dipole by solving the magnetostatic Poisson
-            equation for a moment spread out as the kernel W. The answer depends on two things
-            at distance r: the kernel value W(r) and W̄(r), the average of W over the ball of
-            radius r. Outside the kernel's support the whole blur looks like a point and the
-            formula turns into the exact dipole.
+            The 2019 KAUST paper derives the smoothed dipole by solving the magnetostatic Poisson
+            equation for a moment distributed across the SPH kernel W. At separation r, the exact
+            field depends only on the kernel value W(r) and its average W̄(r) over the ball of
+            radius r. Outside the kernel's support, the entire distribution looks like a point and
+            the expression collapses to the textbook dipole formula.
           </p>
           <p>
-            That derivation is for 3D. This page is a cross-section, so each particle really
-            stands for a long column of fluid running into the screen, and the right fields are
-            those of line dipoles, falling off as 1/r² instead of 1/r³. The 2D version has the
-            same form. The ball average becomes an average over the disk of radius r, which for
-            the cubic spline is a short piecewise polynomial, and the self-field factor of 1/3
-            for a sphere becomes 1/2 for a round column. Pairs interact out to six kernel radii,
-            a 13 × 13 block of grid cells.
+            That original derivation lives in 3D. Because our slice here is 2D, each particle
+            really represents a long cylindrical rod extending into the screen, so its field is
+            that of a line dipole falling off as 1/r² rather than 1/r³. Fortunately the algebra
+            keeps the exact same structure: the spherical average becomes an average over a disk
+            of radius r (a compact piecewise polynomial for the cubic spline), and the 3D
+            self-field factor of 1/3 for a sphere becomes 1/2 for a round cylinder. In the compute
+            shader, particle pairs sum magnetic fields out to six kernel radii, walking a
+            13 × 13 block of grid cells.
           </p>
         </div>
       </details>
@@ -138,44 +145,46 @@ B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which is set by a
       <!-- ================================================================ -->
       <h2 id="solver"><span class="kicker">Step 2 · Iterative solution</span>One sweep a frame</h2>
       <p>
-        The paper solves the moment system to convergence, with an iterative solver, every time
-        step. I went cheaper. Each frame does <em>one</em> sweep of the simplest possible update: work out the
-        field at every particle from the current moments, then move each moment 60% of the way
-        toward the value that field implies. Last frame's moments are the starting guess.
+        In an offline render, you solve that linear moment system all the way to convergence on
+        every single time step. To hold 60 frames per second in a browser, I cut an aggressive
+        corner: each rendered frame runs just <em>one</em> sweep of a dead-simple relaxation
+        update, starting from last frame's moments as the initial guess. Every particle sums the
+        field from its neighbors' current moments, then nudges its own moment 60% of the way
+        toward the new target value:
       </p>
       <pre><code><span class="cm">// one sweep per frame; mi is last frame's moment</span>
 var b = externalH(pi) + selfTerm(mi);
-for (each neighbour j within 6h) { b += smoothedField(pi - pj, mj); }
+for (each neighbor j within 6h) { b += smoothedField(pi - pj, mj); }
 var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't ring</span></code></pre>
       <p>
-        This never fully converges, and it doesn't need to. The answer only changes as fast as
-        the fluid moves, and a crown takes dozens of frames to grow, so the moments trail the
-        exact solution by a frame or so and you can't see the difference. The same goes for the
-        force: the moments and the magnetic forces are computed once per frame and reused across
-        all five substeps, since particles barely move in a sixtieth of a second.
+        Technically the system never fully converges on any given frame, and visually you can
+        hardly tell. A Rosensweig crown takes dozens of frames to rise and shift, whereas the
+        moments chase the exact solution only a frame or two behind the particles. We take the
+        same bargain on the magnetic forces: both the moment sweep and the pairwise force pass run
+        once per rendered frame on the first substep, and the remaining four substeps reuse that
+        cached magnetic acceleration since particles barely budge in a sixtieth of a second.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="force"><span class="kicker">Step 3 · The sign of the force</span>Kelvin vs. current loop</h2>
       <p>
-        With the moments known, the next question is what force they produce. Classical
-        ferrohydrodynamics has several force models that disagree about where force acts inside
-        the fluid. J. V. Byrne showed in 1977 that, once each is paired with its own surface
-        term, they predict the same jump in pressure across the surface, so a continuous fluid
-        ends up in the same shape under any of them. The 2019 paper used the Kelvin force,
-        μ₀(M·∇)H. The 2022 paper uses the current loop model, which is the Kelvin force plus one
-        more term:
+        Once every particle knows its magnetic moment, we have to turn those moments into forces.
+        Classical ferrohydrodynamics actually offers several competing force formulas that
+        disagree about how stress is distributed inside the liquid. In 1977, J. V. Byrne proved
+        that once you include the matching magnetic pressure jump across the free boundary, all
+        of these formulations yield identical equilibrium shapes for a continuous fluid. The 2019
+        KAUST paper chose the classic Kelvin force, μ₀(M·∇)H. Their 2022 paper switched to the
+        current loop model, which adds one bulk term to Kelvin:
       </p>
-      <pre><code>F_CL = F_Kelvin + μ₀(∇M)·M    <span class="cm">// same pressure jump, opposite sign at the surface</span></code></pre>
+      <pre><code>F_CL = F_Kelvin + μ₀(∇M)·M    <span class="cm">// same continuum equilibrium, opposite sign at the surface</span></code></pre>
       <p>
-        On particles, the choice matters. At the surface the Kelvin force points
-        <em>outward</em>: the magnetization drops to zero across the boundary, and the surface
-        particles get pushed off the fluid. A pressure solver has to keep hauling them back,
-        which needs very small time steps. For aligned moments, the current loop's extra term
-        pulls overlapping neighbours together, and the net force at the surface turns inward.
-        The paper's point is that this lets it use modern incompressible solvers with much
-        larger steps. The physics at equilibrium is the same, and the numerics are much better
-        behaved.
+        Once you discretize the liquid into SPH particles, that extra term makes a night-and-day
+        difference. Across the outer skin of the fluid, magnetization drops sharply to zero, so
+        the Kelvin force points <em>outward</em> and tries to peel surface particles straight off
+        the spikes. An SPH pressure solver then has to fight continuously to drag them back in,
+        forcing very small time steps. Adding the current loop's extra term flips the sign between
+        aligned overlapping neighbors so they pull inward together, keeping every rising column
+        cohesive even under larger, faster time steps.
       </p>
 
       <div
@@ -185,24 +194,26 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
       ></div>
 
       <p>
-        The button swaps the force model and keeps everything else: the same moments, solver and
-        settings. On <em>current loop</em> spikes rise and hold, because the near-field pull
-        between aligned neighbours keeps each column together. Switch to <em>Kelvin</em> and
-        give it a few seconds. The tall spikes slump, and the surface settles into a ragged
-        fringe of short points that never grow up.
+        Clicking <em>force model</em> swaps strictly between <em>current loop</em> and
+        <em>Kelvin</em> while holding the moments, relaxation sweep, and every other knob fixed.
+        Wait a couple of seconds for the initial ramp to raise a row of spikes under
+        <em>current loop</em>, then flip to <em>Kelvin</em>: the tall columns slump almost right
+        away, dissolving into a choppy fringe of stunted peaks that struggle to climb back up.
       </p>
       <details class="fold">
         <summary>What the demo computes for each pair</summary>
         <div class="fold-body">
           <p>
-            The paper gets the force between two overlapping particles by integrating the
-            smoothed force density over the overlap, and stores the result as fitted
-            polynomials. I took a shortcut and evaluate both terms at the particle centres
-            instead. The Kelvin term is the gradient of one smoothed dipole's field at the other
-            particle's moment. The bulk term only acts within two kernel radii and is attractive
-            for aligned pairs. That keeps the property that matters most: under Kelvin alone, two
-            aligned, overlapping particles <em>repel</em>, and with the bulk term added they
-            attract. Both terms are equal and opposite for each pair, so momentum is conserved.
+            The 2022 paper computes the exact force between two overlapping particles by
+            integrating the smoothed force density across their overlap volume and approximating
+            the integral with fitted polynomials. Here I take a lighter shortcut and evaluate both
+            force terms directly at the particle centers. The Kelvin piece takes the gradient of
+            one smoothed dipole's field dotted with the other particle's moment, while the extra
+            current-loop bulk piece acts inside two kernel radii and pulls aligned neighbors
+            together. Evaluating at the centers preserves the key sign flip (aligned
+            overlapping pairs repel under Kelvin alone and attract once the bulk term is added)
+            while staying strictly equal and opposite for every pair so linear momentum is
+            conserved.
           </p>
         </div>
       </details>
@@ -210,17 +221,17 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
       <!-- ================================================================ -->
       <h2 id="crown"><span class="kicker">Step 4 · Assembly</span>A crown that spaces itself</h2>
       <p>
-        Now make the applied field the same strength and direction everywhere. A uniform field
-        has no gradient, so it puts <em>no net force</em> on anything, and part one's whole
-        mechanism is switched off. Spikes grow anyway. The field's only job now is to magnetize
-        the particles. The forces come from the particles acting on each other: stacked
-        neighbours attract, so columns gather and sharpen, and side-by-side neighbours repel, so
-        columns keep their distance. That second part is the regular spacing part one never had.
-        Gravity and surface tension set the scale.
+        Turn the external field completely uniform and Part 1's gradient mechanism shuts off
+        entirely. The applied field's sole job now is to magnetize the liquid. Everything that
+        shapes the crown comes from particle-to-particle dipole interactions: aligned particles
+        stacked head to tail attract, pulling oil upward into sharp columns, while aligned
+        particles sitting side by side repel, shoving neighboring columns apart so they cannot
+        merge into one wide lump. Gravity and surface tension step in to cap the height and pick
+        the spacing.
       </p>
       <p>
-        The diagram below takes that apart into stages. Scroll through it to see the applied
-        field, the moments, and the two kinds of pair force.
+        Scroll through the breakdown below to watch how those competing pulls organize a flat pool
+        into a spaced row of peaks:
       </p>
 
       <div data-scrolly="magnetic-crown"></div>
@@ -232,44 +243,42 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
       ></div>
 
       <p>
-        This is all of it together: SPH with cohesion, the one-sweep moment solve, current loop
-        pair forces, and part one's marching-squares renderer. The field ramps up over the first
-        second and a half, so the crown grows out of a flat pool. Below about χ = 1 the surface
-        barely moves. Near the default of 2 you get a crown, and toward 5 it breaks up into
-        lumps and starts throwing drops. Tension does something less obvious: at zero the spikes
-        stay short and shed their tips, and turned up high they grow taller and more even,
-        because cohesion holds each column together. The <em>view</em> button has a fifth stage
-        here, the moments. Hold the cursor just above the surface and the spikes under it stand
-        taller.
+        Here the whole 2D system runs together: SPH pressure and cohesion, the single-sweep moment
+        update, current-loop pair forces, and Part 1's marching-squares renderer. The uniform
+        field ramps up smoothly over the first second and a half so you can watch spikes emerge
+        straight out of a calm pool (<em>re-pour</em> resets the tray and replays the ramp).
+        Below roughly χ = 1 the surface barely ripples; around the default <em>susceptibility χ</em>
+        of 2 a steady crown forms, and cranking it toward 5 fractures the pool into violent lumps
+        that flick stray drops into the air. <em>Surface tension</em> behaves a little
+        counterintuitively at first: set it to zero and the spikes stay short while shedding
+        particles off their tips, whereas dialing it up actually grows taller, cleaner cones
+        because stronger cohesion binds each column together. You can also toggle the
+        <em>force model</em>, cycle <em>view</em> across five stages (now including the
+        <em>moments</em> arrows), or hover just above the surface to pull the spikes beneath your
+        cursor taller.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What's left out</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Shortcuts and what comes next</h2>
       <p>
-        Next to the paper, this page cuts a lot of corners. The paper is fully 3D. It solves
-        pressure implicitly, integrates the pair force instead of sampling it, and solves the
-        moments to convergence. It takes seconds per frame rather than a sixtieth of one. What
-        carries over:
+        Measured against the 2022 KAUST paper, this browser version is unapologetically scrappy.
+        Their reference solver runs in full 3D, computes implicit incompressibility, integrates
+        every overlapping pair force, and iterates the magnetic moments to tight convergence,
+        spending seconds on a single frame where we have sixteen milliseconds. Even so, a few
+        core ideas survive the diet intact. When a coupled linear system evolves slowly from frame
+        to frame, chasing it with one warm-started relaxation sweep gets surprisingly close for a
+        fraction of the cost. Formulations that are provably equivalent in continuum equations can
+        behave like opposites once discretized onto particles. And a uniform field with zero net
+        pull can still carve crisp spatial structure out of a flat liquid purely through pairwise
+        attraction and repulsion.
       </p>
-      <ul>
-        <li>
-          <strong>An unknown that depends on itself can be chased.</strong> One warm-started
-          sweep a frame is enough when the answer moves slower than the frames.
-        </li>
-        <li>
-          <strong>Equivalent on paper isn't equivalent on particles.</strong> Two force models
-          that agree in the continuum give opposite surface forces once the fluid is discrete.
-        </li>
-        <li>
-          <strong>A uniform field can still make structure.</strong> It has no pull of its own.
-          The pattern comes from the pieces acting on each other.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: sum the long-range field with a fast multipole method instead of
-        cutting it off at six radii, which the paper also suggests; swap the relaxation for a few
-        conjugate gradient steps and see how much it changes the crown; and go to 3D, where the
-        spikes can pack in a hexagonal pattern instead of a row. Part three does that last one.
+        If I kept pushing this 2D solver, I'd look at replacing the six-radius magnetic cutoff
+        with a fast multipole method (which the paper also recommends) and testing whether a few
+        conjugate-gradient iterations sharpen the crown noticeably over one Jacobi-style sweep.
+        Before optimizing 2D further, though, there is a much bigger jump waiting: lifting the
+        entire pool into three dimensions, where spikes pack across a square dish instead of a
+        single line and marching squares has to grow up into real 3D surface extraction.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/strange-matter/relief.html">Part three, Sharp Relief</a>.</strong>

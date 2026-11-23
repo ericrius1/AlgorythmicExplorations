@@ -147,16 +147,19 @@ export function mountYieldArea(container: HTMLElement): Demo {
       ctx.fillStyle = "rgba(255,255,255,0.14)";
       ctx.fillRect(lx(ar), py, 1, ph);
       const yv = yieldAt(ar);
+      const yDot = Y(yv);
       font(ctx, 9);
-      text(ctx, label, lx(ar) + (ar > 100 ? -4 : 4), py + ph - 8, MUTED, ar > 100 ? "right" : "left");
+      // Put the vertical-line name at the top when the dot sits near the bottom (and vice versa)
+      const labelY = yDot > py + ph - 26 ? py + 13 : py + ph - 8;
+      text(ctx, label, lx(ar) + (ar > 100 ? -5 : 5), labelY, MUTED, ar > 100 ? "right" : "left");
       ctx.fillStyle = INK;
       ctx.beginPath();
-      ctx.arc(lx(ar), Y(yv), 3, 0, Math.PI * 2);
+      ctx.arc(lx(ar), yDot, 3, 0, Math.PI * 2);
       ctx.fill();
       font(ctx, 10, 600, true);
       const pct = yv * 100 < 1 ? (yv * 100).toFixed(1) : (yv * 100).toFixed(0);
       // keep the value label inside the plot, below the point when it sits near the top
-      const ly = Y(yv) < py + 20 ? Y(yv) + 16 : Y(yv) - 7;
+      const ly = yDot < py + 24 ? yDot + 16 : yDot - 9;
       text(ctx, `${pct}%`, lx(ar) + (ar > 100 ? -7 : 7), ly, INK, ar > 100 ? "right" : "left");
     }
     ctx.fillStyle = C_HEAT;
@@ -287,7 +290,7 @@ export function mountLifetimeEnergy(container: HTMLElement): Demo {
       ctx.arc(X(c), Y(eff(SI_START, SI_RATE, c)), 4.5, 0, Math.PI * 2);
       ctx.fill();
       font(ctx, 10, 600);
-      text(ctx, `crossover, year ${c.toFixed(1)}`, X(c) + 8, Y(eff(SI_START, SI_RATE, c)) + 16, C_BAD);
+      text(ctx, `crossover, year ${c.toFixed(1)}`, X(c) + (c > 19 ? -8 : 8), Y(eff(SI_START, SI_RATE, c)) - 12, C_BAD, c > 19 ? "right" : "left");
     }
 
     // labels and energy totals
@@ -435,7 +438,7 @@ export function mountCostPerWatt(container: HTMLElement): Demo {
     text(ctx, "module", bx + 15, ly, TEXT);
     ctx.fillStyle = rgba(C_HEAT, 0.45);
     ctx.fillRect(bx + 80, ly - 9, 10, 10);
-    text(ctx, "racking, land, wiring, labour", bx + 95, ly, TEXT);
+    text(ctx, "racking, land, wiring, labor", bx + 95, ly, TEXT);
     ly += 26;
     const ahead = c.t.module + c.t.area < c.si.module + c.si.area;
     font(ctx, 12);
@@ -485,10 +488,15 @@ export function mountCostPerWatt(container: HTMLElement): Demo {
     font(ctx, 10);
     text(ctx, "tandem cheaper", GX(aMax) - 6, GY(0) - 6, rgba(C_KEPT, 0.9), "right");
     text(ctx, "silicon cheaper", gx + 6, gy + 14, MUTED);
+    const dx = GX(area);
+    const dy = GY(added);
     ctx.fillStyle = ahead ? C_KEPT : C_BAD;
     ctx.beginPath();
-    ctx.arc(GX(area), GY(added), 5, 0, Math.PI * 2);
+    ctx.arc(dx, dy, 5, 0, Math.PI * 2);
     ctx.fill();
+    font(ctx, 10, 600, true);
+    const dotAlign = area > 155 ? "right" : "left";
+    text(ctx, `+$${added}/m²`, dx + (area > 155 ? -9 : 9), dy + 3, ahead ? C_KEPT : C_BAD, dotAlign);
   };
 
   return {

@@ -19,9 +19,9 @@ export function mountCicDeposit(container: HTMLElement): Demo {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
   const parts: P[] = [
-    { x: 3.3, y: 2.4 },
+    { x: 3.16, y: 2.24 },
     { x: 7.8, y: 4.1 },
-    { x: 8.4, y: 1.7 },
+    { x: 8.2, y: 1.78 },
     { x: 4.9, y: 5.2 },
   ];
   let cic = true;
@@ -55,12 +55,25 @@ export function mountCicDeposit(container: HTMLElement): Demo {
   });
   shell.canvas.addEventListener("pointerup", () => (drag = -1));
 
-  shell.button("CIC — split over 4 cells", () => (cic = true));
-  shell.button("NGP — nearest cell only", () => (cic = false));
+  let cicBtn: HTMLButtonElement;
+  let ngpBtn: HTMLButtonElement;
+  const syncButtons = (): void => {
+    cicBtn.textContent = cic ? "● CIC — split over 4 cells" : "CIC — split over 4 cells";
+    ngpBtn.textContent = cic ? "NGP — nearest cell only" : "● NGP — nearest cell only";
+  };
+  cicBtn = shell.button("CIC — split over 4 cells", () => {
+    cic = true;
+    syncButtons();
+  });
+  ngpBtn = shell.button("NGP — nearest cell only", () => {
+    cic = false;
+    syncButtons();
+  });
+  syncButtons();
   shell.setInfo(() =>
     cic
-      ? "cloud-in-cell: weights are overlap areas; they always sum to 1 — drag a particle"
-      : "nearest grid point: drag slowly across a cell border and watch the mass teleport",
+      ? "cloud-in-cell: each dashed square is 1×1 cell; overlap areas are the four weights"
+      : "nearest grid point: drag slowly across a cell border and watch the mass jump",
   );
 
   return {
@@ -130,19 +143,33 @@ export function mountCicDeposit(container: HTMLElement): Demo {
       }
       ctx.stroke();
 
-      // weight labels and tethers
-      ctx.font = `${11 * dpr}px ui-monospace, Menlo, monospace`;
-      ctx.textAlign = "center";
+      // 1×1 cell-sized "cloud" square around each particle in CIC mode so the
+      // four overlap areas are directly visible.
+      if (cic) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 184, 107, 0.45)";
+        ctx.fillStyle = "rgba(255, 184, 107, 0.06)";
+        ctx.lineWidth = 1.2 * dpr;
+        ctx.setLineDash([4 * dpr, 3 * dpr]);
+        for (const p of parts) {
+          const rx = (p.x - 0.5) * cellW();
+          const ry = (p.y - 0.5) * cellH();
+          ctx.fillRect(rx, ry, cellW(), cellH());
+          ctx.strokeRect(rx, ry, cellW(), cellH());
+        }
+        ctx.restore();
+      }
+
+      // tethers from particles to receiving cell centers
       for (const s of shares) {
         const cx = (s.c + 0.5) * cellW();
         const cy = (s.r + 0.5) * cellH();
-        ctx.strokeStyle = "rgba(255, 184, 107, 0.35)";
+        ctx.strokeStyle = "rgba(255, 184, 107, 0.32)";
+        ctx.lineWidth = 1 * dpr;
         ctx.beginPath();
         ctx.moveTo(s.p.x * cellW(), s.p.y * cellH());
         ctx.lineTo(cx, cy);
         ctx.stroke();
-        ctx.fillStyle = "rgba(240, 243, 250, 0.95)";
-        ctx.fillText(s.wgt.toFixed(2), cx, cy + 4 * dpr);
       }
 
       // the particles
@@ -156,6 +183,29 @@ export function mountCicDeposit(container: HTMLElement): Demo {
         ctx.arc(p.x * cellW(), p.y * cellH(), 8 * dpr, 0, Math.PI * 2);
         ctx.stroke();
       }
+
+      // weight labels on top with subtle backdrop pills so they stay readable
+      // even when a particle is dragged directly over a cell center
+      ctx.font = `${11 * dpr}px ui-monospace, Menlo, monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const m = mass[r][c];
+          if (m <= 0.0005) continue;
+          const cx = (c + 0.5) * cellW();
+          const cy = (r + 0.5) * cellH();
+          const txt = m.toFixed(2);
+          const tw = ctx.measureText(txt).width;
+          ctx.fillStyle = "rgba(6, 7, 11, 0.68)";
+          ctx.beginPath();
+          ctx.roundRect(cx - tw / 2 - 4 * dpr, cy - 7.5 * dpr, tw + 8 * dpr, 15 * dpr, 3 * dpr);
+          ctx.fill();
+          ctx.fillStyle = "rgba(240, 243, 250, 0.96)";
+          ctx.fillText(txt, cx, cy);
+        }
+      }
+      ctx.textBaseline = "alphabetic";
     },
   };
 }

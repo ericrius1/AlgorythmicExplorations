@@ -61,18 +61,23 @@ export function mountScanViz(container: HTMLElement): Demo {
     }
   };
 
+  let autoBtn: HTMLButtonElement = null!;
   shell.button("step", () => {
     auto = false;
+    autoBtn.textContent = "auto-play: off";
     advance();
   });
-  shell.button("auto-play", () => (auto = !auto));
+  autoBtn = shell.button("auto-play: on", () => {
+    auto = !auto;
+    autoBtn.textContent = auto ? "auto-play: on" : "auto-play: off";
+  });
   shell.button("shuffle", shuffle);
 
   const phaseText = (): string => {
     if (phase === 0) return "histogram: count the particles in each cell";
     if (phase <= PASSES) {
       const d = 1 << (phase - 1);
-      return `scan pass ${phase}/4 (d=${d}): every cell adds the value ${d} to its left — in parallel`;
+      return `scan pass ${phase}/4 (d=${d}): every cell adds the value ${d} to its left in parallel`;
     }
     if (phase === 5) return "shift right one cell: each cell's start index in the sorted array";
     return "scatter: every particle copied to start[cell] + slots already claimed";
@@ -156,20 +161,34 @@ export function mountScanViz(container: HTMLElement): Demo {
       const stripH = 0.1 * h;
       ctx.strokeStyle = "rgba(80, 90, 120, 0.4)";
       ctx.strokeRect(0.5, stripTop, w - 1, stripH);
+      if (phase < 6) {
+        ctx.fillStyle = "rgba(138, 145, 165, 0.65)";
+        ctx.textAlign = "left";
+        ctx.fillText(
+          phase === 5 ? "sorted array: slice boundaries ready" : "sorted array",
+          6 * dpr,
+          stripTop - 6 * dpr,
+        );
+        ctx.textAlign = "center";
+      }
       if (phase >= 5) {
         // segment outlines from the offsets
         const total = DOTS;
+        let lastLabelX = -1e9;
         for (let c = 0; c < CELLS; c++) {
-          const start = phase === 5 ? values[c] : values[c];
+          const start = values[c];
           const x = (start / total) * w;
           ctx.strokeStyle = "rgba(122, 162, 255, 0.5)";
           ctx.beginPath();
           ctx.moveTo(x, stripTop);
           ctx.lineTo(x, stripTop + stripH);
           ctx.stroke();
-          if (counts[c] > 0) {
-            ctx.fillStyle = "rgba(215, 219, 230, 0.55)";
-            ctx.fillText(String(start), x + 2 + 8 * dpr, stripTop + stripH + 13 * dpr);
+          if (counts[c] > 0 && x - lastLabelX >= 20 * dpr && x + 18 * dpr <= w) {
+            ctx.fillStyle = "rgba(215, 219, 230, 0.6)";
+            ctx.textAlign = "left";
+            ctx.fillText(String(start), x + 3 * dpr, stripTop + stripH + 13 * dpr);
+            ctx.textAlign = "center";
+            lastLabelX = x;
           }
         }
       }
@@ -187,9 +206,9 @@ export function mountScanViz(container: HTMLElement): Demo {
             placed++;
           }
         }
-        ctx.fillStyle = "rgba(215, 219, 230, 0.7)";
+        ctx.fillStyle = "rgba(215, 219, 230, 0.72)";
         ctx.textAlign = "left";
-        ctx.fillText(`${placed} particles, grouped by cell, zero pointers`, 6 * dpr, stripTop - 5 * dpr);
+        ctx.fillText(`sorted array: ${placed} particles grouped by cell, zero pointers`, 6 * dpr, stripTop - 6 * dpr);
         ctx.textAlign = "center";
       }
     },

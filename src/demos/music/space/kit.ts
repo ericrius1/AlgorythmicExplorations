@@ -1,5 +1,5 @@
 // Shared pieces for the Acoustic Spaces figures: a floor-plan view that maps
-// metres to pixels, draggable handles, a convolver that crossfades when the
+// meters to pixels, draggable handles, a convolver that crossfades when the
 // room changes, and drawing for heads, sources and walls.
 
 import { Tone } from "../../../lib/audio";
@@ -28,13 +28,13 @@ export interface P2 {
   y: number;
 }
 
-// Maps a room's floor plan (x along the length, y along the width, metres)
+// Maps a room's floor plan (x along the length, y along the width, meters)
 // into a box on the canvas, keeping the aspect ratio. y grows downward on
 // screen, so the plan reads like a map.
 export class Plan {
   ox = 0;
   oy = 0;
-  s = 1; // pixels per metre
+  s = 1; // pixels per meter
   constructor(
     public L: number,
     public W: number,
@@ -62,7 +62,7 @@ export class Plan {
   }
 }
 
-// Floor, 1 m grid, and the four walls coloured by material (x = 0, x = L,
+// Floor, 1 m grid, and the four walls colored by material (x = 0, x = L,
 // y = 0, y = W, as in Room.surf).
 export function drawRoom(g: CanvasRenderingContext2D, plan: Plan, room: Room, d: number, wallGlow = 1): void {
   const a = plan.px({ x: 0, y: 0 });

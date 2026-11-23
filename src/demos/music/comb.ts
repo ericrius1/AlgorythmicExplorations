@@ -4,7 +4,7 @@
 // beat glow red, as bright as their roughness. Bottom: the total roughness
 // for every interval (every pair of partials through the Plomp–Levelt
 // curve, summed; Sethares' model). The valleys are found in that curve and
-// labelled from it. Drag along the curve to choose the interval.
+// labeled from it. Drag along the curve to choose the interval.
 //
 // "harmonic" mode varies the number of harmonics and the register; "timbre"
 // mode swaps the tones for inharmonic spectra and the valleys move.
@@ -158,7 +158,7 @@ export async function mountComb(container: HTMLElement, opts: DissOpts = { mode:
   const toggle = (): void => {
     void unlockAudio().then(() => setPlaying(!playing));
   };
-  const pill = new PlayPill(stage, "Tap to play the two tones", toggle, "top");
+  const pill = new PlayPill(stage, "Tap to play the two tones", toggle, [0.5, 0.66]);
   const sync = playButton(stage, ["▶ play", "■ stop"], toggle);
   const setRatio = (r: number, glide = 0.04): void => {
     ratio = Math.max(1, Math.min(RMAX, r));
@@ -321,25 +321,27 @@ export async function mountComb(container: HTMLElement, opts: DissOpts = { mode:
       geo.x0 = x0 + 6;
       geo.x1 = x1 - 6;
       geo.cy0 = top1 + 40;
-      geo.cy1 = H - 36;
-      const cy = (v: number): number => geo.cy1 - v * (geo.cy1 - geo.cy0 - 8);
+      geo.cy1 = H - 34;
+      const curveBot = geo.cy1 - 20;
+      const cy = (v: number): number => curveBot - v * (curveBot - geo.cy0 - 8);
       // semitone grid
       for (let s = 0; s <= Math.floor(1200 * Math.log2(RMAX)); s += 100) {
         const x = xOf(Math.pow(2, s / 1200));
-        vline(g, x, geo.cy0, geo.cy1, s % 1200 === 0 ? "rgba(122,162,255,0.16)" : "rgba(122,162,255,0.06)");
+        vline(g, x, geo.cy0, curveBot, s % 1200 === 0 ? "rgba(122,162,255,0.16)" : "rgba(122,162,255,0.06)");
         if (s % 200 === 0 && (!narrow || s % 400 === 0)) {
           text(g, `${s}¢`, x, geo.cy1 + 13, { size: 9, align: s === 0 ? "left" : "center", color: "rgba(150,160,190,0.5)", mono: true });
         }
       }
+      hline(g, geo.x0, geo.x1, curveBot, "rgba(122,162,255,0.14)");
       if (timbre.grid) {
         for (let k = 0; k <= Math.floor(timbre.grid * Math.log2(RMAX)); k++) {
           const x = xOf(Math.pow(2, k / timbre.grid));
-          vline(g, x, geo.cy1 - 8, geo.cy1, rgba(ORANGE, 0.75), 1.5);
+          vline(g, x, curveBot - 7, curveBot, rgba(ORANGE, 0.75), 1.5);
         }
       }
       const cp = new Path2D();
       const fill = new Path2D();
-      fill.moveTo(geo.x0, geo.cy1);
+      fill.moveTo(geo.x0, curveBot);
       for (let i = 0; i < CURVE; i++) {
         const x = geo.x0 + (i / (CURVE - 1)) * (geo.x1 - geo.x0);
         const y = cy(curve[i]);
@@ -347,15 +349,15 @@ export async function mountComb(container: HTMLElement, opts: DissOpts = { mode:
         else cp.lineTo(x, y);
         fill.lineTo(x, y);
       }
-      fill.lineTo(geo.x1, geo.cy1);
+      fill.lineTo(geo.x1, curveBot);
       fill.closePath();
-      const fg = g.createLinearGradient(0, geo.cy0, 0, geo.cy1);
+      const fg = g.createLinearGradient(0, geo.cy0, 0, curveBot);
       fg.addColorStop(0, "rgba(255, 92, 84, 0.22)");
       fg.addColorStop(1, "rgba(255, 92, 84, 0.02)");
       g.fillStyle = fg;
       g.fill(fill);
       glowStroke(g, cp, mix(RED, ORANGE, 0.3), 1.3, 0.9);
-      // valleys, labelled from the curve, in a row above the axis
+      // valleys, labeled from the curve, in a clean band below the curve floor
       const placed: number[] = [];
       for (const v of [...valleys].sort((a, b) => b.depth - a.depth)) {
         const x = xOf(v.r);
@@ -363,9 +365,9 @@ export async function mountComb(container: HTMLElement, opts: DissOpts = { mode:
         placed.push(x);
         const y = cy(curveAt(v.r));
         const on = Math.abs(1200 * Math.log2(ratio / v.r)) < 3;
-        vline(g, x, y + 5, geo.cy1 - 16, on ? "rgba(255,236,200,0.55)" : "rgba(160,190,255,0.28)", 1, [2, 3]);
+        vline(g, x, y + 5, curveBot + 3, on ? "rgba(255,236,200,0.55)" : "rgba(160,190,255,0.28)", 1, [2, 3]);
         glowDot(g, x, y, 1.6, on ? [255, 236, 200] : [160, 190, 255], 0.7);
-        text(g, nameOf(v.r), x, geo.cy1 - 5, {
+        text(g, nameOf(v.r), x, geo.cy1 - 4, {
           size: narrow ? 9 : 10,
           align: "center",
           color: on ? "rgba(255,236,200,1)" : "rgba(170,190,240,0.85)",
@@ -374,7 +376,7 @@ export async function mountComb(container: HTMLElement, opts: DissOpts = { mode:
         });
       }
       glowDot(g, xOf(ratio), cy(curveAt(ratio)), 3.6, [255, 240, 220], 1);
-      vline(g, xOf(ratio), geo.cy0 - 4, geo.cy1, "rgba(255,236,200,0.25)");
+      vline(g, xOf(ratio), geo.cy0 - 4, curveBot, "rgba(255,236,200,0.25)");
       text(g, "total roughness for every interval · drag along it", geo.x0, geo.cy0 - 14, { size: 10.5, color: "rgba(180,188,210,0.8)" });
       if (!narrow) text(g, `${coincide} pair${coincide === 1 ? "" : "s"} of partials coincide`, x1, geo.cy0 - 14, { size: 10, align: "right", color: "rgba(255,240,220,0.75)" });
     },

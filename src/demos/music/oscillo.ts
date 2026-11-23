@@ -265,7 +265,7 @@ export async function mountOscillo(container: HTMLElement): Promise<Demo> {
         const t = Math.max(0, (db + DB_RANGE) / DB_RANGE);
         if (t <= 0) continue;
         const x = fx(n * freq);
-        const y = ty1 - t * (ty1 - ty0 - 4);
+        const y = ty1 - t * (ty1 - ty0 - 18);
         const c = harmonicRgb(n);
         const p = new Path2D();
         p.moveTo(x, ty1);

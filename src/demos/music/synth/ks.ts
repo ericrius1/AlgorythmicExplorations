@@ -1,7 +1,7 @@
 // Fig. — Karplus–Strong. The whole string is a delay line one period long,
 // drawn as a ring: the sample about to be read sits at the top, and every
 // sample travels once around per period. A pluck fills the ring with noise;
-// each pass averages neighbours, so the jagged high harmonics die first and
+// each pass averages neighbors, so the jagged high harmonics die first and
 // the ring relaxes into a smooth, shrinking loop. The bars are the ring's
 // harmonics (a DFT of one period); the strip is the output level in dB,
 // where an exponential decay is a straight line.
@@ -62,11 +62,11 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
   const fmtB = (v: number): string => (v > 0.97 ? `${v.toFixed(2)} · string` : Math.abs(v - 0.5) < 0.05 ? `${v.toFixed(2)} · drum` : v < 0.03 ? `${v.toFixed(2)} · bottle` : v.toFixed(2));
   const fmtS = (v: number): string => v.toFixed(1);
   const fmtDecay = (v: number): string => (v >= 30 ? "natural" : `${v.toFixed(v < 10 ? 1 : 0)} s`);
-  const fmtPick = (v: number): string => (v <= 0.001 ? "off" : `${Math.round(v * 100)}% along`);
+  const fmtPick = (v: number): string => (v <= 0.001 ? "off" : `${Math.round(v * 100)}%`);
   const fmtHard = (v: number): string => (v > 0.8 ? "hard" : v > 0.4 ? "medium" : "soft");
   const bIn = shell.slider({ label: "blend b", min: 0, max: 1, step: 0.01, value: st.blend, format: fmtB, onInput: (v) => ((st.blend = v), apply(), custom()) });
   const sIn = shell.slider({ label: "decay stretch S", min: 1, max: 20, step: 0.1, value: st.stretch, log: true, format: fmtS, onInput: (v) => ((st.stretch = v), apply(), custom()) });
-  const rIn = shell.slider({ label: "decay (fundamental)", min: 0.3, max: 30, step: 0.1, value: st.decay, log: true, format: fmtDecay, onInput: (v) => ((st.decay = v), apply(), custom()) });
+  const rIn = shell.slider({ label: "decay time", min: 0.3, max: 30, step: 0.1, value: st.decay, log: true, format: fmtDecay, onInput: (v) => ((st.decay = v), apply(), custom()) });
   const pIn = shell.slider({ label: "pick position", min: 0, max: 0.5, step: 0.01, value: st.pick, format: fmtPick, onInput: (v) => ((st.pick = v), apply(), custom()) });
   const hIn = shell.slider({ label: "pluck", min: 0.05, max: 1, step: 0.01, value: st.bright, format: fmtHard, onInput: (v) => ((st.bright = v), apply(), custom()) });
   const fracBtn = shell.button("fractional delay: on", () => {
@@ -235,7 +235,7 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
       }
       // predicted ring time for this harmonic
       const t60 = st.blend >= 0.999 ? stringT60(f0, k, sr, st.stretch, tune.rho) : NaN;
-      if (Number.isFinite(t60) && (narrow ? k % 2 === 1 : k <= 8 || k % 2 === 0)) {
+      if (Number.isFinite(t60) && k % 2 === 1) {
         g.text(t60 >= 10 ? t60.toFixed(0) : t60.toFixed(1), x, barBox.y + 13, { size: 9, align: "center", color: TEXT.dim, mono: true });
       }
       if (k <= 10 || k % 2 === 0) g.text(`${k}`, x, bb + 13, { size: 9.5, align: "center", color: TEXT.dim, mono: true });
@@ -281,6 +281,6 @@ export async function mountKs(container: HTMLElement): Promise<Demo> {
         ? `${noteName(note)} · loop ${loop} = ${total.toFixed(2)} samples · ${err} · fundamental rings ${stringT60(f0, 1, sr, st.stretch, tune.rho).toFixed(1)} s`
         : st.blend < 0.03
           ? `b = 0: the sign flips every pass, so the period doubles: ${noteName(note - 12)}, odd harmonics only`
-          : `b = ${st.blend.toFixed(2)}: random sign flips break the period up; the loop length now sets the decay, not a pitch`;
+          : `b = ${st.blend.toFixed(2)}: random sign flips break up the periodicity; the loop length now sets the decay time`;
   });
 }

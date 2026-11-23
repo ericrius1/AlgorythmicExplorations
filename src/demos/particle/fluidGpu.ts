@@ -1,5 +1,5 @@
 // Demos 4 & 5 of part three: the full GPU pipeline — counting sort, then
-// neighbour forces. mode "grains" runs one contact pass (dry sand); mode
+// neighbor forces. mode "grains" runs one contact pass (dry sand); mode
 // "sph" runs density + pressure passes (water). Cursor stirs either one.
 
 import sphShader from "../../shaders/sph.wgsl?raw";
@@ -160,7 +160,7 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
   }
   shell.setInfo(() =>
     opts.hero
-      ? `${count.toLocaleString()} particles of ${sph ? "water" : "sand"} — stir with your cursor`
+      ? `${count.toLocaleString()} particles of ${sph ? "water" : "sand"} · stir with your cursor`
       : `${count.toLocaleString()} particles · sorted into ${CELLS.toLocaleString()} cells ` +
         `${steps}× per frame · stir with your cursor`,
   );
@@ -214,7 +214,7 @@ export async function mountFluid(container: HTMLElement, opts: FluidDemoOptions)
         pass.end();
       }
       renderer.bind(bufs[0]);
-      // Overlapping sprites so the water reads as a body of liquid, coloured
+      // Overlapping sprites so the water reads as a body of liquid, colored
       // by speed: still water deep blue, moving water cyan, spray white.
       renderer.encode(enc, count, {
         scale: renderScale,

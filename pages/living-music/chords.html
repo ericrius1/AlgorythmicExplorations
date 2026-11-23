@@ -10,7 +10,7 @@
     <title>Major and Minor — Living Music</title>
     <meta
       name="description"
-      content="Triads under a microscope: harmonic alignment, roughness and the implied root. A map of every three-note chord, tension and release in a key, and the Tonnetz, where P, L and R moves walk between chords one note at a time."
+      content="Triads under a harmonic microscope, a geometric map of every three-note chord, voice leading and tonal pull inside a key, and the Tonnetz lattice where P, L, and R move between chords one note at a time."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,40 +31,45 @@
         <p class="hero-kicker">Living Music · Part 6</p>
         <h1>Major and Minor</h1>
         <p class="subtitle">
-          Why the two most common chords sound the way they do, how chords pull toward home,
-          and the geometry of moving between them. The lattice above is a map of all 24 major
-          and minor chords. Tap it to hear a walk across it.
+          How three notes lock together into a chord, why moving one note by a single semitone flips
+          major into minor, and the geometry that connects all twenty-four triads. Tap the lattice
+          above to hear a walk across it.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        <a href="/pages/living-music/scales.html">Part five</a> picked seven of the twelve notes
-        and made one of them home. This part stacks them. Stand on any note of a scale, skip
-        one, take the next, skip one, take the next, and you have three notes a third apart.
-        That's a <strong>triad</strong>. In C major, standing on C gives C–E–G and standing on
-        D gives D–F–A. Do it on all seven notes and you get three major triads, three minor
-        ones and one diminished: the whole chord vocabulary of the key.
+        Play C, E, and G together, then drop the middle note one semitone to E♭. Both chords have
+        the exact same ingredients: one major third, one minor third, and an outer perfect fifth. Yet
+        reversing the order of those two thirds completely changes the character of the sound. Why
+        should such a tiny rearrangement feel so different, and how do chords like these chain
+        together to create the sensation of leaving home and coming back?
       </p>
       <p>
-        The lattice at the top of the page holds every major and minor triad. Each triangle is
-        one chord, and two triangles that share an edge share two notes. The glowing path is a
-        walk from triangle to triangle that changes one note at a time. By the end of this
-        article you'll know why the map is laid out that way, why the warm triangles sound
-        different from the cool ones, and why a walk across it never sounds like a jump.
+        In <a href="/pages/living-music/scales.html">part five</a> we picked seven notes out of
+        twelve and turned one of them into a tonal center. Now we stack them. Start on any degree
+        of a scale, skip a note, take the next, skip another, and take the next: you get three
+        notes stacked in thirds, a <strong>triad</strong>. Starting on C in C major gives C–E–G;
+        starting on D gives D–F–A. Run through all seven degrees and the scale hands you three
+        major triads, three minor ones, and one diminished triad, covering the basic harmonic
+        vocabulary of the key. The triangular grid at the top of the page lays out all twenty-four
+        major and minor triads so that any two triangles sharing an edge also share two notes.
+        Walking across an edge changes just one pitch at a time, which is why the glowing path
+        above can drift into remote keys without ever feeling abrupt.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="triads"><span class="kicker">Step 1 · Stacked thirds</span>Three notes from one ladder</h2>
       <p>
-        Here is the microscope from <a href="/pages/living-music/harmony.html">part three</a>,
-        pointed at a chord. Each row is one note of the chord drawn as its first eight
-        harmonics on a log-frequency axis. Bar height is loudness: harmonic <em>k</em> is 1/<em>k</em>
-        as loud as the first, which is also the tone the figure plays. When a harmonic of one
-        note lands near a harmonic of another, the collision lane along the top marks the spot.
-        White means the two coincide, amber means they're a few hertz apart and beat slowly,
-        and red means they're close enough to grind.
+        To see what actually happens inside a triad, we can aim the harmonic microscope from
+        <a href="/pages/living-music/harmony.html">part three</a> at three notes at once. Each row
+        below plots one note's first eight harmonics on a logarithmic frequency axis, with bar height
+        proportional to loudness (harmonic <em>k</em> has amplitude 1/<em>k</em>, matching the
+        synthesized tone you hear when you strike the chord). Whenever a partial from one note
+        lands close to a partial from another, the collision lane along the top marks the spot:
+        white dots for an exact match, amber for slow beating a few hertz apart, and red where
+        partials sit close enough to grind against each other.
       </p>
 
       <div
@@ -74,69 +79,73 @@
       ></div>
 
       <p>
-        In C major, the third harmonic of C (785 Hz) lands on the second harmonic of G
-        (784 Hz), and the fifth harmonic of C (1,308 Hz) lands near the fourth harmonic of E
-        (1,319 Hz). They line up because the three notes are, very nearly, harmonics 4, 5 and
-        6 of a single lower note: C4, E4 and G4 sit almost on the 4th, 5th and 6th harmonics
-        of C2. The bottom row shows that note, the chord's <strong>implied root</strong>, with
-        its own harmonics drawn as a faint comb behind everything. Most of the chord's partials
-        land on the comb's teeth. A major triad is close to a slice of one harmonic series,
-        the pattern part one showed the ear fusing into a single pitch.
+        Look at C major first. The third harmonic of C4 (785 Hz) lands right next to the second
+        harmonic of G4 (784 Hz), and the fifth harmonic of C4 (1,308 Hz) lands near the fourth
+        harmonic of E4 (1,319 Hz). That alignment happens because C4, E4, and G4 sit very close to
+        harmonics 4, 5, and 6 of a single lower pitch, C2 at 65.4 Hz. The bottom row marks that
+        <strong>implied root</strong> and casts its own harmonic series upward as a faint comb
+        behind the whole graph. Most of the triad's partials snap onto the teeth of that comb, so a
+        major chord behaves a lot like a slice carved out of one vibrating string's overtone
+        series, the same acoustic cue part one showed the ear fusing into a single pitch.
       </p>
       <p>
-        The "very nearly" comes from <a href="/pages/living-music/twelve.html">part four</a>.
-        Equal temperament makes the major third 400 cents wide instead of the 386 of a pure
-        5:4, so E's harmonics miss C's by a little, and the pair at 1,308 and 1,319 Hz beats
-        about ten times a second. The fifth is only 2 cents narrow, so its pair beats less than
-        once a second. Switch the figure to just tuning and every amber mark turns white.
+        The tiny misses come from <a href="/pages/living-music/twelve.html">part four</a>'s
+        compromise. Equal temperament widens the major third from a pure 5:4 (386 cents) to 400
+        cents, so E's fourth harmonic overshoots C's fifth by roughly 10 Hz and produces a steady
+        shimmer. The fifth is only 2 cents narrow, so its collision beats less than once a second.
+        Click <em>tuning: equal</em> to toggle into just intonation and every amber collision snaps
+        cleanly to white.
       </p>
       <p>
-        Now pick <em>minor</em>. C–E♭–G uses the same two thirds stacked the other way up, a
-        minor third under a major one. The fifth still lines up, but the three notes only fit
-        a single harmonic series at 10:12:15, and the implied root drops to 26 Hz: an A♭ more
-        than three octaves down, a note that isn't in the chord. The ear gets no strong single
-        fundamental to hang the chord on, and its root is less clear. Helmholtz made a version
-        of this argument in 1863: some of the faint extra tones a minor triad produces in the
-        ear belong to A♭ rather than to C minor, which he blamed for the "veiled" sound of
-        minor chords.
+        Switch the quality to <em>minor</em> and watch the implied root plummet. C–E♭–G puts the
+        minor third on the bottom and the major third on top. The outer fifth still aligns cleanly,
+        but the three frequencies only share a common overtone ladder way up at 10:12:15, pushing
+        their implied fundamental down to 26.2 Hz, an A♭ more than three octaves below C4 that
+        doesn't even appear in the chord. Without a strong low fundamental anchoring all three
+        notes, the root feels less pinned down. Hermann von Helmholtz noticed a related effect back
+        in 1863: the faint combination tones generated inside the inner ear by a minor triad line up
+        with A♭ rather than C minor, which he credited for the darker, slightly "veiled" quality of
+        minor harmony.
       </p>
       <p>
-        Roughness, the measure part three built from Plomp and Levelt's curve, can't separate
-        the two. The band at the top of the figure computes it for five triads on the same
-        root. On C4: major 0.29, minor 0.31, augmented 0.29, diminished 0.40, sus4 0.32.
-        Diminished is rough because of its tritone. Augmented, which most listeners hear as
-        the least stable of the four triads, comes out as smooth as major. Whatever makes major
-        and minor sound different, it isn't mostly roughness.
+        Sensory roughness alone, computed from Plomp and Levelt's curve in part three, barely
+        distinguishes the two. The strip across the top of the figure runs that calculation across
+        five triads built on C4: major scores 0.29, minor 0.31, augmented 0.29, sus4 0.32, and
+        diminished jumps to 0.40 because of its tritone. Notice that augmented, which most people
+        hear as tense and unstable, comes out just as smooth as major. Whatever drives the felt
+        contrast between major, minor, and augmented, roughness is only a small piece of it.
       </p>
       <p>
-        Listening experiments point the same way. Josh McDermott, Andriana Lehr and Andrew
-        Oxenham measured individual listeners' liking for consonant chords, for harmonic over
-        inharmonic tones, and for steady over beating tones. The people who most preferred
-        consonant chords were the ones who most preferred harmonic spectra. How much they
-        disliked beating didn't predict it.
+        Perceptual studies point toward harmonicity instead. In 2010, Josh McDermott, Andriana Lehr,
+        and Andrew Oxenham tested how strongly individual listeners preferred consonant chords,
+        harmonic over inharmonic spectra, and steady tones over beating ones. Preference for
+        consonant chords tracked preference for clean harmonic spectra closely, whereas sensitivity
+        to beating barely predicted it at all.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Rameau and the sounding body</span>
         <p>
-          Jean-Philippe Rameau's <em>Treatise on Harmony</em> (1722) put the triad and its root
-          at the centre of music theory. In <em>Génération harmonique</em> (1737) he grounded
-          the major triad in the <em>corps sonore</em>, the sounding body: any vibrating string
-          sounds its own harmonics, and among them are a twelfth and a major seventeenth above
-          the fundamental, a major triad spread over three octaves. Minor wouldn't come out of
-          the overtones the same way. He tried several explanations over the following decades
-          and never settled on one.
+          Jean-Philippe Rameau's <em>Treatise on Harmony</em> (1722) put the triad and its root at
+          the center of Western music theory. Fifteen years later, in
+          <em>Génération harmonique</em> (1737), he anchored the major triad in the
+          <em>corps sonore</em> ("sounding body"): any plucked string radiates harmonics that
+          include a twelfth and a major seventeenth above the fundamental, forming a major triad
+          stretched over three octaves. The minor triad refused to fall out of the overtone series
+          the same way, and Rameau spent decades trying out different derivations for it without
+          ever fully convincing himself.
         </p>
       </aside>
       <details class="fold">
         <summary>Why a chord keeps its root when you rearrange it</summary>
         <div class="fold-body">
           <p>
-            Play C–E–G, then move the C up an octave to get E–G–C. The lowest note changed,
-            but it still sounds like C major. The microscope shows why. E4, G4 and C5 are
-            harmonics 5, 6 and 8 of C2, and G3, C4 and E4 are harmonics 3, 4 and 5 of C2.
-            Moving a note by an octave doubles or halves its frequency, which moves it to
-            another tooth of the same comb, so the implied root doesn't move. Musicians call
-            these rearrangements <em>inversions</em> and treat them as the same chord.
+            Play C4–E4–G4, then move the C up an octave to get E4–G4–C5. Even though E is now on
+            the bottom, the chord still reads unmistakably as C major. The harmonic comb explains
+            why: E4, G4, and C5 sit on harmonics 5, 6, and 8 of C2, and G3, C4, and E4 sit on
+            harmonics 3, 4, and 5 of that same C2. Shifting a note by an octave doubles or halves
+            its frequency, moving it to another tooth on the same comb while leaving the implied
+            root right where it was. Musicians call these octave rearrangements
+            <em>inversions</em> and treat them as voicings of the same underlying chord.
           </p>
         </div>
       </details>
@@ -144,20 +153,22 @@
       <!-- ================================================================ -->
       <h2 id="space"><span class="kicker">Step 2 · Chord space</span>Why these two</h2>
       <p>
-        Counting transpositions as the same chord, there are 19 types of three-note chord.
-        Here they all are. Any three notes cut the octave into three gaps that add up to 12
-        semitones: C–E–G is 4 up to E, 3 up to G, and 5 more back up to C. The triangle plots
-        every such split. Its corners are one note tripled, its edges are two-note chords (one
-        gap is zero), and its centre is 4 + 4 + 4, the augmented triad, the only chord that
-        splits the octave evenly. Every other type appears three times, once for each note you
-        could start counting from.
+        If we treat transpositions as equivalent, every possible three-note chord in twelve-tone
+        tuning boils down to just 19 chord types. Any three pitch classes slice the 12-semitone
+        octave into three gaps that add up to 12: C–E–G climbs 4 semitones to E, 3 to G, and 5 more
+        back up to C. The triangle below plots every way to partition 12 into three numbers. The
+        three corners represent triple unisons (12 + 0 + 0), the edges hold two-note chords where
+        one gap collapses to zero, and dead center sits 4 + 4 + 4, the augmented triad, the sole
+        chord that divides the octave into three equal pieces. Every other chord type appears three
+        times around the center, once for each cyclic ordering of its gaps.
       </p>
       <p>
-        Moving one note up a semitone widens the gap below it and narrows the gap above it,
-        so neighbouring dots are one semitone apart. When you tap a dot, the figure plays that
-        chord type at whichever transposition is the smallest move from the chord you just
-        heard. The white lines point to the current chord's neighbours, and each one sounds
-        like a single note sliding.
+        Nudging one voice up by a semitone stretches the gap beneath it by 1 and shrinks the gap
+        above it by 1, which moves you directly to an adjacent dot on the grid. Whenever you tap a
+        dot below, the figure picks whichever transposition of that chord type requires the
+        smallest total finger movement from whatever you just played. Those white spokes connect
+        the current chord to its one-semitone neighbors, letting you hear distance on the map as a
+        single note sliding.
       </p>
 
       <div
@@ -167,58 +178,67 @@
       ></div>
 
       <p>
-        Major and minor are the six dots right around the centre, alternating. After the
-        augmented triad itself, they're the most even three-note chords there are. Dmitri
-        Tymoczko made a lot of this in a 2006 paper in <em>Science</em>: chords that nearly
-        divide the octave evenly can reach many other chords by small moves, which is part of
-        why so much music is built from them. The colour is roughness, averaged over the three
-        ways of voicing each chord, and by that measure major and minor tie for the smoothest
-        type (0.28), with the augmented triad close behind (0.29). The rough dots are the
-        clusters near the corners.
+        Right around the center, alternating like petals around the augmented triad, sit the six
+        dots for major and minor. After the augmented triad itself, they are the most evenly spaced
+        three-note chords possible in twelve-tone tuning. Music theorist Dmitri Tymoczko analyzed
+        this geometry in a 2006 <em>Science</em> paper: chords that come close to dividing the
+        octave evenly sit at the crossroads of chord space, able to reach a huge number of other
+        chords through tiny voice movements. Color here tracks roughness averaged across each
+        chord's three close-position voicings. Major and minor tie for the smoothest interior spot
+        (0.28), augmented sits right behind them (0.29), and roughness flares up toward the tight
+        semitone clusters tucked into the corners.
       </p>
       <p>
-        Press <em>augmented → major or minor</em>. Lower any note of an augmented triad by a
-        semitone and you get a major triad. Raise any note and you get a minor one. Norman
-        Cook has argued that this asymmetry matters more than roughness for how the two
-        sound: the augmented triad is tense because its two intervals are equal, and the two
-        ways out of it go in opposite directions.
+        Try the <em>augmented → major or minor</em> button to hear the symmetry break in both
+        directions. Lower any note of an augmented triad by a semitone and it relaxes into a major
+        triad; raise any note by a semitone and it turns into a minor triad. Psychologist Norman
+        Cook argued that this three-tone tension matters more than pairwise roughness: two stacked
+        equal intervals leave the ear suspended, and resolving upward versus downward tilts the
+        chord into opposite emotional territory.
       </p>
       <p>
-        The dashed lines are mirrors. A chord on a mirror line has two equal gaps, so turning
-        it upside down gives the same chord back. Major and minor sit on opposite sides: flip
-        C–E–G upside down and the gaps 4 then 3 become 3 then 4, a minor triad. Hugo Riemann
-        built a whole theory of harmony, "harmonic dualism", around that mirror.
+        The three faint dashed lines bisecting the triangle are axes of mirror symmetry. Any chord
+        lying directly on a dashed line has two equal gaps (like sus4's 5 + 2 + 5, diminished's
+        3 + 3 + 6, or augmented's 4 + 4 + 4), so flipping its intervals upside down hands back the
+        same chord. Major and minor sit as mirror images across those lines: invert C–E–G (gaps 4
+        then 3) and you get gaps 3 then 4, a minor triad. Nineteenth-century theorist Hugo Riemann
+        built an entire system called "harmonic dualism" out of that reflection.
       </p>
       <p>
-        Now press <em>circle the augmented triad</em>. Walking around the six dots one
-        semitone at a time plays C, C minor, A♭, A♭ minor, E, E minor and back to C. That
-        sequence comes back in step four.
+        Pressing <em>circle the augmented triad</em> walks step by step around those six central
+        dots, moving one voice by a single semitone each time: C, C minor, A♭, A♭ minor, E, E
+        minor, and right back to C. Hold onto that six-chord loop, because it reappears from a
+        completely different angle in step four.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="function"><span class="kicker">Step 3 · Function</span>Tension and release</h2>
       <p>
-        On its own, a chord is a sound. In a key, chords also have jobs. Build a triad on each
-        note of C major and you get I (C), ii (Dm), iii (Em), IV (F), V (G), vi (Am) and vii°
-        (B°). Theory books group them by what they tend to do next. Tonic chords (I, plus vi
-        and iii, which share two notes with it) feel like home. Predominant chords (IV and ii)
-        lean away. Dominant chords (V and vii°) push back toward home. The classic order is
-        tonic, predominant, dominant, tonic, and a great deal of music runs on that loop.
+        Inside a key, chords take on distinct roles beyond their individual color. Building triads
+        on each step of C major gives I (C), ii (Dm), iii (Em), IV (F), V (G), vi (Am), and vii°
+        (B°). Harmony textbooks group these seven chords into three functional families based on
+        where they tend to lead. Tonic chords (I, along with vi and iii, which each share two notes
+        with I) sound settled and home-like. Predominant chords (IV and ii) lean away from home
+        and build momentum. Dominant chords (V and vii°) lean hard back toward resolution. The
+        circuit tonic → predominant → dominant → tonic drives an enormous fraction of Western
+        music.
       </p>
       <p>
-        The pull of V comes from two notes. Add a seventh to G major and you get G7: G–B–D–F.
-        B and F are a tritone apart, and each sits a semitone from a note of C major: B just
-        under C, F just over E. When G7 goes to C, B steps up to C and F steps down to E while
-        G stays put. Two half steps and a held note.
+        Most of the dominant's gravitational pull comes down to two notes. Stack one more third
+        onto G major to make G7 (G–B–D–F) and you introduce a tritone between B and F. Each of
+        those two notes sits just one semitone away from a stable note of C major: B rubs right
+        under C, while F leans right over E. When G7 resolves to C, B rises a half step to C, F
+        drops a half step to E, and G holds steady across both chords.
       </p>
       <p>
-        In the figure each voice is a thread through pitch. The bass takes the roots. The
-        three upper voices use a minimum-motion search: at each change, every voice moves to
-        the nearest note of the new chord, with every chord tone covered. (For V7 the upper
-        voices take B, F and G and leave out D, the usual way to fit a seventh chord into
-        four parts.) Level threads are notes the two chords share. The numbers on the bends
-        are how far a voice moved, in semitones. Play <em>I–IV–V7–I</em> and watch the last
-        change: +1, −1, and a held G.
+        In the progression explorer below, each of the four voices is drawn as a glowing ribbon
+        moving through pitch. The amber bass takes the chord roots, while the three upper voices
+        are chosen automatically by a minimum-motion search that sends every voice to the nearest
+        tone of the next chord while covering the full triad. (On V7, the upper three voices take
+        B, F, and G and omit D, the classic four-part shortcut that keeps the crucial tritone intact.)
+        Flat lines show common tones held between chords, and the signed numbers mark semitone
+        steps. Tap <em>I–IV–V7–I</em> under <em>LOOP</em> and watch the final change: +1, −1, and
+        a flat line on G.
       </p>
 
       <div
@@ -228,40 +248,41 @@
       ></div>
 
       <p>
-        The two bars under each chord are computed. The red one is Fred Lerdahl's distance
-        from the tonic chord, from <em>Tonal Pitch Space</em> (2001). It counts the steps
-        around the circle of fifths between the two roots, plus every note the new chord adds
-        at the root, fifth and triad levels of the key. From I it gives 5 for IV and V, 7 for
-        vi and iii, and 8 for ii and vii°. Lerdahl and Carol Krumhansl later tested a tension
-        model built on this distance against listeners' tension ratings, and it followed them
-        closely. The blue bar is roughness, for the four notes as voiced. V7 is high on both:
-        as far from home as V, and rougher than any other chord in the loop.
+        Beneath each chord chip sit two computed bars. The red bar (<em>δ from I</em>) is Fred
+        Lerdahl's chord distance from <em>Tonal Pitch Space</em> (2001): it adds the number of
+        steps around the key's circle of fifths between the two roots to the count of newly
+        introduced pitch classes across the root, fifth, and triad levels. Relative to I, that
+        gives 5 for IV and V, 7 for iii and vi, and 8 for ii and vii°. When Lerdahl and Carol
+        Krumhansl tested a tension model built on this distance against real listeners' continuous
+        tension ratings, the curves tracked closely. The blue bar below it measures roughness for
+        the four notes as voiced. V7 spikes on both metrics at once, combining high harmonic
+        distance with the sharpest roughness in the key.
       </p>
       <p>
-        Try <em>deceptive</em>. It's the same I–IV–V7, but V7 goes to vi instead of I. B still
-        rises to C and F still falls to E, so the upper voices do what they promised, but the
-        bass steps up from G to A instead of going to C. The cadence lands somewhere other than
-        home, and the music has a reason to keep going.
+        Click <em>deceptive</em> to hear how composers play with that expectation. It runs the same
+        I–IV–V7 setup, then sends V7 to vi instead of I. In the upper voices, B still climbs to C
+        and F still falls to E, fulfilling half the promise, while the bass steps up from G to A
+        instead of landing on C. The phrase dodges finality and buys itself room to keep moving.
       </p>
       <p>
-        <em>I–V–vi–IV</em> never makes the V–I move at all: V goes to vi, and IV returns to I
-        without passing through V. So it can repeat for a whole song without sounding finished.
-        It's the loop under "Let It Be" and "No Woman, No Cry", and the Axis of Awesome's comedy
-        medley "4 Chords" strings together dozens more songs that use it. <em>Pachelbel</em> is the progression
-        from his Canon, I–V–vi–iii–IV–I–IV–V, which falls a fourth and rises a step, over and
-        over.
+        Looping <em>I–V–vi–IV</em> skips the V–I cadence entirely: V moves to vi, and IV glides
+        back to I without passing through a dominant. Because it never slams the door shut, a song
+        can ride those four bars indefinitely, as "Let It Be", "No Woman, No Cry", and dozens of
+        pop hits in the Axis of Awesome's "4 Chords" medley all do. And <em>Pachelbel</em> runs the
+        Canon sequence (I–V–vi–iii–IV–I–IV–V), cycling through a descending-fourth, ascending-step
+        pattern that feels endlessly self-propelling.
       </p>
       <details class="fold">
         <summary>The minimum-motion search, as coded</summary>
         <div class="fold-body">
           <p>
-            For three voices and a three-note chord there are 3³ = 27 ways to assign voices to
-            notes. The search throws out any assignment that leaves a chord tone missing, puts
-            each voice on the nearest octave of its note inside F3–D5, and scores the result:
-            total semitones moved, plus 6 for each pair of voices that land on the same note
-            and 3 for each pair that cross. Lowest score wins. That's all of it, and it
-            reproduces a good share of the voice-leading rules in an eighteenth-century
-            harmony textbook: hold common tones, prefer steps to leaps, keep voices apart.
+            With three upper voices and a three-note chord, there are 3³ = 27 possible voice-to-note
+            assignments. The solver discards any assignment that drops a chord tone, snaps each
+            voice to the closest octave of its target pitch class inside F3–D5, and computes a
+            simple cost: total semitones moved across all three voices, plus a penalty of 6 for any
+            unison and 3 for any pair of voices that cross. Picking the lowest score reproduces
+            most of the voice-leading habits taught in eighteenth-century harmony courses: hold
+            shared notes, favor small steps over leaps, and keep voices cleanly separated.
           </p>
         </div>
       </details>
@@ -269,34 +290,38 @@
       <!-- ================================================================ -->
       <h2 id="tonnetz"><span class="kicker">Step 4 · Voice leading as geometry</span>The Tonnetz</h2>
       <p>
-        One map shows all of this at once. Put the twelve notes on a triangular grid so that
-        moving right goes up a perfect fifth, moving up and right goes up a major third, and
-        moving down and right goes up a minor third. Every small triangle is then a major or
-        minor triad: the ones pointing up are major (warm), the ones pointing down are minor
-        (cool). Leonhard Euler drew an early version of this grid in 1739, and
-        nineteenth-century theorists, Hugo Riemann among them, built on it. It's called the
-        <em>Tonnetz</em>, German for "tone network".
+        All of these chord relationships snap together on a single two-dimensional map. Arrange the
+        twelve pitch classes on a triangular lattice so that moving right climbs a perfect fifth,
+        moving up-right climbs a major third, and moving down-right climbs a minor third. Every
+        unit triangle on that grid automatically becomes a triad: upward-pointing triangles (warm
+        amber) are major, and downward-pointing triangles (cool blue) are minor. Leonhard Euler
+        sketched an early version of this grid in 1739, and nineteenth-century German theorists,
+        Hugo Riemann foremost among them, turned it into the <em>Tonnetz</em>, literally "tone
+        network".
       </p>
       <p>
-        Triangles that share an edge share two notes, so stepping across an edge changes one
-        note. A triangle has three edges, which gives three moves:
+        Because adjacent triangles share an edge, flipping across any edge keeps two notes fixed
+        and moves only the third corner. Every triad has three edges, giving three elementary moves:
       </p>
       <ul>
         <li>
-          <strong>P</strong> (parallel) swaps C major for C minor. The third moves a semitone.
+          <strong>P</strong> (parallel) flips across the root–fifth edge, swapping C major for C
+          minor by nudging the third down a semitone.
         </li>
         <li>
-          <strong>L</strong> (leading-tone exchange) swaps C major for E minor. C moves down a
-          semitone to B.
+          <strong>L</strong> (leading-tone exchange) flips across the third–fifth edge, swapping C
+          major for E minor by lowering C a semitone to B.
         </li>
         <li>
-          <strong>R</strong> (relative) swaps C major for A minor. G moves up a whole tone to A.
+          <strong>R</strong> (relative) flips across the root–third edge, swapping C major for A
+          minor by raising G a whole tone to A.
         </li>
       </ul>
       <p>
-        These are the neo-Riemannian transformations, worked out by David Lewin, Brian Hyer and
-        Richard Cohn in the 1980s and 90s. Press P, L or R to step, or tap any triangle to jump
-        to it. The spark shows the note that moved.
+        David Lewin, Brian Hyer, and Richard Cohn formalized this toolkit as neo-Riemannian theory
+        in the 1980s and 1990s. Use the <em>P</em>, <em>L</em>, and <em>R</em> buttons below to
+        step edge by edge, or tap any triangle directly to jump there; the white spark traces the
+        single voice that moves.
       </p>
 
       <div
@@ -306,64 +331,63 @@
       ></div>
 
       <p>
-        The cycle buttons repeat a pair of moves. P and L alternated give C, C minor, A♭,
-        A♭ minor, E, E minor and back to C, the circle around the augmented triad from step
-        two, now laid out on the map. Cohn called these <em>hexatonic</em> cycles, because the
-        six chords use only six notes between them. P and R alternated give an eight-chord
-        <em>octatonic</em> cycle (C, Cm, E♭, E♭m, F♯, F♯m, A, Am), and L and R alternated
-        walk through all 24 major and minor triads before coming home.
+        Alternating any two of these flips generates closed orbits across the lattice. Press
+        <em>P–L cycle</em> and the lattice steps through C, Cm, A♭, A♭m, E, Em, and back to C: the
+        exact six-chord ring around the augmented triad from step two, now unfolded onto the grid.
+        Cohn named these <em>hexatonic</em> cycles because all six triads draw from a pool of just
+        six pitch classes. <em>P–R cycle</em> traces an eight-chord <em>octatonic</em> loop (C, Cm,
+        E♭, E♭m, F♯, F♯m, A, Am), and <em>L–R chain</em> winds through all twenty-four major and
+        minor triads before returning to where it started.
       </p>
       <p>
-        Composers used these moves long before anyone named them. The second movement of
-        Beethoven's Ninth has a long passage that runs down an L–R chain, and later
-        nineteenth-century composers used P and L to slide between keys that share almost no
-        notes. Cohn connects the chord directly across a hexatonic cycle (C major against
-        A♭ minor) with the uncanny in nineteenth-century music, and the same moves turn up all
-        over film scores, which Frank Lehman catalogues in <em>Hollywood Harmony</em> (2018).
+        Composers were mining these paths long before theorists gave them letters. The scherzo of
+        Beethoven's Ninth Symphony drops straight down a long L–R chain, and late Romantic writers
+        leaned heavily on P and L to glide between distant keys that share almost no diatonic scale
+        tones. Cohn tied the opposite poles of a hexatonic cycle (like C major paired directly with
+        A♭ minor) to moments of eerie strangeness in nineteenth-century scores, and Frank Lehman
+        catalogs hundreds of the same moves in modern movie soundtracks in
+        <em>Hollywood Harmony</em> (2018).
       </p>
       <p>
-        The walk at the top of the page wanders this map with P, L and R moves, sometimes
-        running a cycle. It ends up in distant keys without ever sounding like a jump, because
-        each step moves one voice by one or two semitones and holds the other two.
+        The hero lattice at the top of the page runs a slow walk built entirely out of P, L, and R
+        steps, slipping occasionally into a hexatonic loop or an L–R run. Even when it wanders far
+        from its starting key, every transition stays silky because two notes always anchor the ear
+        while the third shifts by a semitone or whole step.
       </p>
       <aside class="note">
         <span class="note-label">Aside · The map is a doughnut</span>
         <p>
-          Walk twelve steps right on the Tonnetz and you've gone up twelve fifths, which in
-          equal temperament lands back on the note you started from. Walk three steps up and
-          right and three major thirds bring you home too. So the plane repeats in both
-          directions, and the figure is really the surface of a torus unrolled flat. In just
-          intonation it wouldn't close: twelve pure fifths overshoot by the Pythagorean comma
-          from part four, and the map would go on forever.
+          Walk twelve steps east on the Tonnetz and you have climbed twelve perfect fifths, which
+          in equal temperament lands right back on your starting pitch class. Walk three steps
+          northeast and three major thirds close the octave as well. Because the lattice repeats
+          periodically along both axes, this flat drawing is really the surface of a torus unrolled
+          onto a plane. In pure just intonation it would never close: twelve pure fifths overshoot
+          seven octaves by part four's Pythagorean comma, stretching the grid out into an infinite
+          plane.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>A major triad is almost one harmonic series.</strong> Its notes are
-          harmonics 4, 5 and 6 of the root two octaves down. Minor only fits at 10:12:15, on a
-          root that isn't in the chord.
-        </li>
-        <li>
-          <strong>Roughness doesn't explain major and minor.</strong> It ties them, and it rates
-          the augmented triad about as smooth. Harmonicity and three-note structure do better.
-        </li>
-        <li>
-          <strong>In a key, chords have jobs.</strong> V7 pulls toward I because two of its
-          notes are a semitone from I's notes, a tritone apart.
-        </li>
-        <li>
-          <strong>Voice leading is distance.</strong> Major and minor sit next to each other
-          in chord space, and P, L and R are the smallest moves between them.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Putting the pieces together</h2>
       <p>
-        Things I'd try next: add a fourth note, which turns the triangle into a tetrahedron of
-        seventh chords with the diminished seventh at its centre; a Tonnetz in just intonation
-        that never wraps around; and a progression explorer that suggests the next chord from
-        a corpus of real songs instead of the function cycle.
+        Stepping back from the four figures, the contrast between major and minor turns out to have
+        roots in both physics and geometry. Under the microscope, a major triad sits snugly on
+        harmonics 4, 5, and 6 of an implied root two octaves down, whereas minor only matches a
+        single harmonic ladder up at 10:12:15 on a phantom pitch far below the chord. Sensory
+        roughness alone barely splits them (and even puts the tense augmented triad in the same
+        smooth bracket), while three-note chord space shows major and minor hugging the center as
+        the most evenly spaced non-augmented triads in twelve-tone tuning. Inside a key, chords
+        take on jobs driven by voice leading, especially V7's tritone resolving by opposite half
+        steps onto I, and on the Tonnetz all of that smooth voice leading turns into literal
+        proximity across shared triangle edges.
+      </p>
+      <p>
+        There are plenty of natural extensions from here: adding a fourth note turns chord space
+        into a three-dimensional tetrahedron of seventh chords with the diminished seventh at its
+        center; untempering the Tonnetz into just intonation opens up an infinite unwrapping
+        lattice; and swapping the textbook function wheel for transition probabilities learned from
+        a corpus of real songs would turn the loop explorer into a surprisingly opinionated
+        co-writer.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/jukebox.html">Part 7, The Infinite Jukebox</a>.</strong>

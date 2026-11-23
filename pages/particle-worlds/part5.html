@@ -10,7 +10,7 @@
     <title>Gravity in Frequency Space — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Solving gravity with a Fourier transform: a particle-mesh solver with a GPU FFT, Zel'dovich initial conditions, and a cosmic web grown in an expanding 2D box."
+      content="Solving gravity with a Fourier transform: a GPU particle-mesh solver, Zel'dovich initial conditions, and a cosmic web condensing inside an expanding 2D universe."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Particle Worlds · Part 5</p>
         <h1>Gravity in Frequency Space</h1>
         <p class="subtitle">
-          Gravity solved on a mesh with a Fourier transform, and about 590,000 particles
-          growing a cosmic web from small ripples. Move your cursor through it to stir.
+          589,824 matter samples condensing into a cosmic web on a 512×512 mesh, with
+          gravity solved by a GPU Fourier transform. Sweep your cursor through it to stir.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,73 +43,83 @@
 
     <main>
       <p>
-        The simulation at the top of this page is a different kind of thing from the rest
-        of the series. The dots aren't stars, or even galaxies. Each one is a sample of the
-        matter in a box that stands in for a patch of the universe, 589,824 samples in all.
-        The box starts out almost smooth. Gravity grows the small ripples into knots,
-        filaments form between the knots, and the filaments wall off empty voids.
-        Astronomers call this the <em>cosmic web</em>. It's the largest pattern in how
-        matter is laid out, and galaxy surveys see the same structure in the real sky.
+        Zoom out far enough and an entire galaxy shrinks to a speck of dust. The 589,824
+        luminous dots above stand for chunks of dark and ordinary matter spread across a
+        patch of the early universe. At the beginning of the loop, that patch is almost
+        completely smooth, marked only by faint density ripples. Gravity amplifies those
+        ripples into dense knots, stretches slender filaments between the knots, and empties
+        out vast dark voids in between. Galaxy surveys map out this exact lacy network,
+        known as the <em>cosmic web</em>, across hundreds of millions of light-years of real
+        sky.
       </p>
       <p>
-        None of the earlier methods suit this problem. Part one's tree works by summarizing
-        clumps, and the early universe doesn't have any yet. Part three's grid assumes
-        forces with a cutoff distance, and gravity has none. So this part uses a third
-        structure, a mesh plus a Fourier transform, and solves gravity in frequency space.
+        Trying to simulate that with our earlier tools runs into trouble immediately. Part
+        one's mass pyramid earns its speedup by lumping distant clusters together, and a
+        nearly uniform early universe doesn't have clusters to lump yet. Part three's sorted
+        grid only works when forces cut off at a short radius, whereas gravity reaches across
+        the entire box. Cosmologists handle this with a third strategy altogether: deposit
+        matter onto a regular mesh, transform it into sine waves with an FFT, and solve
+        gravity in frequency space.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="periodic"><span class="kicker">Step 1 · Periodic boundaries</span>A universe with no edges</h2>
       <p>
-        A galaxy is a thing in empty space. You can draw a box around it and the box ends.
-        The universe doesn't end: wherever you stand, it carries on in every direction,
-        statistically the same. Simulations handle that by making the box
-        <em>periodic</em>. Leave through the right wall and you come back in through the
-        left, and a particle near one edge pulls on particles near the opposite edge
-        through the wall. Part four freed the grid from its box. Cosmology glues the box
-        back together into a torus.
+        When you simulate an isolated galaxy, you can draw a box around it and leave empty
+        space outside. The universe has no outside: wherever you stand, statistically the
+        same soup of matter extends in every direction. Cosmological simulations capture
+        that by making the simulation box <em>periodic</em>. Drift out through the right
+        wall and you re-enter on the left; sit near one edge and you feel the pull of mass
+        just across the opposite boundary. Where part four tore the walls off the grid,
+        cosmology glues opposite walls together into a wraparound torus.
       </p>
       <p>
-        That's awkward for part one's tree. On a torus every particle also feels every
-        periodic copy of the box, forever, and that sum converges badly. Tree codes handle
-        it with <em>Ewald summation</em>, a 1921 technique from crystallography, at a real
-        cost in time and code. There's a second problem. In the early universe the density
-        is nearly uniform, so the force on each particle is the small amount left over after
-        big pulls from every direction cancel. The tree's approximation errors are small
-        next to the big pulls, but not next to that leftover.
+        Wraparound space is deeply inconvenient for a tree solver. On a torus, every
+        particle pulls on every other particle plus all of its infinite periodic copies, and
+        summing that infinite lattice converges painfully slowly. Tree codes work around it
+        using <em>Ewald summation</em>, a 1921 method borrowed from crystal physics, which
+        adds real complexity and runtime cost. Even worse, when matter is almost uniform,
+        enormous pulls from opposite sides nearly cancel out, leaving a tiny net force. A
+        tree's approximation error is small compared to each individual pull, yet large
+        compared to that delicate remainder.
       </p>
       <p>
-        What works better is to stop thinking about gravity as pairs and treat it as a
-        <em>field</em>. Mass density ρ is a function over the box. The gravitational
-        potential φ is another function, and Poisson's equation relates them:
+        Switching from pairs of bodies to a continuous <em>field</em> sidesteps both issues.
+        Let mass density <code>ρ</code> be a scalar grid across the box and let
+        <code>φ</code> be the gravitational potential on the same grid. They obey Poisson's
+        equation:
       </p>
-      <pre><code>∇²φ = 4πG ρ        <span class="cm">// the potential's curvature is set by the density</span></code></pre>
+      <pre><code>∇²φ = 4πG ρ        <span class="cm">// density sets the curvature of the potential</span></code></pre>
       <p>
-        <code>∇²</code> is the <em>Laplacian</em>, the sum of the second derivatives in each
-        direction. In 2D it's the field's east–west curvature plus its north–south
-        curvature, which measures how much the value at a point sags below or bulges above
-        its neighbours.
+        Here <code>∇²</code> is the <em>Laplacian</em>, the sum of second derivatives along
+        each axis. In 2D it adds east–west curvature to north–south curvature, measuring how
+        far the value at a grid cell dips below or bulges above the average of its
+        neighbors.
       </p>
       <p>
-        The force is then the downhill direction, <code>F = −∇φ</code>. There are no
-        pairs. Each particle reads the slope of a field that already includes every mass in
-        the box and every periodic copy of it. The job is to get the potential everywhere
-        from the density everywhere. On a 512×512 mesh that's 262,144 equations, each
-        unknown tied to its neighbours, and the cosmology demo solves them twice per frame.
-        That sounds like a lot of work. In frequency space the core of the solve is three
-        lines.
+        Once you know <code>φ</code>, gravity is just the downhill slope,
+        <code>F = −∇φ</code>. Every particle reads its acceleration straight off a field
+        that already accounts for every bit of mass in the box and all of its periodic
+        images. The hard part is inverting <code>∇²</code> to obtain <code>φ</code> from
+        <code>ρ</code>. On a 512×512 mesh that means solving 262,144 coupled linear
+        equations, with every cell linked to its neighbors, twice every frame. That looks daunting
+        in position space, yet after a Fourier transform the solve shrinks to a single
+        division per cell.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="waves"><span class="kicker">Step 2 · Fourier</span>Any shape is a sum of waves</h2>
+      <h2 id="waves"><span class="kicker">Step 2 · Fourier</span>Any shape as a sum of waves</h2>
       <p>
-        Any function over the box, however jagged, can be written as a sum of sine waves.
-        That's Fourier's theorem, and the demo below lets you try it. It takes a signal of
-        256 samples and rebuilds it from its waves, lowest frequency first. The bump only
-        needs a handful. The square wave needs far more, and however many you add, the
-        rebuilt version overshoots right next to the jumps. Noise comes back too once the
-        slider is near the top: 256 samples and 128 waves (each with an amplitude and a
-        phase) are 256 numbers either way, so neither form loses anything.
+        Fourier's theorem says any periodic signal over a box, no matter how jagged, can be
+        built by stacking sine and cosine waves of different frequencies. You can test that
+        below on 256 samples, adding frequencies one at a time from lowest to highest. A
+        smooth Gaussian <em>bump</em> snaps into shape after just a handful of waves. A
+        sharp <em>square</em> pulse demands far more, and even with dozens of waves, crisp
+        corners keep a stubborn little ripple right beside each jump. Random <em>noise</em>
+        looks hopeless at first, then locks onto the target cleanly as the slider approaches
+        the top: 256 spatial samples and 128 frequency bins (each carrying amplitude and
+        phase, plus the mean and Nyquist mode) hold the exact same 256 numbers, so nothing
+        gets lost in translation.
       </p>
 
       <div
@@ -119,90 +129,93 @@
       ></div>
 
       <aside class="note">
-        <span class="note-label">Aside · The memoir that wasn't published</span>
+        <span class="note-label">Aside · The memoir Lagrange blocked</span>
         <p>
-          Joseph Fourier had gone to Egypt with Napoleon as secretary of the Institut
-          d'Égypte, and by 1807 he was prefect of the Isère department in Grenoble, working
-          on the mathematics of heat on the side. That year he gave the Institut de France a
-          memoir on heat flow built on this claim, and the committee reviewing it, which
-          included Lagrange, didn't let it through to publication. Lagrange didn't accept
-          that a sum of smooth sine waves could represent an arbitrary function, especially
-          one with jumps.
+          Joseph Fourier had sailed to Egypt with Napoleon as secretary of the Institut
+          d'Égypte, and by 1807 he was serving as prefect of the Isère department in
+          Grenoble while studying heat conduction in his spare time. That year he submitted
+          a memoir on heat flow built around trigonometric series to the Institut de France.
+          The review committee, which included Joseph-Louis Lagrange, refused to publish it.
+          Lagrange couldn't believe a sum of infinitely smooth sine waves could ever
+          represent an arbitrary function with abrupt jumps.
         </p>
         <p>
-          He was wrong in general, but jumps are where it gets subtle. The sum does
-          converge, yet right next to a jump it overshoots by about 9% of the jump's height
-          no matter how many waves you add. That's the <em>Gibbs phenomenon</em>, the
-          ringing in the demo. Fourier's theory finally came out in full in his 1822 book on
-          heat.
+          Fourier was right in general, though jumps do hide a quirk. As you add more
+          waves, the sum converges everywhere away from the step, yet right beside the jump
+          it always overshoots by roughly 9% of the step height, the <em>Gibbs
+          phenomenon</em> visible at the corners of the square wave above. Fourier's full
+          work finally appeared in 1822 as <em>Théorie analytique de la chaleur</em>.
         </p>
       </aside>
       <p>
-        For this article, the important part is that a function and its list of wave
-        amplitudes (its <em>spectrum</em>) hold the same information. The samples say what
-        the value is at each place. The spectrum says how much of each wave the function
-        contains. Either one determines the other, and the <em>Fourier transform</em>
-        converts between them. It's worth converting because some problems are much easier
-        on the spectrum side, and Poisson's equation is one of them.
+        The practical takeaway for solving gravity is that a grid of densities and its list
+        of wave amplitudes (its <em>spectrum</em>) are two interchangeable views of the exact
+        same data. The <em>Fourier transform</em> translates between them, and some
+        differential equations that are hopelessly tangled on the grid fall completely apart
+        on the spectrum side.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="poisson"><span class="kicker">Step 3 · Frequency space</span>Poisson's equation becomes division</h2>
+      <h2 id="poisson"><span class="kicker">Step 3 · Frequency space</span>Turning Poisson's equation into division</h2>
       <p>
-        Take a single wave of density, ρ = sin(<em>k</em>x). Differentiate it twice and you
-        get −<em>k</em>² sin(<em>k</em>x), the same wave scaled by −<em>k</em>². A wave
-        goes through the Laplacian with its shape unchanged, so for one wave the potential
-        is that wave divided by −<em>k</em>². Any density is a sum of waves, and Poisson's
-        equation is linear, so each wave can be solved on its own. The 262,144 coupled
-        equations turn into 262,144 separate divisions.
+        Take one pure density wave, <code>ρ(x) = sin(kx)</code>. Differentiate it once and
+        you get <code>k cos(kx)</code>; differentiate it a second time and you land right
+        back on <code>−k² sin(kx)</code>, the exact same wave multiplied by <code>−k²</code>.
+        Because sine waves keep their shape under the Laplacian, solving Poisson's equation
+        for a single wave means dividing its amplitude by <code>−k²</code>. And because the
+        equation is linear, we can decompose any lumpy density into waves, divide each wave
+        independently by its own <code>−k²</code>, and add the pieces back together. Those
+        262,144 coupled grid equations collapse into 262,144 independent divisions.
       </p>
-      <p>Here it is one stage at a time: break the density into waves, divide, add them back up.</p>
+      <p>Scroll through the stages on a 1D slice to see each frequency flip sign and shrink:</p>
 
       <div data-scrolly="poisson-waves"></div>
 
-      <p>In code:</p>
-      <pre><code>spectrum = fft2d(density);            <span class="cm">// to frequency space</span>
+      <p>In pseudocode, the whole Poisson solver fits in five lines:</p>
+      <pre><code>spectrum = fft2d(density);            <span class="cm">// move to frequency space</span>
 for (each wave k) {
-  spectrum[k] /= -dot(k, k);          <span class="cm">// this line solves Poisson's equation</span>
+  spectrum[k] /= -dot(k, k);          <span class="cm">// solve Poisson's equation per mode</span>
 }
-potential = inverse_fft2d(spectrum);  <span class="cm">// back to the mesh</span></code></pre>
+potential = inverse_fft2d(spectrum);  <span class="cm">// return to the mesh</span></code></pre>
       <p>
-        In position space, Poisson's equation ties every cell to every other cell. In
-        frequency space it's one division per cell. Dividing by k² also shrinks short waves
-        much more than long ones, which is why the potential comes out so much smoother
-        than the density. Periodic boundaries come for free, because the waves the FFT uses
-        already wrap around the box. (The real shader also multiplies by a gentle Gaussian
-        in k, which smooths out noise at the scale of single cells.)
+        Dividing by <code>k²</code> crushes short-wavelength ripples far harder than long
+        ones, which is why gravitational potentials always come out much smoother than the
+        clumpy mass distributions that generate them. Periodic wraparound boundaries appear
+        automatically too, because every Fourier mode already repeats cleanly across the
+        box. (The actual GPU shader also multiplies each mode by a gentle Gaussian in
+        <code>k</code> to damp jagged grid-scale noise.)
       </p>
       <details class="fold">
-        <summary>The k = 0 wave, and why only the difference from average pulls</summary>
+        <summary>The k = 0 mode, and why only departures from the mean pull</summary>
         <div class="fold-body">
           <p>
-            One wave needs special handling. <em>k</em> = 0 is the box's average density,
-            and dividing by zero doesn't work, so the shader sets it to zero. That subtracts
-            the mean. In a periodic box only the difference from the average density pulls
-            on anything, because a perfectly uniform background pulls equally in every
-            direction.
+            One wave needs special treatment: <code>k = 0</code> holds the average density
+            of the whole box, where dividing by <code>k² = 0</code> would explode. The
+            shader zeroes that mode out, which is equivalent to subtracting the mean density.
+            Inside a periodic box, a completely uniform background pulls equally in every
+            direction and cancels out, leaving only overdensities and underdensities to
+            exert net forces.
           </p>
           <p>
-            James Jeans made the same move in 1902 when he worked out how a uniform gas
-            cloud breaks up into clumps. In a static, infinite medium it isn't really
-            justified, and Binney and Tremaine later named it the "Jeans swindle." In an
-            expanding universe it is justified: the average density is what drives the
-            expansion, and equations written in coordinates that expand with the box only
-            see the difference. The non-expanding demos on this page are, strictly speaking,
-            running on the swindle.
+            James Jeans made that exact same move in 1902 while studying how a uniform gas
+            cloud fragments under gravity. In a static, infinite universe dropping the
+            background term is mathematically shaky, and Binney and Tremaine famously nicknamed
+            it the "Jeans swindle." In an expanding universe it turns out to be exact: the
+            uniform mean density drives the expansion of space itself, while the equations
+            in expanding coordinates respond strictly to departures from the mean. Strictly
+            speaking, the non-expanding demos on this page are happily riding the swindle.
           </p>
         </div>
       </details>
       <p>
-        Here it is running live. Drag to paint mass (shift-drag or right-drag erases).
-        Every frame the demo solves Poisson's equation over its whole 256×256 mesh and
-        draws the potential as a contour map, and 50,000 weightless tracer grains fall
-        through it so you can see the slopes. The tracers lose a little speed every step so
-        they settle into the wells instead of orbiting forever. Paint two blobs and their
-        wells merge into one basin before the blobs touch. Paint near an edge and the well
-        wraps around to the other side.
+        You can feel this solver running live below. The canvas starts with two modest blobs
+        of painted mass so you can see their blue potential contours merge into a shared
+        basin right away, with 50,000 weightless tracers sliding downhill into the wells
+        (with light drag so they settle rather than orbiting forever). Drag anywhere to
+        paint more mass, or shift-drag (or right-drag) to erase; every frame runs a full
+        256×256 Poisson solve across the periodic box. Paint close to one edge and watch the
+        gravity well wrap straight onto the far side, or hit <em>clear mass</em> to sketch
+        your own landscape from scratch.
       </p>
 
       <div
@@ -212,37 +225,39 @@ potential = inverse_fft2d(spectrum);  <span class="cm">// back to the mesh</span
       ></div>
 
       <p>
-        This is the third time in the series that a hard problem got easier by changing
-        how it's represented. Part one grouped bodies into a tree so distant ones could be
-        summarized. Part three sorted particles so neighbours sat next to each other in
-        memory. Here the Fourier transform rewrites the density as waves, and in that form
-        each wave can be solved by itself. Mathematicians call that
-        <em>diagonalizing</em> the operator.
+        Across this series, every speedup has come from changing how we organize the data
+        before doing the math. Part one built a tree to summarize distant clusters; part
+        three sorted particles so physical neighbors sat beside each other in memory; here
+        the Fourier transform rewrites density in a basis where the Laplacian acts one mode
+        at a time, which mathematicians call <em>diagonalizing</em> the operator.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="fft"><span class="kicker">Step 4 · The FFT</span>From n² to n log n</h2>
+      <h2 id="fft"><span class="kicker">Step 4 · The FFT</span>From n² down to n log n</h2>
       <p>
-        That leaves <code>fft2d</code> itself. Each output of a Fourier transform is a
-        weighted sum over all n inputs, so computing all n outputs directly costs n², the
-        same wall as in earlier parts. Straight from the definition, one 2D transform of a
-        512×512 mesh is 262,144² multiply-adds, about 69 billion. Each step needs two
-        transforms (forward and back), and the cosmology demo takes two steps per frame.
+        All of that magic only pays off if <code>fft2d</code> itself is fast. Computing a
+        discrete Fourier transform straight from its definition sums over all <code>n</code>
+        inputs for each of the <code>n</code> outputs, landing right back at
+        <code>O(n²)</code>. Doing a 512×512 transform by brute force would mean 262,144²
+        complex multiply-adds (nearly 69 billion operations for a single pass), and our
+        cosmology demo needs forward and inverse transforms twice per frame.
       </p>
       <p>
-        The fast Fourier transform gets around this. A transform of size n splits into two
-        transforms of size n/2, one over the even-numbered samples and one over the odd
-        ones, recombined with one complex multiply per output. Do that recursively and the
-        cost drops to n log n. The diagram below is the <em>butterfly network</em> for 16
-        points: log₂16 = 4 layers, where each layer pairs every value with a partner 8
-        positions away, then 4, then 2, then 1. It's the same layered shape as part three's
-        prefix sum, with complex rotations in place of additions, and it maps onto a GPU
-        just as well.
+        The fast Fourier transform breaks that bottleneck by divide-and-conquer. A transform
+        of length <code>n</code> splits into two half-size transforms, one on the
+        even-indexed samples and one on the odd-indexed samples, stitched back together with
+        a single complex multiply per output. Repeating that split recursively drops the work
+        to <code>O(n log n)</code>. Below, the top diagram traces the resulting
+        <em>butterfly network</em> for 16 points: <code>log₂ 16 = 4</code> layers where
+        every value pairs with a partner 8 slots away, then 4, then 2, then 1. It shares the
+        exact layered fan-in shape of part three's prefix scan, replacing additions with
+        complex rotations, so it maps onto parallel GPU workgroups just as cleanly.
       </p>
       <p>
-        Below the diagram, two bars race a direct n² transform against an FFT on your CPU.
-        Past 2,048 points the direct version would take too long, so it's timed at 2,048
-        and scaled up.
+        Underneath the network, two log-scaled bars race a direct <code>O(n²)</code> DFT
+        against an FFT right on your CPU as you slide <em>points</em> from 256 up to
+        1,048,576. Above 2,048 points the direct transform gets too slow to wait for, so the
+        benchmark times it at 2,048 and scales by <code>n²</code>.
       </p>
 
       <div
@@ -252,66 +267,70 @@ potential = inverse_fft2d(spectrum);  <span class="cm">// back to the mesh</span
       ></div>
 
       <aside class="note">
-        <span class="note-label">Aside · Gauss got there first</span>
+        <span class="note-label">Aside · Gauss beat everyone by 160 years</span>
         <p>
-          Around 1805 Carl Friedrich Gauss was working out the orbits of the asteroids
-          Pallas and Juno from observations, which needed these same sums, and he found a
-          way to split a large transform into smaller ones. He wrote it up in Latin and
-          didn't publish it. It was printed in 1866, after his death, in his collected
-          works, and went largely unnoticed until Heideman, Johnson and Burrus traced the
-          history of the FFT in 1984.
+          Around 1805, while computing the orbits of the newly discovered asteroids Pallas
+          and Juno from astronomical observations, Carl Friedrich Gauss worked out the same
+          even–odd splitting trick to speed up his trigonometric sums. He wrote the method
+          down in Latin and never published it; it only appeared in 1866 in his posthumous
+          collected works, where it sat unnoticed until Michael Heideman, Don Johnson, and
+          Sidney Burrus uncovered the history in 1984.
         </p>
         <p>
-          By then James Cooley and John Tukey had published the algorithm independently, in
-          1965. Part of the push came from Richard Garwin, who wanted fast transforms for
-          detecting Soviet nuclear tests with seismometers and got Cooley to program it.
-          Within a few years the FFT was everywhere signals get processed, from audio and
-          radio to medical imaging.
+          Long before that rediscovery, James Cooley and John Tukey published the algorithm
+          independently in 1965. Part of the motivation came from physicist Richard Garwin,
+          who needed fast spectral analysis to spot Soviet underground nuclear tests in
+          seismometer traces and nudged Cooley to implement Tukey's idea. Within a few
+          years, the FFT reshaped everything from radar and audio compression to MRI scans.
         </p>
       </aside>
       <details class="fold">
-        <summary>The FFT as a GPU kernel</summary>
+        <summary>Inside the GPU FFT kernel</summary>
         <div class="fold-body">
           <p>
-            The shader is a Stockham radix-2 FFT. One workgroup loads one row of the mesh
-            into shared memory, and each of its 256 threads does one butterfly per stage. It
-            folds the row log₂512 = 9 times with a barrier between folds, the same rhythm as
-            part three's scan, then writes it back. Stockham's indexing keeps the output in
-            order, so there's no bit-reversal pass.
+            The WebGPU shader implements a Stockham radix-2 FFT. Each workgroup loads one
+            512-element row into shared memory, where 256 threads execute one butterfly pair
+            each across <code>log₂ 512 = 9</code> stages separated by workgroup barriers,
+            then writes the row back out. Stockham indexing keeps elements sorted after
+            every stage, avoiding a separate bit-reversal permutation pass.
           </p>
           <p>
-            A 2D transform is a pass over the rows and then a pass over the columns, so a
-            forward and an inverse transform make four passes. That's the "4 FFTs" in the
-            demo readouts.
+            A 2D transform runs once across all rows and once down all columns, so a forward
+            and inverse 2D FFT take four compute passes total (the "4 FFTs" listed in the
+            demo readouts).
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="particle-mesh"><span class="kicker">Step 5 · Particle-mesh</span>From particles to a field and back</h2>
+      <h2 id="particle-mesh"><span class="kicker">Step 5 · Particle-mesh</span>Bridging particles and the mesh</h2>
       <p>
-        The solver works on fields, but the matter is particles. The method that connects
-        them is called <em>particle-mesh</em>, and each step goes like this:
+        Our Poisson solver speaks in grid cells, while our universe is made of moving
+        particles. Connecting the two gives the classic <em>particle-mesh</em> (PM) loop:
       </p>
-      <pre><code>deposit:   particles spread their mass onto the mesh   <span class="cm">// particles → field</span>
-solve:     FFT → divide by −k² → inverse FFT            <span class="cm">// potential</span>
-gradient:  difference neighbouring cells                <span class="cm">// force at each cell</span>
-gather:    particles read the force where they are      <span class="cm">// field → particles</span>
-kick and drift, wrap through the walls, repeat</code></pre>
+      <pre><code>deposit:   spread each particle's mass onto the mesh    <span class="cm">// particles → field</span>
+solve:     FFT → divide by −k² → inverse FFT            <span class="cm">// density → potential</span>
+gradient:  difference neighboring cells                 <span class="cm">// potential → force grid</span>
+gather:    interpolate the force back to each particle  <span class="cm">// field → particles</span>
+kick and drift, wrap through periodic walls, repeat</code></pre>
       <p>
-        Deposit and gather are the only parts with real design choices. The crude deposit
-        drops each particle's whole mass into the cell it's in. That jitters: when a
-        particle crosses a cell border its mass jumps from one cell to the next, the field
-        jumps with it, and the particle feels the jump. The standard fix is
-        <em>cloud-in-cell</em> (CIC). Each particle splits its mass over the four nearest
-        cells, weighted by how much a cell-sized square centred on the particle overlaps
-        each one, so the deposit moves as smoothly as the particle does.
+        The subtle part is how particles talk to the mesh during <em>deposit</em> and
+        <em>gather</em>. The simplest rule, <em>nearest grid point</em> (NGP), dumps a
+        particle's entire mass into whichever cell center lies closest. Drag a particle
+        across a cell boundary under NGP and all of its mass teleports abruptly into the
+        next cell, creating sudden force jerks. The standard upgrade is
+        <em>cloud-in-cell</em> (CIC): treat each particle as a 1×1 cell-sized square
+        centered on its position, and split its mass across the four overlapping grid cells
+        in proportion to the overlap areas. As the particle glides smoothly across a border,
+        its mass transfers smoothly from one cell to the next.
       </p>
       <p>
-        The gather reads the force back with the same four weights. Depositing with one
-        scheme and gathering with another would leave each particle feeling a small force
-        from itself, and momentum wouldn't be conserved. Drag the particles below and
-        compare CIC with the nearest-cell version:
+        When gathering forces back onto the particles, we have to use those exact same four
+        bilinear weights. Mixing one deposit scheme with a different gather scheme makes a
+        particle exert a spurious net force on itself, breaking momentum conservation. Drag
+        the four orange particles below and switch between <em>CIC — split over 4 cells</em>
+        and <em>NGP — nearest cell only</em> to watch how the dashed 1×1 cloud distributes
+        mass across borders:
       </p>
 
       <div
@@ -321,14 +340,14 @@ kick and drift, wrap through the walls, repeat</code></pre>
       ></div>
 
       <p>
-        That's the whole method: deposit, transform, divide, transform back, gather. No
-        tree walk and no sort. Below is a cold blob like part four's ghost cloud, this time
-        in a periodic box: 65,536 particles starting at rest, restarting every 14 seconds.
-        The slider changes nothing about the particles, only the mesh the forces are
-        computed on, from 64×64 to 512×512. On the coarse mesh the forces are blurry and the
-        collapse stays smooth. On the fine one the same blob breaks up into much finer
-        filaments and knots. The box is drawn tiled 3×3, so you can watch the neighbouring
-        copies collapse in step, since they're the same particles.
+        Deposit, FFT, divide, inverse FFT, gather: no tree walks and no sorting. Below,
+        that exact solver runs on a cold uniform blob of 65,536 particles starting at rest
+        inside a periodic box (drawn tiled 3×3 so you can see the periodic neighbors
+        collapsing in lockstep, resetting every 14 seconds). Moving the <em>mesh</em> slider
+        between 64×64 and 512×512 leaves the particles untouched and changes only the grid
+        solving gravity. On a 64×64 mesh the gravitational field is blurry and the collapse
+        stays smooth; push it up to 512×512 and the exact same cloud shatters into crisp
+        knots and fine filaments.
       </p>
 
       <div
@@ -338,74 +357,79 @@ kick and drift, wrap through the walls, repeat</code></pre>
       ></div>
 
       <p>
-        That slider shows the method's main limit: <strong>below the size of one cell,
-        there's no gravity to speak of</strong>. The mesh is the softening. For a galaxy
-        that would be fatal. Part one needed forces down to the spacing between stars,
-        which is why it used a tree. For cosmology it's a reasonable trade, because the
-        structures of interest are large and fill the whole box. The tree spends
-        bookkeeping to put resolution where matter clumps. The mesh gives every part of the
-        box the same resolution and makes the whole box cheap.
+        That slider lays bare the core trade-off of particle-mesh gravity:
+        <strong>anything smaller than a single grid cell gets blurred out</strong>. The
+        mesh spacing itself acts as the softening length. For simulating close binaries in a
+        galaxy, that would be a dealbreaker, which is why part one invested in an adaptive
+        tree that puts fine resolution wherever stars clump. For large-scale cosmology,
+        where filaments and voids span the whole volume, giving every part of the box equal
+        resolution in <code>O(M log M)</code> time is a great bargain.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="initial-conditions"><span class="kicker">Step 6 · Initial conditions</span>Seeds and an expanding box</h2>
-      <p>The solver is done. The cosmology demo needs two more things.</p>
+      <h2 id="initial-conditions"><span class="kicker">Step 6 · Initial conditions</span>Primordial seeds and expanding space</h2>
+      <p>With the PM gravity solver running, turning it into a miniature cosmos takes two more ingredients.</p>
       <p>
-        <strong>The seeds.</strong> The young universe was almost featureless. The cosmic
-        microwave background, mapped by COBE, WMAP and Planck, shows it was smooth to about
-        one part in 100,000. The ripples are random, but they have a measured statistical
-        fingerprint: how much ripple there is at each scale, called the <em>power
-        spectrum</em>. So making initial conditions is short. Fill a grid with random
-        noise, transform it, and scale each wave to match the spectrum you want. Then,
-        instead of scattering particles randomly (which would add noise of its own), start
-        them on a perfect lattice and <em>displace</em> each one along the resulting field,
-        with a small velocity in the same direction. This runs on the CPU each time you
-        re-seed, using three more FFTs.
+        <strong>Primordial ripples.</strong> Measurements of the cosmic microwave background
+        by COBE, WMAP, and Planck reveal an infant universe smooth to roughly one part in
+        100,000. Those tiny fluctuations are random in phase, yet follow a specific
+        statistical recipe, the <em>power spectrum</em>, that dictates how much variance sits
+        at each wavelength. Generating matching initial conditions takes just three CPU FFTs
+        at seed time: fill a grid with Gaussian white noise, FFT it, shape every Fourier
+        mode to match the desired power spectrum, divide by <code>k²</code> to turn density
+        ripples into a displacement field, and transform back. Rather than tossing particles
+        down randomly (which would inject unwanted shot noise), we start them on a clean
+        regular lattice and nudge every particle along that displacement field with a
+        matching initial momentum.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Zel'dovich, 1970</span>
+        <span class="note-label">Aside · Zel'dovich's pancakes, 1970</span>
         <p>
-          The displacement recipe is Yakov Zel'dovich's approximation from 1970. While the
-          ripples are small they all grow at the same rate, so each particle moves in a
-          straight line and one nudge along the displacement field gets the early motion
-          right. Zel'dovich used it to predict that the first structures to form would be
-          flattened sheets, which he called pancakes.
+          This lattice-displacement recipe is Yakov Zel'dovich's 1970 approximation. While
+          density fluctuations remain small, every wavelength grows at the same rate, so
+          particles coast along straight trajectories determined by the initial gravitational
+          field. A single push along that field captures the early growth accurately, and
+          Zel'dovich used it to predict that collapsing regions would first flatten along
+          one axis into thin sheets he called "pancakes."
         </p>
       </aside>
       <p>
-        <strong>The expansion.</strong> Space expands, and gravity has to work against it.
-        Simulations fold the expansion into the coordinates. <em>Comoving</em> coordinates
-        stretch along with space, so the box stays size 1 while real distances grow with
-        the scale factor a(t). The expansion only shows up as powers of a in the kick and
-        drift. Everything else stays the same: same kernels, same four FFT passes.
+        <strong>Expanding space.</strong> In an expanding universe, gravity has to pull
+        matter together while space stretches underneath it. Rather than growing the mesh
+        every step, cosmologists switch to <em>comoving</em> coordinates that stretch right
+        along with the expansion, keeping the simulation box fixed at size 1 while physical
+        distances scale by the cosmic scale factor <code>a(t)</code>. All of that expansion
+        math collapses into a few powers of <code>a</code> multiplying the kick and drift
+        steps, leaving the deposit, FFT, and gather shaders completely untouched.
       </p>
       <p>
-        The clock runs in scale factor, from a = 0.02 (the universe at 2% of its present
-        size) to a = 1, which is today. The ripples at the start are bigger than the
-        microwave background's one part in 100,000, since they've had time to grow by then,
-        but they're still small. The demo steps in equal increments of ln a, about 1,000
-        steps in all, so at 60 frames a second it reaches today in roughly eight seconds.
-        Then the clock stops, but the particles keep moving and you can keep stirring. It
-        uses a matter-only universe (called Einstein–de Sitter), which is simpler than the
-        real one with its dark energy.
+        Our clock advances in equal steps of <code>ln a</code> from <code>a = 0.02</code>
+        (redshift <code>z = 49</code>, when the universe was 2% of its present size) up to
+        <code>a = 1</code> (today). Because the run starts long after the microwave
+        background was emitted, the initial ripples have already had time to grow beyond
+        one part in 100,000, though they're still gentle. Around 1,000 substeps bring the
+        box to today in roughly eight seconds at 60 fps, using a simplified matter-only
+        (Einstein–de Sitter) cosmology without dark energy. Once <code>a</code> hits 1, the
+        clock pauses while the web keeps churning and responding to your cursor.
       </p>
       <p>
-        Run it below. The <em>expansion on/off</em> button shows why expansion matters.
-        With it off, gravity runs unopposed and structure grows much faster, ending up as a
-        few big clumps. With it on, gravity wins slowly and only where the seeds favoured
-        it: knots first, then filaments between them, then empty voids as matter drains
-        onto the web.
+        Explore the parameters below. Clicking <em>expansion: on</em> / <em>expansion: off</em>
+        shows the tug-of-war between gravity and Hubble expansion: turn expansion off and
+        gravity goes unchecked, collapsing the box rapidly into a handful of big blobs;
+        leave it on and space stretches fast enough that gravity can only gather matter along
+        the ridges favored by the initial seeds, sculpting knots, filaments, and empty
+        voids.
       </p>
       <p>
-        The <em>ripple strength</em> slider plays the part cosmologists give σ₈, the overall
-        amplitude of the ripples: turn it down and structure shows up later and thinner.
-        The <em>tilt n</em> slider sets how the ripples are split between large and small
-        scales (the spectrum goes as kⁿ). Negative values give a few big filaments, and
-        positive values give a foam of small clumps. Planck measured both numbers for the
-        real universe, σ₈ at about 0.81 and the tilt of the primordial spectrum at about
-        0.965. They're two of the numbers that describe the standard cosmological model,
-        ΛCDM, which has six free parameters in all. The sliders here are simplified
-        stand-ins for them. The particle slider goes from 65,536 to just over a million.
+        The <em>ripple strength</em> slider acts like cosmologists' <code>σ₈</code>,
+        controlling the starting amplitude of the perturbations: lower it and structure
+        emerges later and more delicately. The <em>tilt n</em> slider tunes the balance
+        between long and short waves (<code>P(k) ∝ kⁿ</code>): negative values favor a few
+        sweeping filaments, while positive values break the box into a fine foam of tiny
+        clumps. Planck pinned down both numbers for our actual universe (<code>σ₈ ≈ 0.81</code>
+        and primordial spectral tilt <code>nₛ ≈ 0.965</code>), two of the six parameters in
+        the standard ΛCDM cosmological model. The <em>particles</em> slider steps from
+        65,536 up to 1,048,576, and <em>big bang again</em> draws a fresh random seed.
       </p>
 
       <div
@@ -415,53 +439,44 @@ kick and drift, wrap through the walls, repeat</code></pre>
       ></div>
 
       <p>
-        One caveat: this box is 2D. Poisson's equation in 2D gives a force between two
-        points that falls off as 1/r instead of 1/r². The kick and drift are set up so
-        small ripples grow at the same rate as they would in a matter-only 3D universe, but
-        once things get lumpy the details differ from the real thing. The method is the
-        real one, though. In 3D, the mesh-based codes of the mid-1980s used the same
-        ingredients: a mesh, FFTs and comoving kicks, plus a direct short-range correction
-        (that version is called P³M). With 32,768 particles, Davis, Efstathiou, Frenk and
-        White used them to make the case that cold dark matter, starting from ripples like
-        these, could produce the clustering of galaxies we see.
+        One honest caveat: this universe lives in 2D, where Poisson's equation gives a
+        <code>1/r</code> pairwise force instead of <code>1/r²</code>. The comoving kick and
+        drift coefficients are calibrated so small perturbations grow at the exact 3D
+        Einstein–de Sitter linear rate, though once filaments go nonlinear the detailed
+        collapse shapes diverge from 3D. Even so, the computational skeleton is the real
+        thing. In the mid-1980s, Marc Davis, George Efstathiou, Carlos Frenk, and Simon
+        White used 3D particle-mesh codes (upgraded with direct short-range pairs, a hybrid
+        called P³M) with just 32,768 particles to demonstrate that cold dark matter, seeded
+        with ripples like these, reproduces the observed clustering of galaxies.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>Three ways around n²</h2>
-      <p>Across five parts the n² wall came down three times, with three different structures:</p>
-      <ul>
-        <li>
-          <strong>The tree summarizes space.</strong> Far-away things blur together, so
-          resolution can follow interest. Part one's pyramid answers "what's the total pull
-          on me?" in log n steps, and pays in memory for the hierarchy.
-        </li>
-        <li>
-          <strong>The sort organizes memory.</strong> Things that touch should sit next to
-          each other in memory, not only in space. Part three's counting sort answers "who's
-          next to me?" in constant time per particle, and pays with a scan.
-        </li>
-        <li>
-          <strong>The transform changes the representation.</strong> Some equations are
-          only hard in the form they were asked in. The FFT moves Poisson's equation to
-          where it's a division, and pays n log n.
-        </li>
-      </ul>
       <p>
-        The big production codes use two at once. TreePM, the method in GADGET-2 that ran
-        the Millennium Simulation's ten billion particles, splits gravity at a scale of a
-        few mesh cells. The mesh handles the far field, periodic and cheap, and the tree
-        handles the near field, sharp where matter clumps. Part four paired the tree with
-        the sort. TreePM pairs the tree with the mesh.
+        Over five parts, we have knocked down the same <code>O(n²)</code> wall in three
+        completely different ways. Part one's mass pyramid summarized space hierarchically so
+        distant clusters could be read in <code>O(log n)</code> steps, putting resolution
+        wherever matter piled up. Part three's counting sort rearranged memory so physically
+        touching particles sat next to each other in RAM, answering neighbor queries in
+        constant time after a prefix scan. And here, the FFT changed the representation
+        itself, moving Poisson's equation into frequency space where every wave decouples
+        into a single division at an <code>O(M log M)</code> cost.
       </p>
       <p>
-        Things I'd try next: a third dimension; finer meshes nested inside the deepest
-        wells (adaptive mesh refinement); and initial conditions built from a real
-        cosmological power spectrum instead of a tilt slider.
+        Large production cosmology codes combine two of those ideas in one solver.
+        <em>TreePM</em>, used in Volker Springel's GADGET-2 code to run the ten-billion-particle
+        Millennium Simulation, splits gravity at a cutoff of a few grid cells: a periodic FFT
+        mesh computes the long-range field cheaply across the whole box, while a local
+        Barnes–Hut tree sharpens short-range pulls inside dense halos. Just as part four
+        paired the tree with the hash sort, TreePM pairs the tree with the mesh. Pushing
+        this page closer to that world would mean moving to 3D, nesting finer meshes inside
+        collapsing halos (adaptive mesh refinement), and feeding in a measured ΛCDM power
+        spectrum in place of the tilt slider.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/particle-worlds/part6.html">Part six, The Fluid Instrument</a>.</strong>
-        The same Poisson solve, turned to pressure: a 3D fluid you can stir with your cursor
-        or your hands.
+        The same Poisson equation, repurposed for fluid pressure: a 3D smoke playground you
+        can stir with your cursor or your hands.
       </p>
     </main>
 

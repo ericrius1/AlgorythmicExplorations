@@ -50,11 +50,12 @@ export function mountSlingshot(container: HTMLElement): Demo {
   shell.button("clear", () => {
     bodies = [];
   });
-  shell.setInfo(() =>
-    velocityFirst
-      ? `${bodies.length} bodies · semi-implicit Euler · press, drag, release to launch`
-      : `${bodies.length} bodies · explicit Euler · watch the tight orbit spiral out`,
-  );
+  shell.setInfo(() => {
+    const label = bodies.length === 1 ? "1 body" : `${bodies.length} bodies`;
+    return velocityFirst
+      ? `${label} · semi-implicit Euler · press, drag, release to launch`
+      : `${label} · explicit Euler · watch the tight orbit spiral out`;
+  });
 
   // Pointer drag = launch vector.
   let drag: { x: number; y: number; cx: number; cy: number } | null = null;
@@ -185,7 +186,7 @@ export function mountSlingshot(container: HTMLElement): Demo {
       ctx.fillStyle = core;
       ctx.fillRect(ox - 9 * px, oy - 9 * px, 18 * px, 18 * px);
 
-      // trails, fading toward the tail, in the body's speed colour
+      // trails, fading toward the tail, in the body's speed color
       ctx.lineCap = "round";
       ctx.lineWidth = 1.6 * px;
       for (const b of bodies) {

@@ -9,7 +9,7 @@
 import { Shell, type Demo } from "../../../lib/demoShell";
 import { unlockAudio, frameGuard } from "../../../lib/audio";
 import { PC_NAMES, mod } from "./theory";
-import { COL, Surface, approach, dot, glow, hex, label, mixRgb, rgba, roundRect, signed, text, type RGB } from "./draw";
+import { COL, MONO, Surface, approach, clamp, dot, glow, hex, label, mixRgb, rgba, roundRect, signed, text, type RGB } from "./draw";
 import { Sound, type Held, type Timbre } from "./sound";
 import { button, chips, tapBadge, toggle } from "./ui";
 
@@ -189,7 +189,7 @@ const SCALES: World[] = [
     down: [7, 6, 5, 4, 3, 2, 1, 0],
     drone: null,
     timbre: "metal",
-    caption: "seven tones; pieces mostly use five. Modelled as steps of a nine-step division (133¢)",
+    caption: "seven tones; pieces mostly use five. Modeled as steps of a nine-step division (133¢)",
     subsets: [
       { id: "all", text: "all seven", tones: [0, 1, 2, 3, 4, 5, 6] },
       { id: "nem", text: "pathet nem / lima: 1 2 3 5 6", tones: [0, 1, 2, 4, 5] },
@@ -227,7 +227,7 @@ const TRAD_COLOR: Record<World["tradition"], RGB> = {
 
 export function mountWorldScales(container: HTMLElement): Demo {
   const shell = new Shell(container, 0.5);
-  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.02 : 0.42));
+  const surf = new Surface(shell.canvas, (w) => (w < 600 ? 1.08 : 0.46));
   const sound = new Sound({ level: 1, reverb: 0.2 });
   const badge = tapBadge(container, "tap for sound");
 
@@ -323,7 +323,13 @@ export function mountWorldScales(container: HTMLElement): Demo {
       subChips.el.style.display = sc.subsets ? "" : "none";
       subChips.set("all");
       droneBtn.el.disabled = !sc.drone;
-      droneBtn.el.textContent = sc.drone === "tanpura" ? "tanpura drone" : sc.drone ? "drone on the tonic" : "no drone";
+      droneBtn.setLabels(
+        sc.drone === "tanpura"
+          ? ["tanpura drone", "tanpura on"]
+          : sc.drone
+            ? ["drone on the tonic", "drone on"]
+            : ["no drone", "no drone"],
+      );
     },
   });
   void scaleChips;
@@ -384,7 +390,7 @@ export function mountWorldScales(container: HTMLElement): Demo {
       const x1 = w - (narrow ? 16 : 30);
       const span = sc.octave + 100; // show a little past the octave
       const X = (c: number): number => x0 + ((x1 - x0) * (c + 50)) / span;
-      const stripY = h * 0.7;
+      const stripY = h * 0.72;
       const stripH = narrow ? 44 : 56;
       const tcol = TRAD_COLOR[sc.tradition];
 
@@ -436,20 +442,18 @@ export function mountWorldScales(container: HTMLElement): Demo {
         ctx.stroke();
       }
 
-      // pins
+      // pins: pass 1 draws all stems behind labels so no stem cuts across text
       pins = [];
-      const top = (narrow ? 70 : 82) + capExtra;
-      const rows = 2;
+      const top = (narrow ? 68 : 74) + capExtra;
+      const nameRowGap = narrow ? 36 : 38;
       const visible = sc.notes.map((n, i) => ({ n, i })).concat([{ n: { c: sc.octave, name: sc.notes[0].name, sub: sc.notes[0].sub }, i: sc.notes.length }]);
       visible.forEach(({ n, i }, k) => {
         const on = allowed(i);
         const x = X(n.c);
-        const row = k % rows;
-        const py = top + row * (narrow ? 44 : 50) + 16;
-        const f = flash.get(i === sc.notes.length ? 0 : i) ?? 0;
+        const py = top + (k % 2) * nameRowGap + 14;
         const col = n.alt ? mixRgb(tcol, [150, 160, 200], 0.5) : tcol;
         const a = on ? 1 : 0.25;
-        ctx.strokeStyle = rgba(col, 0.45 * a);
+        ctx.strokeStyle = rgba(col, 0.42 * a);
         ctx.lineWidth = 1.2;
         ctx.setLineDash(n.alt ? [3, 3] : []);
         ctx.beginPath();
@@ -457,24 +461,42 @@ export function mountWorldScales(container: HTMLElement): Demo {
         ctx.lineTo(x, stripY - 2);
         ctx.stroke();
         ctx.setLineDash([]);
+      });
+      // pass 2: dots, note names, and collision-free cent pills
+      const pillSize = narrow ? 8.5 : 9.5;
+      const pillPadX = pillSize * 0.5;
+      const rowRight = [-Infinity, -Infinity, -Infinity];
+      visible.forEach(({ n, i }, k) => {
+        const on = allowed(i);
+        const x = X(n.c);
+        const py = top + (k % 2) * nameRowGap + 14;
+        const f = flash.get(i === sc.notes.length ? 0 : i) ?? 0;
+        const col = n.alt ? mixRgb(tcol, [150, 160, 200], 0.5) : tcol;
+        const a = on ? 1 : 0.25;
         glow(ctx, x, stripY + 4, 16 + 10 * f, col, (0.25 + 0.5 * f) * a);
         dot(ctx, x, rulerY, 3.4 + 2 * f, col, a, 3);
-        // label block
         const nearest = Math.round(n.c / 100);
         const dev = n.c - nearest * 100;
         const etName = PC_NAMES[mod(sc.tonicPc + nearest, 12)];
         noteName(ctx, n.name, x, py - 4, narrow ? 13 : 15, rgba(mixRgb(col, [255, 255, 255], 0.45), a));
         if (n.sub) text(ctx, n.sub, x, py + 9, { size: 9.5, color: rgba(col, 0.85 * a), align: "center" });
         const devStr = Math.abs(dev) < 0.5 ? `= ${etName}` : `${etName} ${signed(dev, 0)}`;
-        const ly = rulerY - 16 - row * 17;
-        label(ctx, narrow ? `${n.c.toFixed(0)}¢` : `${n.c.toFixed(0)}¢ · ${devStr}`, x, ly, {
-          size: narrow ? 8.5 : 9.5,
+        const pillText = narrow ? `${n.c.toFixed(0)}¢` : `${n.c.toFixed(0)}¢ · ${devStr}`;
+        ctx.font = `600 ${pillSize}px ${MONO}`;
+        const pw = ctx.measureText(pillText).width + pillPadX * 2;
+        const lx = clamp(x, x0 + pw / 2, x1 - pw / 2);
+        let pRow = rowRight.findIndex((r) => lx - pw / 2 > r + 5);
+        if (pRow < 0) pRow = rowRight.indexOf(Math.min(...rowRight));
+        rowRight[pRow] = lx + pw / 2;
+        const ly = rulerY - 16 - pRow * 18;
+        label(ctx, pillText, lx, ly, {
+          size: pillSize,
           mono: true,
           color: Math.abs(dev) > 20 ? "#ffd2a8" : "#c8d0e6",
-          bg: "rgba(8, 9, 14, 0.78)",
+          bg: "rgba(8, 9, 14, 0.86)",
         });
         pins.push({ x, y: py, i: i === sc.notes.length ? sc.notes.length : i });
-        pins.push({ x, y: ly, i: i === sc.notes.length ? sc.notes.length : i });
+        pins.push({ x: lx, y: ly, i: i === sc.notes.length ? sc.notes.length : i });
       });
     },
     dispose() {

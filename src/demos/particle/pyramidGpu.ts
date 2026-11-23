@@ -98,7 +98,7 @@ export async function mountPyramidGpu(container: HTMLElement, opts: PyramidDemoO
   shell.setInfo(() =>
     opts.hero
       ? `${count.toLocaleString()} bodies, live in your browser`
-      : `${count.toLocaleString()} bodies × ${steps} steps/frame · tree rebuilt every step, on the GPU`,
+      : `${count.toLocaleString()} bodies × ${steps === 1 ? "1 step/frame" : `${steps} steps/frame`} · tree rebuilt every step, on the GPU`,
   );
 
   return {

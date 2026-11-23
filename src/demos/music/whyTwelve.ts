@@ -1,7 +1,7 @@
 // Fig. 4 of Part 4: why twelve? Divide the octave into N equal steps for
 // every N from 5 to 53 and measure how close the nearest step gets to a pure
 // fifth (blue), a pure major third (amber) and, optionally, the harmonic
-// seventh 7:4 (violet). The fifth's record-setters are labelled with the
+// seventh 7:4 (violet). The fifth's record-setters are labeled with the
 // continued-fraction convergents of log2(3/2): 3/5, 7/12, 24/41, 31/53.
 // Click a column to hear a pure fifth slide to that system's fifth.
 
@@ -136,9 +136,10 @@ export function mountWhyTwelve(container: HTMLElement): Demo {
       const { ctx, w, h } = surf;
       surf.clear();
       const narrow = w < 600;
+      const stackedLegend = narrow || (show7 && w < 720);
       const padL = narrow ? 30 : 44;
       const padR = 12;
-      const top = narrow ? 50 : 46;
+      const top = stackedLegend ? 68 : 56;
       const bottom = h - (narrow ? 42 : 40);
       const x0 = padL;
       const x1 = w - padR;
@@ -158,7 +159,7 @@ export function mountWhyTwelve(container: HTMLElement): Demo {
         ctx.stroke();
         text(ctx, `${g}¢`, x0 - 6, y + 3, { size: 9.5, color: COL.dim, align: "right", mono: true, alpha: 0.75 });
       }
-      text(ctx, "how far the nearest step misses the pure interval", x0, top - (narrow ? 32 : 24), { size: 11, color: COL.dim });
+      text(ctx, "how far the nearest step misses the pure interval", x0, top - (stackedLegend ? 46 : 30), { size: 11, color: COL.dim });
 
       // legend
       const items: [RGB, string][] = [
@@ -166,12 +167,14 @@ export function mountWhyTwelve(container: HTMLElement): Demo {
         [AMBER, "major third 5:4"],
       ];
       if (show7) items.push([VIOLET, "harmonic 7th 7:4"]);
-      let lx = narrow ? x0 : x1 - (show7 ? 330 : 210);
-      const ly = narrow ? top - 14 : top - 22;
+      ctx.font = '500 10.5px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+      const legendW = items.reduce((acc, [, s], idx) => acc + 13 + ctx.measureText(s).width + (idx + 1 < items.length ? 14 : 0), 0);
+      let lx = stackedLegend ? x0 : x1 - legendW;
+      const ly = top - 28;
       for (const [c, s] of items) {
         ctx.fillStyle = rgba(c, 0.9);
         ctx.fillRect(lx, ly - 7, 9, 9);
-        lx += 14 + text(ctx, s, lx + 13, ly + 1, { size: 10.5, color: COL.text }) + 12;
+        lx += 13 + text(ctx, s, lx + 13, ly + 1, { size: 10.5, color: COL.text }) + 14;
       }
 
       const series: [number, RGB][] = [
@@ -204,8 +207,9 @@ export function mountWhyTwelve(container: HTMLElement): Demo {
           }
         });
         // x labels
-        const labelled = narrow ? [5, 12, 19, 31, 41, 53].includes(n) : n % 2 === 1 || n === 12 || n === 22;
-        if (labelled || isSel) {
+        const crowdAdj = cw < 13.5 && (n === 11 || n === 13 || n === 21 || n === 23);
+        const labeled = narrow ? [5, 12, 19, 31, 41, 53].includes(n) : (!crowdAdj && n % 2 === 1) || n === 12 || n === 22;
+        if (labeled || isSel) {
           text(ctx, String(n), cx, bottom + 13, {
             size: narrow ? 9.5 : 9,
             color: isSel ? "#ffe2c2" : records.has(n) ? "#cfdcff" : COL.dim,
@@ -217,9 +221,12 @@ export function mountWhyTwelve(container: HTMLElement): Demo {
         // convergent tags over the fifth's record-setters
         const tag = conv.get(n);
         if (tag) {
-          const e = Math.abs(err(n, FIFTH));
-          const y = Math.min(Y(e), Y(Math.abs(err(n, MAJ3)))) - 14;
-          label(ctx, tag, cx, Math.max(top + 6, y), { size: narrow ? 9 : 10, mono: true, color: "#cfdcff" });
+          const errs = [Math.abs(err(n, FIFTH)), Math.abs(err(n, MAJ3))];
+          if (show7) errs.push(Math.abs(err(n, HARM7)));
+          const y = Math.min(...errs.map((e) => Y(e))) - 13;
+          const align: "left" | "center" | "right" = n === NMIN ? "left" : n === NMAX ? "right" : "center";
+          const px = n === NMIN ? x0 : n === NMAX ? x1 : cx;
+          label(ctx, tag, px, Math.max(top - 10, y), { size: narrow ? 9 : 10, mono: true, align, color: "#cfdcff" });
         }
       }
       text(ctx, "steps per octave →", x1, bottom + 30, { size: 10, color: COL.dim, align: "right" });

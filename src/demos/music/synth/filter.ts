@@ -222,8 +222,11 @@ export async function mountFilter(container: HTMLElement): Promise<Demo> {
     g.dot(hx, hy, 16, [1.2, 0.7, 0.3], 0.35, true);
     g.dot(hx, hy, 6.5, [1.6, 1.0, 0.5], 1);
     g.dot(hx, hy, 3, [0.08, 0.05, 0.02], 1);
-    g.text(fmtHz(cut), hx, Math.max(box.y + 12, hy - 16), { size: 10.5, align: "center", color: TEXT.warm, mono: true, weight: 600 });
-    if (res > 4) g.text("self-oscillating", hx + 14, Math.max(box.y + 26, hy - 2), { size: 10.5, color: "#ffb86b" });
+    g.text(fmtHz(cut), clamp(hx, box.x + 30, box.x + box.w - 30), Math.max(box.y + 12, hy - 16), { size: 10.5, align: "center", color: TEXT.warm, mono: true, weight: 600 });
+    if (res > 4) {
+      const onLeft = hx > box.x + box.w - 110;
+      g.text("self-oscillating", onLeft ? hx - 14 : hx + 14, Math.max(box.y + 26, hy - 2), { size: 10.5, align: onLeft ? "right" : "left", color: "#ffb86b" });
+    }
 
     // what's playing
     const label = src === "noise" ? "white noise" : `${noteName(note)} ${src} · ${fmtHz(f0)}`;

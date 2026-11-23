@@ -249,7 +249,7 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
     shell.slider({
       label: "max bounces",
       min: 1, max: 8, step: 1, value: maxBounces,
-      format: (v) => (v < 1.5 ? "1 (direct only)" : String(Math.round(v))),
+      format: (v) => (v < 1.5 ? "1 direct" : String(Math.round(v))),
       onInput: (v) => {
         maxBounces = Math.round(v);
         reset();
@@ -268,18 +268,18 @@ export async function mountCornell(container: HTMLElement, opts: CornellOptions)
       reset();
     });
     shell.slider({
-      label: "roughness",
+      label: "glossy roughness",
       min: 0, max: 0.6, step: 0.01, value: rough,
-      format: (v) => (matB === 2 ? v.toFixed(2) : `${v.toFixed(2)} (glossy only)`),
+      format: (v) => v.toFixed(2),
       onInput: (v) => {
         rough = v;
         if (matB === 2) reset();
       },
     });
     shell.slider({
-      label: "lamp size",
+      label: "lamp width",
       min: 0.04, max: 0.7, step: 0.01, value: lightSize,
-      format: (v) => `${(v * 2).toFixed(2)} wide`,
+      format: (v) => (v * 2).toFixed(2),
       onInput: (v) => {
         lightSize = v;
         const lim = 0.98 - lightSize;

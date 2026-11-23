@@ -10,7 +10,7 @@
     <title>The Fisheye Map — Dome Projection</title>
     <meta
       name="description"
-      content="Part two of a series on dome projection: directions on a dome, the four common fisheye projection laws, the 180-degree equidistant domemaster, and the backwards question every projector asks."
+      content="Part two of a series on dome projection: encoding 3D dome directions in a circular image, comparing four fisheye lens laws, the 180-degree equidistant domemaster, and inverse sampling through a real projector."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Dome Projection · Part 2</p>
         <h1>The Fisheye Map</h1>
         <p class="subtitle">
-          A dome master is a circle where every pixel stands for a direction. The view above
-          slides between the room and the image that fills it.
+          How a circular domemaster packs an entire hemisphere of directions into a flat
+          square, and how four classic lens laws divide up its radius.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,40 +43,47 @@
 
     <main>
       <p>
-        <a href="/pages/dome-projection/circle.html">Part one</a> named points in a circle.
-        A dome adds one idea: each point in the image stands for a direction in space. The
-        centre of the image is straight up, the zenith. The edge is the horizon. The angle
-        around the image is the compass direction.
+        Open a fulldome movie file on an ordinary laptop and it looks strangely warped:
+        the whole planetarium sky sits squeezed inside a circle touching the four edges of
+        a square frame, with horizons bent into rings and constellations curving around the
+        rim. That layout makes complete sense the moment you treat the image as a lookup
+        table of 3D directions. The exact center of the disk corresponds to straight
+        overhead (the zenith), the circular rim corresponds to the horizon all 360 degrees
+        around the room, and the angle around the disk gives the compass bearing.
       </p>
       <p>
-        The hero shows it happening. For a few seconds you're in the room, looking up at the
-        dome. Then every pixel slides toward the direction it has in a fisheye master, and
-        the dome flattens into a circle with the same stars in the same places. The rings
-        are every 10 degrees down from the zenith, and in the master they come out evenly
-        spaced.
+        Watch the hero at the top of the page for a few seconds to see the connection
+        directly. It starts from a seat inside the dome looking up at the stars, then
+        smoothly pulls every pixel into the position it occupies inside a 180-degree
+        fisheye master before sliding back into the room. Those faint blue rings sit every
+        10 degrees down from the zenith, and once the image flattens into a disk, every ring
+        lands at an identical radial spacing.
       </p>
       <p>
-        That circle is how dome content is usually delivered. It isn't meant to look
-        natural on a flat monitor. It's a lookup table for directions.
+        In <a href="/pages/dome-projection/circle.html">part one</a> we worked strictly in
+        two dimensions, turning pixels inside a flat disk into (<em>r</em>, <em>θ</em>).
+        Moving up to a hemisphere adds one crucial design choice: how far from the center of
+        the image should a given tilt angle land?
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="direction"><span class="kicker">Step 1 · Direction first</span>From the dome to the image</h2>
+      <h2 id="direction"><span class="kicker">Step 1 · Direction first</span>From sky angles to a unit vector</h2>
       <p>
-        A point on the dome can be given by two angles: the azimuth <em>φ</em>, which way
-        round the room it is, and the zenith angle <em>θ</em>, how far it tilts from
-        straight up. In a 180-degree master, <em>θ</em> = 0 is the centre of the image and
-        <em>θ</em> = 90° is its edge.
+        Any point on the hemisphere can be pinned down by two angles: the azimuth
+        <em>φ</em> turning around the room, and the zenith angle <em>θ</em> tilting downward
+        from straight overhead. For a full 180-degree hemisphere, <em>θ</em> = 0° sits at
+        the top of the dome and <em>θ</em> = 90° rings the horizon.
       </p>
-      <pre><code><span class="cm">// direction from the dome angles, z up</span>
+      <pre><code><span class="cm">// direction from dome angles, z up</span>
 dir.x = sin(θ) * cos(φ)
 dir.y = sin(θ) * sin(φ)
 dir.z = cos(θ)</code></pre>
       <p>
-        That vector is the thing that matters. The fisheye image is one way of packing it
-        into pixels: the angle around the image is <em>φ</em>, and the distance from the
-        centre, <em>ρ</em>, is some function of <em>θ</em>. Which function is what a lens
-        is.
+        Every rendering or projection pipeline revolves around that unit vector. A fisheye
+        image is simply a tidy way to pack all of those vectors onto a square texture: keep
+        the azimuth <em>φ</em> as the angle around the image center, and map the zenith
+        angle <em>θ</em> onto a normalized radius <em>ρ</em> between 0 and 1. Different
+        optical lenses do that radial mapping with different curves.
       </p>
 
       <div
@@ -86,14 +93,15 @@ dir.z = cos(θ)</code></pre>
       ></div>
 
       <p>
-        The fisheye on the left is filled pixel by pixel, backwards, the way part one filled
-        its circle. Each pixel's distance from the centre goes through the chosen law to
-        give a zenith angle, and the figure reads the dome's test pattern in that direction.
-        On the right is the same dome sliced in half, with rays every 15 degrees, and under
-        it a plot of <em>ρ</em> against <em>θ</em> for all four laws. Press the
-        <em>law</em> button and watch the rings. Equidistant keeps them evenly spaced.
-        Equisolid and orthographic crowd them toward the edge, and stereographic does the
-        opposite.
+        The circular master on the left renders backward pixel by pixel, just like the disk
+        in part one: each pixel's radius <em>ρ</em> runs backward through the chosen lens
+        formula to recover <em>θ</em>, which gives a 3D direction into our test pattern. On
+        the upper right, the dome appears sliced side-on with rays every 15 degrees, and
+        below it sits a plot of <em>ρ</em> against <em>θ</em> for all four classic curves.
+        Click any law in the plot legend (or cycle the <em>law</em> button) while watching
+        the 15-degree rings on the left. Equidistant spaces the rings evenly from center to
+        rim, equisolid and orthographic pack them tighter toward the horizon, and
+        stereographic stretches the horizon outward while compressing the zenith.
       </p>
 
       <!-- ================================================================ -->
@@ -103,100 +111,107 @@ equisolid      ρ = sin(θ/2) / sin(θmax/2)
 orthographic   ρ = sin(θ) / sin(θmax)
 stereographic  ρ = tan(θ/2) / tan(θmax/2)</code></pre>
       <p>
-        Equidistant gives every degree the same number of pixels. That makes it the easiest
-        one to reason about, and it's what fulldome content is delivered in: a 180-degree
-        equidistant fisheye, usually called a domemaster. Equisolid keeps areas in
-        proportion, and many fisheye camera lenses are built close to it. Orthographic is
-        a hemisphere seen from far above, and it squashes the horizon almost to nothing:
-        the last 15 degrees get only 3% of the radius. Stereographic preserves angles
-        locally, so shapes near the edge keep their proportions while growing larger.
+        <strong>Equidistant</strong> hands every degree of elevation the exact same slice of
+        pixels. That linearity makes shaders trivial to debug, which is why fulldome video
+        settled on the 180-degree equidistant fisheye as its standard delivery format,
+        usually called a <em>domemaster</em>. <strong>Equisolid</strong> preserves solid
+        angle so equal patches of sky occupy equal pixel areas, a property many photographic
+        fisheye lenses aim for. <strong>Orthographic</strong> is what a hemisphere looks
+        like viewed from infinitely far above, crushing the horizon almost flat: the final
+        15 degrees above the rim squeeze into roughly 3% of the radius.
+        <strong>Stereographic</strong> goes the other way, preserving local angles so small
+        shapes keep their proportions near the rim even as they grow in pixel size.
       </p>
       <p>
-        The <em>lens field of view</em> slider sets <em>θ</em>max. A 180-degree lens fills
-        the circle with one hemisphere. Narrow it and the circle covers less than
-        the dome; the red arcs in the side view are the part the lens can't see. Real camera
-        and projector lenses don't follow any of these laws perfectly, so the practical rule
-        is to name the projection, write the formula down, and check it against a grid
-        before trusting a show file.
+        Dragging the <em>field of view</em> slider narrows <em>θ</em><sub>max</sub> below
+        90 degrees. At 180 degrees of total field of view, the circle captures the entire
+        hemisphere; tighten the lens and red arcs appear along the lower dome in the side
+        profile to mark the blind band it can no longer reach. Real glass lenses rarely obey
+        any of these four textbook curves to the sub-pixel, so in production you always
+        document the target formula, check it against a measured ring grid, and let the
+        calibration stage soak up whatever residual lens distortion remains.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Where "fisheye" comes from</span>
         <p>
-          The physicist Robert W. Wood coined the term in 1906. He built a camera filled
-          with water to show how a fish sees the world above the surface: the whole sky
-          squeezed into a circle of about 97 degrees, which is the cone that refraction at
-          the surface lets light through. In the 1920s the meteorologist Robin Hill designed
-          a lens that photographed the whole sky at once, for studying clouds, and fisheye
-          lenses have been the way to put a hemisphere into one image ever since.
+          Physicist Robert W. Wood coined the phrase in 1906 after building a pinhole camera
+          filled with water to photograph how a fish sees the world above a pond. Refraction
+          at the air-water boundary compresses the entire 180-degree sky into a cone roughly
+          97 degrees wide, known as Snell's window. Two decades later, meteorologist Robin
+          Hill designed an all-sky glass lens to photograph cloud cover across the whole
+          hemisphere in a single exposure, establishing the optical family dome projection
+          still relies on.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="projector"><span class="kicker">Step 3 · Backwards</span>The projector asks the question</h2>
+      <h2 id="projector"><span class="kicker">Step 3 · Inverse ray chain</span>Following a pixel back from the projector</h2>
       <p>
-        In a real room the projector isn't at the centre of the dome, its lens has its own
-        distortion, and the dome isn't a perfect hemisphere. The renderer still asks the
-        same backwards question for every output pixel. It just takes more steps to answer:
+        In an actual theater, the projector almost never sits neatly at the dome's center,
+        the ceiling itself has slight structural bumps, and the projection lens introduces
+        its own warp. Even so, the shader follows the exact same backward lookup per
+        projector pixel, just with a couple of geometric steps spliced in:
       </p>
       <pre><code>projector pixel  → ray out of the lens
 ray              → point where it hits the dome
-dome point       → direction from the dome centre
+dome point       → direction from the dome center
 direction        → fisheye uv
-fisheye uv       → colour</code></pre>
+fisheye uv       → color</code></pre>
       <p>
-        Calibration is the work of making those arrows match the physical room. The maths
-        gives the ideal answer, and measured control points and warp meshes turn it into one
-        that works. That's part four.
+        Analytic math gives a clean first approximation of those arrows, and physical
+        calibration turns them into warp meshes that match the real room. We will unpack how
+        multiple projectors measure and blend that chain in part four.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="debugging"><span class="kicker">Step 4 · Debugging</span>Seams, poles and grids</h2>
+      <h2 id="debugging"><span class="kicker">Step 4 · Debugging</span>Reading a calibration grid</h2>
       <p>
-        The most useful dome texture isn't pretty. It has known azimuths, rings at known
-        zenith angles, a mark at the centre and a visible seam, like the pattern in the
-        figure. Each kind of mistake shows up differently on it:
+        Before loading nebulae or starfields onto a dome, engineers always project a plain
+        grid marked with known azimuth spokes, elevation rings, a zenith dot, and an obvious
+        seam, much like the test pattern in Figure 1. When something goes sideways in the
+        pipeline, the grid tells you immediately which stage broke:
       </p>
       <pre><code>seam opens or doubles            → azimuth wrap, or the image is mirrored
 rings bunched or stretched       → wrong projection law or field of view
-a spoke or pinch at the centre   → something depends on φ at the zenith
-labels drift between projectors  → calibration, not content</code></pre>
+a spoke or pinch at the center   → something depends on φ at the zenith
+labels drift between projectors  → calibration error, rather than content</code></pre>
       <details class="fold">
-        <summary>A fisheye isn't the only way to store directions</summary>
+        <summary>Another way to store the same directions</summary>
         <div class="fold-body">
           <p>
-            A cubemap stores the same sphere of directions as six square images, one per
-            face of a cube. Realtime engines often render a cubemap first, because each face
-            is an ordinary 90-degree camera, and then convert it to a fisheye or sample it
-            straight from the projector pass. The direction vector is the same either way.
-            <a href="/pages/dome-projection/cubemap.html">Part three</a> compares the two.
+            A cubemap packs the exact same sphere of directions into six square images, one
+            per face of a cube. Real-time 3D engines frequently render a cubemap first
+            because each face uses a standard 90-degree perspective camera, then resample it
+            into a fisheye or read the cube straight inside each projector pass. Either way,
+            the underlying 3D direction vector stays identical.
+            <a href="/pages/dome-projection/cubemap.html">Part three</a> digs into how those
+            two representations trade off.
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>A dome image stores directions.</strong> The vector is the real data, and
-          the fisheye is one way of packing it into pixels.
-        </li>
-        <li>
-          <strong>A lens is a function ρ(θ).</strong> Name it and test it, because everything
-          downstream assumes it.
-        </li>
-        <li>
-          <strong>Every step works backwards.</strong> However many stages sit between the
-          output pixel and the source, each pixel asks once.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Keeping the direction separate from the container</h2>
       <p>
-        Things I'd try next: add a fifth law fitted to points measured from a real lens,
-        and plot its error against equidistant, since that error is what calibration ends
-        up absorbing.
+        Once you start thinking in unit directions instead of raw texture pixels, fisheye
+        formats stop feeling mysterious. The unit vector is the actual scene data; the lens
+        law <em>ρ</em>(<em>θ</em>) is just the encoding that lays those vectors onto a flat
+        circle, and every downstream pass works backward from an output pixel through that
+        encoding. If I extended Figure 1 further, I would plot a fifth curve fitted to
+        measured dots from a physical projector lens and overlay its error against an ideal
+        equidistant curve, since that residual curve is precisely what venue calibration ends
+        up correcting.
+      </p>
+      <p>
+        A circular fisheye is ideal when you need to ship a finished movie file to another
+        planetarium, yet standard GPU rasterizers struggle to draw curved 180-degree images
+        directly. Next, we look at the representation real-time engines love instead: five
+        flat square cameras looking up and around the room.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/dome-projection/cubemap.html">Part 3, Six Square Cameras</a>.</strong>
-        The other common way to store the same directions, and when it's the better choice.
+        Storing the exact same sky as cubemap faces, why rasterizers prefer them, and when
+        to convert between the two.
       </p>
     </main>
 

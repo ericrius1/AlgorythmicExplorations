@@ -20,7 +20,7 @@ const FOV_TAN = Math.tan(0.45); // camera3d's fov 0.9 halved
 
 interface ModePreset {
   name: string;
-  mode: number; // respawn flavour in the shader
+  mode: number; // respawn flavor in the shader
   swirl: number;
   noiseScale: number;
   buoy: number;
@@ -364,11 +364,12 @@ export async function mountPlayground(container: HTMLElement, opts: PlaygroundOp
   let handsLabel: HTMLButtonElement | null = null;
   const lineData = new Float32Array(2 * BONES.length * 2 * 4);
 
+  const handsOffLabel = opts.hero ? "✋ hands" : "✋ enable hands";
   const toggleHands = async (): Promise<void> => {
     if (handsOn && tracker) {
       tracker.stop();
       handsOn = false;
-      if (handsLabel) handsLabel.textContent = "✋ enable hands";
+      if (handsLabel) handsLabel.textContent = handsOffLabel;
       return;
     }
     if (handsLabel) handsLabel.textContent = "✋ starting…";

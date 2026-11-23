@@ -1,8 +1,8 @@
 // Demo 2 of part four: spatial hashing, made touchable. The same pile of
-// discs as part three's grid demo, but cells no longer own a counter each —
+// disks as part three's grid demo, but cells no longer own a counter each —
 // their integer coordinates hash into a small table of buckets. Your cursor
 // runs the query: yellow cells are the 3×3 window, red cells are strangers
-// that happen to share a bucket with it, and red discs are the impostor
+// that happen to share a bucket with it, and red disks are the impostor
 // candidates the distance test will throw away.
 
 import { Shell, type Demo } from "../../lib/demoShell";
@@ -15,7 +15,7 @@ import {
   type ContactSim,
 } from "./contactsCpu";
 
-const GRID = 24; // visible cells per side; cell width > one disc diameter
+const GRID = 24; // visible cells per side; cell width > one disk diameter
 const VIEW = 0.92;
 const N = 3500;
 
@@ -27,6 +27,9 @@ export function mountHashNeighbors(container: HTMLElement): Demo {
   const ay = new Float32Array(N);
   let table = 128; // buckets — deliberately far fewer than the 576 cells
   const mouse = canvasMouse(shell);
+  // Keep the most recent query point alive even after the pointer moves down
+  // to the bucket slider, so readers can watch red impostors vanish live.
+  let query: [number, number] = [-0.08, -0.22];
 
   const cellXY = (x: number, y: number): [number, number] => [
     Math.min(GRID - 1, Math.max(0, Math.floor(((x + 1) / 2) * GRID))),
@@ -123,12 +126,11 @@ export function mountHashNeighbors(container: HTMLElement): Demo {
       ctx.stroke();
 
       const m = mouse.get();
-      if (!m || Math.abs(m[0]) >= 1 || Math.abs(m[1]) >= 1) {
-        shell.readout.textContent = `${N.toLocaleString()} discs · ${GRID * GRID} cells share ${table} buckets — point at the pile`;
-        return;
+      if (m && Math.abs(m[0]) < 1 && Math.abs(m[1]) < 1) {
+        query = [m[0], m[1]];
       }
 
-      const [cx, cy] = cellXY(m[0], m[1]);
+      const [cx, cy] = cellXY(query[0], query[1]);
       const window = new Set<number>();
       const buckets = new Set<number>();
       for (let oy = -1; oy <= 1; oy++) {
@@ -203,8 +205,8 @@ export function mountHashNeighbors(container: HTMLElement): Demo {
       ctx.fill();
 
       shell.readout.textContent =
-        `9 cells → ${buckets.size} buckets → ${real + impostors} candidates: ` +
-        `${real} real, ${impostors} impostors for the distance test to discard`;
+        `${N.toLocaleString()} disks · ${GRID * GRID} cells in ${table} buckets · ` +
+        `9 cells → ${buckets.size} buckets → ${real} real, ${impostors} impostors`;
     },
   };
 }

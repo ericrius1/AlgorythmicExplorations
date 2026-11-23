@@ -10,7 +10,7 @@
     <title>Seven of Twelve — Living Music</title>
     <meta
       name="description"
-      content="Why most music uses seven of the twelve notes: scales as step patterns, modes as rotations, maximal evenness, the circle of fifths as a map of keys, maqam, rāga and gamelan scales that live between the piano's keys, and a playable explorer where one slider sets the whole tuning."
+      content="Why most music draws seven notes from twelve: scales as step patterns, modes as rotations, maximally even sets, the circle of fifths as a key map, maqam, rāga, and gamelan tunings, and a playable tuning continuum."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,66 +31,71 @@
         <p class="hero-kicker">Living Music · Part 5</p>
         <h1>Seven of Twelve</h1>
         <p class="subtitle">
-          Twelve notes, seven lit, and a melody wandering among them. Every few phrases one
-          note moves a semitone and the mode changes colour. Tap the ring to play along.
+          A melody wandering across seven lit notes out of twelve. Every few phrases a single note
+          slides by a semitone and shifts the mode's color. Tap the ring to play along.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        <a href="/pages/living-music/twelve.html">Part four</a> ended with twelve equal
-        notes per octave. Hardly any music uses all twelve at once. Most melodies you know
-        live inside a set of seven, and a lot of folk music inside five. On a piano the
-        white keys are one such set:
+        Look down at a piano keyboard and you see something slightly odd.
+        <a href="/pages/living-music/twelve.html">Part four</a> left us with twelve equal
+        semitones per octave, yet the front row of white keys skips five of them in a lopsided
+        clump of two and three:
       </p>
       <pre><code>C   D   E   F   G   A   B   C
   2   2   1   2   2   2   1      <span class="cm">// steps, in semitones</span></code></pre>
       <p>
-        Seven steps, five of them whole steps and two half steps, and the two half steps
-        aren't evenly spaced. This article is about why that lopsided pattern works so
-        well, what you get by starting it from a different note, how keys relate to each
-        other, and what some musical traditions that don't use the piano's grid do instead.
+        Hardly any song uses all twelve pitches at once. Most melodies stick to seven of them, and
+        a huge share of the world's folk tunes get by on five. Five whole steps and two half steps
+        spaced unevenly around the octave sounds like an awkward accident until you inspect its
+        geometry, start rotating it, map how keys overlap, and listen to what musical traditions
+        outside the piano's grid do when they carve up an octave on their own terms.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="ring"><span class="kicker">Step 1 · The ring</span>A scale is a step pattern</h2>
       <p>
-        Draw the twelve notes round a clock, C at the top, and a scale becomes a shape: a
-        necklace with some beads lit. The arcs between lit beads are the steps, labelled W
-        for a whole step and H for a half step. The figure starts on the major scale.
+        Arrange the twelve chromatic pitches around a clock face with C at twelve o'clock, and any
+        scale becomes a necklace of lit beads. The arcs connecting adjacent scale notes show the
+        step sizes, labeled <strong>W</strong> for a whole step (two semitones),
+        <strong>H</strong> for a half step (one semitone), and <strong>W+H</strong> for a
+        three-semitone gap. The ring below opens on C major.
       </p>
 
       <div
         data-demo="ring"
         data-title="One pattern, rotated"
-        data-hint="Rotate it, turn on the drone"
+        data-hint="Rotate the pattern, turn on the drone"
       ></div>
 
       <p>
-        The half steps are the landmarks. Because the two of them sit at different
-        distances from each other, every note in the scale has a different set of
-        neighbours, so your ear can tell where it is. B is a half step below C, and that's
-        why a melody that reaches B leans toward C. Switch the pattern to <em>whole
-        tone</em>, six equal steps, and the landmarks disappear: every note looks like every
-        other, and the scale has no obvious home. Debussy used it for that floating sound in
-        pieces like <em>Voiles</em>. The pentatonic pattern goes the other way and has no
-        half steps at all, which is why you can noodle on the piano's five black keys and nothing clashes.
+        Those two half steps act as landmarks. Because E–F and B–C sit at different distances from
+        each other around the ring, every scale degree has a distinct neighborhood of surrounding
+        intervals, giving your ear an instant sense of orientation. B sits just a semitone below C,
+        which gives melodies reaching B a strong pull upward into home. Switch the pattern to
+        <em>whole tone</em> (six equal whole steps) and every landmark vanishes: every bead sees
+        identical surroundings, so the scale floats without gravity, an effect Debussy leaned on
+        in pieces like <em>Voiles</em>. Switch to <em>pentatonic</em> and the half steps disappear
+        for a different reason, leaving only whole steps and three-semitone leaps, which is why
+        improvising freely on the piano's five black keys rarely produces a harsh clash.
       </p>
       <p>
-        Now turn on the drone and press <em>rotate the pattern</em>. The shape stays the
-        same, but it starts from its next note while C stays home. Starting the major
-        pattern on its second note gives 2 1 2 2 2 1 2, on its third 1 2 2 2 1 2 2, and so
-        on. Each rotation puts the half steps somewhere else relative to C, and each one has
-        its own name and its own colour. These are the <strong>modes</strong>.
+        Turn on <em>drone on C</em>, switch back to <em>major (diatonic)</em>, and click
+        <em>rotate the pattern →</em>. Keeping C anchored as home while starting the exact same
+        necklace on its second step produces 2 1 2 2 2 1 2; starting on the third gives
+        1 2 2 2 1 2 2, and so on around the circle. Each rotation relocates the two half steps
+        relative to the C drone, transforming the mood of the exact same tune button. Those seven
+        rotations are the <strong>modes</strong>.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="modes"><span class="kicker">Step 2 · Modes</span>Brightest to darkest</h2>
       <p>
-        The seven modes of the major scale can be put in order. Sort them so each one has
-        lower notes than the one before, and something tidy happens: each step down the
-        ladder lowers exactly one note by a semitone. Nothing else moves.
+        Instead of ordering the seven modes by necklace rotation, sort them from the highest
+        collection of pitches down to the lowest. A tidy pattern falls out: every step down the
+        ladder lowers exactly one note by a single semitone while all six other notes stay put.
       </p>
 
       <div
@@ -100,93 +105,102 @@
       ></div>
 
       <p>
-        Lydian, at the top, has a raised fourth, and it sounds bright and slightly
-        unresolved; the Simpsons theme is built on it. Ionian is the major scale. Lower its
-        seventh and you get Mixolydian, the sound of a lot of rock and folk ("Norwegian
-        Wood" is in it). Lower the third and you're in Dorian, a minor mode with a raised
-        sixth that keeps it from sounding sad ("So What", "Scarborough Fair"). Aeolian is
-        the natural minor. Phrygian's half step right above home is common in flamenco.
-        Locrian even lowers the fifth, and with no stable fifth above its home note it's
-        rarely used as a home at all.
+        At the top sits Lydian, whose raised fourth (F♯) gives it a bright, buoyant lift familiar
+        from film scores and the <em>Simpsons</em> theme. Lower F♯ to F and you arrive at Ionian,
+        the standard major scale. Lower B to B♭ for Mixolydian, a mainstay of rock and folk
+        ("Norwegian Wood" lives there). Lower E to E♭ to reach Dorian, a minor scale whose raised
+        sixth keeps it brisk and unsentimental ("So What", "Scarborough Fair"). Lower A to A♭ for
+        Aeolian, the natural minor. Lower D to D♭ for Phrygian, whose half step right above the
+        tonic drives flamenco harmonies. One last drop lowers G to G♭ for Locrian, which loses its
+        stable fifth above C and is rarely treated as a home key.
       </p>
       <p>
-        Lower the one note Locrian has left, the root itself, and you're back at Lydian a
-        semitone down. The ladder is a loop.
+        If you keep going one more notch and lower the only unaltered note Locrian has left (the
+        root C down to B), the entire pattern wraps back around into Lydian a semitone lower.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Where the names come from</span>
         <p>
-          The names are Greek, but the scales aren't. Medieval church theorists borrowed
-          names like Dorian and Phrygian from Greek writings and attached them to their own
-          modes, which weren't the scales the Greeks meant. Heinrich Glarean added Ionian and
-          Aeolian in 1547, which brought the major and minor scales into the system.
+          Medieval church theorists borrowed labels like Dorian and Phrygian from ancient Greek
+          music treatises and attached them to their own liturgical modes, even though the Greek
+          originals referred to different pitch arrangements. In 1547 the Swiss theorist Heinrich
+          Glarean added Ionian and Aeolian to the list, folding the major and minor scales into
+          the same family.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="why-seven"><span class="kicker">Step 3 · Why seven</span>Spread as evenly as possible</h2>
       <p>
-        There are 66 different ways to choose seven notes out of twelve (counting
-        transpositions as the same), so why this one? One answer is evenness. Seven doesn't
-        divide twelve, so seven notes can't be spaced perfectly evenly, but they can be
-        spaced as evenly as the semitone grid allows. Put the steps as close to 12/7 as
-        possible, which means a mix of 2s and 1s with the 1s spread apart, and you get the
-        major scale. John Clough and Jack Douthett called these sets <em>maximally
-        even</em> in 1991, and for every number of notes there's one such shape.
+        Counting rotations and transpositions as equivalents, there are 66 distinct ways to pick
+        seven notes out of twelve. Why did this particular pattern end up dominating so much of
+        music? Evenness gives one clean geometric answer. Since 7 does not divide 12 evenly, seven
+        beads can never sit at identical spacing on a twelve-hour clock, yet you can spread them
+        out as evenly as the semitone grid permits. Approximating steps of 12/7 semitones forces a
+        mix of five 2s and two 1s with the 1s pushed as far apart as possible, which yields the
+        diatonic scale uniquely. Music theorists John Clough and Jack Douthett formalized these
+        shapes in 1991 as <em>maximally even sets</em>, one unique necklace for every note count
+        from 1 to 12.
       </p>
 
       <div
         data-demo="even"
         data-title="Spread k notes as evenly as possible"
-        data-hint="Slide k, or click to edit"
+        data-hint="Slide k, or click the left ring to edit"
       ></div>
 
       <p>
-        Slide through the counts and many familiar names come out: 3 is the augmented
-        triad, 4 the diminished seventh chord, 5 the pentatonic scale, 6 the whole-tone
-        scale, 7 the diatonic scale, 8 the octatonic scale. Click notes on the left ring to
-        build a set of your own; the evenness score drops as soon as you bunch notes up.
+        Sweep the <em>how many notes</em> slider from 3 to 8 and a roster of textbook structures
+        pops out automatically: 3 gives the augmented triad, 4 the diminished seventh chord, 5 the
+        pentatonic scale, 6 the whole-tone scale, 7 the diatonic scale, and 8 the octatonic scale.
+        You can also click any dot on the left chromatic ring to toggle notes by hand and watch
+        the evenness score dip the moment pitches bunch together.
       </p>
       <p>
-        The right ring shows the same notes in circle-of-fifths order, and for 5 and 7 they
-        form one unbroken chain: C G D A E for the pentatonic, F C G D A E B for the major
-        scale. That's the chain from part four's spiral. Stacking fifths and spreading notes
-        evenly turn out to give the same scales.
+        The middle ring plots the exact same pitches in circle-of-fifths order.
+        At 5 notes (C, G, D, A, E) and 7 notes (F, C, G, D, A, E, B), the maximally even set
+        collapses into a single unbroken chain of fifths, the very same chain that grew out of
+        part four's spiral. Spreading notes evenly around the octave and stacking pure fifths
+        converge on the exact same scales.
       </p>
       <p>
-        The bars count how many pairs of notes sit 1, 2, 3, 4, 5 and 6 semitones apart.
-        For the major scale those counts are 2, 5, 4, 3, 6 and 1, all different. Music
-        theorists call a scale with this property <em>deep</em>. It matters for the next
-        step. Move a scale by some interval and the number of notes it keeps is the number of
-        pairs at that distance (doubled for the tritone). For the major scale that's 6 notes
-        kept for a move of a fifth, 5 for a whole step, 4 for a minor third, 3 for a major
-        third, and 2 for a half step or a tritone.
+        The horizontal bars on the right tally how many pairs of notes in the scale lie 1, 2, 3,
+        4, 5, and 6 semitones apart. For the diatonic scale those counts come out to 2, 5, 4, 3,
+        6, and 1: six nonzero integers, all completely different. Theorists call a scale with
+        unique interval multiplicities a <em>deep scale</em>. That uniqueness pays off directly
+        when a piece changes key: transpose a scale by any interval, and the number of notes it
+        retains equals the count for that interval (doubled for the symmetric tritone). Moving a
+        major scale by a fifth keeps 6 of its 7 notes; moving by a whole step keeps 5; by a minor
+        third keeps 4; by a major third keeps 3; and by a half step or tritone keeps just 2.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Five notes everywhere</span>
         <p>
-          Pentatonic scales turn up in an enormous range of music: Scottish and Irish folk
-          songs, Chinese and Japanese traditional music, West African music, spirituals and
-          the blues. At the 2009 World Science Festival, Bobby McFerrin had an audience sing
-          notes as he jumped between spots on the stage, then jumped to a spot he hadn't
-          shown them. The whole room sang the next note of the pentatonic scale without being
-          told. Whether that's built into hearing or learned from a lifetime of music is
-          still argued about.
+          Pentatonic scales appear across an extraordinary range of traditions: Scottish and Irish
+          folk songs, Chinese and Japanese classical repertoires, West African melodies,
+          spirituals, and the blues. At the 2009 World Science Festival, Bobby McFerrin got an
+          entire auditorium singing along as he hopped between imaginary notes across the stage;
+          when he jumped to a spot he had never demonstrated, the crowd immediately sang the next
+          degree of the pentatonic scale in unison. Researchers still debate how much of that
+          instinct is acoustic and how much comes from a lifetime of shared musical exposure.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="keys"><span class="kicker">Step 4 · Keys</span>The circle of fifths as a map</h2>
       <p>
-        Rotating the pattern against a fixed C gave modes. The other move is to keep the
-        pattern and move the home note. Start the major pattern on D and you get D major,
-        which sounds like C major moved up a step. In equal temperament every key is the
-        same shape, so the useful question is how far apart two keys are.
+        In Step 1 we rotated the diatonic necklace against a fixed C to generate modes. The other
+        option is to keep the major pattern fixed and slide its starting note somewhere else.
+        Starting W W H W W W H on D gives D major, which preserves every internal interval while
+        shifting the pitch height. Under equal temperament every major key has the exact same
+        internal geometry, so what matters most when composing or improvising is how cleanly one
+        key transitions into another.
       </p>
       <p>
-        The circle of fifths answers it. Arrange the keys so each is a fifth above the last
-        and neighbours share six of their seven notes. C major and G major differ only in F
-        versus F♯. Two steps round, five notes are shared; across the circle, only two.
+        The circle of fifths turns that shared-note math from Step 3 into a geographic map. Place
+        keys around a ring one fifth apart, and every adjacent pair shares six of its seven
+        pitches: C major and G major differ only by F versus F♯. Two steps away, five notes
+        overlap; straight across the circle, only two survive.
       </p>
 
       <div
@@ -196,39 +210,40 @@
       ></div>
 
       <p>
-        Each key is marked with how many notes it shares with the selected one. Click
-        another key and the figure modulates: it plays the old home chord, then the new
-        key's dominant seventh chord, then the new home chord. To a neighbouring key the
-        move is barely noticeable, because six of the seven notes stay put. To the far side
-        of the circle it's a jolt. That's why most music that changes key moves to a
-        neighbour, and why a jump across the circle is something composers save for an
-        effect. The inner ring holds the relative minors, which use the same notes as the
-        major key outside them with a different home.
+        Each key around the rim shows how many notes it shares with your current home. Click any
+        other key to hear a short modulation: the old home chord, the new key's dominant seventh
+        chord (V7), and finally the new home chord. Stepping one click to a neighbor sounds smooth
+        and natural because six pitches stay in place. Jumping straight across to F♯ feels like a
+        sharp harmonic jolt, which is why composers usually modulate to nearby keys for continuity
+        and save cross-circle leaps for dramatic turns. Click any node on the inner ring to switch
+        to the relative minor keys, which share the exact same pitch collection as their outer
+        major partner while centering the ear on a different tonic.
       </p>
       <p>
-        Key signatures follow the same map. Each step clockwise adds one sharp, in the order
-        F♯ C♯ G♯ D♯ A♯ E♯ B♯, which is the chain of fifths again. Each step anticlockwise
-        adds a flat, B♭ E♭ A♭ and so on.
+        Written key signatures follow the exact same circle. Each step clockwise adds one sharp in
+        fifth order (F♯, C♯, G♯, D♯, A♯, E♯, B♯), and each step counterclockwise adds one flat in
+        reverse (B♭, E♭, A♭, and so on).
       </p>
       <aside class="note">
         <span class="note-label">Aside · The first map</span>
         <p>
-          The oldest known circle-of-fifths diagram is in Nikolai Diletsky's
-          <em>Grammatika</em> of 1679, a composition handbook written in Moscow. Johann
-          David Heinichen published his own "musical circle" in Germany in 1711, and the
-          version in Western textbooks descends from his. Both were practical tools for
-          working out which keys could follow which.
+          The earliest surviving circle-of-fifths diagram appears in Nikolai Diletsky's
+          <em>Grammatika</em> (1679), a composition treatise written in Moscow. Johann David
+          Heinichen published a "musical circle" in Germany in 1711 that became the template for
+          later Western textbooks. Both authors drew the wheel as a practical cheat sheet for
+          figuring out which keys connected smoothly in real compositions.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="other-maps"><span class="kicker">Step 5 · Other maps</span>Scales between the piano's keys</h2>
       <p>
-        Everything so far assumes the twelve-note grid. Many musical traditions don't use
-        it, and their scales have notes that fall between the piano's keys. Here are three,
-        with each note pinned where it's tuned above a strip of the twelve equal-tempered
-        semitones. They're simplified: in all three traditions a scale is only part of what
-        defines a piece, and intonation is learned by ear rather than read off a chart.
+        Everything up to this point has lived on the twelve-semitone grid. Huge swathes of the
+        world's music grew up around fretless strings, voices, and bronze percussion where pitches
+        regularly land right between piano keys. The figure below pins the notes of three major
+        traditions at their tuned cent values directly above a standard twelve-key strip. Every
+        example here is necessarily a sketch: in all three traditions, scale pitches are only one
+        layer alongside melodic phrasing, ornament, and intonation learned by ear.
       </p>
 
       <div
@@ -238,79 +253,82 @@
       ></div>
 
       <p>
-        <strong>Arabic maqam.</strong> A maqam is built from <em>ajnas</em> (singular
-        <em>jins</em>), short groups of three to five notes, stacked so that the second
-        starts on a pivot note. Maqam Rast is jins Rast on C followed by jins Rast or
-        Nahawand on G. Some ajnas contain steps of about three quarters of a tone, and the
-        notes between the piano's keys are written with a half-flat sign, a flat with a
-        slash through it. Since the early twentieth century those have been notated on a
-        24-step quarter-tone grid, but the grid is a notation: how high E half-flat sits
-        depends on the maqam, the region and the performer. The figure uses the pitches
-        MaqamWorld plays for its examples. In Rast, E half-flat is 355 cents above C. In
-        Bayati the second note is 151 cents above D, and the F above it is tuned 19 cents
-        below the piano's F. A maqam also comes with a characteristic path
-        through its notes, its <em>sayr</em>, and that's as much a part of its identity as
-        the scale.
+        <strong>Arabic maqam.</strong> A maqam is assembled from short three- to five-note
+        building blocks called <em>ajnas</em> (singular <em>jins</em>), joined at a shared pivot
+        note. Maqam Rast, for instance, stacks jins Rast on C with a second jins Rast (or Nahawand
+        on the way down) starting on G. Many ajnas feature neutral intervals roughly
+        three-quarters of a tone wide, written with a slashed half-flat sign. While twentieth-century
+        notation often maps these onto a 24-step quarter-tone staff, performers adjust the exact
+        height of an E half-flat depending on the maqam, region, and expressive context. The
+        examples here use the tunings recorded by MaqamWorld: in Rast, E half-flat sits 355 cents
+        above C (45 cents below the piano's E), and descending passages drop the seventh to B♭. In
+        Bayati on D, the second degree sits at 151 cents and the F above it sits 19 cents flatter
+        than an equal-tempered F. Beyond pitches, each maqam carries a traditional melodic
+        journey, its <em>sayr</em>, that defines its character just as strongly as the intervals.
       </p>
       <p>
-        <strong>Hindustani rāga.</strong> North Indian classical music is played against a
-        drone, usually a <em>tanpura</em> whose four strings sound Sa and Pa (the tonic and
-        fifth), and every note is heard against that drone. The notes are named Sa Re Ga Ma
-        Pa Dha Ni, and Re, Ga, Dha and Ni can be lowered (<em>komal</em>) and Ma raised
-        (<em>tīvra</em>). Yaman, an evening rāga, uses the raised Ma, the same notes as the
-        Lydian mode, but it has its own ascent and descent: it climbs Ni Re Ga Ma Dha Ni Sa,
-        skipping Sa and Pa on the way up, and descends through Pa. Bhairav, a morning rāga,
-        uses komal Re and komal Dha, and both are played with a slow sway called
-        <em>andolan</em>, which the figure imitates. Ancient theory, going back to the
-        <em>Nātyaśāstra</em>, divided the octave into 22 <em>śrutis</em>. Measurements of
-        real performances, starting with Nazir Jairazbhoy and A. W. Stone in 1963, have found
-        that intonation varies with the rāga, the phrase and the performer rather than
-        sitting on fixed positions. The ratios in the figure (5:4 for Ga, 3:2 for Pa and so
-        on) are a common way to approximate notes tuned against a drone, not a standard.
+        <strong>Hindustani rāga.</strong> North Indian classical music unfolds over a continuous
+        drone, typically a four-stringed <em>tanpura</em> plucking Sa and Pa (tonic and fifth), so
+        every melodic pitch is judged directly against those sustained overtones. The seven scale
+        degrees are named Sa, Re, Ga, Ma, Pa, Dha, and Ni; Re, Ga, Dha, and Ni can be lowered
+        (<em>komal</em>), while Ma can be raised (<em>tīvra</em>). Rāga Yaman, played in the
+        evening, uses tīvra Ma (matching Lydian's pitch set) yet follows its own prescribed ascent
+        and descent, climbing Ni Re Ga Ma Dha Ni Sa and bringing Pa in on the way down. Morning
+        rāga Bhairav pairs komal Re and komal Dha with a slow, deliberate oscillation called
+        <em>andolan</em>, which you can hear when playing its notes above. Classical treatises
+        dating back to the <em>Nātyaśāstra</em> describe 22 <em>śrutis</em> per octave, though
+        acoustic studies of live performers starting with Nazir Jairazbhoy and A. W. Stone in 1963
+        show that fine intonation shifts fluidly with the rāga, phrase direction, and artist. The
+        simple ratios used here (such as 5:4 for Ga and 3:2 for Pa) are a practical approximation
+        of tuning against a drone rather than a rigid specification.
       </p>
       <p>
-        <strong>Javanese gamelan.</strong> A gamelan is a set of bronze instruments, mostly
-        gongs and metal bars, tuned together and never retuned to match another set. Java
-        has two tuning systems. <em>Slendro</em> has five notes per octave in steps that are
-        roughly equal. <em>Pelog</em> has seven notes in uneven steps, and most pieces use a
-        five-note subset of them, which the figure lets you pick. There is no standard
-        tuning for either: each gamelan has its own, and no two sets are the same. In 1972
-        Wasisto Surjodiningrat, P. J. Sudarjana and Adhi Susanto published
-        measurements of dozens of respected gamelan. The slendro in the figure is the average
-        of their slendro sets (0, 231, 474, 717, 955 cents, with an octave stretched to 1208).
-        The pelog is a model: Martin Braun found that the same pelog measurements cluster
-        near steps of a nine-step equal division of the octave, 133 cents each, and the
-        figure uses those positions. The metal-bar timbre matters too. Bars and gongs have
-        overtones that aren't whole-number multiples, so the harmonic alignment from part
-        three works differently on these instruments.
+        <strong>Javanese gamelan.</strong> A Javanese gamelan is an ensemble of cast bronze gongs,
+        kettles, and keyed metallophones tuned together at the forge as a single unified set and
+        never matched to another ensemble. Java uses two distinct tuning systems: <em>slendro</em>,
+        a five-note scale with nearly equal wide steps, and <em>pelog</em>, a seven-note scale
+        with sharply contrasting small and large steps from which most pieces draw a five-note
+        <em>pathet</em> subset (try the <em>pelog subset</em> buttons when pelog is selected). No
+        universal standard governs either system, so every gamelan has its own recognizable voice.
+        In 1972 Wasisto Surjodiningrat, P. J. Sudarjana, and Adhi Susanto measured dozens of
+        venerated Central Javanese gamelan; the slendro above averages their data (0, 231, 474,
+        717, and 955 cents, with an octave slightly stretched to 1208 cents). For pelog, Martin
+        Braun noticed that those same measurements cluster tightly around steps of a nine-equal
+        division of the octave (multiples of 133 cents), which is the model played here. The
+        bronze timbre plays a direct acoustic role too: vibrating metal bars produce non-harmonic
+        overtones, changing which interval sizes fuse cleanly compared with harmonic strings and
+        pipes.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Measuring other scales</span>
         <p>
-          Alexander Ellis invented the cent in 1885 (part four) to compare the scales of
-          instruments like these, including Javanese gamelan instruments. His
-          conclusion was that the musical scale is not one natural thing but many, built
-          differently by different cultures. Western music theory took a long time to
-          absorb that.
+          Alexander Ellis invented the cent in 1885 specifically so he could measure and compare
+          instruments like these, including Javanese gamelan brought to London. His measurements
+          convinced him that musical scales are cultural inventions shaped by instruments and
+          aesthetics rather than copies of a single natural template, an insight that took Western
+          music theory decades to fully accept.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="explorer"><span class="kicker">Step 6 · Explorer</span>One slider for the fifth</h2>
       <p>
-        Back to the seven-note scales, with one more idea from part four. Pythagorean
-        tuning, quarter-comma meantone, and 12-, 19-, 31- and 53-equal are all chains of
-        identical fifths; they differ only in how big each fifth is. A mode is a set of
-        positions on that chain. The major scale is F C G D A E B, positions −1 to 5 counting
-        from C. So a single number, the size of the fifth, tunes every note of every mode.
+        Return to the seven-note diatonic family for a moment and bring back the chain-of-fifths
+        view from part four. Pythagorean tuning, quarter-comma meantone, and 12-, 19-, 31-, and
+        53-equal all share the same underlying recipe: stack identical fifths and fold them into
+        one octave. Every mode is simply a chosen window along that chain (for instance, the major
+        scale spans positions −1 through 5 around C: F, C, G, D, A, E, B). That means a single
+        parameter, the width of the fifth, smoothly retunes every note and every chord of every
+        mode simultaneously:
       </p>
       <pre><code>whole step  = 2 × fifth − 1200
 half step   = 3600 − 5 × fifth
 major third = 4 × fifth − 2400     <span class="cm">// pure (386.3¢) when the fifth is 696.58¢</span></code></pre>
       <p>
-        The figure below puts that number on a slider. Play the pads, use your keyboard
-        (A S D F G H J K L ; ' play the scale upward), or press the Roman-numeral buttons,
-        which play the triad built on each degree from the scale's own notes.
+        The explorer below puts that parameter directly on a slider. Tap the pads, play from your
+        computer keyboard (<code>A S D F G H J K L ; '</code> climb the scale), or fire the
+        Roman-numeral buttons (<code>I</code> through <code>VII</code>) to audition diatonic
+        triads built from the scale's own degrees.
       </p>
 
       <div
@@ -320,52 +338,44 @@ major third = 4 × fifth − 2400     <span class="cm">// pure (386.3¢) when th
       ></div>
 
       <p>
-        Drag the fifth all the way down to 685.7 cents and the whole steps shrink until all
-        seven steps are equal, 171.4 cents each: the major scale has turned into seven-equal
-        and lost its landmarks. Drag it up to 720 and the half steps shrink to nothing. E
-        lands on F, B lands on C, and the seven-note scale collapses into five-equal, a
-        pentatonic. In between are all the historical tunings, and the major chord (press I)
-        changes character along the way: pure at quarter-comma meantone, shimmering at
-        12-equal, rough at Pythagorean. Andrew Milne, William Sethares and James Plamondon
-        call this range the <em>syntonic tuning continuum</em> and have built software
-        instruments that let a player slide along it while playing.
+        Slide the fifth all the way down to 685.7 cents and the whole steps shrink until they match
+        the half steps at 171.4 cents apiece: the diatonic scale flattens into seven-equal and
+        every landmark melts away. Push the slider all the way up to 720 cents and the half steps
+        squeeze down to zero until degree 3 collides with degree 4 (E merges into F) and degree 7
+        collides with the upper octave (B merges into C), collapsing the seven-note scale into a
+        five-equal pentatonic. Every historical keyboard tuning sits in the narrow corridor in
+        between. Press <code>I</code> while sliding across the middle and listen to the major
+        triad pass smoothly through pure stillness at <em>¼-comma</em> meantone, gentle piano
+        shimmer at <em>12-equal</em>, and bright roughness at <em>Pythagorean</em>. Andrew Milne,
+        William Sethares, and James Plamondon named this single-parameter sweep the
+        <em>syntonic tuning continuum</em> and built software controllers that let performers morph
+        tunings mid-phrase.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <p>What to keep from this part:</p>
-      <ul>
-        <li>
-          <strong>A scale is a step pattern.</strong> The uneven placement of the half steps
-          gives every note a different set of neighbours, which is how the ear finds home.
-        </li>
-        <li>
-          <strong>Modes are rotations.</strong> Ordered from bright to dark, each one lowers
-          a single note.
-        </li>
-        <li>
-          <strong>Seven is the evenest odd split of twelve.</strong> The major scale is the
-          maximally even seven-note set and a chain of seven fifths at the same time.
-        </li>
-        <li>
-          <strong>Distance between keys is shared notes.</strong> The circle of fifths is a
-          map of how much changes when music moves.
-        </li>
-        <li>
-          <strong>Twelve is one answer.</strong> Maqam, rāga and gamelan scales tune notes
-          the piano doesn't have, and they're learned by ear, not from a grid.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Seven notes, and beyond</h2>
       <p>
-        Things I'd try next: a rāga figure that bends between notes the way a singer does
-        (<em>meend</em>), since a sequence of fixed pitches leaves out most of what makes a
-        rāga sound like itself; maqam modulation between ajnas; and the explorer on an
-        isomorphic button grid, where every chord keeps its shape at any fifth size.
+        The piano's familiar white keys look asymmetric at first glance, yet their layout turns out
+        to solve several problems at once. Placing two half steps unevenly around twelve semitones
+        gives every degree its own recognizable neighborhood; rotating that same pattern yields
+        seven modes that step cleanly from bright to dark one lowered pitch at a time; spreading
+        seven notes as evenly as the grid permits automatically produces a seven-fifth chain with
+        unique interval counts, which in turn makes the circle of fifths a smooth map for changing
+        keys. And stepping outside the twelve-note grid into Arabic maqam, Hindustani rāga, and
+        Javanese gamelan shows how much richer pitch space becomes once fixed equal semitones are
+        no longer calling the shots.
+      </p>
+      <p>
+        A few things I'd love to build next: a rāga synthesizer with continuous pitch glides
+        (<em>meend</em>), since stepped notes miss half of what gives a rāga its voice; an
+        interactive maqam explorer that modulates smoothly from one jins into another on a shared
+        pivot; and pairing the tuning continuum above with an isomorphic hexagonal button grid so
+        every chord keeps the exact same finger shape no matter how wide you stretch the fifth.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/chords.html">Part six, Major and Minor</a>.</strong>
-        Stack the scale's notes in thirds and you get chords. Why major and minor sound so
-        different, and why one chord pulls so hard toward home.
+        Stack notes from these seven-note scales in thirds and chords appear. Why major and minor
+        triads feel so different, and why one chord pulls so hard toward home.
       </p>
     </main>
 

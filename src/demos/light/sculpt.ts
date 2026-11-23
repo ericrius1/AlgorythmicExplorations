@@ -264,7 +264,7 @@ fn scene(uv: vec2f) -> vec3f {
 
   var col = vec3f(0.0);
   if (m > 1.5 && m < 2.5) {
-    // copper: all specular, coloured by the metal
+    // copper: all specular, colored by the metal
     let f0 = vec3f(0.95, 0.6, 0.45);
     let F = fresnel(f0, dot(n, v));
     let shine = 48.0;
@@ -290,7 +290,7 @@ fn scene(uv: vec2f) -> vec3f {
     col += reflEnv(r) * fresnel(vec3f(0.04), dot(n, v)) * ao * 0.5;
   }
 
-  // distance haze. No scattering, just a blend toward the sky colour, and
+  // distance haze. No scattering, just a blend toward the sky color, and
   // complete before the far floor gets anywhere near the edge of the march
   let fog = 1.0 - exp(-pow(max(tt - 4.5, 0.0), 2.0) * 0.022);
   col = mix(col, sky(rd), fog);
@@ -365,7 +365,7 @@ export async function mountSculpt(container: HTMLElement, opts: SculptOptions): 
     shell.slider({
       label: "blend radius k",
       min: 0, max: 0.55, step: 0.01, value: sminK,
-      format: (v) => (v < 0.005 ? "0 (plain min)" : v.toFixed(2)),
+      format: (v) => (v < 0.005 ? "0 (min)" : v.toFixed(2)),
       onInput: (v) => (sminK = v),
     });
   }

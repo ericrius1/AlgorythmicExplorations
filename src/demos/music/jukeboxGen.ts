@@ -440,7 +440,8 @@ export async function mountJukeboxGen(container: HTMLElement, opts: JukeboxOpts 
     // lane labels
     const labelFont = font(px, 9, 650);
     text(ctx, "lead", left - 8 * px, Y(76), { color: TRACK_COL.lead, align: "right", font: labelFont });
-    text(ctx, "keys", left - 8 * px, Y(62), { color: TRACK_COL.keys, align: "right", font: labelFont });
+    text(ctx, "keys", left - 8 * px, Y(65), { color: TRACK_COL.keys, align: "right", font: labelFont });
+    text(ctx, "pad", left - 8 * px, Y(54), { color: TRACK_COL.pad, align: "right", font: labelFont });
     text(ctx, "bass", left - 8 * px, Y(40), { color: TRACK_COL.bass, align: "right", font: labelFont });
     drumRows.forEach((d, i) => text(ctx, d, left - 8 * px, drumTop + drumH * (i + 0.5), { color: TRACK_COL.drums, align: "right", font: font(px, 8.5, 600), alpha: 0.8 }));
 

@@ -10,7 +10,7 @@
     <title>Consonance and Roughness — Living Music</title>
     <meta
       name="description"
-      content="Why some pairs of notes sound smooth and others rough: beats, critical bands, whole-number ratios, Lissajous figures, the Plomp–Levelt dissonance curve, and Sethares' discovery that changing the timbre moves the consonant intervals. Every figure is playable."
+      content="Why some pairs of notes blend smoothly while others beat and buzz: beats, critical bands, simple ratios, Lissajous figures, the Plomp–Levelt dissonance curve, and Sethares' discovery that changing timbre moves the consonant intervals."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Living Music · Part 3</p>
         <h1>Consonance and Roughness</h1>
         <p class="subtitle">
-          Why some pairs of notes sound smooth and others rough. Two tones are drawing the
-          figure above. Drag along the curve to change the interval between them.
+          Two tones drawing a harmonograph across a landscape of dissonance. Drag along the top
+          curve to hear intervals lock in or grind apart.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,38 +43,45 @@
 
     <main>
       <p>
-        The figure at the top is a harmonograph, a pen moved by two vibrations at once. One
-        tone at 220 Hz pushes it sideways, the second tone pushes it up and down, and the
-        trace fades as it goes, like a pendulum drawing. The curve across the top is how
-        rough the two tones sound together for every interval from unison to the octave.
-        Tap to turn the sound on and drag along that curve. When you let go, it snaps to the
-        nearest named interval if one is close. Left alone, it tours a dozen intervals,
-        holding each one for a few seconds.
+        Anyone who has ever tuned a guitar by ear knows a strange acoustic transition. Pluck two
+        strings tuned a hair apart and the combined tone breathes in and out in slow, countable
+        swells. Turn the tuning peg a little farther and those swells speed up until they blur
+        into a harsh, gritty buzz. Keep turning, and past a certain gap the grit clears away into
+        two clean, separate notes.
       </p>
       <p>
-        Notice that the low points of the curve are where the drawing closes into a still,
-        tidy knot, and that those are the intervals that sound smooth. This article is about
-        why. <a href="/pages/living-music/vibration.html">Part one</a> took a single note apart
-        into a pitch, a loudness, and a recipe of harmonics. This part plays two notes at
-        once, and it turns out that the recipe of harmonics decides most of what happens.
+        Up at the top of the page, a virtual harmonograph turns that exact acoustic story into a
+        drawing. One tone at 220 Hz drives the glowing pen sideways while a second tone drives it
+        vertically, fading out like a dying pendulum. Across the top runs a curve measuring how
+        rough the pair sounds at every interval from unison to the octave. Tap the canvas (or hit
+        <strong>sound</strong>) and drag along that curve; letting go snaps onto any nearby named
+        interval, and left alone it wanders through twelve intervals on its own. Wherever the
+        curve plunges into a deep valley, the tangled weave suddenly freezes into a tidy,
+        repeating knot, and the sound snaps smooth. In
+        <a href="/pages/living-music/vibration.html">Part 1</a> we unpacked a single note into a
+        stack of sine harmonics. Now we play two notes at once and discover that those hidden
+        harmonics are what carve out nearly every valley in Western harmony.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="beats"><span class="kicker">Step 1 · Close frequencies</span>Beats and roughness</h2>
       <p>
-        Start with the simplest pair: two sine waves at almost the same frequency. They drift
-        in and out of step with each other. When they're in step their peaks add and the sound
-        gets louder. Half a beat later they're opposite, they cancel, and it gets quiet. The
-        sound swells and fades |<em>f</em>₂ − <em>f</em>₁| times a second, because that's how
-        often the faster wave gains a whole cycle on the slower one.
+        Begin with the barest possible case: two pure sine waves separated by just a few hertz.
+        Because one cycles slightly faster than the other, their peaks drift steadily in and out
+        of alignment. When peaks line up, they reinforce each other and the tone swells; half a
+        beat later, peak meets trough, they cancel, and the tone dips. That pulsing happens
+        |<em>f</em>₂ − <em>f</em>₁| times every second, once for every full cycle the higher sine
+        gains on the lower one:
       </p>
       <pre><code>sin(2π·220·t) + sin(2π·223·t) = 2·cos(2π·1.5·t)·sin(2π·221.5·t)
 <span class="cm">// a 221.5 Hz tone whose loudness swells 3 times a second</span></code></pre>
       <p>
-        The figure starts there, at A3 (220 Hz) plus 3 Hz. Press play. The left panel shows
-        20 ms of both waves and their sum sliding in and out of step. The right panel shows
-        the last second of the sum, so you can count the three swells. Then drag the slider
-        (0.1 to 160 Hz above the first tone) slowly to the right.
+        The figure opens on that exact pair, A3 (220 Hz) alongside 223 Hz. Click
+        <strong>play both</strong>. On the left, a 20 ms window shows the blue and orange sines
+        sliding past one another as their bright white sum grows and collapses. On the right, a
+        one-second envelope traces the three distinct swells. Now drag the
+        <strong>second tone, above the first</strong> slider slowly across its range from 0.1 to
+        160 Hz.
       </p>
 
       <div
@@ -84,49 +91,52 @@
       ></div>
 
       <p>
-        Below about 10 Hz you hear a slow wobble that you can count, the sound a guitarist
-        listens for when tuning two strings to each other. Past that, the wobble gets too fast
-        to follow and turns into a gritty, unpleasant texture called
-        <strong>roughness</strong>. At A3 it's worst at about 22 Hz apart. Keep going and the
-        roughness clears up until, past about 60 Hz, you hear two separate, smooth notes.
+        Below about 10 Hz you hear gentle, countable throbs, the exact cue a guitarist listens for
+        when matching two strings. Push past 10 Hz and your ear loses track of individual pulses;
+        the wobble fuses into a coarse, rasping sensation called <strong>roughness</strong>. Near
+        A3, roughness peaks around 22 Hz apart, then gradually relaxes until, past roughly 60 Hz,
+        the grit vanishes and two independent, smooth tones emerge.
       </p>
       <p>
-        The curve under the waves is that progression as a graph, from listening tests that
-        Reinier Plomp and Willem Levelt ran in 1965. They found that roughness depends on
-        where the two tones fall in the inner ear. The cochlea sorts sound by frequency along
-        its length, and each spot responds to a band of nearby frequencies called a
-        <strong>critical band</strong>. Two tones inside the same band shake the same patch
-        of the membrane, and the fast beating between them is what you hear as roughness.
-        Plomp and Levelt found roughness was worst at about a quarter of a critical band
-        apart.
+        The curve drawn across the bottom plots that trajectory directly from listening
+        experiments Reinier Plomp and Willem Levelt published in 1965. Its shape is dictated by
+        the mechanics of your inner ear. Inside the cochlea, incoming sound waves separate by
+        frequency along the basilar membrane, and each patch of sensory hair cells responds to a
+        local neighborhood of frequencies known as a <strong>critical band</strong>. When two
+        tones land inside the same critical band, they physically shake the same patch of membrane
+        at once, and the rapid interference between them registers as roughness. Plomp and Levelt
+        found that roughness peaks when two tones sit roughly a quarter of a critical band apart.
       </p>
       <p>
-        The register buttons show the consequence. Critical bands are wide at low frequencies
-        and narrower, relative to the pitch, at high ones. At A5 the roughest gap is 34 Hz,
-        about two thirds of a semitone. At A2 it's 20 Hz, which down there is almost a minor
-        third, and two sines at A2 stay rough until they're nearly a fifth apart. This is why
-        a close chord low on a piano sounds muddy while the same chord two octaves up sounds
-        clear, and why bass parts tend to be written in wide intervals.
+        Click through the register buttons (<strong>A2</strong> through <strong>A5</strong>) to
+        see how pitch register shifts the picture. Critical bands stay relatively wide down in the
+        bass and grow narrower, as a fraction of pitch, higher up. At A5 (880 Hz), the peak
+        roughness gap of 34 Hz spans only about two-thirds of a semitone. Down at A2 (110 Hz), a
+        20 Hz peak spans nearly a minor third, and two sines keep grinding against each other until
+        they are almost a fifth apart. That single quirk of cochlear anatomy explains why a tight
+        chord played low on the piano turns muddy while the exact same notes two octaves up sound
+        crystalline, and why arrangers naturally space bass voices wide.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Tuning by counting</span>
         <p>
-          Piano tuners use beats as a measuring tool. To set a temperament they don't judge
-          whether an interval sounds in tune. They play it and count beats between the
-          harmonics of the two strings, and adjust until the beat rate matches a number they
-          already know for that interval. A tuned fifth in the middle of the piano beats
-          a little under once per second.
+          Professional piano tuners treat beating as a stopwatch. When laying down a temperament
+          across the middle of a piano, they rely on precise beat counts between upper harmonics
+          of two strings, adjusting the tuning pin until the pulse rate hits a known target for
+          each interval. On a modern equal-tempered piano, a properly tuned middle-register fifth
+          still beats slowly, just shy of once per second.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="ratios"><span class="kicker">Step 2 · Simple ratios</span>Patterns that repeat</h2>
       <p>
-        Far apart, two sines don't beat, so something else has to separate a smooth interval
-        from a tense one. The next figure shows the other half of the story. One tone drives a
-        dot sideways and the other drives it up and down, the same idea as the hero, drawn
-        from the last 36 ms of the real signals. The pattern it traces is a
-        <strong>Lissajous figure</strong>.
+        Once two pure sine waves sit more than a critical band apart, they stop beating against
+        each other completely. Yet in music, a fifth sounds settled while a tritone feels tense.
+        Before bringing harmonics back in, look at what happens to the geometry of the combined
+        waveform itself. Below, tone A (220 Hz) drives a dot horizontally and tone B drives it
+        vertically over the last 36 ms of motion, tracing a <strong>Lissajous figure</strong>
+        beside their time-domain sum.
       </p>
 
       <div
@@ -136,55 +146,61 @@
       ></div>
 
       <p>
-        When the two frequencies form a ratio of small whole numbers, the path closes on
-        itself and stands still. At 3:2 (a perfect fifth, 220 and 330 Hz), the faster tone
-        does three cycles while the slower one does two, and then the whole pattern starts
-        over. The panel on the right marks it: the sum of the two waves repeats every 9.09 ms,
-        110 times a second, an octave below the lower tone. The ratios with small numbers
-        repeat quickly and draw simple knots. 45:32 (one version of the tritone) also repeats
-        in the end, but only every 145 ms, about 7 times a second. That's too slow to hear as
-        a pitch, and the figure never settles into a simple shape.
+        Click through the ratio presets beneath the slider. Whenever the two frequencies form a
+        ratio of small integers, the glowing trace closes neatly on itself and holds still. At
+        <strong>3:2</strong> (a perfect fifth, 220 and 330 Hz), the upper sine completes three
+        cycles in the exact time the lower one finishes two, so the combined waveform repeats
+        every 9.09 ms (110 times per second, exactly an octave below the lower tone). Ratios with
+        larger integers take far longer to realign: <strong>45:32</strong> (one version of the
+        tritone) technically repeats too, yet only once every 145 ms (around 7 times per second),
+        far too sluggish for the ear to hear as a shared pitch, leaving the knot perpetually dense
+        and restless.
       </p>
       <p>
-        Drag the slider a little away from 3:2 and the knot starts turning. It turns at the
-        rate the pattern slips, which the figure computes like this:
+        Nudge the <strong>frequency ratio</strong> slider just slightly off 1.5000 and watch the
+        3:2 knot begin to tumble slowly in space. Its rotation speed matches the exact rate at
+        which the two waves slip out of alignment:
       </p>
       <pre><code><span class="cm">// near p:q, harmonic q of the upper tone and harmonic p of the lower one almost meet</span>
 const slip = Math.abs(near.q * f2 - near.p * F1);</code></pre>
       <p>
-        That's a beat rate. It's the beat between the third harmonic of 220 Hz and the second
-        harmonic of the upper tone, two frequencies that coincide at an exact fifth. Pure sine
-        waves don't have those harmonics, so you'll hear very little difference between an
-        in-tune and an out-of-tune fifth here. Real instruments do have them, and that's
-        where the next figure comes in.
+        That slip rate is a beat frequency in disguise: specifically, the beat between the third
+        harmonic of 220 Hz (660 Hz) and the second harmonic of the upper tone, which coincide
+        perfectly at an exact 3:2 fifth. Pure sine waves carry zero overtones, so listening here
+        you will barely hear a difference between an exact fifth and one nudged slightly off
+        center. Real instruments, however, are packed with those harmonics, and the moment we put
+        them back in, that slip becomes unmistakably audible.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Mirrors on tuning forks</span>
         <p>
-          Jules Lissajous drew these figures in 1857 without electronics. He glued a small
-          mirror to a tine of each of two tuning forks, set at right angles, and bounced a
-          beam of light off one mirror, then the other, onto a screen. The figure's slow turn
-          showed how far one fork was from an exact ratio with the other, and for decades the
-          method was a standard way to compare frequencies accurately.
+          French physicist Jules Lissajous invented these figures optically in 1857. He glued a
+          tiny mirror onto one tine of each of two tuning forks mounted at right angles, then
+          bounced a narrow beam of light off the first mirror, onto the second, and across to a
+          projection screen. Because any tiny mistuning made the luminous knot rotate slowly at
+          the exact slip rate, Lissajous figures served for decades as a precision laboratory
+          tool for calibrating frequency standards.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="alignment"><span class="kicker">Step 3 · Harmonics collide</span>Where the harmonics land</h2>
       <p>
-        Part one showed that a real note isn't one sine. It's a stack of harmonics at 1, 2, 3…
-        times its frequency. So when two real notes play together, every harmonic of one is
-        close to some harmonic of the other, and every one of those pairs beats or doesn't
-        according to step 1. Consonance is mostly a matter of how many of those pairs land
-        close enough to be rough.
+        Real musical tones (strings, reeds, brass, voices) sound a full harmonic stack at 1, 2, 3,
+        and higher integer multiples of their fundamental. Play two such notes simultaneously and
+        you have dozens of sine-wave pairs interacting at once across the cochlea. Every harmonic
+        from the first note lands near some harmonic from the second, and each pair either aligns
+        cleanly, sits far enough apart to stay smooth, or falls inside a critical band and grates
+        according to the Plomp–Levelt curve from Step 1.
       </p>
       <p>
-        The figure below shows both stacks on a log-frequency axis, tone A in blue pointing up
-        and tone B in orange pointing down, starting at a fifth. Pairs that land on top of
-        each other flare white: at 3:2, B's 2nd harmonic sits on A's 3rd and B's 4th on A's
-        6th. Pairs that land close enough to beat glow red. The graph underneath adds up the
-        roughness of every pair for every interval from unison to just past the octave. Drag
-        along it to move tone B.
+        Below, both harmonic stacks sit face to face on a logarithmic frequency axis: tone A in
+        blue pointing upward, tone B in orange pointing downward, starting on a fifth. Pairs that
+        line up within a few cents flare crisp white (at 3:2, B's 2nd partial locks right onto
+        A's 3rd, and B's 4th locks onto A's 6th). Pairs close enough to beat pulse angry red. The
+        graph underneath totals up the Plomp–Levelt roughness of every cross-tone partial pair at
+        every interval from unison to just past the octave. Tap <strong>play</strong> and drag
+        horizontally across the curve to sweep tone B.
       </p>
 
       <div
@@ -194,21 +210,25 @@ const slip = Math.abs(near.q * f2 - near.p * F1);</code></pre>
       ></div>
 
       <p>
-        The valleys are found in the curve itself and labelled by the nearest simple ratio.
-        With the default seven harmonics per tone they fall on 6:5, 5:4, 4:3, 7:5, 3:2, 5:3,
-        7:4, and 2:1, and the deepest are the octave and the fifth. That's close to the
-        ranking of intervals in any harmony textbook, worked out from one psychoacoustic curve
-        and some addition. The ratios with a 7 in them (7:5 and 7:4) show up because harmonic
-        7 is in the stack. Western tuning doesn't use them, though barbershop quartets are
-        often said to tune their seventh chords toward 7:4, and no piano key plays them.
+        Every valley label underneath the curve is detected automatically from the curve's own
+        local minima and matched to the nearest simple ratio. With the default seven harmonics per
+        tone, the dips fall squarely on 6:5, 5:4, 4:3, 7:5, 3:2, 5:3, 7:4, and 2:1, with the
+        octave and fifth plunging deepest of all. Out of one empirical cochlear roughness curve
+        and straightforward addition falls nearly the entire traditional hierarchy of musical
+        consonance. Notice the two septimal valleys containing a 7 (7:5 and 7:4): they appear
+        because harmonic 7 is present in the stack. Standard Western notation skips them, though
+        barbershop quartets famously lean their dominant sevenths down toward the silky 7:4 ratio
+        because no piano key ties them down.
       </p>
       <p>
-        The harmonics slider shows where the valleys come from. Drag it down to 1 and you're
-        back to pure sines: the curve has one hump near unison and no valleys at all. With 2
-        harmonics the octave appears. With 3 the fifth appears. Each harmonic you add brings
-        in new coincidences and new valleys. Then try the register buttons. At C3 the thirds'
-        valleys are about half as deep as at A4, the same low-register muddiness as in
-        step 1.
+        Slide <strong>harmonics per tone</strong> down to <code>1 (pure sine)</code> to watch the
+        valleys evaporate: with pure sines, only a single broad roughness hump near unison
+        remains. Step up to <code>2</code> and the octave valley snaps into view; step to
+        <code>3</code> and the perfect fifth carves itself out. Each additional harmonic adds new
+        coincidences and digs fresh valleys. Then flip between <strong>low (C3)</strong>,
+        <strong>middle (A3)</strong>, and <strong>high (A4)</strong>: down at C3, the minor and
+        major third valleys flatten to roughly half their depth at A4, echoing the low-register
+        muddiness from Step 1.
       </p>
       <pre><code><span class="cm">// Plomp–Levelt roughness of two partials, in Sethares' parameterization</span>
 export function roughness(f1: number, a1: number, f2: number, a2: number): number {
@@ -221,22 +241,22 @@ export function roughness(f1: number, a1: number, f2: number, a2: number): numbe
         <summary>Deep dive: the model behind the curve</summary>
         <div class="fold-body">
           <p>
-            William Sethares fit Plomp and Levelt's data with the difference of two
-            exponentials above. The roughness of a pair is zero at unison, rises to a peak,
-            and decays as the pair separates. The factor <em>s</em> scales the frequency gap
-            by the width of the critical band at the lower frequency, so the peak always sits
-            at <em>x</em> ≈ 0.22, which works out to 22 Hz apart at 220 Hz. Each pair is
-            weighted by the quieter of its two amplitudes. The figures give harmonic
-            <em>n</em> an amplitude of 0.88<sup><em>n</em>−1</sup> and sum the roughness of
-            every pair, one partial from each tone. (Pairs inside one tone don't change with
-            the interval, so they're left out.)
+            Electrical engineer and music theorist William Sethares fit Plomp and Levelt's
+            listening data with the difference of two exponentials above. Roughness starts at zero
+            for unison, rises sharply to a peak at <em>x</em> ≈ 0.22 (which evaluates to 22 Hz at
+            220 Hz), and tails off smoothly as the separation widens. The factor <em>s</em>
+            rescales the frequency gap by the local critical bandwidth at the lower partial, and
+            each pair is weighted by the quieter of its two amplitudes. Here, partial <em>n</em>
+            has amplitude 0.88<sup><em>n</em>−1</sup>, and the total curve sums roughness over
+            every cross-tone pair (within-tone pairs remain constant regardless of interval, so
+            they add only a flat offset).
           </p>
           <p>
-            It's a model of sensory roughness and nothing else. It doesn't know about the
-            way two notes at an octave fuse into one sound, about how chords move from one to
-            the next, or about what a listener is used to hearing. Those matter too. What's
-            surprising is how much of the traditional ranking of intervals falls out of
-            roughness alone.
+            This curve captures sensory roughness alone. It knows nothing about harmonic fusion at
+            the octave, melodic context, tension and resolution across chord progressions, or a
+            listener's cultural habits. All of those shape real musical consonance too. Even so, it
+            is striking how much of the classical ranking of intervals drops straight out of
+            cochlear interference.
           </p>
         </div>
       </details>
@@ -244,11 +264,11 @@ export function roughness(f1: number, a1: number, f2: number, a2: number): numbe
       <!-- ================================================================ -->
       <h2 id="timbre"><span class="kicker">Step 4 · Change the sound, change the scale</span>Timbre moves the valleys</h2>
       <p>
-        If the valleys come from where the harmonics land, then a sound with different
-        harmonics should have different valleys. Sethares followed that idea through in the
-        1990s. The next figure is the same dissonance curve, with buttons that swap both tones
-        for an inharmonic sound, one whose partials aren't whole-number multiples of the
-        lowest one.
+        If consonance valleys form wherever two notes' partials line up, a bold prediction
+        follows: change the partial spacing inside the timbre itself, and the consonant intervals
+        ought to move right along with them. William Sethares tested this systematically in the
+        1990s. The curve below runs the exact same roughness calculation, except the buttons now
+        swap both tones to inharmonic timbres whose overtones abandon the integer series.
       </p>
 
       <div
@@ -258,85 +278,89 @@ export function roughness(f1: number, a1: number, f2: number, a2: number): numbe
       ></div>
 
       <p>
-        It starts on "stretched", one of Sethares' own examples. Its partials are spaced as if
-        an octave were a ratio of 2.1 instead of 2, so partial <em>n</em> sits at
-        2.1<sup>log₂<em>n</em></sup>. Look at the curve: the deepest valley has moved from 2.0
-        to 2.1, and the 3:2 valley has moved to 1.543. Play the two tones at 2.000 and they
-        sound rough, an octave that's out of tune. Play them at 2.100 and they're smooth.
-        With this timbre, a stretched octave is the consonant one.
+        The figure starts on <strong>stretched</strong>, one of Sethares' favorite demonstrations.
+        Every partial is stretched outward as though an octave had a ratio of 2.1 instead of 2,
+        putting partial <em>n</em> at 2.1<sup>log₂<em>n</em></sup>. Glance at the curve: the
+        deepest valley has migrated from 2.000 over to 2.100, and the fifth has drifted from 1.500
+        to 1.543. Play the pair right at a normal 2.000 octave (1200¢) and it grates like a badly
+        mistuned chord; slide a hair right to 2.100 (1284¢) and the roughness collapses to 4%,
+        locking cleanly into place. For this stretched timbre, the pseudo-octave of 2.1 sounds
+        completely in tune while the textbook 2:1 octave clashes.
       </p>
       <p>
-        The other buttons:
+        Try the remaining timbres to see how far that link goes:
       </p>
       <ul>
         <li>
-          <strong>Stiff string.</strong> Real strings are slightly stiff, which pushes each
-          partial a little sharp: <em>f<sub>n</sub></em> = <em>n</em>·<em>f</em>·√(1 +
-          <em>B</em><em>n</em>²), here with <em>B</em> = 0.002. The octave valley moves to
-          about 20 cents wide. Piano tuners stretch their octaves for the same reason.
+          <strong>stiff string:</strong> physical metal strings resist bending slightly, which
+          pushes upper partials progressively sharp according to
+          <em>f<sub>n</sub></em> = <em>n</em>·<em>f</em>·√(1 + <em>B</em><em>n</em>²) (shown here
+          with <em>B</em> = 0.002, typical of piano treble wire). That gentle stretch pulls the
+          octave valley roughly 20 cents sharp, which is the physical reason piano tuners
+          deliberately stretch octaves wide toward the top of the keyboard.
         </li>
         <li>
-          <strong>Metal bar.</strong> A uniform bar free at both ends, like a glockenspiel
-          bar, has partials at 1, 2.76, 5.40, 8.93 and 13.3 times the lowest. With only five
-          partials spread that far apart, the curve is low almost everywhere past a whole
-          tone, with shallow dips near 1.49, 1.65 and 1.96. The octave isn't special any
-          more.
+          <strong>metal bar:</strong> a uniform bar suspended freely at both ends, like a
+          glockenspiel or vibraphone bar, vibrates at strongly inharmonic ratios of 1, 2.76, 5.40,
+          8.93, and 13.3. With just five widely spaced partials, roughness stays fairly tame
+          everywhere past a whole tone, showing shallow dips near 1.49, 1.65, and 1.96 while the
+          standard 2:1 octave loses its special status altogether.
         </li>
         <li>
-          <strong>10-TET spectrum.</strong> Each harmonic moved to the nearest step of a scale
-          that divides the octave into 10 equal steps instead of 12. The valleys move onto
-          steps of that scale (240, 360, 480, 600, 720 cents and so on). A ten-note scale that
-          sounds out of tune with ordinary instruments can sound in tune with a timbre built
-          to match it.
+          <strong>10-TET spectrum:</strong> each harmonic has been nudged onto the nearest pitch
+          of a scale dividing the octave into 10 equal steps of 120 cents (instead of 12). Look
+          at the orange tick marks along the curve floor: the valleys snap straight onto the
+          10-TET grid (<code>2\10</code>, <code>3\10</code>, <code>4\10</code>, <code>5\10</code>,
+          <code>6\10</code>, or 240, 360, 480, 600, and 720 cents). A ten-note equal scale
+          that sounds weirdly sour on a piano suddenly sounds coherent and settled when paired
+          with a matching spectrum.
         </li>
       </ul>
       <aside class="note">
         <span class="note-label">Aside · Gamelan</span>
         <p>
-          The metallophones of a Javanese gamelan are bars and gongs, so their partials are
-          inharmonic, and their tunings don't follow Western ratios. Sethares measured the
-          spectra of gamelan instruments and found that the dissonance curves they produce
-          have minima close to steps of the five-note slendro scale. That doesn't prove
-          the scales came from the timbres. It does show the two fit each other, which is the
-          same relationship harmonic timbres have with Western intervals.
+          Indonesian Javanese gamelan ensembles are dominated by struck bronze bars and bossed
+          gongs whose overtones are naturally inharmonic, and their traditional scales diverge
+          sharply from Western intervals. When Sethares measured the spectra of real gamelan
+          instruments and plotted their dissonance curves, the minima fell surprisingly close to
+          the steps of the five-note <em>slendro</em> scale. That alignment stops short of proving
+          scales evolved solely from acoustics, yet it reveals a tight mutual fit between an
+          instrument's physics and the tuning system built around it, much like the partnership
+          harmonic strings and pipes share with Western intervals.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>Consonance is a fit</h2>
-      <ul>
-        <li>
-          <strong>Close frequencies beat.</strong> Slow beats wobble, beats in the tens of hertz
-          sound rough, and the size of the rough zone is set by the ear's critical bands,
-          which are widest in the bass.
-        </li>
-        <li>
-          <strong>Simple ratios line up harmonics.</strong> At 3:2 the harmonics of two notes
-          coincide instead of beating, and small numbers mean many coincidences.
-        </li>
-        <li>
-          <strong>The consonant intervals depend on the timbre.</strong> Harmonic timbres
-          produce the familiar intervals. Change the partials and the smooth intervals move
-          with them.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: the same curve for three notes, so you can compare major and
-        minor chords by roughness; a "bell" timbre measured from a real recording; and a
-        figure that builds a custom timbre for whatever scale you give it, the way Sethares
-        did, so a seven-step equal scale sounds in tune.
+        Looking back across these four steps, musical consonance stops feeling like numerology and
+        starts looking like geometry inside the ear. Two frequencies separated by a few hertz
+        beat slowly; widen them into the tens of hertz and they crowd the same cochlear critical
+        band, producing roughness (especially across wide bass bands). On real harmonic
+        instruments, simple integer ratios like 3:2 and 4:3 sound open and settled because they
+        bring whole ladders of overtones into alignment instead of leaving them grinding against
+        one another. And the clincher from Sethares' experiments is that those preferred intervals
+        belong to the partnership between ear and timbre: swap out integer harmonics for stretched
+        partials or vibrating metal bars, and the smooth valleys pack up and move.
       </p>
       <p>
-        One hard problem is left over. Every valley in the curve sits on a ratio of small
-        whole numbers, and a keyboard has to pick a fixed set of notes that plays those ratios
-        from any starting note. Stack twelve perfect fifths and you land almost, but not
-        quite, on seven octaves. The gap is about a quarter of a semitone, and dealing with it
-        is how the piano got its twelve notes.
+        There are plenty of directions to push this further: generalizing the roughness landscape
+        to three simultaneous tones so you can see major, minor, and diminished triads as
+        topographical basins; importing spectra recorded from real church bells; or running
+        Sethares' inverse trick to synthesize a custom timbre on the fly that makes an exotic
+        seven-step equal scale sound smoothly in tune.
+      </p>
+      <p>
+        Before going there, though, Western instruments run headfirst into an arithmetic headache.
+        Every deep valley in the harmonic dissonance curve sits on an exact small-integer ratio,
+        yet a fixed keyboard has to play those ratios starting from any key. Stack twelve pure
+        3:2 fifths end to end and you overshoot seven pure 2:1 octaves by about a quarter of a
+        semitone. Wrestling with that unavoidable gap is how the modern piano ended up with its
+        twelve slightly compromised notes.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/living-music/twelve.html">Part four, Twelve Imperfect Notes</a>.</strong>
-        The spiral of fifths, the Pythagorean comma, and the compromise called equal
-        temperament.
+        The spiral of fifths, the Pythagorean comma, and the compromise called equal temperament.
       </p>
     </main>
 

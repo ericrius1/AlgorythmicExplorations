@@ -115,7 +115,7 @@ export function mountColonize2D(container: HTMLElement): Demo {
     ctx.fillRect(0, 0, W, H);
 
     // influence radius around the newest tips, faint, so you can see what a tip "sees"
-    ctx.strokeStyle = "rgba(122, 162, 255, 0.07)";
+    ctx.strokeStyle = "rgba(122, 162, 255, 0.13)";
     ctx.lineWidth = dpr;
     for (const n of nodes) {
       if (n.children !== 0 || done) continue;
@@ -125,7 +125,7 @@ export function mountColonize2D(container: HTMLElement): Demo {
     }
 
     for (let k = 0; k < ax.length; k++) {
-      ctx.fillStyle = alive[k] ? "rgba(103, 232, 249, 0.85)" : "rgba(103, 232, 249, 0.1)";
+      ctx.fillStyle = alive[k] ? "rgba(103, 232, 249, 0.85)" : "rgba(103, 232, 249, 0.12)";
       ctx.beginPath();
       ctx.arc(ax[k], ay[k], (alive[k] ? 2.4 : 1.6) * dpr, 0, Math.PI * 2);
       ctx.fill();
@@ -148,6 +148,50 @@ export function mountColonize2D(container: HTMLElement): Demo {
       ctx.moveTo(p.x, p.y);
       ctx.lineTo(nodes[i].x, nodes[i].y);
       ctx.stroke();
+    }
+
+    // compact corner legend
+    const lx = 14 * dpr;
+    let ly = 16 * dpr;
+    const rowH = 16 * dpr;
+    ctx.font = `${Math.round(10.5 * dpr)}px ui-monospace, Menlo, monospace`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const keyItems: { label: string; drawIcon: (x: number, y: number) => void }[] = [
+      {
+        label: "attractor",
+        drawIcon: (x, y) => {
+          ctx.fillStyle = "rgba(103, 232, 249, 0.9)";
+          ctx.beginPath();
+          ctx.arc(x, y, 2.8 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+        },
+      },
+      {
+        label: "reached",
+        drawIcon: (x, y) => {
+          ctx.fillStyle = "rgba(103, 232, 249, 0.25)";
+          ctx.beginPath();
+          ctx.arc(x, y, 2.2 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+        },
+      },
+      {
+        label: "influence radius",
+        drawIcon: (x, y) => {
+          ctx.strokeStyle = "rgba(122, 162, 255, 0.55)";
+          ctx.lineWidth = 1.2 * dpr;
+          ctx.beginPath();
+          ctx.arc(x, y, 4 * dpr, 0, Math.PI * 2);
+          ctx.stroke();
+        },
+      },
+    ];
+    for (const item of keyItems) {
+      item.drawIcon(lx + 4 * dpr, ly);
+      ctx.fillStyle = "rgba(170, 184, 214, 0.72)";
+      ctx.fillText(item.label, lx + 14 * dpr, ly);
+      ly += rowH;
     }
     const left = alive.filter(Boolean).length;
     shell.readout.textContent = done
@@ -216,7 +260,7 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
   let timer = 0;
   const leafScale = { value: 0 };
 
-  const regrow = (): void => {
+  const regrow = (animate = true): void => {
     const skel = growTree(params);
     const built = buildTreeGeometry(skel, { sun: look.sunDir });
     segs = built.segmentCount;
@@ -229,23 +273,25 @@ export async function mountTreeStudio(container: HTMLElement): Promise<Demo> {
     else { leaves = new THREE.Mesh(built.leaves, mats.leaves); stage.scene.add(leaves); }
     bark.position.y = leaves.position.y = groundY - 0.05;
 
-
-    growT = 0;
-    leafScale.value = 0;
+    growT = animate ? 0 : 1;
+    leafScale.value = animate ? 0 : 1;
   };
-  regrow();
+  regrow(false);
 
   const queue = (): void => {
     clearTimeout(timer);
-    timer = window.setTimeout(regrow, 250);
+    timer = window.setTimeout(() => regrow(true), 250);
   };
 
   shell.slider({ label: "attractors", min: 80, max: 800, step: 20, value: params.attractors, onInput: (v) => { params.attractors = v; queue(); } });
   shell.slider({ label: "influence", min: 0.5, max: 2.5, step: 0.05, value: params.influence, onInput: (v) => { params.influence = v; queue(); } });
   shell.slider({ label: "kill radius", min: 0.18, max: 0.7, step: 0.02, value: params.kill, onInput: (v) => { params.kill = v; queue(); } });
   shell.button("replay growth", () => { growT = 0; leafScale.value = 0; });
-  shell.button("new tree", () => { params.seed = (Math.random() * 1e6) | 0; regrow(); });
-  shell.setInfo(() => `${segs} segments · ${leafCount.toLocaleString()} leaves · grew in ${iters} rounds`);
+  shell.button("new tree", () => { params.seed = (Math.random() * 1e6) | 0; regrow(true); });
+  shell.setInfo(() => {
+    const growing = growT < 1 || leafScale.value < 1 ? " · growing…" : "";
+    return `${segs} segments · ${leafCount.toLocaleString()} leaves · grew in ${iters} rounds${growing}`;
+  });
 
   let last = performance.now();
   return {

@@ -54,6 +54,7 @@ export function mountSabine(container: HTMLElement): Demo {
   let irDirty = true;
   let stopAt = -1; // page time (s) when the tone stopped, for the stopwatch
   let pending = 0;
+  let firstSound: "pipe" | "clap" = "pipe";
   const HOLD = 1.2;
 
   const rebuild = (): void => {
@@ -95,7 +96,8 @@ export function mountSabine(container: HTMLElement): Demo {
     }
     voice.fadeTo(1, 0.04);
     soundOn = true;
-    sound("pipe");
+    sound(firstSound);
+    firstSound = "pipe";
   };
   const gate = playGate(wrap, "Tap to sound the pipe", "a 512 Hz organ pipe, held, then stopped", start);
   const guard = frameGuard(() => {
@@ -135,8 +137,13 @@ export function mountSabine(container: HTMLElement): Demo {
       schedule();
     },
   });
-  smallButton(shell.controls, "▶ organ pipe", () => (soundOn ? sound("pipe") : gate.el.click()));
+  smallButton(shell.controls, "▶ organ pipe", () => {
+    firstSound = "pipe";
+    if (!soundOn) gate.el.click();
+    else sound("pipe");
+  });
   smallButton(shell.controls, "▶ clap", () => {
+    firstSound = "clap";
     if (!soundOn) gate.el.click();
     else sound("clap");
   });
@@ -176,7 +183,7 @@ export function mountSabine(container: HTMLElement): Demo {
       label(g, "reverberation time at 500 Hz", pad + 12 * d, pad + 15 * d, 11 * d, SC.muted);
       g.strokeStyle = "rgba(150,160,200,0.12)";
       g.lineWidth = d;
-      const tStep = Tmax > 6 ? 2 : 1;
+      const tStep = Tmax > 12 ? 4 : Tmax > 6 ? 2 : 1;
       for (let t = 0; t <= Tmax; t += tStep) {
         const y = gy + ght - (t / Tmax) * ght;
         g.beginPath();
@@ -245,8 +252,11 @@ export function mountSabine(container: HTMLElement): Demo {
         g.stroke();
         label(g, `${db} dB`, px0 - 6 * d, y, 9.5 * d, SC.muted, "right", 500, true);
       }
-      const ts = tSpan > 4 ? 2 : tSpan > 2 ? 1 : 0.5;
-      for (let t = 0; t <= tSpan + 1e-6; t += ts) label(g, `${t} s`, px0 + (t / tSpan) * pw, py0 + ph + 12 * d, 9.5 * d, SC.muted, "center", 500, true);
+      const ts = tSpan > 12 ? 4 : tSpan > 4 ? 2 : tSpan > 2 ? 1 : 0.5;
+      for (let t = 0; t <= tSpan + 1e-6; t += ts) {
+        const align: CanvasTextAlign = t === 0 ? "left" : Math.abs(t - tSpan) < 1e-6 ? "right" : "center";
+        label(g, `${t} s`, px0 + (t / tSpan) * pw, py0 + ph + 12 * d, 9.5 * d, SC.muted, align, 500, true);
+      }
       // −60 dB line
       const y60 = py0 + (-60 / dbMin) * ph;
       g.strokeStyle = "rgba(255,143,107,0.5)";

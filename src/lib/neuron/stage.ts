@@ -565,8 +565,18 @@ export function hudLabel(
   g.fill();
   g.textAlign = left ? "right" : "left";
   g.textBaseline = "middle";
+  const fontSize = (stage.compact ? 10 : 11.5) * s;
+  const labelX = tx + (left ? -4 : 4) * s;
+  const textW = g.measureText(text).width;
+  const padX = 5 * s;
+  const padY = 2.5 * s;
+  const bx = left ? labelX - textW - padX : labelX - padX;
+  g.fillStyle = "rgba(7, 9, 15, 0.76)";
+  g.beginPath();
+  g.roundRect(bx, ty - fontSize * 0.5 - padY, textW + padX * 2, fontSize + padY * 2, 4 * s);
+  g.fill();
   g.fillStyle = color;
-  g.fillText(text, tx + (left ? -4 : 4) * s, ty);
+  g.fillText(text, labelX, ty);
   g.textAlign = "left";
 }
 
@@ -598,31 +608,28 @@ export function drawScope(
   const g = stage.g;
   const s = stage.px;
   const { x, y, w, h } = box;
-  g.fillStyle = "rgba(8, 9, 15, 0.62)";
-  g.strokeStyle = "rgba(122, 162, 255, 0.16)";
+  g.fillStyle = "rgba(8, 9, 15, 0.78)";
+  g.strokeStyle = "rgba(122, 162, 255, 0.18)";
   g.lineWidth = 1 * s;
   g.beginPath();
   g.roundRect(x, y, w, h, 8 * s);
   g.fill();
   g.stroke();
   const pad = 8 * s;
-  const vy = (v: number): number => y + pad + (1 - (v - range[0]) / (range[1] - range[0])) * (h - pad * 2);
+  const topPad = title ? 20 * s : pad;
+  const vy = (v: number): number => y + topPad + (1 - (v - range[0]) / (range[1] - range[0])) * (h - topPad - pad);
   g.font = `${9.5 * s}px ${HUD_FONT}`;
   g.textBaseline = "middle";
   for (const l of lines) {
     const ly = vy(l.v);
-    g.strokeStyle = l.color ?? "rgba(255,255,255,0.09)";
+    g.strokeStyle = l.color ?? "rgba(255,255,255,0.1)";
     g.setLineDash([3 * s, 4 * s]);
     g.beginPath();
     g.moveTo(x + pad, ly);
     g.lineTo(x + w - pad, ly);
     g.stroke();
     g.setLineDash([]);
-    g.fillStyle = "rgba(170, 180, 205, 0.55)";
-    g.textAlign = "right";
-    g.fillText(l.label, x + w - pad, ly - 6 * s);
   }
-  g.textAlign = "left";
   for (const { trace, color, width } of traces) {
     const n = trace.data.length;
     if (trace.count < 2) continue;
@@ -639,10 +646,25 @@ export function drawScope(
     }
     g.stroke();
   }
+  g.font = `${9.5 * s}px ${HUD_FONT}`;
+  g.textBaseline = "middle";
+  for (const l of lines) {
+    const ly = vy(l.v);
+    const labelY = Math.max(y + topPad + 4 * s, ly - 6 * s);
+    const tw = g.measureText(l.label).width;
+    g.fillStyle = "rgba(8, 9, 15, 0.78)";
+    g.beginPath();
+    g.roundRect(x + w - pad - tw - 4 * s, labelY - 5.5 * s, tw + 6 * s, 11 * s, 3 * s);
+    g.fill();
+    g.fillStyle = "rgba(195, 206, 232, 0.75)";
+    g.textAlign = "right";
+    g.fillText(l.label, x + w - pad - 1 * s, labelY);
+  }
+  g.textAlign = "left";
   if (title) {
-    g.fillStyle = "rgba(200, 210, 235, 0.7)";
+    g.fillStyle = "rgba(205, 214, 238, 0.78)";
     g.font = `600 ${9.5 * s}px ${HUD_FONT}`;
-    g.fillText(title, x + pad, y + pad + 3 * s);
+    g.fillText(title, x + pad, y + 10 * s);
   }
 }
 

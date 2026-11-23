@@ -107,7 +107,7 @@ export async function mountSwing(container: HTMLElement): Promise<Demo> {
     max: 75,
     step: 1,
     value: swing * 100,
-    format: (x) => `${Math.round(x)}% · ${(x / (100 - x)).toFixed(2)} : 1`,
+    format: (x) => `${Math.round(x)}% · ${(x / (100 - x)).toFixed(2)}:1`,
     onInput: (x) => (swing = x / 100),
   });
   const sigS = shell.slider({

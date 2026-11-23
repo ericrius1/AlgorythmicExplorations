@@ -319,7 +319,7 @@ export async function mountChordSpace(container: HTMLElement): Promise<Demo> {
     }
     ctx.setLineDash([]);
 
-    // neighbour links of the current chord (one semitone away)
+    // neighbor links of the current chord (one semitone away)
     const nb: Gaps[] = [];
     const deltas: Gaps[] = [
       [1, -1, 0],
@@ -336,7 +336,7 @@ export async function mountChordSpace(container: HTMLElement): Promise<Demo> {
     const [ux, uy] = P(cur);
     for (const g of nb) {
       const [nx, ny] = P(g);
-      line(ctx, ux, uy, nx, ny, rgba(COL.white, 0.22), 1.2 * px);
+      line(ctx, ux, uy, nx, ny, rgba(COL.white, 0.36), 1.3 * px);
     }
 
     // path you walked
@@ -406,16 +406,31 @@ export async function mountChordSpace(container: HTMLElement): Promise<Demo> {
       if (!d.label || d.kind === "unison") continue;
       const [x, y] = P(d.g);
       const col = d.kind === "maj" ? COL.major : d.kind === "min" ? COL.minor : d.kind === "aug" ? COL.aug : COL.muted;
-      // push labels outward from the centre so they don't sit on the dots
+      // push labels outward from the center so they sit in clear gaps between dots
       const [mx, my] = P([4, 4, 4]);
       let dx = x - mx;
       let dy = y - my;
       const L = Math.hypot(dx, dy) || 1;
       dx /= L;
       dy /= L;
-      const off = d.kind === "aug" ? 0 : dotR * 2.3;
-      const lx = d.kind === "aug" ? x : x + dx * off;
-      const ly = d.kind === "aug" ? y - dotR * 2.4 : y + dy * off;
+      let lx: number;
+      let ly: number;
+      if (d.kind === "aug") {
+        lx = x;
+        ly = y - dotR * 2.35;
+      } else if (d.kind === "cluster" && d.g[0] === 1) {
+        // bottom-left and bottom-right clusters: tuck cleanly below the dot, above the edge row
+        lx = x;
+        ly = y + dotR * 1.8;
+      } else if ((d.kind === "maj" || d.kind === "min") && Math.abs(dy) < 0.25) {
+        // horizontal maj/min neighbors of aug: place in the open gap below the dot
+        lx = x;
+        ly = y + dotR * 2.15;
+      } else {
+        const off = dotR * 2.3;
+        lx = x + dx * off;
+        ly = y + dy * off;
+      }
       text(ctx, d.label, lx, ly, { color: col, align: "center", alpha: 0.95 });
     }
     // corners and edges

@@ -192,15 +192,15 @@ export async function mountLadder(container: HTMLElement): Promise<Demo> {
         const lc = mix(harmonicRgb(n, 0.78), WHITE, 0.2 + 0.4 * boost[n]);
         text(g, String(n), x, yTop - 9, { size: narrow ? 10 : 11.5, align: "center", color: rgba(lc, 0.95), weight: 700, mono: true });
         const nn = nearestNote(f);
-        const showName = sp > (narrow ? 34 : 44) || boost[n] > 0.3;
+        const showName = sp > (narrow ? 34 : 42) || (!narrow && n === 7) || boost[n] > 0.3;
         if (showName) {
           const nm = `${NOTE[((nn.midi % 12) + 12) % 12]}${Math.floor(nn.midi / 12) - 1}`;
           text(g, nm, x, yTop - 23, { size: narrow ? 9 : 10, align: "center", color: rgba(lc, 0.75) });
-          if (nn.cents !== 0 && sp > (narrow ? 34 : 50)) {
+          if (nn.cents !== 0 && (sp > (narrow ? 34 : 42) || (!narrow && n === 7) || boost[n] > 0.3)) {
             text(g, `${nn.cents > 0 ? "+" : "−"}${Math.abs(nn.cents)}¢`, x, yTop - 35, {
               size: narrow ? 8.5 : 9.5,
               align: "center",
-              color: rgba(lc, Math.abs(nn.cents) > 20 ? 0.9 : 0.55),
+              color: rgba(lc, Math.abs(nn.cents) > 20 ? 0.9 : 0.6),
               mono: true,
             });
           }

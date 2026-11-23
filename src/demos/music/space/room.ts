@@ -3,7 +3,7 @@
 // method, and the room's resonant modes.
 
 export const C_SOUND = 343; // m/s, air at about 20 °C
-export const BANDS = [125, 250, 500, 1000, 2000, 4000]; // octave-band centres, Hz
+export const BANDS = [125, 250, 500, 1000, 2000, 4000]; // octave-band centers, Hz
 export const BAND_NAMES = ["125", "250", "500", "1k", "2k", "4k"];
 
 export interface Material {
@@ -65,14 +65,14 @@ export function blendMaterial(a: string, b: string, frac: number): string {
   return id;
 }
 
-// Energy absorbed by the air per metre, per band (about 20 °C, 50–70% humidity).
+// Energy absorbed by the air per meter, per band (about 20 °C, 50–70% humidity).
 export const AIR_M = [0.0001, 0.0002, 0.0004, 0.0009, 0.0022, 0.0075];
 
 // Surfaces in order: x = 0 wall, x = L wall, y = 0 wall, y = W wall, floor, ceiling.
 export type Surfaces = [string, string, string, string, string, string];
 
 export interface Room {
-  L: number; // x, metres
+  L: number; // x, meters
   W: number; // y
   H: number; // z
   surf: Surfaces;
@@ -146,7 +146,7 @@ export interface Image {
   dist: number; // to the listener
   order: number;
   hits: number[]; // reflections off each of the six surfaces
-  gain: number[]; // pressure gain per band, including 1/r spreading (r in metres)
+  gain: number[]; // pressure gain per band, including 1/r spreading (r in meters)
 }
 
 // All image sources whose path to the listener is shorter than maxDist (and of

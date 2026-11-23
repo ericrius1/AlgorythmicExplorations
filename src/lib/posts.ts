@@ -65,14 +65,14 @@ export const POSTS: Post[] = [
     series: "Particle Worlds",
     part: 3,
     title: "Sorting Water",
-    subtitle: "Neighbour search, dry sand, and 80,000 particles of water",
+    subtitle: "Neighbor search, dry sand, and 80,000 particles of water",
   },
   {
     href: "/pages/particle-worlds/part4.html",
     series: "Particle Worlds",
     part: 4,
     title: "Worlds from Dust",
-    subtitle: "Planets from a disc of debris",
+    subtitle: "Planets from a disk of debris",
   },
   {
     href: "/pages/particle-worlds/part5.html",

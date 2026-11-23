@@ -10,7 +10,7 @@
     <title>The Heightfield — Algorythmic Explorations</title>
     <meta
       name="description"
-      content="Procedural terrain from scratch, part one: hashed gradient noise, octaves, ridges and domain warping, and a height function turned into a lit, shadowed mesh."
+      content="Procedural terrain from scratch, part one: hashed gradient noise, stacked octaves, ridging, domain warping, and turning a pure height function into a lit 3D mesh."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,8 +31,8 @@
         <p class="hero-kicker">Ground Truth · Part 1</p>
         <h1>The Heightfield</h1>
         <p class="subtitle">
-          A landscape built from one function that returns a height for any point. The
-          mountains above are generated and drawn live in your browser.
+          A whole range of peaks compressed into one pure function of (x, z), generated
+          and shaded live in the browser.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -43,82 +43,94 @@
 
     <main>
       <p>
-        The mountains at the top of this page come from one function. You give it an x and
-        a z, and it gives back a height. There's no stored map behind it. The same inputs
-        always produce the same answer, so any piece of the landscape can be rebuilt at any
-        time from the function and a seed. The view above is about 229,000 vertices, built
-        when the page loads, and the camera takes about nine minutes to fly one lap.
+        Satellite elevation maps of a single mountain range take hundreds of megabytes of
+        storage. Everything drifting past at the top of this page comes from a few dozen
+        lines of math and one integer seed. Hand that function any <code>(x, z)</code>
+        coordinate and it hands back an elevation, deterministically, with zero map data
+        stored in memory. When this page opened, the browser sampled it across roughly
+        229,000 vertices, baked the sunlight, and set a slow camera circling on a nine-minute
+        lap.
       </p>
       <p>
-        This series builds a whole landscape on top of that function. This part makes the
-        function. Part two runs simulated rain over it until the valleys connect. Parts
-        three and four add grass and trees, part five decides what grows where, and part
-        six streams the world in around a moving camera so it never runs out.
+        Over six parts, we will grow a complete landscape on top of that height function.
+        Here we build the mountains themselves. In part two, simulated rainfall carves them
+        until separate hollows link up into drainage networks. Parts three and four add
+        wind-blown grass and space-colonized trees, part five sorts out where forests,
+        meadows, and bare scree belong, and part six streams chunks in around a flying
+        camera so the ground never runs out.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="noise"><span class="kicker">Step 1 · Smooth randomness</span>Gradient noise</h2>
       <p>
-        Random numbers on their own make bad ground. Give every point an independent
-        random height and you get static, because real elevation is correlated: the height
-        here tells you a lot about the height a step away. Terrain needs randomness that
-        changes smoothly and has a typical feature size.
+        If you assign every point on a grid an independent random height, you get static
+        rather than ground. Real terrain is spatially correlated: knowing the elevation
+        under your boots tells you a lot about the elevation three steps away. What we want
+        is randomness with a smooth transition between samples and a controllable feature
+        size.
       </p>
       <p>
-        Ken Perlin's gradient noise does this. It puts randomness only at the integer grid
-        points, and what it puts there is a random slope (a gradient) instead of a random
-        height. The noise is zero at every grid point and leaves it at that point's slope.
-        In between, each surrounding corner extends its own slope to the sample point, and
-        the four answers are blended with a smooth curve:
+        Ken Perlin's gradient noise delivers both by hiding its randomness on the integer
+        lattice and storing a random slope (a gradient vector) at each grid corner instead
+        of a random altitude. At every integer corner the value is zero, leaving the corner
+        tilted along its assigned slope. For a sample point anywhere inside a grid cell,
+        each of the four surrounding corners projects its slope plane out to that point, and
+        the four values are blended with a smooth interpolation curve:
       </p>
       <pre><code>fade(t)      = 6t⁵ − 15t⁴ + 10t³          <span class="cm">// flat 1st and 2nd derivative at 0 and 1</span>
 corner(c, p) = grad(hash(c)) · (p − c)     <span class="cm">// that corner's slope, extended to p</span>
 noise(p)     = the four corners blended by fade(fx) and fade(fy)</code></pre>
       <p>
-        That fade curve is from Perlin's 2002 revision. His original 1985 noise used
-        3t² − 2t³, which matches slopes across grid lines but has a jump in curvature
-        there, and once the noise is lit as a surface the jump shows up as faint grid
-        lines. The quintic is flat in both the first and second derivative where it meets
-        the grid, so the lighting can't find the seams.
+        That fifth-degree <code>fade</code> polynomial comes from Perlin's 2002 revision.
+        His original 1985 noise used the cubic <code>3t² − 2t³</code>, whose slope reaches
+        zero smoothly at the cell borders while its curvature jumps sharply there. On a flat
+        texture you rarely notice, yet once you compute surface normals and shine a low sun
+        across the terrain, those curvature jumps catch the light as faint grid lines. The
+        quintic curve flattens both the first and second derivatives at 0 and 1, erasing the
+        lattice from the shading.
       </p>
       <p>
-        The <code>hash</code> turns a grid point and a seed into a number that looks
-        random. Mine is a few integer multiplies and xor-shifts borrowed from the finalizer
-        of MurmurHash3, and the result picks one of 256 evenly spaced gradient directions.
-        There's no table of random numbers anywhere. The mountain at (1402, 88) looks
-        random, and it comes out the same every time anyone asks for it. The whole series
-        depends on that. Part six streams terrain in and out of memory, which only works if
-        a piece of ground comes back identical when you return to it.
+        The <code>hash</code> function turns integer grid coordinates and a seed into a
+        pseudo-random index with a few integer multiplies and xor-shifts borrowed from the
+        MurmurHash3 finalizer, selecting one of 256 evenly spaced gradient directions.
+        Because no lookup table of random floats sits in memory, asking for the elevation at
+        <code>(1402, 88)</code> always returns the exact same answer. That guarantee pays
+        off much later: in part six we throw chunks away as they pass behind
+        the camera and rebuild them if you turn around, which only holds together if every
+        peak comes back identical.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Noise and the movies</span>
         <p>
-          Perlin came up with his noise in 1983, after working on Disney's <em>Tron</em> at
-          the effects company MAGI, because he was tired of how clean and machine-made
-          computer images looked. He published it at SIGGRAPH in 1985 in "An Image
-          Synthesizer", and in 1997 the Academy of Motion Picture Arts and Sciences gave him
-          a Technical Achievement Award for it.
+          Perlin invented gradient noise in 1983 after working on Disney's <em>Tron</em> at
+          MAGI, frustrated by how sterile and machine-tooled early computer graphics looked.
+          He published the technique at SIGGRAPH 1985 in "An Image Synthesizer", and in 1997
+          the Academy of Motion Picture Arts and Sciences awarded him a Technical
+          Achievement Award for it.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="octaves"><span class="kicker">Step 2 · The fractal sum</span>Octaves</h2>
       <p>
-        One layer of noise gives smooth rolling swells and nothing else. Real ground has
-        detail at every scale at once, from ridgelines kilometres long down to gullies a
-        metre wide. The usual fix is to add the noise to itself at higher frequencies and
-        smaller amplitudes, over and over. Each layer is called an octave, and the sum is
-        called fractional Brownian motion, or fBm.
+        A single pass of gradient noise looks like soft rolling dough. Real mountains carry
+        structure across orders of magnitude at once, from ridgelines stretching kilometers
+        across a horizon down to ankle-high gullies. To reproduce that multi-scale
+        roughness, we evaluate the noise repeatedly at finer and finer frequencies while
+        shrinking its amplitude each time, then sum the layers together. Borrowing musical
+        terminology, each layer is an octave, and the whole stack is fractional Brownian
+        motion, or fBm.
       </p>
       <p>
-        The figure draws each octave in its own lane at its real size, labelled with its
-        frequency and amplitude, and their sum underneath as a profile. Two numbers set the
-        character. <strong>Lacunarity</strong> is the frequency step between octaves. At 2,
-        each octave is twice as fine as the one before, which is where the musical name
-        comes from. <strong>Persistence</strong> is the amplitude step. At 0.5 each octave
-        is half as tall as the last, and the fine ones add texture without changing the
-        shape. Push it up toward 0.85 and the fine octaves are nearly as tall as the coarse
-        ones, and the profile turns to rubble.
+        Below, each octave sits in its own lane drawn at true scale, with its frequency
+        multiplier (<code>freq</code>) and weight (<code>amp</code>) down the left edge and
+        the combined mountain profile shaded underneath. Two sliders steer the texture of
+        the sum. <strong>Lacunarity</strong> sets the frequency jump between lanes; at 2,
+        each layer oscillates twice as fast as the previous one.
+        <strong>Persistence</strong> scales each lane's height. At 0.5, high octaves roughen
+        the silhouette while leaving the big peaks intact; drag it up toward 0.85 and the
+        finest ripples grow nearly as tall as the base hills, turning the skyline into jagged
+        rubble.
       </p>
 
       <div
@@ -127,7 +139,7 @@ noise(p)     = the four corners blended by fade(fx) and fade(fy)</code></pre>
         data-hint="Drag the sliders"
       ></div>
 
-      <p>In code it's a short loop:</p>
+      <p>In 2D, stacking those layers takes a ten-line loop:</p>
       <pre><code>for (let o = 0; o &lt; octaves; o++) {
   let n = perlin2(x, y, seed + o * 131);   <span class="cm">// a different seed per octave</span>
   sum += n * amp;
@@ -142,56 +154,62 @@ return sum / norm;                         <span class="cm">// roughly −1 to 1
         <summary>Why each octave gets turned</summary>
         <div class="fold-body">
           <p>
-            Every octave reads the same integer grid, just scaled. With lacunarity exactly
-            2, the grid lines of all the octaves pass through the origin and line up along
-            the axes, and with enough octaves the agreement shows as faint horizontal and
-            vertical structure. Rotating the coordinates by 0.5 radians (about 29°) between
-            octaves means no two of them share a grid orientation, for the cost of four
-            multiplies. The different seed per octave keeps them from repeating each other's
-            pattern.
+            Every octave samples the same integer lattice at a different scale. When
+            lacunarity is an exact power of two, grid lines from every layer intersect at
+            the origin and reinforce one another along the x and z axes, leaving subtle
+            horizontal and vertical banding once you stack five or six octaves. Rotating the
+            sampling coordinates by 0.5 radians (around 29°) on each pass ensures no two
+            layers share an axis alignment, for the price of four multiplications, while
+            bumping the seed per octave stops layers from echoing one another.
           </p>
         </div>
       </details>
       <aside class="note">
         <span class="note-label">Aside · Coastlines and mountains</span>
         <p>
-          Benoit Mandelbrot made the case for modelling nature this way. His 1967 paper
-          "How Long Is the Coast of Britain?" pointed out that a coastline looks
-          statistically similar at different scales, so its measured length keeps growing
-          as your ruler gets shorter. In 1968 he and John Van Ness described fractional
-          Brownian motion, and <em>The Fractal Geometry of Nature</em> (1982) used it to
-          draw imaginary mountain ranges. The word lacunarity is his too, from the Latin for
-          a gap. The noise literature borrowed it for the frequency step.
+          Benoit Mandelbrot championed this statistical view of natural shapes. His 1967
+          paper "How Long Is the Coast of Britain?" showed that natural boundaries keep
+          revealing self-similar detail as your measuring stick shrinks, so their measured
+          length diverges. He and John Van Ness formalized fractional Brownian motion in
+          1968, and <em>The Fractal Geometry of Nature</em> (1982) famously rendered
+          synthetic mountain ranges with it. Even the word <em>lacunarity</em> is his,
+          coined from the Latin for a gap and later adopted by graphics programmers for the
+          frequency ratio between octaves.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="ridges"><span class="kicker">Step 3 · Ridges and warps</span>Breaking the symmetry</h2>
       <p>
-        In two dimensions the same sum makes a map. Plain fBm still has two giveaways. It's
-        symmetric: valleys have the same shape as peaks turned upside down, while real
-        mountains have sharp crests and broad valleys. And it has no direction. The features
-        are round blobs that don't flow anywhere.
+        Move that loop into two dimensions and you immediately get a recognizable heightmap,
+        though two telltale artifacts still give away its mathematical origin. First, plain
+        fBm is vertically symmetric: flip a peak upside down and it has the exact same round
+        profile as a valley, whereas geological ranges tend to pair crisp, narrow crests
+        with broader basins. Second, plain noise is isotropic, producing lumpy mounds with
+        no sense of geological grain or flow.
       </p>
       <p>
-        <strong>Ridging</strong> fixes the first. Fold each octave at zero with 1 − 2|n| and
-        the smooth zero crossings become sharp creases pointing up. The ridge setting blends
-        between the plain and folded versions, inside the octave loop:
+        We can break the vertical symmetry inside the octave loop with
+        <strong>ridging</strong>. Taking <code>1 - 2 * Math.abs(n)</code> folds each
+        octave along its zero crossings, turning gentle sign changes into sharp upward
+        creases while keeping valleys rounded. Blending between plain and folded noise lets
+        us dial the effect anywhere from soft hills to alpine spines:
       </p>
       <pre><code>if (ridge &gt; 0) n = lerp(n, 1 - 2 * Math.abs(n), ridge);</code></pre>
       <p>
-        <strong>Domain warping</strong> fixes the second. Instead of reading the noise at
-        the point you asked about, read it at a point that two smoother noise fields have
-        pushed around:
+        To introduce directional sweep, we bend the coordinate space itself with
+        <strong>domain warping</strong>. Before sampling the main terrain fBm, we evaluate
+        two low-octave noise fields and use them to nudge <code>x</code> and <code>z</code>:
       </p>
       <pre><code>qx = fbm(x, z)                               <span class="cm">// 3 octaves, its own seed</span>
 qz = fbm(x, z)                               <span class="cm">// 3 octaves, another seed</span>
-h  = fbm(x + 4·warp·qx,  z + 4·warp·qz)      <span class="cm">// the real terrain, read off-centre</span></code></pre>
+h  = fbm(x + 4·warp·qx,  z + 4·warp·qz)      <span class="cm">// the real terrain, read off-center</span></code></pre>
       <p>
-        The warp fields are smooth, so neighbouring points get pushed in nearly the same
-        direction, and features get stretched into long curved flows instead of being
-        scrambled. At the default warp of 0.9 a point can move by up to about 3.6 world
-        units, where a typical hill is around ten across.
+        Because those two offset fields only use three octaves, neighboring points shift in
+        almost the same direction. Instead of scrambling the terrain, the warp stretches
+        slopes and ridges into long, sinuous sweeps reminiscent of folded strata. At the
+        default warp of 0.9, a sample can slide up to about 3.6 world units sideways on hills
+        roughly ten units across.
       </p>
 
       <div
@@ -201,71 +219,76 @@ h  = fbm(x + 4·warp·qx,  z + 4·warp·qz)      <span class="cm">// the real te
       ></div>
 
       <p>
-        This is a relief map: brighter is higher, lit from the upper left. Slide
-        <strong>ridge</strong> up and the crests tighten into bright creases while the
-        valleys widen. Slide <strong>warp</strong> and the features shear into long sweeps,
-        a bit like folded rock. Each redraw evaluates the height function at 63,000 points,
-        and the readout shows how long that took.
+        The relief map above shades higher elevations brighter and lights slopes from the
+        upper left. Raising <strong>ridge</strong> pinches the bright crests into crisp
+        spines while opening up the dark hollows between them; pushing <strong>warp</strong>
+        shears the entire range into curving arcs. Every adjustment recomputes the height
+        function across all 63,000 pixels on the CPU, with the timing printed underneath.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Where these came from</span>
         <p>
-          Warping is almost as old as the noise. The marble in Perlin's 1985 paper is a sine
-          wave with turbulence added to its input, which is a domain warp. Ridged noise was
-          popularised by Ken Musgrave, whose "ridged multifractal" terrain appears in
-          <em>Texturing and Modeling: A Procedural Approach</em> (1994). Inigo Quilez's
-          articles later made fBm warped by fBm a standard tool for terrain and clouds.
+          Domain warping goes all the way back to Perlin's 1985 marble shader, which added
+          turbulence to the phase of a sine wave. Ridged multifractal terrain was
+          popularized by Ken Musgrave in <em>Texturing and Modeling: A Procedural Approach</em>
+          (1994), and Inigo Quilez's essays later turned warping fBm by another fBm into a
+          go-to recipe for rock formations, coastlines, and clouds.
         </p>
       </aside>
 
       <!-- ================================================================ -->
       <h2 id="mesh"><span class="kicker">Step 4 · Standing it up</span>From function to mesh</h2>
       <p>
-        The third dimension is a flat grid of vertices with every y set to h(x, z). Before
-        that, the height gets shaped. Raw fBm is centred on zero and as likely to dip as to
-        rise. The height function maps it to the range 0 to 1 and raises it to the power
-        1.6, which spreads out the low ground and keeps the peaks narrow. Real valleys are
-        wide and flat because sediment fills them in. Part two simulates that; here the
-        curve stands in for it.
+        Turning the 2D field into a 3D surface starts with a regular grid of triangles whose
+        <code>y</code> coordinates come from <code>h(x, z)</code>. One extra shaping step
+        sits right at the end of the height function: raw fBm hovers around zero with as
+        much area above the midline as below, so we remap it into <code>[0, 1]</code> and
+        raise it to the power 1.6. That power curve flattens out the lower third into broad
+        basin floors while pinching the peaks upward. In the real world, valley floors grow
+        wide and flat because washed-down sediment fills them in; part two will simulate
+        that erosion directly, and this curve approximates the silhouette until then.
       </p>
       <p>
-        Normals come from the same grid by central differences, with no extra calls to the
-        noise:
+        Surface normals come straight from neighboring grid samples via central differences,
+        avoiding any extra calls into the noise function:
       </p>
       <pre><code>normal(i, j) = normalize( (H[i−1, j] − H[i+1, j]) / 2Δ,  1,  (H[i, j−1] − H[i, j+1]) / 2Δ )</code></pre>
       <p>
-        The builder samples one extra row of heights beyond each edge, so the border
-        vertices get the same two-sided difference as everyone else. That costs almost
-        nothing here, and in part six it's what keeps neighbouring chunks from showing a
-        crease of shading along every seam.
+        When building a mesh patch, the generator evaluates one extra margin row of heights
+        just outside all four borders. That way edge vertices compute the exact same
+        two-sided difference as interior ones. On an isolated square it barely matters, yet
+        in part six it guarantees that two adjacent chunks compute identical normals along
+        their shared seam, preventing shading creases across tile boundaries.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="light"><span class="kicker">Step 5 · Paint and light</span>Making it read as land</h2>
       <p>
-        A lit grey mesh still doesn't look like land. The colour comes from two numbers per
-        pixel: the height as a fraction of the maximum (h01), and the steepness, measured as
-        1 − normal.y, which is 0 on flat ground and 1 on a vertical wall. The shader blends
-        four colours with a few smoothsteps:
+        Even with accurate normals, an untextured gray heightfield reads like molded plastic.
+        To make it read as earth and stone without loading image textures, the fragment
+        shader blends four base materials from two numbers already sitting on every pixel:
+        normalized elevation <code>h01</code> and steepness <code>1 − normal.y</code> (which
+        runs from 0 on level ground to 1 on a vertical face):
       </p>
       <pre><code>col  = mix(grass, scree, smoothstep(0.4, 0.7, h01));      <span class="cm">// high ground goes stony</span>
 col  = mix(col, rock, smoothstep(0.25, 0.5, slope));      <span class="cm">// steep ground loses its soil</span>
 snow = smoothstep(0.6, 0.72, h01) * (1 - smoothstep(0.3, 0.55, slope));
 col  = mix(col, snowColor, snow);                         <span class="cm">// snow, but not on cliffs</span></code></pre>
       <p>
-        Snow needs height and also needs ground flat enough to sit on, so the snowline
-        follows the shape of the crests instead of cutting through the mountains at one
-        altitude. A little noise added to each threshold keeps the edges from looking like
-        contour lines.
+        Requiring both altitude and gentle slope for snow lets white caps cling to saddles
+        and ridgelines while shedding off sheer rock faces, instead of painting a flat
+        bathtub ring at a single elevation. Perturbing each threshold slightly with noise
+        breaks up any remaining contour-line look.
       </p>
       <p>
-        Most of the light is baked when the mesh is built. Every vertex marches toward the
-        sun across the height grid and records how close the terrain came to blocking it,
-        which gives soft shadows behind ridges without a shadow map. Each vertex also
-        compares its height with the average of its surroundings at two scales, and points
-        that sit below their neighbourhood get darker, a cheap kind of ambient occlusion.
-        The sky is a function of view direction, and the haze takes its colour from the sky
-        behind each pixel, so distant ridges fade into the horizon instead of into grey.
+        Because the sun stays fixed in these scenes, we can bake the heavier lighting once
+        per vertex during mesh construction. From every vertex, the builder marches across
+        the height grid toward the sun and checks how close intervening ridges come to
+        blocking the ray, yielding soft terrain self-shadows without maintaining a real-time
+        shadow map. A second quick pass compares each vertex against the average height of
+        its neighborhood at two radii, darkening tucked-away gullies as cheap ambient
+        occlusion. Finally, atmospheric haze pulls its color from the procedural sky directly
+        behind each pixel, so distant ridges dissolve cleanly into the horizon glow.
       </p>
 
       <div
@@ -275,44 +298,40 @@ col  = mix(col, snowColor, snow);                         <span class="cm">// sn
       ></div>
 
       <p>
-        The same four dials, now in 3D: a 16-unit square with 201 × 201 vertices and 80,000
-        triangles, rebuilt and relit whenever a slider comes to rest. The readout shows
-        how long that took. Turn on the wireframe to see how plain the geometry is. Reroll
-        changes the seed and keeps the dials, because the seed decides which world you get
-        and the dials decide what kind of world it is.
+        Here the height function stands up as a 16-unit square of 201 × 201 vertices and
+        80,000 triangles, rebuilt and relit whenever you release a slider. Alongside
+        <strong>octaves</strong>, <strong>ridge</strong>, and <strong>warp</strong>, a
+        <strong>height</strong> slider scales the vertical relief. Clicking
+        <strong>wireframe</strong> strips away the surface paint to show the uniform triangle
+        grid underneath, and <strong>reroll</strong> picks a fresh seed while preserving your
+        parameter choices.
       </p>
       <p>
-        The view at the top of the page is the same function at a larger scale: height 15
-        instead of 3.2, seven octaves, and three square rings of mesh around the camera. The
-        inner ring has a vertex every quarter unit, and the outer ring reaches 540 units out
-        with one every 4.5. Part six builds rings like these on the fly as the camera moves.
+        The flyover at the top of the page runs the exact same function scaled way up: peak
+        height 15 instead of 3.2, seven octaves, and three nested square rings of mesh
+        centered on the camera. The inner ring places a vertex every quarter unit, while the
+        outer ring stretches 540 units out with samples spaced 4.5 units apart. Part six
+        will turn that static ring layout into a live streaming window that follows you
+        indefinitely.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>What carries over</h2>
-      <ul>
-        <li>
-          <strong>A function beats a map.</strong> Nothing is stored, so nothing runs out,
-          and the same seed always gives back the same mountain.
-        </li>
-        <li>
-          <strong>Detail comes from sums.</strong> One octave is a swell. Six of them at
-          persistence 0.5 are a mountain range.
-        </li>
-        <li>
-          <strong>Shape the statistics.</strong> Ridging, warping, and the power curve each
-          fix one specific way raw noise doesn't look like land.
-        </li>
-        <li>
-          <strong>Bake what doesn't move.</strong> The sun stays put, so shadows and
-          occlusion are worked out once per vertex instead of every frame.
-        </li>
-      </ul>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Where this leaves us</h2>
       <p>
-        Things I'd try next: evaluate the height function in a compute shader so the mesh
-        builds on the GPU; use the noise's analytic derivatives for normals instead of
-        finite differences; and try Quilez's derivative-damped fBm, which suppresses fine
-        detail on steep slopes and looks surprisingly eroded without any simulation.
+        With one stateless function, we can summon reproducible mountains at any coordinate,
+        stack octaves for multi-scale roughness, break fractal symmetry with ridging, domain
+        warping, and a shaping curve, and bake shadows and occlusion once when the vertices
+        are built. Everything downstream in this series leans on that contract: a mountain
+        range that takes a few kilobytes of code and comes back bit-for-bit the same
+        whenever you ask for it.
+      </p>
+      <p>
+        If I were pushing this stage further, I would move height evaluation into a GPU
+        compute shader to build meshes off the main thread, compute analytic noise
+        derivatives instead of finite-difference normals, and try Quilez's derivative-damped
+        fBm, which quiets high-frequency octaves on steep slopes and fakes weathered rock
+        surprisingly well without running a drop of water. First, though, let's see what
+        happens when real simulated rain gets a turn at these peaks.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/ground-truth/erosion.html">Part 2, The Rain</a>.</strong>

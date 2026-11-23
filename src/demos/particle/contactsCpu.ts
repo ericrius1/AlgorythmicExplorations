@@ -7,7 +7,7 @@ import { speedBuckets, SPEED_BUCKETS, pixelRatio } from "../../lib/palette";
 
 const DISC_FILLS = speedBuckets(0.92);
 
-const R = 0.016; // disc radius
+const R = 0.016; // disk radius
 const VIEW = 0.92;
 
 export interface ContactSim {
@@ -88,7 +88,7 @@ export function drawContacts(ctx: CanvasRenderingContext2D, sim: ContactSim, mou
   ctx.strokeStyle = "rgba(110, 122, 160, 0.45)";
   ctx.lineWidth = dpx;
   ctx.strokeRect(ox - sc, oy - sc, sc * 2, sc * 2);
-  // colour by speed: the resting pile reads blue, anything you knock loose warms up
+  // color by speed: the resting pile reads blue, anything you knock loose warms up
   const pr = Math.max(R * sc, 1.2);
   for (let k = 0; k < SPEED_BUCKETS; k++) {
     ctx.fillStyle = DISC_FILLS[k];

@@ -10,7 +10,7 @@
     <title>Rooms That Play Back — Acoustic Spaces</title>
     <meta
       name="description"
-      content="Room acoustics you can hear in the browser: image sources, Sabine's reverberation time, absorption by frequency, room modes, two-ear hearing, and Alvin Lucier's I am sitting in a room, all computed live."
+      content="Live browser simulations of room acoustics: mirror image sources, Sabine's reverberation formula, octave-band absorption, bass modes, binaural cues, and Alvin Lucier's I am sitting in a room."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <!-- No browser zoom on a phone (it crops the page): Safari and Chrome on an iPhone ignore user-scalable=no, so a
@@ -31,67 +31,73 @@
         <p class="hero-kicker">Acoustic Spaces · Part 1</p>
         <h1>Rooms That Play Back</h1>
         <p class="subtitle">
-          A room answers every sound with thousands of echoes, and you can work them out. Tap
-          the plan above to clap in an empty hall, and hear it from where the head is standing.
+          Every sound you hear indoors arrives buried in thousands of reflections from the walls,
+          floor, and ceiling. Tap the plan above to clap in an empty hall and hear it from where
+          the head is standing.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        <a href="/pages/living-music/vibration.html">Living Music</a> was about notes up to
-        the moment they leave the instrument. This series is about what happens next. Before
-        a sound reaches you it has hit the walls, the floor, the ceiling and the furniture,
-        and each of those sends back a copy that's a little later, a little quieter and a
-        little duller. The copies arrive by the thousand. You don't hear them as echoes. You
-        hear them as the room.
+        <a href="/pages/living-music/vibration.html">Living Music</a> followed a note up to the
+        moment it leaves a string or a pipe. The moment it enters the air, the room takes over.
+        Before a clap finishes reaching your ears directly, copies of it are already bouncing off
+        the walls, the floor, and the ceiling, each one arriving slightly later, slightly quieter,
+        and with a little less treble than the last. Within a fraction of a second those copies
+        number in the thousands, and your brain blends them together into an immediate sense of
+        how big the space is and what its walls are made of.
       </p>
       <p>
-        Everything on this page runs on one model: a rectangular room with six surfaces, each
-        made of a material whose absorption is known in six octave bands, from 125 Hz to
-        4 kHz. From that the page builds an <em>impulse response</em>, the room's complete
-        answer to a single click, and then plays sounds through it by convolution. The plan at
-        the top is an empty hall, 12 × 7 × 4 metres, with a brick wall, a glass wall, wood
-        panels and plaster. The ripple is a separate wave simulation, slowed down 65 times so
-        you can watch the sound spread and bounce. The dashed lines light up as the slowed
-        wavefront reaches the head along the direct path and the four first reflections off
-        the walls. What you hear is the impulse response, at the real speed of sound. Drag the
-        head somewhere else and clap again.
+        Every figure on this page works from the same core model: a rectangular box with six
+        surfaces, each assigned real-world absorption measurements across six octave bands from
+        125 Hz to 4 kHz. From those dimensions and materials, the code computes an
+        <em>impulse response</em> (the room's complete acoustic reaction to a single sharp click)
+        and passes live audio through it by convolution. Up top is an empty 12 × 7 × 4 meter hall
+        with brick, window glass, wood panels, and plaster. The glowing ripples come from a
+        separate 2D wave solver slowed down 65 times so your eyes can follow the wavefronts;
+        as a ripple passes the listener, the direct path and the four first wall reflections
+        light up in turn. The audio you hear runs at full speed through the room's binaural
+        impulse response. Try dragging the head to a different corner and clapping again.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="mirror-rooms"><span class="kicker">Step 1 · Reflections</span>Mirror rooms</h2>
       <p>
-        A flat wall reflects sound the way a mirror reflects light: the angle going in equals
-        the angle coming out. That means the reflected sound reaches you as if it came from a
-        copy of the source standing behind the wall, as far behind it as the real source is
-        in front. Mirror the copy in a second wall and you get the path that bounces twice.
-        Keep going and the whole plane fills with mirrored rooms, each holding one
-        <em>image source</em>, and every image is one path from the source to you.
+        When a sound wave hits a smooth, flat wall, it bounces at the same angle it came in,
+        just like light off a mirror. For a listener standing in the room, that reflection
+        appears to originate from a virtual copy of the sound source tucked behind the wall,
+        at the exact same distance behind it as the real source sits in front. Reflect that
+        virtual room across a second wall and you get a double bounce. Repeat the reflection
+        across every wall and the floor plan tiles the plane with mirrored rooms, each holding
+        one <em>image source</em> that corresponds to a single unique bounce path back to the
+        listener.
       </p>
       <p>
-        Each image needs only two numbers to become sound: how far it is, and which walls it
-        bounced off on the way. Distance gives the delay (343 metres per second) and the
-        spreading loss (pressure falls as one over distance). Each bounce multiplies the
-        pressure by √(1 − α), where α is the fraction of energy the wall absorbs, per octave
-        band. Jont Allen and David Berkley wrote this down for rectangular rooms in 1979, and
-        it's still how most room simulators start. Here is the gain of one image in each band,
+        Turning an image source into audio only takes two pieces of geometry: its straight-line
+        distance to the listener, and the tally of how many times the path struck each wall.
+        Distance sets the arrival delay (at 343 meters per second) and the spherical spreading
+        loss, where pressure drops as one over distance. Each wall hit scales the pressure in
+        each octave band by √(1 − α), where α is the fraction of energy that surface absorbs.
+        Jont Allen and David Berkley laid out this rectangular-room method in 1979, and it
+        remains the standard foundation for room simulators. Here is the band-gain loop straight
         from <code>room.ts</code>:
       </p>
       <pre><code><span class="cm">// beta = √(1 − α) per surface and band; hits = bounces off each of the six surfaces</span>
 const gain = BANDS.map((_, b) =&gt; {
   let g = 1 / dist;
   for (let i = 0; i &lt; 6; i++) if (hits[i]) g *= Math.pow(beta[i][b], hits[i]);
-  return g * Math.exp(-0.5 * AIR_M[b] * dist); <span class="cm">// and the air takes a little</span>
+  return g * Math.exp(-0.5 * AIR_M[b] * dist); <span class="cm">// plus a little air absorption</span>
 });</code></pre>
       <p>
-        The figure is a 6 × 4 metre room seen from above. To keep it flat I made the floor and
-        ceiling fully absorbing, so only the four walls reflect. The real room is in the middle;
-        the rest are its mirror images, with one dot per image source, coloured by how many
-        bounces it stands for. One second-order path is selected to start with: the dashed line
-        runs straight from its image to the listener, and the solid line is the same path
-        folded back into the real room. Tap any dot, or any bar in the echogram underneath, to
-        see its path. The clap plays only these paths, with no reverb added.
+        Below is a 6 × 4 meter room viewed from above, with floor and ceiling treated as
+        completely absorbing so the geometry stays in two dimensions. The real room sits in the
+        center, surrounded by its mirror copies. Each colored dot is an image source shaded by
+        reflection order, and one second-order path starts out highlighted: the dashed line runs
+        straight from the virtual source to the head, while the solid orange line folds that
+        same segment back inside the real walls to show the actual bounces. You can drag either
+        the source or the listener, click any dot or echogram bar to inspect its path, and hit
+        <code>clap</code> to hear only these discrete reflections with no reverb tail added.
       </p>
 
       <div
@@ -101,52 +107,56 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        At order 0 you hear the dry clap. At order 1 you hear four distinct slaps, which is
-        what a small hard room sounds like if you listen for it. By order 6 or so they run
-        together into a short buzz, and by 12 it starts to sound like a space. The count grows
-        fast. In this flat room it grows with the square of the time; in a real 3D room the
-        number of images within reach after <em>t</em> seconds is about
-        4π(<em>ct</em>)³ / 3<em>V</em>, so they arrive at a rate of 4π<em>c</em>³<em>t</em>² /
-        <em>V</em> per second. In the hall at the top (336 m³) that passes 4,000 a second after
-        about 50 milliseconds. Beyond that, counting stops being useful, and the next step
-        replaces the count with a statistic.
+        Slide <code>reflection order</code> down to 0 for a completely dry clap, then step up
+        to 1 to hear the four distinct slaps off the walls, the kind of tight flutter you notice
+        clapping in a small bare bedroom. Around order 6 the echoes start fusing into a metallic
+        buzz, and by order 12 the room begins to feel recognizable. Counting individual images
+        gets out of hand quickly, though. In this flat 2D slice the count grows with the square
+        of elapsed time; in a real 3D room with floor and ceiling included, the number of image
+        sources within reach after <em>t</em> seconds scales like 4π(<em>ct</em>)³ / 3<em>V</em>,
+        meaning reflections arrive at a rate of roughly 4π<em>c</em>³<em>t</em>² / <em>V</em>
+        per second. In the 336 m³ hall at the top of the page, that rate passes 4,000 arrivals a
+        second after only 50 milliseconds. Tracking individual echoes past that point stops
+        paying off, so the model switches from geometry to statistics.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="sabine"><span class="kicker">Step 2 · The tail</span>Sabine's stopwatch</h2>
       <p>
-        In 1895 Harvard's president asked Wallace Clement Sabine, a 27-year-old physics
-        instructor, to do something about the lecture room in the new Fogg Art Museum, where
-        nobody could understand the speakers. Sabine decided to measure how long a sound
-        lingered. He sounded an organ pipe at 512 Hz, cut it off, and timed with a chronograph
-        how long it took to become inaudible. Then he borrowed the seat cushions from Sanders
-        Theatre, laid them out in the room a few at a time, and timed it again, working at
-        night when the street was quiet. The time multiplied by the total absorption, the
-        room's own plus the cushions', came out constant.
+        In 1895, Harvard's president asked Wallace Clement Sabine, a 27-year-old physics
+        instructor, to rescue the lecture hall in the new Fogg Art Museum, where reverberation
+        turned every speaker into mud. Rather than guessing, Sabine built a measurement setup:
+        he blew an organ pipe tuned to 512 Hz, cut the air off, and used a chronograph to time
+        how long the dying tone stayed audible. Late at night, once the streetcars and traffic
+        outside had gone quiet, he hauled seat cushions across from Sanders Theatre, laid them
+        out a few at a time, and timed the decay again. When he plotted the results, the decay
+        time multiplied by total absorption (the bare room plus whatever cushions were on the
+        floor) came out to a straight constant.
       </p>
       <p>
-        That gave him a formula. With the room's volume <em>V</em> in cubic metres and its
-        total absorption <em>A</em> = Σ <em>S</em>·α in square metres (each surface's area
-        times its absorption coefficient), the reverberation time is
+        Out of those late nights came a surprisingly simple law. Given a room's volume <em>V</em> in
+        cubic meters and its total absorption <em>A</em> = Σ <em>S</em>·α in square meters (each
+        surface's area multiplied by its absorption coefficient), the reverberation time is
       </p>
       <pre><code>T = 0.161 · V / A   <span class="cm">// seconds, to fall by 60 dB</span></code></pre>
       <p>
-        He published it in 1900, the year Boston's Symphony Hall opened with Sabine as its
-        acoustician. Today the reverberation time is defined as the time for the sound to fall
-        by 60 dB, to a millionth of its energy. In 1930 Carl Eyring pointed out that Sabine's
-        formula overestimates the time in very dead rooms (cover every surface with something
-        that absorbs everything and Sabine still predicts a small echo), and gave a version
-        with −<em>S</em>·ln(1 − ᾱ) in place of <em>A</em>. The two agree when the room is
-        live and part ways when it isn't.
+        Sabine published the formula in 1900, the same year Boston's Symphony Hall opened under
+        his acoustic supervision. Modern acoustics defines reverberation time, <em>T</em><sub>60</sub>,
+        as the time it takes sound energy to drop by 60 dB, down to one-millionth of its starting
+        level. In 1930 Carl Eyring refined the math for heavily damped spaces: if you cover every
+        surface with a perfect absorber (ᾱ = 1), Sabine's equation still predicts a small nonzero
+        echo, whereas replacing <em>A</em> with −<em>S</em>·ln(1 − ᾱ) sends the decay cleanly to
+        zero. The two curves sit nearly on top of each other in live rooms and split apart once
+        a room gets very absorbent.
       </p>
       <p>
-        The figure is a plaster hall with the proportions of a long lecture room, 2 : 1.4 : 1.
-        Change its volume, from 60 to 20,000 m³, and cover its floor with a seated audience. The
-        left panel is both formulas against coverage. The right panel is the decay that
-        actually comes out of the impulse response the figure builds, measured the way
-        acousticians do it, by integrating the energy backwards from the end (Manfred
-        Schroeder's method, from 1965). Press the organ pipe to hear Sabine's test: the
-        stopwatch starts when the pipe stops.
+        The figure below models a plaster hall with lecture-room proportions of 2 : 1.4 : 1. Use
+        the sliders to scale the hall volume from 60 to 20,000 m³ and gradually fill its wood
+        floor with a seated audience. On the left, Sabine and Eyring trace the 500 Hz decay time
+        against audience coverage. On the right, the green curve shows the actual energy decay
+        measured straight off the synthesized impulse response using Manfred Schroeder's 1965
+        backward-integration method. Trigger <code>▶ organ pipe</code> to replay Sabine's test:
+        the pipe sounds for just over a second, then cuts off as the stopwatch starts ticking.
       </p>
 
       <div
@@ -156,41 +166,44 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        Empty, the 1,200 m³ hall rings for 6.7 seconds at 500 Hz. A quarter of the floor full
-        of people halves it, to 3.2, and a full floor brings it down to 1.3 seconds (1.1 by
-        Eyring). That's the whole lesson Sabine took from the cushions: reverberation time
-        follows the absorption you put in the room, and audiences are most of it. It's also
-        why a hall sounds different in rehearsal and in concert.
+        Completely empty, the 1,200 m³ hall rings for 6.7 seconds at 500 Hz. Putting people across
+        just a quarter of the floor cuts that in half to 3.2 seconds, and a full house pulls it
+        all the way down to 1.3 seconds by Sabine (1.1 by Eyring). People in clothes soak up far
+        more sound than plaster and hardwood, which is why an orchestra hall sounds so bright and
+        boomy during an empty afternoon rehearsal and settles down the moment the seats fill.
       </p>
       <p>
-        The tail in the impulse response is not a sum of image sources. Once the reflections
-        are too dense to count (the <em>mixing time</em>, when they reach about 4,000 a second,
-        kept between 45 and 250 ms), I switch to noise. The noise is made in frames of 1,024
-        samples with random phases. Each frequency starts at the level the image sources had
-        reached by then and falls at its own band's rate: 6.9 / <em>T</em> nepers a second in
-        amplitude, which is 60 dB in <em>T</em> seconds. The two parts overlap and crossfade
-        over the last 15% of the mixing time.
+        To synthesize the late tail without summing millions of image sources, the code finds the
+        <em>mixing time</em> where arrival density hits 4,000 reflections per second (clamped
+        between 45 and 250 ms) and hands off to decaying noise. It generates overlapping frames
+        of 1,024 samples with random phases, matches each frequency band to the energy level the
+        early reflections had reached by then, and lets every frequency decay at its own rate of
+        6.91 / <em>T</em> nepers per second in amplitude, which drops 60 dB in exactly <em>T</em>
+        seconds. A cosine crossfade over the final 15% of the mixing time stitches the two halves
+        together.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="bands"><span class="kicker">Step 3 · Colour</span>Six bands, six clocks</h2>
+      <h2 id="bands"><span class="kicker">Step 3 · Color</span>Six bands, six clocks</h2>
       <p>
-        Sabine's formula gives one number, but rooms don't absorb all frequencies equally, so
-        every band gets its own. Carpet hardly touches 125 Hz (it absorbs 2%) and soaks up 65%
-        at 4 kHz. Drywall on studs does the opposite: the board flexes, and at 125 Hz it
-        absorbs 29%. Glazed tile reflects 99% of everything. The air itself takes a share of
-        the high frequencies over long distances, which matters in big halls. So a room has
-        six clocks running at once, and the balance between them is most of its character:
-        a carpeted room with drywall sounds boomy and dull; a tiled one sounds bright.
+        Real materials rarely absorb low and high frequencies alike, so a single decay time only
+        tells part of the story. Plush carpet barely registers a 125 Hz bass wave (absorbing 2%)
+        while soaking up 65% of the energy at 4 kHz. Drywall nailed over wooden studs does the
+        exact opposite: the panel flexes like a drumhead at low frequencies, pulling 29% out at
+        125 Hz while reflecting 96% at 1 kHz. Glazed tile bounces back 99% across most of the
+        spectrum. In huge rooms, the air itself starts stealing high frequencies along long
+        travel paths. Every room effectively runs six separate decay clocks at once, and the tilt
+        between bass and treble is what makes a carpeted living room sound warm and muffled while
+        a tiled stairwell rings harshly.
       </p>
       <p>
-        Pick a room, or set the walls, floor and ceiling yourself. The top row is the
-        absorption of the three surfaces. Below left, each band's decay in the room's impulse
-        response; below right, the reverberation time per band, from Eyring's formula (bars)
-        and measured from the response between −5 and −35 dB (white ticks, the standard
-        <em>T</em><sub>30</sub> measurement). They should agree, since the tail is built from those
-        times. The check is that nothing between the formula and the speaker, no filter and no
-        join, bends it.
+        Pick one of the room presets below, or mix and match materials for the walls, floor, and
+        ceiling. The top row plots each surface's absorption across the six octave bands. Below
+        left, you can watch each band die out inside the impulse response; below right, the bars
+        show Eyring's predicted <em>T</em><sub>60</sub> while the white horizontal ticks show the
+        <em>T</em><sub>30</sub> measured back out of the finished audio between −5 and −35 dB.
+        Since the tail is built directly from those Eyring times, the ticks should hug the tops
+        of the bars as a sanity check that no filter or crossfade skewed the result.
       </p>
 
       <div
@@ -200,52 +213,53 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        Every room here is empty and a perfect box, so the times run long next to real rooms
-        with furniture, doors and people in them. The shapes are right, though. The tiled
-        bathroom rings for 3.8 seconds at 1 kHz but only 1.1 at 125 Hz, because the drywall
-        ceiling eats the bass. The empty living room holds 500 Hz for 1.3 seconds and loses
-        4 kHz in 0.37. The vocal booth is under a tenth of a second everywhere. The concert
-        hall, 42 × 26 × 18 metres with its floor full of people, stays close to 1.9 seconds
-        from 125 Hz to 2 kHz and drops to 1.5 at 4 kHz, which is about what good halls are
-        built for. The church
-        holds the middle for 13 seconds. Try the voice in the booth and then in the church.
-        The words are hard to follow in the church because each syllable is still sounding
-        when the next one arrives.
+        Because every preset here is an empty rectangular box with no chairs, curtains, or open
+        doorways, the decay times run longer than a furnished real-world room, while keeping the
+        right spectral shape. In the tiled bathroom, 1 kHz rings for 3.8 seconds while 125 Hz
+        drops to 1.1 seconds because the drywall ceiling drains the bass. The living room holds
+        500 Hz for 1.3 seconds and loses 4 kHz in 0.37. The vocal booth stays under a tenth of a
+        second everywhere. The 42 × 26 × 18 meter concert hall, with a full audience across the
+        floor, sits steadily around 1.9 seconds from 125 Hz through 2 kHz before rolling down to
+        1.5 seconds at 4 kHz, right in the classic orchestral sweet spot. Then compare the vocal
+        booth and the stone church using <code>▶ voice</code>: with a 13-second midrange tail in
+        the church, each syllable smears straight over the next one.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="modes"><span class="kicker">Step 4 · Bass</span>The room's own notes</h2>
       <p>
-        At low frequencies the picture of rays bouncing off walls breaks down. A 50 Hz wave is
-        6.9 metres long, bigger than most rooms, and the room behaves like a box-shaped organ
-        pipe. It has resonances, called <em>modes</em>, at the frequencies where a whole number
-        of half-wavelengths fits between the walls in each direction:
+        Down in the bass, picturing sound as neat billiard-ball rays stops working. A 50 Hz wave
+        is nearly 6.9 meters long, bigger than most bedrooms, so the wave fills the whole volume
+        at once and the room starts behaving like a boxy organ pipe. Whenever a whole number of
+        half-wavelengths fits cleanly between opposing walls along any combination of length,
+        width, and height, the room rings at a natural resonance called a <em>mode</em>:
       </p>
       <pre><code>f = (c / 2) · √( (nx/L)² + (ny/W)² + (nz/H)² )   <span class="cm">// nx, ny, nz = 0, 1, 2, …</span></code></pre>
       <p>
-        A mode with one nonzero index bounces between two opposite walls (axial); two indices
-        means it goes around four walls (tangential); three means all six (oblique). The
-        room in the figure is 5.2 × 3.8 × 2.6 metres, with drywall walls and ceiling and a wood
-        floor. Its lowest modes are 33.0 Hz (1,0,0), 45.1 Hz (0,1,0), 55.9 Hz (1,1,0) and a
-        pair at 66.0 Hz, one along the length and one between floor and ceiling. Below 200 Hz
-        there are 67 of them.
+        Modes with a single nonzero index bounce straight between two parallel walls (axial);
+        two nonzero indices graze four surfaces (tangential); three involve all six surfaces
+        (oblique). In the 5.2 × 3.8 × 2.6 meter drywall-and-wood room below, the lowest modes
+        land at 33.0 Hz (1,0,0), 45.1 Hz (0,1,0), 55.9 Hz (1,1,0), and a doubled pair right at
+        66.0 Hz, because the 5.2 meter length is exactly twice the 2.6 meter ceiling height.
+        Below 200 Hz, 67 modes pack into that small space.
       </p>
       <p>
-        Each mode is a standing wave with fixed loud spots and silent lines, so the bass you
-        hear depends on where you stand. Manfred Schroeder worked out in the 1950s where this
-        stops mattering: above roughly 2000 √(<em>T</em> / <em>V</em>) Hz the modes overlap so
-        much that the response turns into a dense, random-looking jumble, and the statistical
-        picture from Step 2 takes over. For this room that's 158 Hz. The impulse responses
-        on this page don't model what happens below it, since their tail is noise, so this
-        figure computes the modes directly: a sum over all of them, each damped at the room's
-        125 Hz reverberation time (0.32 s).
+        Every mode sets up a fixed standing wave of loud pressure peaks and dead quiet valleys,
+        so walking two steps across a room completely changes how much bass you hear. In the
+        1950s, Manfred Schroeder worked out the transition point above which individual modes
+        overlap so densely that the room's response turns into a statistical jumble: roughly
+        2000 √(<em>T</em> / <em>V</em>) Hz. For this room, that crossover sits at 158 Hz. Because
+        the noise-tail impulse responses in the earlier figures smooth over individual low-end
+        resonances, this demo evaluates the modal sum directly, damping every mode using the
+        room's 125 Hz decay time (0.32 s).
       </p>
       <p>
-        The map shows how loud a bass tone from the speaker in the corner is at every point at
-        ear height (1.2 m). The curve below is the response where the head is standing. Drag
-        the head along the room at 64 Hz and the level changes by almost 20 dB within a metre
-        of the dark line.
-        You'll need headphones: laptop speakers can't play this low.
+        The color map plots the loudness of a steady bass tone at ear height (1.2 m) across the
+        floor plan, spanning 30 dB from dark blue valleys to bright amber peaks. Underneath, the
+        curve traces the frequency response at the listener's head, with vertical blue lines
+        marking the axial modes. Put on headphones (laptop speakers roll off well above these
+        frequencies), keep the tone near 64 Hz, and drag the head across the dark vertical valley
+        to hear the volume plunge by nearly 20 dB within a single meter.
       </p>
 
       <div
@@ -255,34 +269,37 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        The speaker sits in a corner on purpose. Every mode has a pressure maximum in every
-        corner, so a speaker there drives all of them, which is also why bass gets boomy when
-        you push a subwoofer into one. The deep notches in the curve are frequencies where
-        the listener is on a silent line of the strongest nearby mode. Sweep the note and you
-        hear the room's bass as a series of swells and holes that have nothing to do with the
-        music. Mixing engineers sit in a measured spot for this reason, and treat the room
-        with bass traps, which are absorbers thick enough to work at these wavelengths.
+        Notice the speaker starts tucked in the top-left corner. Because every rectangular mode
+        has a cosine pressure maximum at the walls, every single mode peaks in all eight corners.
+        Parking a speaker there drives the entire set at once, which is why shoving a subwoofer
+        against a corner makes the bass swell and boom. Hit <code>▶ sweep 25–200 Hz</code> and
+        the room turns a perfectly flat test tone into a rollercoaster of swells and deep notches
+        whenever the sweep crosses a silent node at your spot. Studio engineers obsess over
+        listening position and thick corner bass traps specifically to tame those dips and peaks.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="ears"><span class="kicker">Step 5 · Direction</span>Two ears</h2>
       <p>
-        So far the room has had one listener with one ear. You have two, about 17.5 cm apart
-        with a head in between, and that's how you know where a sound comes from. In 1907 Lord
-        Rayleigh described two separate cues, an idea now called the <em>duplex theory</em>.
-        At low frequencies the wavelength is longer than the head, the sound bends around it
-        easily, and what differs between the ears is the arrival time. At high frequencies the
-        head casts an acoustic shadow, and what differs is the level.
+        Every room model up to now has assumed a single microphone floating in space. Human
+        hearing runs on two ears roughly 17.5 cm apart with a solid skull between them, and
+        back in 1907 Lord Rayleigh figured out that we rely on two distinct physical cues to
+        place a sound, a framework still called the <em>duplex theory</em>. Low frequencies have
+        wavelengths far longer than a head, so they bend right around it; what tells your
+        brain left from right is the tiny head start the closer ear gets. High frequencies have
+        short wavelengths that the head physically blocks, casting an acoustic shadow that makes
+        the far ear noticeably quieter.
       </p>
       <p>
-        For a round head of radius <em>a</em> the extra distance to the far ear is the straight
-        part plus the arc around the head, which gives Robert Woodworth's formula for the time
-        difference: (<em>a</em> / <em>c</em>)(θ + sin θ) for a source at angle θ off centre. With
-        <em>a</em> = 8.75 cm it peaks at 656 µs for a sound straight to one side. For the
-        shadow I used Richard Brown and Richard Duda's spherical-head filter from 1998: one
-        pole and one zero per ear, with the high frequencies boosted by up to 6 dB on the side
-        facing the sound and cut by up to 20 dB in the shadow. In the live figure each ear gets
-        a delay and a high-shelf filter set from those formulas.
+        Modeling the head as a sphere of radius <em>a</em>, a wave reaching the far ear travels
+        a straight tangent segment and then creeps along the curved surface to the ear canal.
+        That geometry gives Robert Woodworth's time-difference formula, (<em>a</em> / <em>c</em>)(θ + sin θ)
+        for a source at angle θ off center. With <em>a</em> = 8.75 cm, the delay tops out at
+        656 µs for a sound directly to one side. To approximate the acoustic shadow, the code
+        uses Richard Brown and Richard Duda's 1998 one-pole, one-zero spherical-head model:
+        high frequencies pick up to a +6 dB boost on the side facing the source and lose up to
+        20 dB in the shadow behind the head. In the live demo below, each ear runs through a
+        short delay and a high-shelf filter driven directly by those equations.
       </p>
 
       <div
@@ -292,43 +309,47 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        The sound circles once every 14 seconds until you drag it. With timing only, the
-        high frequencies are equally loud in both ears. With level only, nothing is delayed,
-        and the low voice barely moves, because the shadow mostly acts above 1 kHz. With both,
-        the sound should leave the middle of your head and sit off to the side. The plain pan
-        only changes the balance between the channels, the same at every frequency, with no
-        delay. Watch the dashed circle marked "same cues". A sphere
-        gives identical timing and shadow for a sound in front and its mirror image behind, so
-        this model can't tell them apart, and it can't hear height at all. Real ears separate
-        them with the folds of the outer ear, which filter the sound differently from each
-        direction (measured as a <em>head-related transfer function</em>), and with small head
-        movements.
+        On headphones, the source orbits once every 14 seconds until you grab it or tap somewhere
+        else on the circle. Switch <code>cues</code> to <code>timing only</code> and the treble
+        stays equally bright in both ears; switch to <code>level only</code> with <code>voice</code>
+        selected and the low vocal tones barely budge, because the head shadow really kicks in
+        above 1 kHz. Turn on
+        <code>both</code> and the sound steps outside the center of your skull to sit cleanly off
+        to one side, far more convincingly than <code>plain pan</code>, which just nudges overall
+        channel gain equally at all frequencies with zero delay. Keep an eye on the dashed circle
+        marked <em>same cues</em>: a symmetrical sphere produces identical timing and shadow for
+        a sound in front and its mirror image behind, and gives no clue about elevation. Real
+        ears break that tie using the tiny ridges and folds of the outer ear (captured in a
+        <em>head-related transfer function</em>) along with subtle unconscious turns of the head.
       </p>
       <p>
-        The impulse responses on this page use the same head. Every image source arrives from
-        its own direction and gets its own time difference and shadow filter for each ear, and
-        the late tail uses a separate noise for each ear, so the reverb surrounds you instead
-        of sitting in the middle. That's why the hero sounds like standing in the hall, if you
-        have headphones on.
+        The impulse responses throughout this page put that same two-eared head inside every
+        room. Each early image source arrives from its own 3D direction and gets its own
+        interaural delay and head-shadow filter, while the late noise tail is synthesized with
+        independent random noise for the left and right channels so the reverberation wraps all
+        the way around you. Put headphones on and clap in the hall at the top of the page to hear
+        that spatial envelope kick in.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="lucier"><span class="kicker">Step 6 · Feedback</span>I am sitting in a room</h2>
       <p>
-        In 1969 the composer Alvin Lucier recorded himself reading a short text, played the
-        recording back into the same room and recorded it again, and kept going. Each pass adds
-        the room's response once more, and after a few dozen passes the words are gone and
-        what's left is a set of pitches: the frequencies the room favours. The text he reads
-        describes the process. It turns out to be easy to compute.
+        In 1969, composer Alvin Lucier recorded himself reading a short paragraph aloud, played
+        that tape back into the same room while recording it onto a second machine, and repeated
+        the cycle over and over. Each round trip stamps the room's acoustic signature on top of
+        the last. After a couple of dozen passes, the consonants and vowels dissolve completely,
+        leaving behind a ghostly chord of steady pitches picked out by the room itself.
       </p>
       <p>
-        Playing a sound into a room multiplies its spectrum by the room's frequency response
-        <em>H</em>(<em>f</em>). Doing it <em>n</em> times multiplies it by |<em>H</em>|<sup><em>n</em></sup>,
-        and the tallest peaks of <em>H</em> win by more each time. The figure does this 32 times
-        by convolution, at 24 kHz to save work, rolling off below 70 Hz and above 7 kHz at each
-        pass the way a loudspeaker and microphone would. The voice is the vowel synthesizer
-        from the other figures, seven syllables with no consonants, since I don't have
-        Lucier's recording to use. Each row of the waterfall is one generation's spectrum.
+        In frequency space, playing audio through a room multiplies its spectrum by the room's
+        transfer function <em>H</em>(<em>f</em>). Repeating the loop <em>n</em> times scales the
+        spectrum by |<em>H</em>|<sup><em>n</em></sup>, so even modest peaks pull exponentially
+        ahead of everything else. The demo below runs 32 generations of FFT convolution at 24 kHz,
+        rolling off below 70 Hz and above 7 kHz on each pass to mimic a real loudspeaker and
+        microphone. Since I don't have Lucier's original tape to ship in the browser, the input
+        is a seven-syllable vowel phrase from the same formant synthesizer used earlier. Each
+        horizontal row of the waterfall displays one generation's spectrum from top (generation 0)
+        down to generation 32.
       </p>
 
       <div
@@ -338,53 +359,43 @@ const gain = BANDS.map((_, b) =&gt; {
       ></div>
 
       <p>
-        The formants of the voice are the broad bright bands at the top. By generation 8 they
-        are breaking into narrow lines, and by 16 only the lines are left. The readout names the
-        pitches that survive in each room. Which pitches they are depends on what was in the
-        voice to begin with, since a room can only boost what it's given, and on where the
-        speaker and the microphone stand. Above the Schroeder frequency the response of a room is a
-        tangle of peaks whose positions change when you move a few centimetres. That's true of
-        real rooms, and here it's true of the random tail, so the room's "notes" belong to the
-        positions as much as to the room.
+        At generation 0 you can spot the wide glowing formant bands of the synthesized vowels.
+        By generation 8 they are already fracturing into thin vertical streaks, and by generation
+        16 almost nothing remains except a handful of razor-sharp tones, marked by the green
+        triangles at the bottom and named in the readout. Click
+        <code>▶ 0 → 1 → 2 → 4 → 8 → 16 → 32</code> to hear the voice melt straight into pure
+        resonance. Notice that the surviving notes depend both on what energy the voice supplied
+        in the first place and on where the speaker and microphone happen to sit. Above the
+        Schroeder frequency, a room's frequency response is a jagged thicket of interference
+        peaks that reshuffle if you shift a microphone by a few centimeters. That happens in
+        physical rooms and in our random-phase tail alike, meaning the chord you uncover belongs
+        just as much to the exact pair of positions as it does to the architecture.
       </p>
 
       <!-- ================================================================ -->
       <h2 id="lessons"><span class="kicker">Epilogue</span>What a room does</h2>
-      <p>A few lessons from this part:</p>
-      <ul>
-        <li>
-          <strong>Reflections are mirrored sources.</strong> One rule, reflect the room, turns
-          echoes into geometry: a delay, a distance and a list of walls.
-        </li>
-        <li>
-          <strong>After a few dozen milliseconds, count statistically.</strong> The images
-          arrive too fast to matter one at a time, and a noise tail with the right decay per
-          band sounds the same.
-        </li>
-        <li>
-          <strong>Absorption sets the time.</strong> Sabine's formula is still the first
-          estimate for a live room, and Eyring's for a dead one.
-        </li>
-        <li>
-          <strong>Bass is a different problem.</strong> Below the Schroeder frequency the room
-          is a resonator, and where you stand matters more than what the walls are made of.
-        </li>
-        <li>
-          <strong>Two ears make it a place.</strong> A time difference and a filter per ear
-          move the room from between your ears to around you.
-        </li>
-      </ul>
       <p>
-        Things I'd try next: rooms that aren't boxes, which need ray tracing or a wave solver
-        instead of mirrors; scattering, since real walls aren't perfect mirrors and a rough
-        surface spreads its reflection out; measured head-related transfer functions instead of
-        a sphere, to get front, back and height; and a low-frequency part built from the modes,
-        joined to the noise tail at the Schroeder frequency.
+        Put those pieces side by side and a surprisingly small toolkit covers most of how indoor
+        spaces sound. Mirroring a box turns early reflections into plain distance and wall-hit
+        bookkeeping; once arrivals cross a few thousand per second, Sabine and Eyring's
+        absorption math lets a six-band decaying noise tail take over without giving the handoff
+        away. Down below the Schroeder frequency, ray geometry gives way to standing waves where
+        standing a meter to the left matters more than repainting the walls, and running every
+        path through Woodworth's delay and a spherical head shadow finally pulls the sound out
+        of the middle of your headphones and into a room around you.
+      </p>
+      <p>
+        Plenty of real-world acoustics still sits outside this box model. L-shaped rooms, domes,
+        and sloped auditorium ceilings break clean mirror tiling and call for ray tracing or full
+        wave solvers; rough plaster and bookshelves scatter sound sideways instead of bouncing it
+        like glass; measured head-related transfer functions would separate front from back and
+        add overhead height; and a truly unified solver would stitch a modal bass engine cleanly
+        onto the noise tail right around the Schroeder frequency.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/acoustic-spaces/room-instrument.html">Part 2, The Room Instrument</a>.</strong>
-        A room becomes a sequencer: its echoes set the rhythm, its walls the tone, and the
-        whole thing fits in a link.
+        Flip the same physics around and turn the room into a sequencer where echoes set the
+        rhythm, wall materials write the accents, and anything you build fits inside a shareable URL.
       </p>
     </main>
 
