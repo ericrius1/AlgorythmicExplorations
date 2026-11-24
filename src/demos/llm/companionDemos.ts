@@ -45,6 +45,7 @@ import {
   type EnvironmentInstance,
 } from "../../lib/pet/environments";
 import { PetBrain, nextStageXp } from "../../lib/pet/petBrain";
+import { decodeCheckpoint, downloadCheckpointFile } from "../../lib/llm/checkpoint";
 import { petAudio } from "../../lib/pet/petAudio";
 import {
   EVOLUTION_NAMES,
@@ -263,7 +264,10 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
           </div>
           <div class="sm-brain-actions">
             <button type="button" class="sm-secondary-btn" data-train-burst>Train +15 Steps</button>
+            <button type="button" class="sm-secondary-btn" data-load-smw>Load .smw Brain</button>
+            <button type="button" class="sm-secondary-btn" data-export-smw>Export .smw</button>
             <button type="button" class="sm-secondary-btn" data-reset-pet>Reset Memories</button>
+            <input type="file" accept=".smw" style="display:none" data-smw-input />
           </div>
         </div>
         <div class="sm-brain-attn">
@@ -347,6 +351,8 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
 
     brainKvEl.innerHTML = `
       <span>Backend</span><b>${brain.backend}</b>
+      <span>Brain Source</span><b>${brain.brainSource}</b>
+      <span>Architecture</span><b>${brain.archLabel}</b>
       <span>Parameters</span><b>${(brain.paramCount / 1000).toFixed(1)}K (${(brain.gpuBytes / 1e6).toFixed(1)} MB)</b>
       <span>Online Steps</span><b>${brain.stepsTrained} · loss ${brain.lastLoss.toFixed(2)}</b>
       <span>Decode Speed</span><b>${brain.lastTokPerSec > 0 ? `${brain.lastTokPerSec.toFixed(0)} tok/s` : "—"}</b>
@@ -575,13 +581,57 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
   hud.querySelector("[data-train-burst]")!.addEventListener("click", () => {
     if (brain.trainingNow || !brain.ready) return;
     attentionPulse = 1;
+    const burstLr = brain.isPretrained ? 0.0008 : 0.007;
     showSpeech("Running 15 online WebGPU gradient steps...");
-    void brain.runOnlineSteps(15, 0.007).then((loss) => {
+    void brain.runOnlineSteps(15, burstLr).then((loss) => {
       showSpeech(`Done! Loss is now ${loss.toFixed(3)} (${brain.stepsTrained} total steps).`);
       void brain.persist();
       syncHud();
     });
   });
+
+  const smwInput = hud.querySelector<HTMLInputElement>("[data-smw-input]")!;
+  hud.querySelector("[data-load-smw]")!.addEventListener("click", () => {
+    if (!brain.ready) return;
+    smwInput.value = "";
+    smwInput.click();
+  });
+  smwInput.addEventListener("change", () => {
+    const file = smwInput.files?.[0];
+    if (!file) return;
+    showSpeech(`Loading ${file.name} onto WebGPU...`, 4000);
+    void file
+      .arrayBuffer()
+      .then((buf) => {
+        const ckpt = decodeCheckpoint(buf);
+        return brain.loadCheckpoint(ckpt, { label: `Imported (${file.name})` }).then(() => ckpt);
+      })
+      .then((ckpt) => {
+        const kb = (ckpt.byteLength / 1024).toFixed(0);
+        appendChat(
+          "sys",
+          `Loaded ${file.name} (${(ckpt.paramCount / 1000).toFixed(1)}K params · ${kb} KB ${ckpt.quant.toUpperCase()} · ${brain.archLabel}).`,
+        );
+        showSpeech(`Loaded ${(ckpt.paramCount / 1000).toFixed(0)}K brain from ${file.name}! Try chatting with me!`, 5500);
+        spawnSparkles(petPos.clone().add(new THREE.Vector3(0, 0.85, 0)), 0x7aa2ff, 22);
+        syncHud();
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        appendChat("sys", `Failed to load ${file.name}: ${msg}`);
+        showSpeech(`Could not load ${file.name}: ${msg}`, 5000);
+      });
+  });
+
+  hud.querySelector("[data-export-smw]")!.addEventListener("click", () => {
+    if (!brain.ready) return;
+    void brain.exportCheckpoint().then((bytes) => {
+      const slug = brain.species.id;
+      downloadCheckpointFile(bytes, `${slug}-small-minds.smw`);
+      showSpeech(`Exported ${slug}-small-minds.smw (${(bytes.byteLength / 1024).toFixed(0)} KB Q8).`, 4500);
+    });
+  });
+
   hud.querySelector("[data-reset-pet]")!.addEventListener("click", () => {
     void brain.resetProgress().then(() => {
       rig?.setEvolution(effectiveStage());
@@ -686,6 +736,8 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
       ["evolution", `Stage ${effectiveStage()} · ${EVOLUTION_NAMES[effectiveStage()]}`],
       ["environment", `${envMeta.name} (${envMeta.inspiredBy})`],
       ["llm backend", brain.backend],
+      ["brain source", brain.brainSource],
+      ["llm arch", brain.archLabel],
       ["llm params", `${(brain.paramCount / 1000).toFixed(1)}K · ${(brain.gpuBytes / 1e6).toFixed(1)} MB`],
       ["train / loss", `${brain.stepsTrained} steps · ${brain.lastLoss.toFixed(3)}`],
       ["decode", brain.lastTokPerSec > 0 ? `${brain.lastTokPerSec.toFixed(0)} tok/s` : "–"],

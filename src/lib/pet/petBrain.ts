@@ -7,8 +7,16 @@
 //  5) IndexedDB Persistence so your companion remembers you across visits!
 
 import { PET_CORPUS } from "../llm/datasets";
-import { decodeTokens, encodeText } from "../llm/tokenizer";
+import { EOS_ID, NL_ID, decodeTokens, encodeText } from "../llm/tokenizer";
 import { createMicroLLM, sampleBatch, type MicroLLM } from "../llm/webgpuEngine";
+import {
+  decodeCheckpoint,
+  encodeCheckpoint,
+  loadCheckpointUrl,
+  type CheckpointMeta,
+  type DecodedCheckpoint,
+} from "../llm/checkpoint";
+import { getDevice } from "../gpu";
 import { BrowserAutoResearcher, type ExperimentNode } from "../llm/autoresearch";
 import type { EnvironmentId } from "./environments";
 import type { EvolutionStage, PetMood, PetTrick, SpeciesDefinition } from "./types";
@@ -33,7 +41,9 @@ export interface PersistedPetState {
   /** Tiny 6 x 4 policy logits updated via reward-modulated gradient steps */
   policyWeights: number[];
   memories: MemoryItem[];
-  weights?: number[]; // serialized Float32Array when saved
+  weights?: number[]; // legacy serialized Float32Array
+  checkpointBytes?: Uint8Array; // compact SMW1 Q8 binary checkpoint
+  brainSource?: string;
 }
 
 export interface BrainReply {
@@ -124,6 +134,8 @@ export class PetBrain {
   ready = false;
   trainingNow = false;
   dreamingNow = false;
+  brainSource = "In-browser warm-start";
+  pretrainedMeta: CheckpointMeta | null = null;
 
   private researcher: BrowserAutoResearcher | null = null;
   private userName: string | null = null;
@@ -153,6 +165,84 @@ export class PetBrain {
     return this.llm?.gpuBytes ?? 0;
   }
 
+  get archLabel(): string {
+    const c = this.llm?.config;
+    if (!c) return "—";
+    return `${c.nLayers}L · d${c.dModel} · ${c.nHeads}H · ${c.activation.toUpperCase()} · ctx ${c.seqLen}`;
+  }
+
+  get isPretrained(): boolean {
+    return this.pretrainedMeta !== null;
+  }
+
+  private async fetchBundledCheckpoint(): Promise<DecodedCheckpoint | null> {
+    const base = import.meta.env.BASE_URL || "/";
+    const normalized = base.endsWith("/") ? base : `${base}/`;
+    const candidates = [
+      `${normalized}models/small-minds/${this.species.id}.smw`,
+      `${normalized}models/small-minds/companion-base.smw`,
+    ];
+    for (const url of candidates) {
+      const ckpt = await loadCheckpointUrl(url);
+      if (ckpt) return ckpt;
+    }
+    return null;
+  }
+
+  private formatSource(meta: CheckpointMeta, fallbackLabel: string): string {
+    const where = meta.trainedOn || fallbackLabel;
+    const bpb = typeof meta.valBpb === "number" ? ` · val ${meta.valBpb.toFixed(2)} bpb` : "";
+    return `${where}${bpb}`;
+  }
+
+  async loadCheckpoint(ckpt: DecodedCheckpoint, opts: { persist?: boolean; label?: string } = {}): Promise<void> {
+    this.ready = false;
+    this.llm?.dispose();
+    this.llm = await createMicroLLM({
+      ...ckpt.config,
+      lr: ckpt.config.lr ?? 0.0008,
+      batchSize: ckpt.config.batchSize ?? 4,
+    });
+    this.llm.importWeights(ckpt.weights);
+    this.pretrainedMeta = ckpt.meta ?? {};
+    this.brainSource = this.formatSource(ckpt.meta, opts.label ?? "Imported .smw");
+    if (typeof ckpt.meta.valLoss === "number") {
+      this.lastLoss = ckpt.meta.valLoss;
+    } else if (typeof ckpt.meta.valBpb === "number") {
+      this.lastLoss = ckpt.meta.valBpb * Math.LN2;
+    } else {
+      this.lastLoss = Math.min(this.lastLoss, 1.35);
+    }
+    if (typeof ckpt.meta.trainedSteps === "number" && this.stepsTrained < ckpt.meta.trainedSteps) {
+      this.stepsTrained = ckpt.meta.trainedSteps;
+    }
+    this.ready = true;
+    if (opts.persist !== false) {
+      await this.persist();
+    }
+  }
+
+  async exportCheckpoint(): Promise<Uint8Array> {
+    if (!this.llm) throw new Error("Brain is not initialized yet");
+    const weights = await this.llm.exportWeights();
+    return encodeCheckpoint(
+      weights,
+      this.llm.config,
+      {
+        ...(this.pretrainedMeta ?? {}),
+        speciesId: this.species.id,
+        label: `${this.customName} (${this.species.species})`,
+        trainedOn: this.pretrainedMeta?.trainedOn ?? `Browser ${this.backend}`,
+        trainedSteps: this.stepsTrained,
+        valLoss: Number(this.lastLoss.toFixed(4)),
+        valBpb: Number((this.lastLoss / Math.LN2).toFixed(4)),
+        createdAt: new Date().toISOString(),
+      },
+      "q8",
+      32,
+    );
+  }
+
   private buildReplayText(): string {
     let text = this.species.personalitySeed + "\n" + PET_CORPUS;
     // Repeat personal memories slightly so continual learning absorbs user phrases!
@@ -164,6 +254,9 @@ export class PetBrain {
 
   async init(onStatus?: (msg: string) => void): Promise<void> {
     this.ready = false;
+    this.pretrainedMeta = null;
+    this.brainSource = "In-browser warm-start";
+
     const saved = await loadState(this.species.id);
     if (saved) {
       this.customName = saved.customName || this.species.name;
@@ -179,6 +272,41 @@ export class PetBrain {
       this.extractUserNameFromMemories();
     }
 
+    const hasGpu = (await getDevice()) !== null;
+
+    // 1. Check saved SMW1 checkpoint in IndexedDB
+    let savedCkpt: DecodedCheckpoint | null = null;
+    if (saved?.checkpointBytes && saved.checkpointBytes.byteLength >= 12) {
+      try {
+        savedCkpt = decodeCheckpoint(saved.checkpointBytes);
+      } catch {
+        savedCkpt = null;
+      }
+    }
+
+    // 2. Check bundled Colab-trained checkpoint under public/models/small-minds/
+    onStatus?.(`Checking pretrained brain for ${this.customName}...`);
+    const bundled = hasGpu ? await this.fetchBundledCheckpoint() : null;
+
+    // Prefer saved SMW1 unless a larger/newer bundled Colab checkpoint has shipped
+    const shouldUpgradeToBundled =
+      bundled !== null &&
+      (!savedCkpt || (bundled.paramCount > savedCkpt.paramCount && !saved?.brainSource?.includes("Imported")));
+
+    if (shouldUpgradeToBundled && bundled) {
+      onStatus?.(`Loading ${this.customName}'s pretrained WebGPU brain (${(bundled.paramCount / 1000).toFixed(0)}K)...`);
+      await this.loadCheckpoint(bundled, { persist: false, label: "Colab Pretrained" });
+      return;
+    }
+
+    if (savedCkpt && (hasGpu || savedCkpt.paramCount <= 160_000)) {
+      onStatus?.(`Restoring ${this.customName}'s saved WebGPU brain...`);
+      await this.loadCheckpoint(savedCkpt, { persist: false, label: saved?.brainSource ?? "Saved Brain" });
+      if (saved?.brainSource) this.brainSource = saved.brainSource;
+      return;
+    }
+
+    // 3. Fallback: lightweight scratch WebGPU micro-LLM (fast boot even without pretrained files)
     onStatus?.("Allocating WebGPU micro-LLM...");
     this.llm?.dispose();
     this.llm = await createMicroLLM({
@@ -230,7 +358,14 @@ export class PetBrain {
   }
 
   async persist(): Promise<void> {
-    const weights = this.llm ? Array.from(await this.llm.exportWeights()) : undefined;
+    let checkpointBytes: Uint8Array | undefined;
+    if (this.llm) {
+      try {
+        checkpointBytes = await this.exportCheckpoint();
+      } catch {
+        checkpointBytes = undefined;
+      }
+    }
     await saveState({
       speciesId: this.species.id,
       customName: this.customName,
@@ -243,7 +378,8 @@ export class PetBrain {
       trickMastery: this.trickMastery,
       policyWeights: Array.from(this.policyWeights),
       memories: this.memories.slice(-40),
-      weights,
+      checkpointBytes,
+      brainSource: this.brainSource,
     });
   }
 
@@ -256,6 +392,22 @@ export class PetBrain {
     this.trickMastery = defaultTrickMastery();
     this.memories = [];
     this.userName = null;
+    this.pretrainedMeta = null;
+    this.brainSource = "In-browser warm-start";
+    // Clear saved state first so init() reloads fresh bundled Colab weights (or clean warm-start)
+    await saveState({
+      speciesId: this.species.id,
+      customName: this.species.name,
+      environmentId: this.environmentId,
+      xp: 0,
+      bond: 20,
+      stepsTrained: 0,
+      dreamGenerations: 0,
+      lastLoss: 4.4,
+      trickMastery: defaultTrickMastery(),
+      policyWeights: Array.from(this.policyWeights),
+      memories: [],
+    });
     await this.init();
     await this.persist();
   }
@@ -323,7 +475,7 @@ export class PetBrain {
     });
 
     // Also consolidate the live pet weights directly with replay training!
-    await this.runOnlineSteps(14, 0.0055);
+    await this.runOnlineSteps(this.isPretrained ? 6 : 14, this.isPretrained ? 0.0006 : 0.0055);
     this.dreamGenerations++;
     this.xp += 18;
     this.bond = Math.min(100, this.bond + 5);
@@ -364,8 +516,21 @@ export class PetBrain {
     let rawSample = "";
     let tokPerSec = 0;
     if (this.llm) {
-      const prompt = encodeText(`user: ${low}\npet: `);
-      const gen = await this.llm.generate(prompt, { maxNewTokens: 42, temperature: 0.72, topP: 0.9 });
+      let promptStr = `user: ${low}\npet: `;
+      if (this.llm.config.seqLen >= 96 && this.memories.length > 0) {
+        const prev = this.memories[this.memories.length - 1];
+        const ctxCandidate = `user: ${prev.user.toLowerCase()}\npet: ${prev.pet.toLowerCase()}\nuser: ${low}\npet: `;
+        if (ctxCandidate.length < this.llm.config.seqLen - 16) {
+          promptStr = ctxCandidate;
+        }
+      }
+      const prompt = encodeText(promptStr);
+      const gen = await this.llm.generate(prompt, {
+        maxNewTokens: this.isPretrained ? 110 : 48,
+        temperature: this.isPretrained ? 0.68 : 0.72,
+        topP: 0.9,
+        stopTokenIds: [NL_ID, EOS_ID],
+      });
       tokPerSec = gen.tokPerSec;
       this.lastTokPerSec = tokPerSec;
       this.lastAttention = gen.lastAttention;
@@ -374,23 +539,22 @@ export class PetBrain {
     }
 
     // Craft an endearing, context-aware reply grounded in species voice, memory,
-    // and real WebGPU neural generation (and as the pet trains more steps,
-    // its live neural generations shine through more cleanly!).
+    // and real WebGPU neural generation. When a Colab-pretrained brain is loaded,
+    // let its pure-WebGPU neural generation lead directly!
     const fav = this.species.favoriteWords[Math.floor(Math.random() * this.species.favoriteWords.length)];
     const callUser = this.userName ? `, ${this.userName}` : "";
     let mood: PetMood = "happy";
     let reply = "";
 
-    // Extract clean English-like fragment from the WebGPU micro-LLM if loss is low
     const neuralLooksClean =
-      this.lastLoss < 1.85 &&
-      rawSample.length >= 14 &&
-      /^[a-z0-9 ,.!?'’-]+$/i.test(rawSample) &&
-      rawSample.split(" ").length >= 3;
+      rawSample.length >= 10 &&
+      /^[a-z0-9 ,.!?'’~:;-]+$/i.test(rawSample) &&
+      rawSample.split(/\s+/).length >= 3 &&
+      (this.isPretrained || this.lastLoss < 1.85);
 
-    if (neuralLooksClean && !triggeredTrick && !nameMatch && Math.random() < 0.55) {
+    if (neuralLooksClean && !nameMatch && (this.isPretrained || (!triggeredTrick && Math.random() < 0.55))) {
       reply = rawSample;
-      mood = "proud";
+      mood = triggeredTrick ? "playful" : "proud";
     } else if (nameMatch) {
       reply = `${fav}! nice to meet you, ${this.userName}! i just wrote your name straight into my episodic memory.`;
       mood = "happy";
@@ -438,7 +602,10 @@ export class PetBrain {
       topic: topicWords[topicWords.length - 1] ?? "our chat",
     });
 
-    const lossAfter = await this.runOnlineSteps(6, 0.006);
+    // Gentle continual fine-tuning LR for Colab-pretrained brains prevents catastrophic forgetting
+    const onlineSteps = this.isPretrained ? 3 : 6;
+    const onlineLr = this.isPretrained ? 0.0008 : 0.006;
+    const lossAfter = await this.runOnlineSteps(onlineSteps, onlineLr);
     this.xp += 10;
     this.bond = Math.min(100, this.bond + 3);
     void this.persist();

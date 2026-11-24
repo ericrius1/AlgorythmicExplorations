@@ -8,6 +8,7 @@ import { pixelRatio } from "../../lib/palette";
 import { CORPORA } from "../../lib/llm/datasets";
 import { decodeTokens, encodeText } from "../../lib/llm/tokenizer";
 import { createMicroLLM, sampleBatch, type MicroLLM, type OptimizerKind } from "../../lib/llm/webgpuEngine";
+import { decodeCheckpoint, downloadCheckpointFile, encodeCheckpoint } from "../../lib/llm/checkpoint";
 
 // ---- 1. Hero: Live Gradient Stream & Loss Basin ----------------------------
 
@@ -323,6 +324,58 @@ export async function mountLiveTrainer(container: HTMLElement): Promise<Demo> {
     void rebuildModel();
   });
   shell.button("reset", () => void rebuildModel());
+
+  const smwFileInput = document.createElement("input");
+  smwFileInput.type = "file";
+  smwFileInput.accept = ".smw";
+  smwFileInput.style.display = "none";
+  container.appendChild(smwFileInput);
+
+  shell.button("load .smw", () => {
+    smwFileInput.value = "";
+    smwFileInput.click();
+  });
+  smwFileInput.addEventListener("change", () => {
+    const file = smwFileInput.files?.[0];
+    if (!file) return;
+    training = false;
+    trainBtn.textContent = "train";
+    void file
+      .arrayBuffer()
+      .then(async (buf) => {
+        const ckpt = decodeCheckpoint(buf);
+        llm.dispose();
+        llm = await createMicroLLM({ ...ckpt.config, batchSize: ckpt.config.batchSize ?? 4 });
+        llm.importWeights(ckpt.weights);
+        lossHistory.length = 0;
+        lr = ckpt.config.lr ?? 0.001;
+        updateBackendBadge();
+        lastMetrics = `loaded ${file.name} · ${(ckpt.paramCount / 1000).toFixed(1)}K params (${ckpt.config.nLayers}L d${ckpt.config.dModel})`;
+        await runSample();
+      })
+      .catch((err) => {
+        lastMetrics = `failed to load .smw: ${err instanceof Error ? err.message : String(err)}`;
+      });
+  });
+
+  shell.button("export .smw", () => {
+    void llm.exportWeights().then((w) => {
+      const bytes = encodeCheckpoint(
+        w,
+        llm.config,
+        {
+          corpus: CORPORA[corpusIdx].id,
+          trainedOn: `Browser ${llm.backend}`,
+          trainedSteps: llm.stepCount,
+          valLoss: lossHistory.length ? lossHistory[lossHistory.length - 1] : undefined,
+          createdAt: new Date().toISOString(),
+        },
+        "q8",
+        32,
+      );
+      downloadCheckpointFile(bytes, `small-minds-${CORPORA[corpusIdx].id}.smw`);
+    });
+  });
   shell.slider({
     label: "lr",
     min: 0.002,

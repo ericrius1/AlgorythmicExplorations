@@ -56,6 +56,7 @@ export interface GenerateOptions {
   maxNewTokens: number;
   temperature?: number;
   topP?: number;
+  stopTokenIds?: number[];
   onToken?: (tokenId: number, stepMs: number) => void;
 }
 
@@ -936,6 +937,7 @@ class WebGpuMicroLLM implements MicroLLM {
       const { logits, attention } = await this.forwardLogits(input);
       lastAttn = attention;
       const nextId = sampleFromLogits(logits, pos * V, V, opts.temperature ?? 0.8, opts.topP ?? 0.9);
+      if (opts.stopTokenIds?.includes(nextId)) break;
       ctx.push(nextId);
       generated.push(nextId);
       opts.onToken?.(nextId, performance.now() - t0);
@@ -1329,6 +1331,7 @@ class CpuMicroLLM implements MicroLLM {
       const { logits, attention } = await this.forwardLogits(input);
       lastAttn = attention;
       const nextId = sampleFromLogits(logits, (slice.length - 1) * V, V, opts.temperature ?? 0.8, opts.topP ?? 0.9);
+      if (opts.stopTokenIds?.includes(nextId)) break;
       ctx.push(nextId);
       generated.push(nextId);
       opts.onToken?.(nextId, performance.now() - t0);
@@ -1374,6 +1377,9 @@ export async function createMicroLLM(partial: Partial<ModelConfig> = {}): Promis
   const cfg: ModelConfig = { ...DEFAULT_CONFIG, ...partial };
   // Ensure headDim is even and <= 32 for register FlashAttention
   if (cfg.dModel % cfg.nHeads !== 0) cfg.nHeads = 4;
+  while (cfg.dModel / cfg.nHeads > 32 && cfg.dModel % (cfg.nHeads * 2) === 0) {
+    cfg.nHeads *= 2;
+  }
   const dev = await getDevice();
   if (dev) {
     return new WebGpuMicroLLM(dev, cfg);
