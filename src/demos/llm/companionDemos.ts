@@ -6,7 +6,34 @@
 //  2. mountSpeciesGallery     — Interactive 3D turntable & evolution stage explorer
 
 import * as THREE from "three/webgpu";
+import { pass } from "three/tsl";
+import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { Shell, type Demo } from "../../lib/demoShell";
+
+/** Lightweight pure three/webgpu studio light-dome for PMREM IBL (zero duplicate Three.js warning!) */
+function createStudioEnvTexture(renderer: THREE.WebGPURenderer): THREE.Texture {
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x141826);
+  const panels: { pos: [number, number, number]; scale: [number, number, number]; col: number }[] = [
+    { pos: [4, 5, 4], scale: [4, 4, 0.2], col: 0xfff0d4 },
+    { pos: [-5, 3, -3], scale: [5, 3, 0.2], col: 0x7ca8ff },
+    { pos: [0, 6, 0], scale: [6, 0.2, 6], col: 0xb8d0ff },
+    { pos: [0, -3, 0], scale: [8, 0.2, 8], col: 0x2a2434 },
+  ];
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  for (const p of panels) {
+    const m = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: p.col }));
+    m.position.set(...p.pos);
+    m.scale.set(...p.scale);
+    m.lookAt(0, 0, 0);
+    envScene.add(m);
+  }
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const tex = pmrem.fromScene(envScene, 0.04).texture;
+  pmrem.dispose();
+  box.dispose();
+  return tex;
+}
 import { Orbit3D } from "../../lib/stage3d";
 import { pageDebug } from "../../lib/debugmode";
 import { SPECIES_CATALOG, getSpeciesById } from "../../lib/pet/speciesRegistry";
@@ -46,23 +73,48 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
   await renderer.init();
   renderer.setPixelRatio(1);
   renderer.setSize(shell.canvas.width, shell.canvas.height, false);
+  // Loom-inspired filmic AgX tone mapping + real soft shadows + studio IBL environment
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 0.96;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, shell.canvas.width / shell.canvas.height, 0.05, 80);
+  const envTex = createStudioEnvTexture(renderer);
+  scene.environment = envTex;
+  scene.environmentIntensity = 0.42;
+
+  const camera = new THREE.PerspectiveCamera(36, shell.canvas.width / shell.canvas.height, 0.05, 80);
   const orbit = new Orbit3D();
   orbit.target.set(0, 0.52, 0);
-  orbit.distance = 3.15;
-  orbit.minDistance = 1.6;
-  orbit.maxDistance = 6.2;
-  orbit.elevation = 0.24;
-  orbit.azimuth = 0.32;
+  orbit.distance = 2.85;
+  orbit.minDistance = 1.45;
+  orbit.maxDistance = 6.0;
+  orbit.elevation = 0.22;
+  orbit.azimuth = 0.34;
   orbit.autoSpin = 0.00045;
   orbit.attach(shell.canvas);
 
-  const hemi = new THREE.HemisphereLight(0xbcd4ff, 0x3b4d2e, 0.95);
-  const key = new THREE.DirectionalLight(0xffddb5, 1.85);
-  const rim = new THREE.DirectionalLight(0x8fbaff, 0.75);
+  const hemi = new THREE.HemisphereLight(0xbcd4ff, 0x3b4d2e, 0.9);
+  const key = new THREE.DirectionalLight(0xffddb5, 1.9);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 14;
+  key.shadow.camera.left = -3.2;
+  key.shadow.camera.right = 3.2;
+  key.shadow.camera.top = 3.2;
+  key.shadow.camera.bottom = -3.2;
+  key.shadow.bias = -0.0008;
+  const rim = new THREE.DirectionalLight(0x8fbaff, 0.95);
   scene.add(hemi, key, rim);
+
+  // HDR Energy-Conserving Bloom pipeline (Loom film.wgsl spirit!)
+  const renderPipeline = new THREE.RenderPipeline(renderer);
+  const scenePass = pass(scene, camera);
+  const sceneColor = scenePass.getTextureNode("output");
+  const bloomPass = bloom(sceneColor, 0.2, 0.42, 1.05);
+  renderPipeline.outputNode = sceneColor.add(bloomPass);
 
   // Soft grounding shadow disc following pet
   const shadowDisc = new THREE.Mesh(
@@ -791,11 +843,12 @@ export async function mountCompanionSanctuary(container: HTMLElement): Promise<D
       }
 
       orbit.apply(camera);
-      renderer.render(scene, camera);
+      renderPipeline.render();
     },
     dispose() {
       rig?.dispose();
       envInst?.dispose();
+      envTex.dispose();
       brain.llm?.dispose();
       renderer.dispose();
     },
@@ -810,29 +863,45 @@ export async function mountSpeciesGallery(container: HTMLElement): Promise<Demo>
   await renderer.init();
   renderer.setPixelRatio(1);
   renderer.setSize(shell.canvas.width, shell.canvas.height, false);
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 0.96;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
+  const envTex = createStudioEnvTexture(renderer);
+  scene.environment = envTex;
+  scene.environmentIntensity = 0.42;
+
   const camera = new THREE.PerspectiveCamera(34, shell.canvas.width / shell.canvas.height, 0.05, 40);
   const orbit = new Orbit3D();
   orbit.target.set(0, 0.48, 0);
-  orbit.distance = 2.65;
+  orbit.distance = 2.55;
   orbit.elevation = 0.2;
   orbit.azimuth = 0.35;
   orbit.autoSpin = 0.0055;
   orbit.attach(shell.canvas);
 
   const hemi = new THREE.HemisphereLight(0xc2d8ff, 0x2c2a3a, 1.0);
-  const key = new THREE.DirectionalLight(0xfff0dd, 1.85);
+  const key = new THREE.DirectionalLight(0xfff0dd, 1.9);
   key.position.set(2.5, 3.8, 2.4);
-  const rim = new THREE.DirectionalLight(0x7aa2ff, 0.9);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  const rim = new THREE.DirectionalLight(0x7aa2ff, 0.95);
   rim.position.set(-2.4, 2.2, -2.5);
   scene.add(hemi, key, rim);
 
+  const renderPipeline = new THREE.RenderPipeline(renderer);
+  const gPass = pass(scene, camera);
+  const gColor = gPass.getTextureNode("output");
+  renderPipeline.outputNode = gColor.add(bloom(gColor, 0.22, 0.45, 0.92));
+
   const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.95, 1.05, 0.1, 48),
-    new THREE.MeshStandardMaterial({ color: 0x161926, roughness: 0.45, metalness: 0.35 }),
+    new THREE.CylinderGeometry(0.95, 1.05, 0.1, 64),
+    new THREE.MeshStandardMaterial({ color: 0x161926, roughness: 0.4, metalness: 0.38 }),
   );
   pedestal.position.y = -0.05;
+  pedestal.receiveShadow = true;
   scene.add(pedestal);
 
   let idx = 0;
@@ -913,10 +982,11 @@ export async function mountSpeciesGallery(container: HTMLElement): Promise<Demo>
       });
 
       orbit.apply(camera);
-      renderer.render(scene, camera);
+      renderPipeline.render();
     },
     dispose() {
       rig?.dispose();
+      envTex.dispose();
       renderer.dispose();
     },
   };

@@ -8,6 +8,7 @@
 
 import * as THREE from "three/webgpu";
 import { screenUV, mix, vec3, float } from "three/tsl";
+import { uSanctuaryKeyColor, uSanctuaryKeyDir, uSanctuaryRimColor } from "./petShaders";
 
 export type EnvironmentId = "meadow" | "nebula" | "bonfire" | "harmonic" | "ferro";
 
@@ -135,6 +136,12 @@ export function applyEnvironmentBackdrop(
   lights.rim.color.setHex(meta.rim.color);
   lights.rim.intensity = meta.rim.intensity * (dreaming ? 1.15 : 1);
   lights.rim.position.set(...meta.rim.position);
+
+  // Sync Loom/SSS shader uniforms so every pet's subsurface transmission & rim
+  // halo physically match the active environment's sun, campfire, or nebula!
+  uSanctuaryKeyDir.value.set(...meta.key.position).normalize();
+  uSanctuaryKeyColor.value.setHex(meta.key.color);
+  uSanctuaryRimColor.value.setHex(meta.rim.color);
 }
 
 export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
@@ -158,26 +165,27 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
     groundGeo.computeVertexNormals();
     const ground = new THREE.Mesh(
       groundGeo,
-      new THREE.MeshStandardMaterial({ color: 0x2d4a2f, roughness: 0.95 }),
+      new THREE.MeshStandardMaterial({ color: 0x2a452e, roughness: 0.94 }),
     );
+    ground.receiveShadow = true;
     group.add(ground);
 
-    // Instanced swaying grass blades around the clearing (Ground Truth tribute!)
-    const bladeCount = 520;
-    const bladeGeo = new THREE.ConeGeometry(0.022, 0.24, 4);
-    bladeGeo.translate(0, 0.12, 0);
+    // Instanced swaying grass blades + blooming meadow wildflowers (Ground Truth tribute!)
+    const bladeCount = 920;
+    const bladeGeo = new THREE.ConeGeometry(0.022, 0.25, 4);
+    bladeGeo.translate(0, 0.125, 0);
     const bladeMat = new THREE.MeshStandardMaterial({ color: 0x5d9448, roughness: 0.85 });
     const blades = new THREE.InstancedMesh(bladeGeo, bladeMat, bladeCount);
     const baseData: { x: number; y: number; z: number; yaw: number; h: number; phase: number }[] = [];
     const dummy = new THREE.Object3D();
     for (let i = 0; i < bladeCount; i++) {
       const a = (i * 2.39996) % (Math.PI * 2);
-      const r = 1.15 + Math.sqrt(i / bladeCount) * 4.2;
+      const r = 1.05 + Math.sqrt(i / bladeCount) * 4.4;
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
       const edge = Math.max(0, (r - 1.65) / 4.8);
       const y = edge * edge * (0.45 + 0.35 * Math.sin(x * 0.9) * Math.cos(z * 0.8)) - 0.02;
-      const h = 0.75 + ((i * 37) % 100) / 140;
+      const h = 0.72 + ((i * 37) % 100) / 135;
       baseData.push({ x, y, z, yaw: a, h, phase: i * 0.31 });
       dummy.position.set(x, y, z);
       dummy.scale.set(1, h, 1);
@@ -186,6 +194,28 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
       blades.setMatrixAt(i, dummy.matrix);
     }
     group.add(blades);
+
+    // Tiny luminous meadow wildflowers catching twilight bloom
+    const flowerPalette = [0xffd384, 0xffa8cc, 0xa8d6ff];
+    for (let i = 0; i < 28; i++) {
+      const a = i * 2.18 + 0.5;
+      const r = 1.25 + (i % 7) * 0.42;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const edge = Math.max(0, (r - 1.65) / 4.8);
+      const y = edge * edge * (0.45 + 0.35 * Math.sin(x * 0.9) * Math.cos(z * 0.8)) + 0.09;
+      const fl = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.032, 0),
+        new THREE.MeshStandardMaterial({
+          color: flowerPalette[i % 3],
+          emissive: flowerPalette[i % 3],
+          emissiveIntensity: 0.75,
+          roughness: 0.35,
+        }),
+      );
+      fl.position.set(x, y, z);
+      group.add(fl);
+    }
 
     // Stepping stones & glowing fireflies
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x5c6373, roughness: 0.92 });
@@ -250,10 +280,11 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
   if (id === "nebula") {
     // Floating crystalline sanctuary plinth + orbiting gravitational particle ring!
     const plinth = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.75, 1.45, 0.14, 48),
-      new THREE.MeshStandardMaterial({ color: 0x171b30, roughness: 0.45, metalness: 0.35 }),
+      new THREE.CylinderGeometry(1.75, 1.45, 0.14, 64),
+      new THREE.MeshStandardMaterial({ color: 0x171b30, roughness: 0.35, metalness: 0.45 }),
     );
     plinth.position.y = -0.075;
+    plinth.receiveShadow = true;
     group.add(plinth);
 
     const rim = new THREE.Mesh(
@@ -308,11 +339,12 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
 
   if (id === "bonfire") {
     const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(5.5, 48),
+      new THREE.CircleGeometry(5.5, 64),
       new THREE.MeshStandardMaterial({ color: 0x1d171a, roughness: 0.96 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.005;
+    floor.receiveShadow = true;
     group.add(floor);
 
     // Cozy campfire offset gently behind-right so the pet sits warmly beside it
@@ -389,10 +421,11 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
     // Serene acoustic hall with resonant concentric floor rings (Living Music / Acoustic Spaces)
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(5.2, 64),
-      new THREE.MeshStandardMaterial({ color: 0x161b2c, roughness: 0.42, metalness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: 0x161b2c, roughness: 0.36, metalness: 0.3 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.005;
+    floor.receiveShadow = true;
     group.add(floor);
 
     const rings: { mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; baseR: number }[] = [];
@@ -442,10 +475,11 @@ export function createEnvironment(id: EnvironmentId): EnvironmentInstance {
 
   // Default: "ferro" — Strange Matter reactive magnetic fluid pool!
   const plinth = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.15, 1.22, 0.06, 48),
-    new THREE.MeshStandardMaterial({ color: 0x181e28, roughness: 0.22, metalness: 0.75 }),
+    new THREE.CylinderGeometry(1.15, 1.22, 0.06, 64),
+    new THREE.MeshStandardMaterial({ color: 0x181e28, roughness: 0.2, metalness: 0.78 }),
   );
   plinth.position.y = -0.03;
+  plinth.receiveShadow = true;
   group.add(plinth);
 
   const poolGeo = new THREE.PlaneGeometry(7.2, 7.2, 56, 56);
