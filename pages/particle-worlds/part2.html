@@ -95,7 +95,7 @@
         Stopping at a coarser bottom grid trades away some near-field sharpness, since any
         other bodies sharing a nearby finest-level voxel collapse into that voxel's center of
         mass. At 20,000 bodies, those bottom voxels start out roughly 0.06 units across, almost
-        identical to our softening radius of 0.05, so the grid blurs close pulls by about the
+        identical to the softening radius of 0.05, so the grid blurs close pulls by about the
         same amount softening already does. In a diffuse galaxy where individual flybys barely
         register, that trade-off is practically invisible; for tight planetary systems with
         close gravitational slingshots, you would want exact leaf lists at the bottom.
@@ -143,7 +143,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));  <span class="cm">// Σ
       <!-- ================================================================ -->
       <h2 id="rendering"><span class="kicker">Step 2 · Rendering</span>Drawing without sorting</h2>
       <p>
-        Before testing the octree, we need a way to look at 3D particles cleanly. Normally,
+        Testing the octree first requires a clean way to look at 3D particles. Normally,
         rendering translucent sprites in 3D forces you to sort them by depth on every frame,
         because standard alpha blending depends on draw order: painting a closer translucent
         glow before a farther one produces the wrong color. Sorting hundreds of thousands of
@@ -154,7 +154,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));  <span class="cm">// Σ
         Additive blending sidesteps the sort completely. When particles emit light onto an
         empty background rather than occluding what sits behind them, overlapping glows simply
         add together, and addition is commutative (a + b = b + a). Draw order stops mattering,
-        so we can drop both the depth sort and the depth buffer. For a field of stars, that
+        so both the depth sort and the depth buffer can go. For a field of stars, that
         shortcut also matches reality pretty well: stars shine, and across galactic distances
         they almost never eclipse one another.
       </p>
@@ -196,7 +196,7 @@ atomicAdd(&amp;grid[c + 3], …(m * frac.z * FP_SCALE));  <span class="cm">// Σ
 
       <p>
         This brute-force version opens at 25,000 bodies and caps the slider at 60,000. Even
-        with shared-memory tiling, quadratic scaling still hits hard in 3D, which brings us
+        with shared-memory tiling, quadratic scaling still hits hard in 3D, which leads straight
         back to the octree.
       </p>
 
@@ -333,7 +333,7 @@ com = (n.xyz * n.w - p * myMass) / m;</code></pre>
         <p>
           Scattering particles uniformly across a hemisphere takes a small trick: sampling
           latitude and longitude uniformly crowds points tightly around the north pole.
-          Archimedes handed us the fix roughly 2,200 years ago with his hat-box theorem, which
+          Archimedes supplied the fix roughly 2,200 years ago with his hat-box theorem, which
           shows that a sphere and its surrounding cylinder have equal surface area between any
           two horizontal slices. Picking a uniform height <code>z</code> in <code>[0, R]</code>
           together with a uniform azimuth angle around the circle lands uniformly on the

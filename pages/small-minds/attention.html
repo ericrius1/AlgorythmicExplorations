@@ -44,13 +44,13 @@
         Once a sentence becomes a sequence of embedding vectors, each token sits in isolation: the
         vector for <em>"it"</em> has no idea whether it refers to <em>"cat"</em> or
         <em>"star"</em> five positions earlier. Self-attention solves that by turning every token
-        into three projections — a <strong>Query</strong> (what I am looking for), a
-        <strong>Key</strong> (what I offer), and a <strong>Value</strong> (what information I pass
+        into three projections — a <strong>Query</strong> (what this token is looking for), a
+        <strong>Key</strong> (what it offers), and a <strong>Value</strong> (what information it passes
         along if matched) — and blending earlier values in proportion to how strongly their keys
-        align with my query.
+        align with its query.
       </p>
       <p>
-        Because we are building a language model that predicts the next token, position
+        Because the model under construction predicts the next token, position
         <code>t</code> is only allowed to look backward at positions <code>0..t</code> — never into
         the future. Above, click <strong>next head</strong> to watch different attention heads
         specialize: one locks onto subjects, another tracks local syntax, and another bridges
@@ -104,8 +104,8 @@
         <em>online safe softmax</em>. Each GPU thread keeps its query vector plus three tiny running
         values in on-chip registers: the largest score seen so far <code>m_i</code>, the running
         exponential sum <code>l_i</code>, and the running weighted value vector <code>O_i</code>. As
-        each new key-value arrives, if a larger score appears we simply rescale the accumulated sum
-        by <code>exp(m_old − m_new)</code> and keep going:
+        each new key-value arrives, if a larger score appears the thread simply rescales the accumulated sum
+        by <code>exp(m_old − m_new)</code> and keeps going:
       </p>
       <pre><code>let m_new = max(m_i, score);
 let alpha = exp(m_i - m_new);
@@ -121,12 +121,12 @@ m_i  = m_new;</code></pre>
       ></div>
 
       <p>
-        The readout above isn't a mockup: every time you drag <strong>sequence T</strong>, our
+        The readout above isn't a mockup: every time you drag <strong>sequence T</strong>, the
         actual <code>flash_attn_fwd</code> WGSL compute shader executes on your GPU and checks its
         output against exact naive softmax. The maximum numerical difference sits around
         <code>10⁻⁷</code> (pure floating-point rounding), while VRAM traffic drops from
-        <code>O(T²)</code> down to a single scalar log-sum-exp per query row — which is also all we
-        need to recompute probabilities during the backward pass!
+        <code>O(T²)</code> down to a single scalar log-sum-exp per query row — which is also all the
+        backward pass needs to recompute probabilities!
       </p>
 
       <!-- ================================================================ -->
@@ -154,7 +154,7 @@ m_i  = m_new;</code></pre>
         Try pushing <strong>signal scale</strong> to <code>6×</code> with RMSNorm on: columns 2 and
         3 don't even flinch. Now click <strong>RMSNorm: OFF</strong> and watch the downstream
         activations explode off the rails. With tiled SGEMM, RoPE, FlashAttention, RMSNorm, and
-        SwiGLU all running in WGSL, we have the complete forward pass of a modern LLM. Time to send
+        SwiGLU all running in WGSL, the complete forward pass of a modern LLM is in place. Time to send
         gradients backward and teach the weights to speak in
         <a href="/pages/small-minds/training.html">Part 3: Teaching the Weights</a>.
       </p>

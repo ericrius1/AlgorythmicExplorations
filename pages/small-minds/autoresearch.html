@@ -59,8 +59,8 @@
       </p>
       <p>
         Second, if memory bandwidth is the bottleneck, ship fewer bits across the wire. Instead of
-        storing every weight as a 32-bit float, we chop each row into groups of 32 weights, record
-        one shared float scale per group, and pack <strong>four INT8 bytes</strong> or
+        storing every weight as a 32-bit float, the quantizer chops each row into groups of 32 weights,
+        records one shared float scale per group, and packs <strong>four INT8 bytes</strong> or
         <strong>eight INT4 nibbles</strong> into a single <code>u32</code> word. Inside the WGSL
         decode shader, each thread loads one <code>u32</code>, unpacks 8 weights in registers with
         bit shifts, multiplies by the group scale, and accumulates — cutting VRAM bandwidth by
@@ -88,14 +88,14 @@ acc = fma(w, x[col + lane], acc);</code></pre>
       <h2 id="autoresearch"><span class="kicker">Step 2 · The research loop</span>Autoresearch inside the browser</h2>
       <p>
         Once a full training run on your browser GPU takes less than a second, something remarkable
-        becomes possible. Inspired by Andrej Karpathy's <em>autoresearch</em>, we can hand the
-        steering wheel to an automated research loop right inside the tab:
+        becomes possible. Inspired by Andrej Karpathy's <em>autoresearch</em>, the steering wheel can be
+        handed to an automated research loop right inside the tab:
       </p>
       <ol>
         <li>Start from a baseline Transformer genome and measure its held-out validation <strong>bits per byte (val_bpb)</strong>.</li>
         <li>Propose one concrete scientific mutation — switching GeGLU to SwiGLU, testing Muon against AdamW, adding cosine warmdown, adjusting RoPE frequency base <code>θ</code>, widening <code>dModel</code>, or expanding the FFN ratio.</li>
         <li>Allocate a fresh pure-WebGPU model, train it for the exact same fixed step budget, and grade it on held-out validation tokens.</li>
-        <li>If <code>val_bpb</code> drops, <strong>commit</strong> the new genome as the frontier; if it regresses, <strong>revert</strong> and log what we learned.</li>
+        <li>If <code>val_bpb</code> drops, <strong>commit</strong> the new genome as the frontier; if it regresses, <strong>revert</strong> and log what was learned.</li>
       </ol>
       <p>
         Below, that exact loop runs live on your GPU. Pick a search strategy — greedy
@@ -132,10 +132,10 @@ acc = fma(w, x[col + lane], acc);</code></pre>
       <!-- ================================================================ -->
       <h2 id="bridge"><span class="kicker">Step 3 · From lab to life</span>What if a creature ran this loop in its sleep?</h2>
       <p>
-        Everything we built across Parts 1 through 4 now fits in a few hundred kilobytes of
+        Everything built across Parts 1 through 4 now fits in a few hundred kilobytes of
         TypeScript and WGSL: tiled GPU math, FlashAttention, live on-device backpropagation, fast
-        decoding, and an autonomous self-improvement loop. What happens when we give that brain a
-        body, an episodic memory, a trick-learning policy, and a cozy 3D world — and let it run
+        decoding, and an autonomous self-improvement loop. What happens when that brain gets a
+        body, an episodic memory, a trick-learning policy, and a cozy 3D world — and is left to run
         autoresearch cycles while it dreams?
       </p>
       <p>

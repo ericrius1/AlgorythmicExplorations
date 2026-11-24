@@ -53,7 +53,7 @@
         sky.
       </p>
       <p>
-        Trying to simulate that with our earlier tools runs into trouble immediately. Part
+        Simulating that with the earlier tools runs into trouble immediately. Part
         one's mass pyramid earns its speedup by lumping distant clusters together, and a
         nearly uniform early universe doesn't have clusters to lump yet. Part three's sorted
         grid only works when forces cut off at a short radius, whereas gravity reaches across
@@ -163,7 +163,7 @@
         back on <code>−k² sin(kx)</code>, the exact same wave multiplied by <code>−k²</code>.
         Because sine waves keep their shape under the Laplacian, solving Poisson's equation
         for a single wave means dividing its amplitude by <code>−k²</code>. And because the
-        equation is linear, we can decompose any lumpy density into waves, divide each wave
+        equation is linear, the solver can decompose any lumpy density into waves, divide each wave
         independently by its own <code>−k²</code>, and add the pieces back together. Those
         262,144 coupled grid equations collapse into 262,144 independent divisions.
       </p>
@@ -225,7 +225,7 @@ potential = inverse_fft2d(spectrum);  <span class="cm">// return to the mesh</sp
       ></div>
 
       <p>
-        Across this series, every speedup has come from changing how we organize the data
+        Across this series, every speedup has come from changing how the data is organized
         before doing the math. Part one built a tree to summarize distant clusters; part
         three sorted particles so physical neighbors sat beside each other in memory; here
         the Fourier transform rewrites density in a basis where the Laplacian acts one mode
@@ -239,7 +239,7 @@ potential = inverse_fft2d(spectrum);  <span class="cm">// return to the mesh</sp
         discrete Fourier transform straight from its definition sums over all <code>n</code>
         inputs for each of the <code>n</code> outputs, landing right back at
         <code>O(n²)</code>. Doing a 512×512 transform by brute force would mean 262,144²
-        complex multiply-adds (nearly 69 billion operations for a single pass), and our
+        complex multiply-adds (nearly 69 billion operations for a single pass), and the
         cosmology demo needs forward and inverse transforms twice per frame.
       </p>
       <p>
@@ -305,7 +305,7 @@ potential = inverse_fft2d(spectrum);  <span class="cm">// return to the mesh</sp
       <!-- ================================================================ -->
       <h2 id="particle-mesh"><span class="kicker">Step 5 · Particle-mesh</span>Bridging particles and the mesh</h2>
       <p>
-        Our Poisson solver speaks in grid cells, while our universe is made of moving
+        The Poisson solver speaks in grid cells, while the simulated universe is made of moving
         particles. Connecting the two gives the classic <em>particle-mesh</em> (PM) loop:
       </p>
       <pre><code>deposit:   spread each particle's mass onto the mesh    <span class="cm">// particles → field</span>
@@ -325,7 +325,7 @@ kick and drift, wrap through periodic walls, repeat</code></pre>
         its mass transfers smoothly from one cell to the next.
       </p>
       <p>
-        When gathering forces back onto the particles, we have to use those exact same four
+        Gathering forces back onto the particles has to use those exact same four
         bilinear weights. Mixing one deposit scheme with a different gather scheme makes a
         particle exert a spurious net force on itself, breaking momentum conservation. Drag
         the four orange particles below and switch between <em>CIC — split over 4 cells</em>
@@ -378,7 +378,7 @@ kick and drift, wrap through periodic walls, repeat</code></pre>
         at seed time: fill a grid with Gaussian white noise, FFT it, shape every Fourier
         mode to match the desired power spectrum, divide by <code>k²</code> to turn density
         ripples into a displacement field, and transform back. Rather than tossing particles
-        down randomly (which would inject unwanted shot noise), we start them on a clean
+        down randomly (which would inject unwanted shot noise), the setup starts them on a clean
         regular lattice and nudge every particle along that displacement field with a
         matching initial momentum.
       </p>
@@ -403,7 +403,7 @@ kick and drift, wrap through periodic walls, repeat</code></pre>
         steps, leaving the deposit, FFT, and gather shaders completely untouched.
       </p>
       <p>
-        Our clock advances in equal steps of <code>ln a</code> from <code>a = 0.02</code>
+        The simulation clock advances in equal steps of <code>ln a</code> from <code>a = 0.02</code>
         (redshift <code>z = 49</code>, when the universe was 2% of its present size) up to
         <code>a = 1</code> (today). Because the run starts long after the microwave
         background was emitted, the initial ripples have already had time to grow beyond
@@ -426,7 +426,7 @@ kick and drift, wrap through periodic walls, repeat</code></pre>
         emerges later and more delicately. The <em>tilt n</em> slider tunes the balance
         between long and short waves (<code>P(k) ∝ kⁿ</code>): negative values favor a few
         sweeping filaments, while positive values break the box into a fine foam of tiny
-        clumps. Planck pinned down both numbers for our actual universe (<code>σ₈ ≈ 0.81</code>
+        clumps. Planck pinned down both numbers for the real universe (<code>σ₈ ≈ 0.81</code>
         and primordial spectral tilt <code>nₛ ≈ 0.965</code>), two of the six parameters in
         the standard ΛCDM cosmological model. The <em>particles</em> slider steps from
         65,536 up to 1,048,576, and <em>big bang again</em> draws a fresh random seed.
@@ -453,7 +453,7 @@ kick and drift, wrap through periodic walls, repeat</code></pre>
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>Three ways around n²</h2>
       <p>
-        Over five parts, we have knocked down the same <code>O(n²)</code> wall in three
+        Over five parts, the series has knocked down the same <code>O(n²)</code> wall in three
         completely different ways. Part one's mass pyramid summarized space hierarchically so
         distant clusters could be read in <code>O(log n)</code> steps, putting resolution
         wherever matter piled up. Part three's counting sort rearranged memory so physically

@@ -47,15 +47,15 @@
         sixty frames a second. The physics from
         <a href="/pages/strange-matter/ferro.html">Part 1</a> and
         <a href="/pages/strange-matter/crown.html">Part 2</a> carries straight over, and the
-        magnetic dipole formulas actually get cleaner in 3D than our 2D cross-section workaround.
+        magnetic dipole formulas actually get cleaner in 3D than the 2D cross-section workaround.
         Almost everything surrounding the math gets harder: neighbor loops explode cubically,
         hardware alpha-blending disappears because GPUs cannot blend particle quads into a 3D
         volume texture, and turning that volume into glossy spikes forces a choice between
         competing surface extractors.
       </p>
       <p>
-        In this final part, we lift the entire magnetized pool into a 3D dish, splat its density
-        into a 128³ voxel volume using fixed-point integer atomics, and pit three real-time
+        This final part lifts the entire magnetized pool into a 3D dish, splats its density
+        into a 128³ voxel volume using fixed-point integer atomics, and pits three real-time
         meshing algorithms against one another on the exact same scalar field: marching
         tetrahedra, surface nets, and dual contouring. Swap between them on a live crown and you
         can watch triangle counts, surface smoothness, and spike tips change immediately.
@@ -64,7 +64,7 @@
       <!-- ================================================================ -->
       <h2 id="neighbours"><span class="kicker">Step 1 · Scaling costs</span>One more dimension</h2>
       <p>
-        The first wall you hit in 3D is the neighbor search. Our spatial sorting grid shifts from
+        The first wall you hit in 3D is the neighbor search. The spatial sorting grid shifts from
         256² cells to 64³, and checking a single cell radius now means visiting a 3 × 3 × 3 cube
         of 27 cells instead of a 3 × 3 square of 9. The GPU counting sort keeps the same
         histogram, prefix scan, and scatter layout from
@@ -90,7 +90,7 @@ for (var dz = -reach; dz &lt;= reach; dz++) {
         a hurry because dipole fields reach much farther. Part 2 summed magnetic pairs out to six
         kernel radii, which was a 13 × 13 square in 2D. Cube that reach in 3D and every particle
         would have to inspect 2,197 cells per pass; even four radii costs 729. To keep things
-        interactive, I trim the magnetic reach to three radii: 343 cells and roughly 900 neighbors
+        interactive, the solver trims the magnetic reach to three radii: 343 cells and roughly 900 neighbors
         deep inside the bulk. Because the near-field attraction that pulls particles into vertical
         columns lives mostly inside two kernel radii, that cutoff preserves spike formation while
         discarding the long tail of side-by-side repulsion between distant peaks. It is a real
@@ -112,7 +112,7 @@ for (var dz = -reach; dz &lt;= reach; dz++) {
       <p>
         For once, moving up a dimension simplifies the physics code. Huang, Hädrich, and Michels
         originally derived their smoothed dipole in three dimensions back in 2019, and Part 2 had
-        to adapt it into 2D line dipoles for our vertical slice. In a full 3D dish, every
+        to adapt it into 2D line dipoles for its vertical slice. In a full 3D dish, every
         particle carries a 3D magnetic moment and every neighbor contributes the original
         spherical solution: the SPH kernel W, its average W̄ over a ball of radius r, and the
         classic 1/3 self-field factor for a sphere.
@@ -120,7 +120,7 @@ for (var dz = -reach; dz &lt;= reach; dz++) {
       <p>
         With a full horizontal surface to play with, spikes can sprout anywhere across the floor
         rather than lining up in a single row. In a broad laboratory dish they settle into a tidy
-        hexagonal pattern; in our compact, shallow dish you get several bustling rows of peaks
+        hexagonal pattern; in this compact, shallow dish you get several bustling rows of peaks
         constantly nudging each other for space. Just as in Part 2, the uniform vertical field has
         zero gradient and pulls on nothing by itself, doing its work strictly by magnetizing the
         particles so their mutual dipole forces organize the spikes. Hovering your cursor over the
@@ -138,7 +138,7 @@ for (var dz = -reach; dz &lt;= reach; dz++) {
         its weight into every touched cell.
       </p>
       <p>
-        Our density grid measures 128 × 128 × 128, roughly two million voxels occupying eight
+        The density grid measures 128 × 128 × 128, roughly two million voxels occupying eight
         megabytes. Fitting that volume tightly around the dish instead of the entire simulation
         box shrinks each voxel down to 0.0075 world units, about half a particle spacing. Because
         a particle's splat radius spans roughly five voxels in each direction, every frame triggers
@@ -166,7 +166,7 @@ let density = f32(field[voxel]) / 256.0;</code></pre>
       <!-- ================================================================ -->
       <h2 id="tets"><span class="kicker">Step 4 · Triangles from a field</span>Marching tetrahedra</h2>
       <p>
-        Now we have a scalar density sitting at every voxel corner, an invisible threshold surface
+        At this point there is a scalar density sitting at every voxel corner, an invisible threshold surface
         threading between them, and a rasterizer waiting for triangles. Since 1987 the textbook
         tool has been <em>marching cubes</em>: inspect every 2 × 2 × 2 cube of corners, classify
         each of the eight corners as inside or outside, and index into a 256-entry lookup table
@@ -254,8 +254,8 @@ let density = f32(field[voxel]) / 256.0;</code></pre>
       <p>
         <em>Dual contouring</em> (Ju, Losasso, Schaefer, and Warren, 2002) keeps the exact same
         one-vertex-per-cell connectivity as surface nets, while using one extra clue the density
-        volume already holds: its gradient. At every edge crossing we know both where the surface
-        passes and which direction it faces, giving us a point and a normal, which together define
+        volume already holds: its gradient. Every edge crossing reveals both where the surface
+        passes and which direction it faces, yielding a point and a normal, which together define
         a local tangent plane (often called Hermite data). Dual contouring moves the cell's vertex
         to the spot that minimizes squared distance to all of the cell's tangent planes at once.
         On a flat flank those planes all agree and the vertex stays near the mass point; inside a
@@ -287,7 +287,7 @@ for (var it = 0u; it &lt; 10u; it++) {
         <p>
           Dual contouring has a famous Achilles' heel: when surface normals get noisy, nearly
           parallel tangent planes can intersect far outside their voxel, causing quads to pinch
-          and fold over themselves. Because our normals come from a density grid re-splatted by
+          and fold over themselves. Because these normals come from a density grid re-splatted by
           thousands of moving particles every frame, they always carry a faint jitter. Clamping
           vertices to their cell prevents wild spikes, and backing <em>sharpness</em> slightly
           below 1 trades a sliver of tip crispness for a calmer reflection. Offline QEF solvers
@@ -300,7 +300,7 @@ for (var it = 0u; it &lt; 10u; it++) {
       <h2 id="dish"><span class="kicker">Step 7 · Assembly</span>The dish</h2>
       <p>
         The full 3D workbench below steps 28,000 particles and exposes every simulation and
-        meshing parameter at once. Its shading mirrors our 2D setup in three dimensions: the base
+        meshing parameter at once. Its shading carries the 2D setup into three dimensions: the base
         ferrofluid color is near-black, lit almost entirely by a virtual studio overhead softbox,
         warm and cool side light strips, and a crisp point highlight catching the crest of each
         spike, finished with bloom and filmic tone mapping.
@@ -322,7 +322,7 @@ for (var it = 0u; it &lt; 10u; it++) {
         particles, whereas higher values shrink the surface tight around each cluster, which is
         where the extractors diverge most visibly. Zooming in on a single peak and flipping
         <em>extract</em> between <em>surface nets</em> and <em>dual contouring</em> while sliding
-        <em>sharpness</em> shows the vertex tug in action; at 28,000 particles our spikes are
+        <em>sharpness</em> shows the vertex tug in action; at 28,000 particles the spikes are
         still fairly rounded to begin with, so the shift is only a voxel or so at each crest, yet
         you can watch the specular pin highlight tighten as the tip pulls upward. Switching
         <em>view</em> to <em>particles</em> during a full crown reveals the brightest magnetized
@@ -336,7 +336,7 @@ for (var it = 0u; it &lt; 10u; it++) {
         Next to the offline 2022 KAUST simulator, this 3D dish is still a lightweight sketch. The
         reference paper solves pressure implicitly, integrates overlapping dipole forces exactly,
         sums magnetic fields over all pairs rather than truncating at three kernel radii, and
-        spends seconds rendering a single frame. Our WebGPU version keeps every stage resident on
+        spends seconds rendering a single frame. The WebGPU version here keeps every stage resident on
         one GPU at interactive speed: grid sort, warm-started magnetization, current-loop pair
         forces, fixed-point volume splat, indirect-drawn surface extraction, and studio shading.
         The CPU writes a few hundred bytes of uniforms per frame and never waits on a single

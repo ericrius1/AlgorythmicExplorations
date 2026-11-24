@@ -94,8 +94,8 @@
         Dragging your cursor through the pile stirs the grains near the pointer, still paying
         for two million pair checks underneath. A Barnes–Hut tree offers no help here either:
         summarizing distant regions is pointless when distant particles contribute exactly
-        zero. What we need is a spatial structure that answers "who sits right next to me?"
-        and skips the rest of the box completely.
+        zero. The job calls for a spatial structure that answers "who sits right next to this
+        particle?" and skips the rest of the box completely.
       </p>
 
       <!-- ================================================================ -->
@@ -168,7 +168,7 @@ function testNeighbors(i) {
         variable-length memory allocation, pointer chasing, and a write head that depends on
         who appended just ahead of you. Running thousands of GPU threads into shared lists
         serializes them right back down. Just as part one replaced pointer quadtrees with index
-        arithmetic, we can replace per-cell lists on the GPU with a sort.
+        arithmetic, a sort can replace per-cell lists on the GPU.
       </p>
 
       <!-- ================================================================ -->
@@ -176,11 +176,11 @@ function testNeighbors(i) {
       <p>
         All the 3×3 neighbor loop really asks for is that every cell's particles sit together
         in memory alongside the index where each cell's slice begins. Sorting the particle
-        array by cell ID hands us exactly that: every cell becomes one contiguous run inside a
+        array by cell ID delivers exactly that: every cell becomes one contiguous run inside a
         single flat buffer, with zero pointers.
       </p>
       <p>
-        Because cell IDs are small integers, we can sort them in linear time without comparing
+        Because cell IDs are small integers, they can be sorted in linear time without comparing
         any two particles against each other using <em>counting sort</em>. First, tally a
         histogram of how many particles fell into each cell. Second, compute the running sum of
         counts ahead of every cell so each cell knows where its slice starts. Third, drop every
@@ -261,7 +261,7 @@ for (const p of particles) {
         <p>
           Parallel prefix sum grew out of hardware history too. Hillis and Steele wrote their
           algorithm for the Connection Machine, a massively parallel supercomputer with 65,536
-          one-bit processors (coincidentally the exact number of cells in our 256×256 GPU grid
+          one-bit processors (coincidentally the exact number of cells in the 256×256 GPU grid
           below). Peter Kogge and Harold Stone had already introduced the same doubling tree in
           1973 for solving recurrences and designing fast carry-lookahead adders.
         </p>
@@ -277,7 +277,7 @@ for (const p of particles) {
         <summary>The scan as three GPU dispatches</summary>
         <div class="fold-body">
           <p>
-            Scanning all 65,536 cells of our 256×256 grid breaks cleanly into three WebGPU
+            Scanning all 65,536 cells of the 256×256 grid breaks cleanly into three WebGPU
             dispatches. First, 256 workgroups of 256 threads each run an in-shared-memory scan
             over their own 256-cell block and write out their block totals. Second, a single
             workgroup scans those 256 block totals. Third, every cell adds its block's scanned
@@ -406,13 +406,13 @@ fn scatter(@builtin(global_invocation_id) gid: vec3u) {
       <p>
         Dry sand grains only push when their hard rims touch. Water behaves differently: it
         resists compression throughout the entire volume, even deep inside a calm pool. To get
-        fluid waves and splashing out of the same sorted grid, we switch the force kernel to
+        fluid waves and splashing out of the same sorted grid, the force kernel switches to
         <em>smoothed particle hydrodynamics</em> (SPH). Instead of treating each particle as a
         tiny billiard ball, SPH treats it as a soft, overlapping kernel of fluid of radius
         <em>h</em>. Summing the kernel weights of nearby neighbors gives the local density at
         every particle; regions packed above rest density push outward, while sparse regions
         draw inward. Pressure turns out to be one more short-range pairwise force, dropping
-        straight into our existing 3×3 cell search.
+        straight into the existing 3×3 cell search.
       </p>
       <pre><code><span class="cm">// pass 1, density: how crowded is each particle?</span>
 ρ_i = Σ over neighbors j:  (1 − r/h)²
@@ -501,7 +501,7 @@ acc -= r̂ · (P_i + P_j)/2 · (1 − r/h)</code></pre>
         is the workhorse that makes that rearrangement possible without serial bottlenecks.
       </p>
       <p>
-        Notice too how sharply the physics shaped our data structures across these first three
+        Notice too how sharply the physics shaped the data structures across these first three
         parts. Gravity demanded a multi-scale pyramid because distant clusters still pull in
         aggregate, whereas sand and water demanded flat local buckets because anything past
         radius <em>h</em> drops to zero. Extending this grid to 3D folds one more coordinate

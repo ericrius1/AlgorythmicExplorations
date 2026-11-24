@@ -283,7 +283,7 @@ const gain = BANDS.map((_, b) =&gt; {
       <p>
         Every room model up to now has assumed a single microphone floating in space. Human
         hearing runs on two ears roughly 17.5 cm apart with a solid skull between them, and
-        back in 1907 Lord Rayleigh figured out that we rely on two distinct physical cues to
+        back in 1907 Lord Rayleigh figured out that listeners rely on two distinct physical cues to
         place a sound, a framework still called the <em>duplex theory</em>. Low frequencies have
         wavelengths far longer than a head, so they bend right around it; what tells your
         brain left from right is the tiny head start the closer ear gets. High frequencies have
@@ -346,7 +346,7 @@ const gain = BANDS.map((_, b) =&gt; {
         spectrum by |<em>H</em>|<sup><em>n</em></sup>, so even modest peaks pull exponentially
         ahead of everything else. The demo below runs 32 generations of FFT convolution at 24 kHz,
         rolling off below 70 Hz and above 7 kHz on each pass to mimic a real loudspeaker and
-        microphone. Since I don't have Lucier's original tape to ship in the browser, the input
+        microphone. Since Lucier's original tape can't ship in the browser, the input
         is a seven-syllable vowel phrase from the same formant synthesizer used earlier. Each
         horizontal row of the waterfall displays one generation's spectrum from top (generation 0)
         down to generation 32.
@@ -368,7 +368,7 @@ const gain = BANDS.map((_, b) =&gt; {
         in the first place and on where the speaker and microphone happen to sit. Above the
         Schroeder frequency, a room's frequency response is a jagged thicket of interference
         peaks that reshuffle if you shift a microphone by a few centimeters. That happens in
-        physical rooms and in our random-phase tail alike, meaning the chord you uncover belongs
+        physical rooms and in this simulation's random-phase tail alike, meaning the chord you uncover belongs
         just as much to the exact pair of positions as it does to the architecture.
       </p>
 

@@ -66,7 +66,7 @@
       <!-- ================================================================ -->
       <h2 id="collisionless"><span class="kicker">Step 1 · No surfaces</span>Why gravity alone stays ghostly</h2>
       <p>
-        Back in part one, we added <em>softening</em> to gravity so two bodies passing right
+        Back in part one, <em>softening</em> was added to gravity so two bodies passing right
         over each other wouldn't divide by zero and fling off to infinity. Softening also
         sneaks in a physical assumption: particles have no solid surface. Once two bodies
         get inside the softening radius, the pull tapers off and they glide straight through
@@ -113,8 +113,8 @@
       <p>
         <em>Spatial hashing</em> keeps the fixed-size cells and throws away the walls. Each
         cell is still just a pair of integer coordinates, column and row, anywhere across
-        the entire plane. Instead of indexing directly into a 2D array, we hash those two
-        integers into a fixed table of buckets:
+        the entire plane. Instead of indexing directly into a 2D array, the code hashes those
+        two integers into a fixed table of buckets:
       </p>
       <pre><code>fn bucketOf(c: vec2i) -&gt; u32 {
   let h = (u32(c.x) * 0x9E3779B1u) ^ (u32(c.y) * 0x85EBCA77u);
@@ -178,7 +178,7 @@
       </p>
       <p>
         You could sort the mass array alongside the positions and velocities, turning it
-        into a key–value sort with one more buffer to shuffle. Instead, I changed the
+        into a key–value sort with one more buffer to shuffle. Instead, this page changes the
         problem: <strong>every dust grain gets the same mass</strong>. Uniform grains are
         plenty for a dust disk, and if every particle weighs the same, permuting the buffer
         has zero effect on gravity. The mass array disappears completely, and the pyramid
@@ -276,7 +276,7 @@ acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: bleed off p
           Isaac Newton measured bounciness for the <em>Principia</em> by swinging pairs of
           pendulums made of different materials into each other and recording what fraction
           of their closing speed survived impact: around 5/9 for tightly wound wool, and
-          around 15/16 for glass. Today we call that ratio the coefficient of restitution,
+          around 15/16 for glass. Today that ratio is called the coefficient of restitution,
           and turning up <em>stickiness</em> turns it down.
         </p>
         <p>
@@ -323,10 +323,10 @@ acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: bleed off p
           up smaller neighbors, as <em>oligarchic growth</em>, a term coined in Eiichiro
           Kokubo and Shigeru Ida's 1998 simulations. Their runs tracked up to 4,000
           planetesimals using dedicated gravity hardware from the same Tokyo GRAPE project
-          we met in part one. On a modern laptop GPU, the slider above handles 150,000.
+          featured in part one. On a modern laptop GPU, the slider above handles 150,000.
         </p>
         <p>
-          Saturn's A ring performs a live version of this tug-of-war right in our backyard.
+          Saturn's A ring performs a live version of this tug-of-war right in the solar system's backyard.
           Its ice particles keep trying to clump under self-gravity while orbital shear
           keeps pulling the clumps apart. The Cassini spacecraft spotted both sides of the
           balance: fleeting diagonal bands called <em>self-gravity wakes</em>, looking much
@@ -349,11 +349,11 @@ acc -= nrm * vn * P.damping;            <span class="cm">// dashpot: bleed off p
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>How two structures stay out of each other's way</h2>
       <p>
-        What surprised me most while building this page is how little the two halves had to
+        The most surprising thing about building this page is how little the two halves had to
         know about each other. The gravity pyramid and the spatial hash never share a cell
         size, never share an indexing scheme, and never even communicate; one answers "what
         does everything far away add up to?" while the other answers "what is pressing
-        against me right now?", and the force kernel simply sums the two vectors. Getting
+        against this grain right now?", and the force kernel simply sums the two vectors. Getting
         them to coexist cleanly came down to removing a conflict in the data itself: giving
         every grain the same mass made the sort's shuffling invisible to gravity, deleting an
         entire bookkeeping pass in the process. And on the physics side, all the machinery

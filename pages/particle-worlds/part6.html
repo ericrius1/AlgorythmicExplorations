@@ -44,9 +44,9 @@
 
     <main>
       <p>
-        For five parts we have been chasing physical models: orbits, galaxies, sloshing
-        water, accreting dust, and the cosmic web. For this finale, we are throwing away
-        physical units and building an instrument. Every parameter in the glowing cloud
+        For five parts the series has been chasing physical models: orbits, galaxies, sloshing
+        water, accreting dust, and the cosmic web. This finale throws away physical units
+        and builds an instrument instead. Every parameter in the glowing cloud
         above (drag, buoyancy, trail length, color stops) was picked purely by eye until it
         felt satisfying to swirl around.
       </p>
@@ -54,7 +54,7 @@
         Visual effects artists call this <em>art direction</em>, and it turns out almost all
         of the numerical machinery from the earlier essays stays useful when your goal is
         expressive motion. Under the paint sits a real 3D fluid solver driven by the exact
-        same Poisson equation we just solved for cosmology, paired with curl noise,
+        same Poisson equation just solved for cosmology, paired with curl noise,
         hundreds of thousands of lightweight tracers, and an optional webcam hand tracker
         running straight on your GPU.
       </p>
@@ -69,12 +69,12 @@
         <em>incompressibility</em>, and enforcing it brings back a familiar equation.
       </p>
       <p>
-        In part five we solved <code>∇²φ = 4πGρ</code> to turn mass density into
+        Part five solved <code>∇²φ = 4πGρ</code> to turn mass density into
         gravitational potential. Fluids use the exact same differential equation with
         pressure in place of gravity. After you stir a velocity field <code>u</code>, add
         wind, or let it coast forward, the resulting field picks up regions where flow
         converges into a sink or bursts out of a source. Incompressible flow requires the
-        divergence <code>∇·u</code> to be zero everywhere, so we solve for a scalar pressure
+        divergence <code>∇·u</code> to be zero everywhere, so the solver finds a scalar pressure
         field <code>p</code> whose gradient cancels out every source and sink:
       </p>
       <pre><code>∇²p = ∇·u        <span class="cm">// find the pressure pushing back against pile-ups</span>
@@ -87,7 +87,7 @@ u ← u − ∇p       <span class="cm">// subtract its gradient to restore zero
         The other half of the fluid step carries the velocity field along its own currents,
         a stage called <em>advection</em>. Pushing values forward from each cell along its
         velocity vector tends to overshoot and explode whenever speeds get high. Instead,
-        we trace <em>backward</em>: stand at each grid cell, ask where the fluid sitting
+        the solver traces <em>backward</em>: stand at each grid cell, ask where the fluid sitting
         here came from one timestep earlier, and sample the old velocity field at that
         departure point:
       </p>
@@ -117,7 +117,7 @@ u ← u − ∇p       <span class="cm">// subtract its gradient to restore zero
           <p>
             The 3D playground runs on a 64³ grid (262,144 cells) every frame. Part five
             solved its Poisson equation exactly in one shot with an FFT, which relied on
-            periodic wraparound boundaries. Our fluid sits inside a walled cube, so we use
+            periodic wraparound boundaries. This fluid sits inside a walled cube, so it uses
             ten sweeps of Jacobi relaxation instead: on every sweep, each cell averages its
             six 3D neighbors, subtracts the scaled local divergence, and writes the updated
             pressure, starting fresh from zero each frame.
@@ -152,7 +152,7 @@ u ← u − ∇p       <span class="cm">// subtract its gradient to restore zero
       <p>
         In <em>downhill (sinks)</em> mode, every tracer races straight toward the nearest
         peak of the noise and gets trapped there. A gradient field is pure sources and
-        sinks, the exact kind of compression our pressure solver is fighting to eliminate.
+        sinks, the exact kind of compression the pressure solver is fighting to eliminate.
         Rotate that exact same 2D gradient by 90° and flow runs <em>along</em> the contour
         lines instead of climbing them, so fluid circulates in closed eddies with zero
         divergence by construction. In 2D, rotating by 90° is just swapping components and
@@ -163,7 +163,7 @@ u ← u − ∇p       <span class="cm">// subtract its gradient to restore zero
 ∇·(∇ × ψ) = 0    <span class="cm">// the divergence of any curl is identically zero</span></code></pre>
       <p>
         That vector field is <em>curl noise</em>: lively, turbulent motion that never pools
-        and stays divergence-free before the pressure solver even runs. Our playground adds
+        and stays divergence-free before the pressure solver even runs. The playground adds
         a slowly drifting curl-noise force to the 64³ grid every frame, giving the volume a
         gentle breathing motion whenever nobody is stirring it. In the WGSL shader, each
         noise gradient is differentiated analytically from the same eight lattice-corner
@@ -249,7 +249,7 @@ u ← u − ∇p       <span class="cm">// subtract its gradient to restore zero
         Inside the playground, each detected hand feeds up to three stirrers into the fluid
         grid. Your palm drives a wide Gaussian push whose strength scales up as you splay
         your fingers open. Your index fingertip drives a tighter, higher-emission brush for
-        sketching crisp ribbons. Finally, we measure how closely your thumb and index tips
+        sketching crisp ribbons. Finally, the tracker measures how closely your thumb and index tips
         meet, normalized by your palm size so the gesture behaves the same whether you sit
         close to the laptop or lean back:
       </p>
@@ -305,7 +305,7 @@ pinch = clamp(1 − |thumb_tip − index_tip| / (1.05 · hand_scale), 0, 1)</cod
         advection for MacCormack or BFECC advection would sharpen the swirling ribbons.
       </p>
       <p>
-        That wraps up Particle Worlds. We started back in part one with two dots falling
+        That wraps up Particle Worlds. The series started back in part one with two dots falling
         toward each other under one line of Newtonian gravity, and almost every hurdle since
         turned out to be a question of data structures: a pointer-free mass pyramid, an
         octree bent over a planetarium dome, a counting sort that lines up physical

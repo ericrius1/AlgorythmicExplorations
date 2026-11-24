@@ -43,7 +43,7 @@
 
     <main>
       <p>
-        Up to now, almost every question we asked about the landscape could be answered
+        Up to now, almost every question the series asked about the landscape could be answered
         directly from coordinates: plug in <code>(x, z)</code> to get elevation, check the
         soil ledger to see if grass takes root. A branching tree resists that kind of local
         lookup. Every limb exists because an older limb reached that neighborhood first, and
@@ -56,7 +56,7 @@
         successive generations. L-systems produce striking botanical symmetry, though pure
         grammars expand blindly from the inside out without sensing nearby branches or open
         sky. Real canopies are sculpted from the outside in by competition for light and
-        room, so here we use an algorithm built around that competition directly:
+        room, so this part uses an algorithm built around that competition directly:
         <em>space colonization</em>.
       </p>
       <p>
@@ -125,7 +125,7 @@
       <h2 id="pipes"><span class="kicker">Step 2 · Thickness</span>The pipe model</h2>
       <p>
         Space colonization leaves behind a wire skeleton of nodes with no thickness. To give
-        each limb realistic taper, we borrow the botanical pipe model: picture a tree as a
+        each limb realistic taper, the generator borrows the botanical pipe model: picture a tree as a
         bundle of narrow straws hauling water from soil to foliage, so every parent limb
         must be wide enough to carry the combined flow of all the branches sprouting past
         it. Leonardo da Vinci noted an early version in his notebooks, observing that the
@@ -134,12 +134,12 @@
         clean recurrence:
       </p>
       <pre><code>radius(tip)    = 0.016
-radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area; I use 2.4</span></code></pre>
+radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area; 2.4 here</span></code></pre>
       <p>
         Setting the exponent <code>E = 2</code> preserves exact cross-sectional area at
         every split. Murray's law for branching blood vessels predicts <code>E = 3</code>,
         and field measurements of real timber usually land between 2 and 3. Using 2.4 gave
-        trunks sturdy enough to balance these crowns visually. Because we append nodes to
+        trunks sturdy enough to balance these crowns visually. Because nodes are appended to
         the array in growth order, every child sits after its parent, so a single reverse
         pass over the array assigns every radius in the tree.
       </p>
@@ -155,9 +155,9 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
       </p>
       <p>
         Every parent-child edge is wrapped in a six-sided bark cylinder whose ring vertices
-        share outward-pointing normals for smooth shading. Because we write all bark tubes
+        share outward-pointing normals for smooth shading. Because all bark tubes go
         into an unindexed vertex buffer strictly in growth order, animating the tree growing
-        from sapling to mature crown takes zero extra simulation: we simply sweep WebGPU's
+        from sapling to mature crown takes zero extra simulation: the renderer simply sweeps WebGPU's
         draw range forward through the existing vertex array.
       </p>
       <p>
@@ -186,8 +186,8 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
         <strong>kill radius</strong> increases fine twig branching.
       </p>
       <p>
-        True light bounce inside a dense leafy canopy would call for path tracing, so we
-        approximate self-shadowing once per vertex when building the mesh. Vertices on the
+        True light bounce inside a dense leafy canopy would call for path tracing, so the builder
+        approximates self-shadowing once per vertex when building the mesh. Vertices on the
         sunward exterior of the crown receive full sunlight and open sky, while leaves
         tucked deep inside or on the shaded backside drop into cool ambient shade. When you
         orbit around to look back toward the sun, sunlit leaves also pick up a yellow-green
@@ -198,7 +198,7 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
       <!-- ================================================================ -->
       <h2 id="grove"><span class="kicker">Step 4 · A grove</span>Six trees, a hundred places</h2>
       <p>
-        For the hero hillside, we grow six distinct trees with varying seeds and 300 to 450
+        For the hero hillside, the scene grows six distinct trees with varying seeds and 300 to 450
         attractors (taking only a few milliseconds apiece), upload each variant as one
         instanced bark mesh and one instanced leaf mesh, and stamp out 104 instances with
         hashed yaws and scales between 0.8 and 1.3. Because human vision mostly reads trees
@@ -211,7 +211,7 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
         and modulated by a slow sine wave so woods cluster into natural groves with open
         clearings between them. Any candidate within 2.6 units of an already accepted tree
         is discarded. That greedy dart-throwing loop works cleanly on a single bounded
-        hillside, though as we will see in part five, it breaks down the moment a world has
+        hillside, though as part five shows, it breaks down the moment a world has
         to be generated piece by piece.
       </p>
       <p>
@@ -242,7 +242,7 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
       <!-- ================================================================ -->
       <h2 id="epilogue"><span class="kicker">Epilogue</span>From saplings to woods</h2>
       <p>
-        Modeling competition for open space gave us organic branching, realistic crown
+        Modeling competition for open space produced organic branching, realistic crown
         silhouettes, and collision-free limbs out of three lines of logic, while a single
         reverse pass of the pipe model handled trunk and branch proportions. Keeping vertex
         buffers ordered by birth round turned growth animation into a free draw-range
@@ -250,10 +250,10 @@ radius(node)ᴱ  = Σ radius(child)ᴱ      <span class="cm">// E = 2 keeps area
         into a full grove for twelve draw calls.
       </p>
       <p>
-        Where I would take this next: sculpt species-specific attractor clouds (narrow
+        Natural next steps: sculpt species-specific attractor clouds (narrow
         cones for spruces, flat umbrellas for acacias), thin out attractors inside terrain
         shadows so hillside trees naturally lean toward open sky, and render distant trees
-        to a handful of billboard impostor cards for far-off ridges. Right now, though, our
+        to a handful of billboard impostor cards for far-off ridges. Right now, though, the
         trees and meadows are still arranged by hand per scene; part five replaces that
         manual choreography with climate rules.
       </p>

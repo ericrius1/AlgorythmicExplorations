@@ -52,8 +52,8 @@
         lap.
       </p>
       <p>
-        Over six parts, we will grow a complete landscape on top of that height function.
-        Here we build the mountains themselves. In part two, simulated rainfall carves them
+        Over six parts, a complete landscape grows on top of that height function.
+        This first part builds the mountains themselves. In part two, simulated rainfall carves them
         until separate hollows link up into drainage networks. Parts three and four add
         wind-blown grass and space-colonized trees, part five sorts out where forests,
         meadows, and bare scree belong, and part six streams chunks in around a flying
@@ -65,7 +65,7 @@
       <p>
         If you assign every point on a grid an independent random height, you get static
         rather than ground. Real terrain is spatially correlated: knowing the elevation
-        under your boots tells you a lot about the elevation three steps away. What we want
+        under your boots tells you a lot about the elevation three steps away. What terrain needs
         is randomness with a smooth transition between samples and a controllable feature
         size.
       </p>
@@ -95,8 +95,8 @@ noise(p)     = the four corners blended by fade(fx) and fade(fy)</code></pre>
         MurmurHash3 finalizer, selecting one of 256 evenly spaced gradient directions.
         Because no lookup table of random floats sits in memory, asking for the elevation at
         <code>(1402, 88)</code> always returns the exact same answer. That guarantee pays
-        off much later: in part six we throw chunks away as they pass behind
-        the camera and rebuild them if you turn around, which only holds together if every
+        off much later: part six throws chunks away as they pass behind
+        the camera and rebuilds them if you turn around, which only holds together if every
         peak comes back identical.
       </p>
       <aside class="note">
@@ -116,7 +116,7 @@ noise(p)     = the four corners blended by fade(fx) and fade(fy)</code></pre>
         A single pass of gradient noise looks like soft rolling dough. Real mountains carry
         structure across orders of magnitude at once, from ridgelines stretching kilometers
         across a horizon down to ankle-high gullies. To reproduce that multi-scale
-        roughness, we evaluate the noise repeatedly at finer and finer frequencies while
+        roughness, the generator evaluates the noise repeatedly at finer and finer frequencies while
         shrinking its amplitude each time, then sum the layers together. Borrowing musical
         terminology, each layer is an octave, and the whole stack is fractional Brownian
         motion, or fBm.
@@ -189,17 +189,17 @@ return sum / norm;                         <span class="cm">// roughly −1 to 1
         no sense of geological grain or flow.
       </p>
       <p>
-        We can break the vertical symmetry inside the octave loop with
-        <strong>ridging</strong>. Taking <code>1 - 2 * Math.abs(n)</code> folds each
+        <strong>Ridging</strong> breaks the vertical symmetry inside the octave loop.
+        Taking <code>1 - 2 * Math.abs(n)</code> folds each
         octave along its zero crossings, turning gentle sign changes into sharp upward
-        creases while keeping valleys rounded. Blending between plain and folded noise lets
-        us dial the effect anywhere from soft hills to alpine spines:
+        creases while keeping valleys rounded. Blending between plain and folded noise
+        dials the effect anywhere from soft hills to alpine spines:
       </p>
       <pre><code>if (ridge &gt; 0) n = lerp(n, 1 - 2 * Math.abs(n), ridge);</code></pre>
       <p>
-        To introduce directional sweep, we bend the coordinate space itself with
-        <strong>domain warping</strong>. Before sampling the main terrain fBm, we evaluate
-        two low-octave noise fields and use them to nudge <code>x</code> and <code>z</code>:
+        Directional sweep comes from bending the coordinate space itself with
+        <strong>domain warping</strong>. Before sampling the main terrain fBm, the function evaluates
+        two low-octave noise fields and uses them to nudge <code>x</code> and <code>z</code>:
       </p>
       <pre><code>qx = fbm(x, z)                               <span class="cm">// 3 octaves, its own seed</span>
 qz = fbm(x, z)                               <span class="cm">// 3 octaves, another seed</span>
@@ -242,7 +242,7 @@ h  = fbm(x + 4·warp·qx,  z + 4·warp·qz)      <span class="cm">// the real te
         Turning the 2D field into a 3D surface starts with a regular grid of triangles whose
         <code>y</code> coordinates come from <code>h(x, z)</code>. One extra shaping step
         sits right at the end of the height function: raw fBm hovers around zero with as
-        much area above the midline as below, so we remap it into <code>[0, 1]</code> and
+        much area above the midline as below, so it gets remapped into <code>[0, 1]</code> and
         raise it to the power 1.6. That power curve flattens out the lower third into broad
         basin floors while pinching the peaks upward. In the real world, valley floors grow
         wide and flat because washed-down sediment fills them in; part two will simulate
@@ -281,7 +281,7 @@ col  = mix(col, snowColor, snow);                         <span class="cm">// sn
         breaks up any remaining contour-line look.
       </p>
       <p>
-        Because the sun stays fixed in these scenes, we can bake the heavier lighting once
+        Because the sun stays fixed in these scenes, the heavier lighting can be baked once
         per vertex during mesh construction. From every vertex, the builder marches across
         the height grid toward the sun and checks how close intervening ridges come to
         blocking the ray, yielding soft terrain self-shadows without maintaining a real-time
@@ -316,9 +316,9 @@ col  = mix(col, snowColor, snow);                         <span class="cm">// sn
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="epilogue"><span class="kicker">Epilogue</span>Where this leaves us</h2>
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>Where this leaves the terrain</h2>
       <p>
-        With one stateless function, we can summon reproducible mountains at any coordinate,
+        One stateless function can summon reproducible mountains at any coordinate,
         stack octaves for multi-scale roughness, break fractal symmetry with ridging, domain
         warping, and a shaping curve, and bake shadows and occlusion once when the vertices
         are built. Everything downstream in this series leans on that contract: a mountain
@@ -326,11 +326,11 @@ col  = mix(col, snowColor, snow);                         <span class="cm">// sn
         whenever you ask for it.
       </p>
       <p>
-        If I were pushing this stage further, I would move height evaluation into a GPU
-        compute shader to build meshes off the main thread, compute analytic noise
-        derivatives instead of finite-difference normals, and try Quilez's derivative-damped
+        Pushing this stage further would mean moving height evaluation into a GPU
+        compute shader to build meshes off the main thread, computing analytic noise
+        derivatives instead of finite-difference normals, and trying Quilez's derivative-damped
         fBm, which quiets high-frequency octaves on steep slopes and fakes weathered rock
-        surprisingly well without running a drop of water. First, though, let's see what
+        surprisingly well without running a drop of water. First, though, the next part finds out what
         happens when real simulated rain gets a turn at these peaks.
       </p>
       <p class="continue">

@@ -45,10 +45,10 @@
 
     <main>
       <p>
-        Across all six parts of the
-        <a href="/pages/particle-worlds/part1.html">Particle Worlds</a> series, I simulated
+        The six parts of the
+        <a href="/pages/particle-worlds/part1.html">Particle Worlds</a> series simulate
         gravity, sand, water, swirling dust, a slice of the cosmic web, and an interactive
-        fluid instrument without ever simulating light. Every bright spot in those demos was
+        fluid instrument, yet not one of them ever simulates light. Every bright spot in those demos was
         just additive paint: particles carrying their own color, stacked onto a buffer and
         tone-mapped afterward. When the core of a galaxy flared up in part one, its spiral
         arms felt none of that light.
@@ -69,8 +69,8 @@
       <!-- ================================================================ -->
       <h2 id="wax"><span class="kicker">Step 1 · One number per particle</span>Wax with a temperature</h2>
       <p>
-        Underneath the glow sits the same smoothed-particle hydrodynamics (SPH) solver I
-        wrote for water in
+        Underneath the glow sits the same smoothed-particle hydrodynamics (SPH) solver
+        written for water in
         <a href="/pages/particle-worlds/part3.html">Sorting Water</a>. Particles get binned
         into a uniform spatial grid, each one sums its neighbors with a smooth falloff
         kernel to estimate local density, and pressure pushes particles apart wherever they
@@ -92,8 +92,8 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// proxy for the surroundi
         expansion: a hot pocket wants fewer neighbors per unit area, so it pushes outward
         and swells as it heats up. The second line is an even bigger shortcut. In a real
         lamp, wax floats inside clear liquid, and buoyancy is that surrounding fluid pushing
-        lighter wax upward. Rather than simulating a second fluid, I apply an upward force
-        proportional to temperature and use velocity damping to stand in for the water's
+        lighter wax upward. Rather than simulating a second fluid, the solver applies an upward force
+        proportional to temperature and uses velocity damping to stand in for the water's
         viscous drag. Cold wax sinks, hot wax rises, and the damping keeps everything moving
         at that sleepy lava-lamp pace.
       </p>
@@ -101,7 +101,7 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// proxy for the surroundi
         Left with only pressure and buoyancy, though, a rising plume shreds into wispy
         streamers. Pressure resists crowding, yet nothing pulls separated particles back
         together. Real wax beads up because the interface between wax and water carries
-        surface tension. To imitate that at the particle level, I add a pairwise cohesion
+        surface tension. To imitate that at the particle level, the solver adds a pairwise cohesion
         force that attracts neighbors at medium range and repels them up close. Thin necks
         now pinch off cleanly, small droplets coalesce into larger ones, and floating blobs
         round themselves out. You can zero out the <em>surface tension</em> slider in the
@@ -135,7 +135,7 @@ acc.y += buoyancy·T_i − gravity   <span class="cm">// proxy for the surroundi
       <p>
         Even with 9,000 particles, summing individual bumps still leaves slight lumpiness at
         the scale of single particles, which a sharp threshold turns into scalloped edges.
-        Before extracting the surface, I run a separable Gaussian blur across the field (one
+        Before the surface is extracted, a separable Gaussian blur runs across the field (one
         horizontal pass and one vertical pass, nine taps each) so the contours stay glassy
         and smooth.
       </p>
@@ -316,10 +316,10 @@ cascade 2:  probes every 8 px,  64 rays each,  covering  20 →  84 px
         Matching the sampling structure to the signal is what made that affordable here.
         Near light changes sharply in space, far light changes sharply in angle, and keeping
         the cascades on a coarse grid while redrawing geometry edges at full canvas
-        resolution hides the low-res lighting almost completely. If I came back to polish
-        this lamp further, I would tint the liquid so light picks up color as it travels,
-        add refraction along the glass walls, and replace the temperature-buoyancy shortcut
-        with a true two-fluid sim. First, though, I want to see how far these same 2D
+        resolution hides the low-res lighting almost completely. A further polish of
+        this lamp would tint the liquid so light picks up color as it travels, add
+        refraction along the glass walls, and replace the temperature-buoyancy shortcut
+        with a true two-fluid sim. First, though, the next part tests how far these same 2D
         cascades can stretch when a scene fills up with thousands of moving lights, bouncing
         wall colors, and an open sky.
       </p>

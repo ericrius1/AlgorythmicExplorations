@@ -108,10 +108,10 @@ y     = t · height − lean² · t² · 0.3 · height    <span class="cm">// a 
       <!-- ================================================================ -->
       <h2 id="planting"><span class="kicker">Step 2 · Planting</span>Reading the soil map</h2>
       <p>
-        Remember the sediment ledger we kept at the end of part two? Positive values mark
+        Remember the sediment ledger kept at the end of part two? Positive values mark
         level valley floors where raindrops dumped washed-down silt, while negative values
         mark steep chutes scoured back to bare rock. Rather than hand-painting a density
-        mask, our planter walks through hashed candidate coordinates across the terrain and
+        mask, the planter walks through hashed candidate coordinates across the terrain and
         computes each spot's odds of germinating straight from height, slope, and that
         erosion ledger:
       </p>
@@ -208,7 +208,7 @@ move the vertex by (0.82·sway, −0.45·sway², 0.57·sway)</code></pre>
         only slightly toward the blade's facing direction for subtle variation. To the sun
         and sky, the meadow shades like a continuous velvety carpet whose silhouette breaks
         into crisp individual tips, matching how real turf reads from a few meters away.
-        We also skip rotating those normals during wind gusts: once stalks are swaying, the
+        Those normals also skip rotating during wind gusts: once stalks are swaying, the
         eye tracks motion through changing silhouettes and ignores that the diffuse normals
         held still.
       </p>
@@ -237,7 +237,7 @@ move the vertex by (0.82·sway, −0.45·sway², 0.57·sway)</code></pre>
         GPU inside a hashed grid sliding under the camera, dropping faraway stalks down to
         single three-vertex triangles as a distance LOD, and writing footsteps or rolling
         objects into a small trail texture so grass parts around anything moving through it.
-        Before worrying about endless fields, though, our valley needs taller company.
+        Before worrying about endless fields, though, the valley needs taller company.
       </p>
       <p class="continue">
         <strong>Next: <a href="/pages/ground-truth/trees.html">Part 4, The Trees</a>.</strong>

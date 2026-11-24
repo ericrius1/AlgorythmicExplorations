@@ -43,7 +43,7 @@
 
     <main>
       <p>
-        Once you have pulled a musical note apart into sines and resonances (as we did in Part 1),
+        Once you have pulled a musical note apart into sines and resonances (as Part 1 did),
         the natural next impulse is to reverse the process and build sounds from nothing at all.
         That spectral mountain range scrolling at the top of the page is already doing it. Each
         glowing ridge is one slice of time split into frequencies from low on the left to high on
@@ -113,12 +113,12 @@
         classic square wave. Slide it to 25% and sin(π<em>n</em>/4) hits zero for every fourth
         harmonic, knocking out 4, 8, 12, and so on. At 20% every fifth harmonic vanishes. Narrow
         pulses sound reedy and nasal, and gently sweeping the pulse width during a held note
-        creates one of the richest animation tricks in analog synthesis (we'll wire an LFO to it
-        in Step 5).
+        creates one of the richest animation tricks in analog synthesis (Step 5 wires an LFO
+        to it).
       </p>
       <p>
         Synth designers lean heavily on the sawtooth because it contains every harmonic right out
-        of the gate, giving you raw marble to carve away with filters. Before we get to carving,
+        of the gate, giving you raw marble to carve away with filters. Before the carving starts,
         though, generating a clean sawtooth inside a digital computer turns out to hide a nasty
         trap.
       </p>
@@ -152,7 +152,7 @@
         tune.
       </p>
       <p>
-        The spectrogram below runs our engine's own oscillator code through a slow sweep from A3 up
+        The spectrogram below runs the engine's own oscillator code through a slow sweep from A3 up
         to A7 and back down (eight seconds each way), with time across the horizontal axis and
         frequency climbing up to the pink Nyquist line at the top. Watch the bright real harmonics
         fan upward as the pitch rises. On <strong>naive</strong>, every line that strikes the top
@@ -252,7 +252,7 @@ saw = 2 * t - 1 - polyblep(t, dt);</code></pre>
         <strong>cutoff</strong> and progressively attenuates everything above it.
       </p>
       <p>
-        Our engine models Robert Moog's famous transistor ladder filter: four simple one-pole
+        This engine models Robert Moog's famous transistor ladder filter: four simple one-pole
         lowpass stages chained in series, each sloping off at 6 dB per octave above the cutoff for
         a combined 24 dB per octave drop (the slope buttons tap the ladder after 1, 2, 3, or 4
         stages). Adding <strong>resonance</strong> feeds a fraction <em>k</em> of the fourth
@@ -295,7 +295,7 @@ saw = 2 * t - 1 - polyblep(t, dt);</code></pre>
             Digitizing a resonant feedback loop has a subtle catch: the filter output you want to
             feed back depends instantaneously on the current input sample you haven't finished
             computing yet. Inserting a naive one-sample delay into the feedback path detunes the
-            resonant peak and makes high cutoffs behave erratically. Instead, our engine solves
+            resonant peak and makes high cutoffs behave erratically. Instead, the engine solves
             the algebraic loop simultaneously at every sample using Vadim Zavalishin's
             zero-delay-feedback (topology-preserving) integrator. Each of the four stages takes
             just three lines of arithmetic:
@@ -379,7 +379,7 @@ v.s1 = y1 + t;</code></pre>
         Notice the gentle bend in every segment. Attack curves follow an analog RC charging curve
         aimed at 1.5 and clamped at 1.0, giving a brisk initial lift that eases into the peak.
         Decay and release are true exponentials whose times specify how long it takes to fall
-        60 dB (effectively to silence), matching our logarithmic perception of loudness so a fade
+        60 dB (effectively to silence), matching the ear's logarithmic perception of loudness so a fade
         sounds smooth rather than rushing to a cliff at the end.
       </p>
       <aside class="note">
@@ -705,7 +705,7 @@ buf[v.w] = y;</code></pre>
       </p>
       <p>
         Time turns out to do just as much heavy lifting as static tone color. A frozen snapshot of
-        our brass patch or FM bell barely hints at what it is, yet let the filter bloom slightly
+        the brass patch or FM bell barely hints at what it is, yet let the filter bloom slightly
         behind the volume or let the modulation index collapse as the note decays and your ear
         immediately hears horn or bronze. And moving those ideas into digital code adds its own
         craft: an edge that costs two transistors in analog hardware needs PolyBLEP math to avoid
@@ -713,11 +713,11 @@ buf[v.w] = y;</code></pre>
         a delay line to a fraction of a sample.
       </p>
       <p>
-        If I keep expanding this engine, I would love to add morphing wavetable and granular
+        Future versions of this engine could add morphing wavetable and granular
         oscillators, couple the Karplus–Strong delay line to a resonant guitar body model, wire up
         all six DX7 operators with selectable algorithms, and pack custom patches into shareable
         URLs. Meanwhile, the spectral landscape at the top of the page is built straight out of the
-        modules we just assembled: a two-oscillator subtractive patch from Step 3, shaped by the
+        modules just assembled: a two-oscillator subtractive patch from Step 3, shaped by the
         envelopes of Step 4 and nudged by a touch of vibrato from Step 5.
       </p>
       <p class="continue">

@@ -50,13 +50,13 @@
         computer keyboard.
       </p>
       <p>
-        In <a href="/pages/living-music/jukebox.html">part seven</a> we built a generative band
+        In <a href="/pages/living-music/jukebox.html">part seven</a> a generative band took shape
         that composes and mixes whole songs from a seed, completely deaf to the outside world. Here
-        we flip the pipeline around: notes flow in, theory runs in real time, and accompaniment
+        the pipeline flips around: notes flow in, theory runs in real time, and accompaniment
         flows back out fast enough to feel conversational. Rather than wrestling with microphone
         pitch detection, every note arrives as a clean key-down and key-up event carrying an exact
         MIDI pitch and timestamp. That strips accompaniment down to three musical questions a human
-        bandmate solves almost subconsciously: what key are we in, what chord fits right now, and
+        bandmate solves almost subconsciously: what key is this in, what chord fits right now, and
         how busy should the band be?
       </p>
 
@@ -157,8 +157,8 @@ r[key] = correlation(hist, profile turned to key's tonic)   <span class="cm">// 
         Dragging <em>memory half-life</em> reveals an unavoidable engineering trade-off. A short
         half-life pivots quickly on modulations, yet gets easily spooked by chromatic runs; a long
         half-life stays rock steady and lags behind real key changes. Five seconds works out to
-        around two bars at the band's default tempo, which struck a comfortable balance when I
-        played against it.
+        around two bars at the band's default tempo, which strikes a comfortable balance when
+        playing against it.
       </p>
       <aside class="note">
         <span class="note-label">Aside · A map of keys</span>
@@ -179,7 +179,7 @@ r[key] = correlation(hist, profile turned to key's tonic)   <span class="cm">// 
             In 1999, David Temperley refined the algorithm with adjusted profiles and a dynamic
             segmentation pass that penalizes frequent key switches, improving accuracy across
             classical corpora; later systems fit profiles directly from large databases of scores
-            rather than behavioral ratings. I kept the original 1982 numbers here because they come
+            rather than behavioral ratings. The original 1982 numbers stay in place here because they come
             directly from human listeners, tying step one straight into the live band.
           </p>
           <p>
@@ -326,7 +326,7 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
       <p>
         Two finishing touches pull these replies together: notes landing on strong beats snap to
         the closest chord tone, and the final note always resolves onto a chord tone and rings out.
-        Before I added those two constraints, the replies sounded like generic scale noodling; with
+        Without those two constraints, the replies sound like generic scale noodling; with
         them in place, they land with clear harmonic punctuation. If you jump back in before the
         vibraphone finishes, it immediately yields the floor and cancels its remaining notes.
       </p>
@@ -355,7 +355,7 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
           improvisation, with Lewis deliberately designing <em>Voyager</em> as an autonomous peer
           with its own musical agenda rather than a passive follower. In 2002, François Pachet
           built <em>The Continuator</em>, which learned a pianist's phrasing on the fly using
-          variable-order Markov chains and immediately traded licks in their voice. Our riff mode
+          variable-order Markov chains and immediately traded licks in their voice. The riff mode here
           is a tiny single-step cousin of that idea.
         </p>
       </aside>
@@ -414,15 +414,15 @@ style = notesPerSecond &lt; 0.7 ? "fill"   <span class="cm">// arpeggios into th
         to the musical feel as all the rootless jazz voicings put together.
       </p>
       <p>
-        Given more time, the next features on my wish list would be an adaptive beat tracker so the
+        Given more time, the next features on the wish list would be an adaptive beat tracker so the
         band can follow a soloist's rubato, a chord transition model so it can anticipate where a
         progression is heading instead of always reacting half a bar behind, a deeper multi-step
         Markov memory for the vibraphone closer to Pachet's Continuator, and an ear sensitive to
         melodic intervals and meter so G moving to C carries more tonal weight than C moving to G.
       </p>
       <p>
-        That brings Living Music to a close. Eight essays ago, we started with one vibrating string
-        and the three basic dimensions of a single tone, moved through oscillators, filters,
+        That brings Living Music to a close. Eight essays ago, the series started with one
+        vibrating string and the three basic dimensions of a single tone, moved through oscillators, filters,
         sensory roughness, the math behind twelve-tone tuning, scales and modes, triads and voice
         leading, and a self-contained generative jukebox, arriving finally at a band that listens
         back. Nearly every earlier part is still running quietly inside this last figure: the

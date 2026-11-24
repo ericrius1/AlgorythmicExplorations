@@ -141,7 +141,7 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// output v
         silicon already landed right near the top of it.
       </p>
       <aside class="note">
-        <span class="note-label">Aside · Which sun are we using?</span>
+        <span class="note-label">Aside · Which sun is in these figures?</span>
         <p>
           To keep the photon sampling clean, these figures model the sun as a 5,778 K blackbody scaled
           to 1,000 W/m². Real sunlight reaching the ground has bite marks chewed out of it by
@@ -191,7 +191,7 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// output v
         In a <em>two-terminal</em> tandem (solid curve), the two cells are stacked electrically in
         series like batteries in a flashlight: the same current has to flow through both, so whichever
         cell generates less current bottlenecks the pair. Efficiency climbs to a sharp tent peak right
-        where the currents match: 41.6% at a 1.76 eV top gap under our blackbody sun (or roughly 45%
+        where the currents match: 41.6% at a 1.76 eV top gap under the blackbody sun (or roughly 45%
         near 1.70 eV under AM1.5G). In a <em>four-terminal</em> stack (dashed curve), each cell has its
         own independent pair of wires and runs at its own maximum power point, which flattens out the
         penalty for mismatch while barely raising the peak.
@@ -201,7 +201,7 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// output v
         21.9 mA/cm² while silicon below gets 18.1 mA/cm². Wired in series, the whole stack is throttled
         to 18.1 mA/cm², leaving the dashed chunk at the end of the green bar stranded. Real tandems
         still cluster near 1.68 eV anyway because pushing halide perovskites much wider makes their
-        crystal chemistry start to separate under bright light, as we'll see in a moment.
+        crystal chemistry start to separate under bright light, as Step 4 shows.
       </p>
       <p>
         Even with that tighter current-matching constraint, almost the entire industry is chasing
@@ -411,7 +411,7 @@ V   = (kT/q) × ln((jsc − J) / j0 + 1)            <span class="cm">// output v
       <!-- ================================================================ -->
       <h2 id="current"><span class="kicker">Step 6 · Series matching</span>Two cells, one current</h2>
       <p>
-        Now let's bring realistic voltage losses and resistance into a two-terminal stack. Each subcell
+        Next come realistic voltage losses and resistance in a two-terminal stack. Each subcell
         obeys the same detailed-balance diode equation from Step 1, except its dark current <em>j0</em>
         is scaled upward for non-radiative recombination (which trims a fixed chunk off its voltage: here
         130 mV for a good HJT silicon bottom cell, and an adjustable loss for the perovskite). Because
@@ -455,7 +455,7 @@ P = max over J of  J × V_stack(J)</code></pre>
         pushing series resistance from 2 to 8 Ω·cm² pulls fill factor down from 88% to 82%.
       </p>
       <p>
-        Even with our simplified blackbody sun, this model lands within a couple of points of the 35%+
+        Even with its simplified blackbody sun, this model lands within a couple of points of the 35%+
         world records set in 2026 under AM1.5G. What it leaves out are the purely optical losses before
         photons ever reach the absorbers: front-glass reflection, shadowing from silver grid fingers,
         and parasitic absorption in the transparent conducting oxides and C₆₀, which together shave a
@@ -634,7 +634,7 @@ P = max over J of  J × V_stack(J)</code></pre>
       <h2 id="epilogue"><span class="kicker">Stepping back</span>Why the whole tree matters</h2>
       <p>
         Tracing a perovskite-on-silicon tandem from Shockley and Queisser's 1961 paper down to a
-        factory yield curve leaves a few things sticking in my head. For sixty years silicon engineers
+        factory yield curve leaves a few lessons that stick. For sixty years silicon engineers
         wrung astonishing gains out of bulk purity and surface passivation, yet the two biggest losses
         left on the table—blue-photon heat and wasted infrared—belong strictly to having one bandgap.
         Adding a second absorber fixes the optical ceiling, and immediately hands you a new set of
@@ -650,7 +650,7 @@ P = max over J of  J × V_stack(J)</code></pre>
         panel is so much harder—and more interesting—than chasing the next decimal place.
       </p>
       <p>
-        If I come back to expand this page, three upgrades are next on my list: swapping the smooth
+        Any future expansion of this page has three upgrades queued up: swapping the smooth
         blackbody for the real tabulated AM1.5G spectrum so every figure reproduces published limits to
         the decimal, adding a thin-film optical interference model to capture reflection and parasitic
         contact absorption, and integrating two-terminal current matching across a full day of shifting

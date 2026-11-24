@@ -46,7 +46,7 @@
         Real landscapes telegraph their climate from miles away. An abrupt contour across a
         mountainside tells you where winter gets too cold for timber, and bands of green
         trace where moisture lingers. Spreading grass and trees uniformly across generated
-        hills breaks that illusion almost instantly. Up to this point we have built
+        hills breaks that illusion almost instantly. Up to this point the series has built
         <a href="/pages/ground-truth/heightfield.html">mountains</a>,
         <a href="/pages/ground-truth/erosion.html">erosion</a>,
         <a href="/pages/ground-truth/grass.html">grass</a>, and
@@ -54,10 +54,10 @@
         them together by hand for one bounded patch.
       </p>
       <p>
-        Here we turn placement over to rules, with a strict engineering constraint hanging
-        over everything. First, we classify any point on the ground into a biome from its
-        elevation, slope, and a broad moisture field. Second, we scatter individual trees
-        and boulders in a way that any slice of an infinite world can compute in complete
+        This part turns placement over to rules, with a strict engineering constraint hanging
+        over everything. First, any point on the ground gets classified into a biome from its
+        elevation, slope, and a broad moisture field. Second, individual trees and boulders
+        scatter in a way that any slice of an infinite world can compute in complete
         isolation, without ever asking neighboring chunks what they planted. That second
         requirement ends up steering the whole architecture, because
         <a href="/pages/ground-truth/horizon.html">part six</a> will stream the world in
@@ -76,7 +76,7 @@
       <p>
         Ecologists often map terrestrial biomes on a Whittaker diagram, plotting annual
         precipitation against average temperature to carve out regions of tundra, desert,
-        grassland, and forest. We can build a compact procedural version with three inputs
+        grassland, and forest. A compact procedural version needs only three inputs
         available at every <code>(x, z)</code>. Altitude stands in for temperature, steep
         slope gets a veto so sheer rock faces stay bare, and rainfall comes from a second
         fractal noise field tuned to a much broader wavelength than the hills: three
@@ -144,7 +144,7 @@ return scrub;</code></pre>
         <code>floor(x / cell)</code> and <code>floor(z / cell)</code> so cell boundaries
         never care where a chunk begins or ends. Each square gets at most one candidate
         tree, nudged inside the middle 76% of the cell by hashing the cell's integer pair.
-        Then we query the biome at that candidate point and let a final hash decide whether
+        The biome is then queried at that candidate point, and a final hash decides whether
         a tree takes root:
       </p>
       <pre><code>x = (ci + 0.12 + 0.76 · hash(ci, cj)) · cell          <span class="cm">// same for z with another hash</span>
@@ -187,7 +187,7 @@ keep the tree if hash(ci, cj, salt) &lt; p</code></pre>
         <div class="fold-body">
           <p>
             The 243 trees in the hero valley reuse the exact six space-colonized skeletons
-            from part four, stamped out with hashed scales and rotations. Because we view
+            from part four, stamped out with hashed scales and rotations. Because the camera views
             them from further back here, each variant builds a lighter level-of-detail
             mesh: one-third as many leaf cards (scaled slightly larger to keep crown volume
             intact) and twigs thinner than 0.022 units skipped since foliage conceals them
@@ -215,12 +215,12 @@ keep the tree if hash(ci, cj, salt) &lt; p</code></pre>
         past the draw range of individual crowns.
       </p>
       <p>
-        With more time, I would add a slope-aspect term so shaded north-facing flanks carry
+        A next step would add a slope-aspect term so shaded north-facing flanks carry
         a lower tree line than sunny south slopes, grow distinct tree species per biome
         instead of sharing one hardwood shape everywhere, and replace pure noise moisture
         with a stateless approximation of local concavity so damp forests hug valleys
         without needing an erosion pass. Now that every mountain, tree, rock, and grass
-        blade can be reconstructed from coordinates alone, we are finally ready to take down
+        blade can be reconstructed from coordinates alone, the next part can finally take down
         the walls around the world.
       </p>
       <p class="continue">

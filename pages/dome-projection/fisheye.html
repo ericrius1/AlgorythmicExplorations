@@ -60,7 +60,7 @@
         lands at an identical radial spacing.
       </p>
       <p>
-        In <a href="/pages/dome-projection/circle.html">part one</a> we worked strictly in
+        In <a href="/pages/dome-projection/circle.html">part one</a> the work stayed strictly in
         two dimensions, turning pixels inside a flat disk into (<em>r</em>, <em>θ</em>).
         Moving up to a hemisphere adds one crucial design choice: how far from the center of
         the image should a given tilt angle land?
@@ -95,7 +95,7 @@ dir.z = cos(θ)</code></pre>
       <p>
         The circular master on the left renders backward pixel by pixel, just like the disk
         in part one: each pixel's radius <em>ρ</em> runs backward through the chosen lens
-        formula to recover <em>θ</em>, which gives a 3D direction into our test pattern. On
+        formula to recover <em>θ</em>, which gives a 3D direction into the test pattern. On
         the upper right, the dome appears sliced side-on with rays every 15 degrees, and
         below it sits a plot of <em>ρ</em> against <em>θ</em> for all four classic curves.
         Click any law in the plot legend (or cycle the <em>law</em> button) while watching
@@ -159,8 +159,8 @@ direction        → fisheye uv
 fisheye uv       → color</code></pre>
       <p>
         Analytic math gives a clean first approximation of those arrows, and physical
-        calibration turns them into warp meshes that match the real room. We will unpack how
-        multiple projectors measure and blend that chain in part four.
+        calibration turns them into warp meshes that match the real room. Part four unpacks how
+        multiple projectors measure and blend that chain.
       </p>
 
       <!-- ================================================================ -->
@@ -197,7 +197,7 @@ labels drift between projectors  → calibration error, rather than content</cod
         formats stop feeling mysterious. The unit vector is the actual scene data; the lens
         law <em>ρ</em>(<em>θ</em>) is just the encoding that lays those vectors onto a flat
         circle, and every downstream pass works backward from an output pixel through that
-        encoding. If I extended Figure 1 further, I would plot a fifth curve fitted to
+        encoding. A further extension of Figure 1 would plot a fifth curve fitted to
         measured dots from a physical projector lens and overlay its error against an ideal
         equidistant curve, since that residual curve is precisely what venue calibration ends
         up correcting.
@@ -205,7 +205,7 @@ labels drift between projectors  → calibration error, rather than content</cod
       <p>
         A circular fisheye is ideal when you need to ship a finished movie file to another
         planetarium, yet standard GPU rasterizers struggle to draw curved 180-degree images
-        directly. Next, we look at the representation real-time engines love instead: five
+        directly. Next comes the representation real-time engines love instead: five
         flat square cameras looking up and around the room.
       </p>
       <p class="continue">

@@ -48,9 +48,9 @@
         hundreds of times per second: multiplying two dense grids of floating-point numbers.
       </p>
       <p>
-        In this five-part series, we are going to build an entire modern language model from raw
+        This five-part series builds an entire modern language model from raw
         metal inside your browser tab using <strong>pure WebGPU</strong> and hand-written WGSL
-        compute shaders — no ML runtimes, no ONNX, no black boxes. We will start with matrix math
+        compute shaders — no ML runtimes, no ONNX, no black boxes. It starts with matrix math
         and tokens here, build RoPE and FlashAttention in
         <a href="/pages/small-minds/attention.html">Part 2</a>, wire up full GPU backpropagation in
         <a href="/pages/small-minds/training.html">Part 3</a>, turn your browser into an autonomous
@@ -85,8 +85,8 @@ for (var k = 0u; k &lt; dims.K; k++) {
       <p>
         The trick that unlocks GPU speed is noticing that neighboring output cells need the exact
         same rows of <code>A</code> and columns of <code>B</code>. Instead of letting 256 threads
-        fetch the same numbers independently from slow global memory, we group them into a
-        <code>16 × 16</code> workgroup and give them two tiny scratchpads inside fast on-chip SRAM
+        fetch the same numbers independently from slow global memory, the kernel groups them into a
+        <code>16 × 16</code> workgroup and gives them two tiny scratchpads inside fast on-chip SRAM
         using WGSL's <code>var&lt;workgroup&gt;</code>.
       </p>
       <pre><code>var&lt;workgroup&gt; tileA: array&lt;f32, 256&gt;;
@@ -119,7 +119,7 @@ for (var t = 0u; t &lt; numTiles; t++) {
       <p>
         Try pushing <code>N</code> up to 1024. At small sizes, dispatch overhead hides the gap; once
         matrices outgrow the L1 cache, the tiled kernel pulls dramatically ahead because its threads
-        cooperate instead of competing for the memory bus. Every linear layer in our Transformer —
+        cooperate instead of competing for the memory bus. Every linear layer in the Transformer —
         forward projections (<code>A @ Bᵀ</code>), backward activation gradients
         (<code>dY @ W</code>), and weight gradients (<code>dYᵀ @ X</code>) — reuses this exact
         16×16 workgroup-tiling engine.
@@ -130,11 +130,11 @@ for (var t = 0u; t &lt; numTiles; t++) {
           <p>
             A linear layer computes <code>Y = X · Wᵀ</code> where <code>X</code> is
             <code>[N, D_in]</code> and <code>W</code> is <code>[D_out, D_in]</code>. During the
-            backward pass we need two different transposes without copying or transposing buffers in
+            backward pass needs two different transposes without copying or transposing buffers in
             memory: <code>dX = dY · W</code> (standard tiled <code>A @ B</code>) and
             <code>dW += dYᵀ · X</code> (tiled <code>Aᵀ @ B</code> with an accumulate flag). Writing
             those three tiled entry points in <code>matmul.wgsl</code> eliminates every intermediate
-            transpose kernel from our training step.
+            transpose kernel from the training step.
           </p>
         </div>
       </details>
@@ -142,7 +142,7 @@ for (var t = 0u; t &lt; numTiles; t++) {
       <!-- ================================================================ -->
       <h2 id="tokens"><span class="kicker">Step 3 · Words into vectors</span>Tokenization and embeddings</h2>
       <p>
-        Matrix multipliers only speak floats, so our first bridge from human language to silicon is
+        Matrix multipliers only speak floats, so the first bridge from human language to silicon is
         twofold: slice text into integer IDs (<strong>tokenization</strong>), then look up each ID
         in a learned table of vectors <code>W_E</code> (<strong>embeddings</strong>).
       </p>
@@ -161,7 +161,7 @@ for (var t = 0u; t &lt; numTiles; t++) {
       ></div>
 
       <p>
-        For our interactive in-browser GPU trainer in Parts 3 through 5, we will use a crisp
+        The interactive in-browser GPU trainer in Parts 3 through 5 uses a crisp
         98-token printable-ASCII vocabulary. That keeps the output softmax matrix tiny —
         <code>[N, 98]</code> instead of <code>[N, 50257]</code> — so a complete Transformer can train
         at hundreds of steps per second on your browser GPU while still spelling arbitrary English,

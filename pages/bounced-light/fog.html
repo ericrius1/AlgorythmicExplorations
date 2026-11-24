@@ -55,7 +55,7 @@
         the light traveling through it.
       </p>
       <p>
-        Adding fog to our 2D radiance cascades keeps the jump-flood distance field, the
+        Adding fog to the 2D radiance cascades keeps the jump-flood distance field, the
         probe hierarchy, and the top-down merge completely intact. All it takes is one extra
         texture describing the mist and a couple of bookkeeping lines tucked inside the ray
         march itself.
@@ -110,8 +110,8 @@ a      = 1 − exp(−σ · ρ · Δs)             <span class="cm">// fraction 
 inscat += T · J · scatter · a               <span class="cm">// fraction scattered back along the ray</span>
 T      *= 1 − a</code></pre>
       <p>
-        Conveniently, we already have an answer for <code>J</code>: the cascade-0 fluence
-        computed one frame earlier. It is the exact same temporal feedback loop that gave us
+        Conveniently, an answer for <code>J</code> already exists: the cascade-0 fluence
+        computed one frame earlier. It is the exact same temporal feedback loop that produced
         multi-bounce wall color in part two, now applied to the air itself. On frame one,
         direct sunlight illuminates the mist; on frame two, that glowing mist radiates light
         into neighboring pockets of fog, giving second-order scattering; frame three adds
@@ -154,7 +154,7 @@ T      *= 1 − a</code></pre>
         warm gold the moment it drifts across a sunlit shaft.
       </p>
       <details class="fold">
-        <summary>Deep dive: the phase function I left out</summary>
+        <summary>Deep dive: the missing phase function</summary>
         <div class="fold-body">
           <p>
             The equations above assume <em>isotropic scattering</em>, sending deflected
@@ -194,7 +194,7 @@ T      *= 1 − a</code></pre>
         <em>view: final</em> cycles through the diagnostic buffers including a new
         <em>fog density</em> view showing the raw media texture (the stratified mist bank,
         drifting noise, and any smoke puffs you breathe in with your cursor). Switching back
-        and forth between <em>fog density</em> and <em>final</em> separates what I authored
+        and forth between <em>fog density</em> and <em>final</em> separates what was authored
         from what the cascades solved: a single uniform band of mist turns bright gold where
         sunlight slips between two pines and drops to cool gray a trunk width away.
       </p>
@@ -202,20 +202,20 @@ T      *= 1 − a</code></pre>
       <!-- ================================================================ -->
       <h2 id="flatland"><span class="kicker">Wrap-up</span>Leaving the plane</h2>
       <p>
-        Our 2D cascade renderer now handles arbitrary numbers of moving emitters, colored
+        The 2D cascade renderer now handles arbitrary numbers of moving emitters, colored
         multi-bounce walls, an environment sky, and air that simultaneously absorbs and
         scatters light, all built by adding a couple of lines inside the ray march and
-        reusing last frame's fluence one more time. If I kept extending this 2D world, I
-        would store a few directional coefficients in the fog texture for forward-peaked
-        glare, give the mist wavelength-dependent absorption so thick fog shifts hue with
-        distance, and hook real light-blocking smoke onto part two's bonfire.
+        reusing last frame's fluence one more time. Extending this 2D world further would
+        mean storing a few directional coefficients in the fog texture for forward-peaked
+        glare, giving the mist wavelength-dependent absorption so thick fog shifts hue with
+        distance, and hooking real light-blocking smoke onto part two's bonfire.
       </p>
       <p>
         At this point, though, the real bottleneck is living inside a two-dimensional slice.
         Every scene across these first three parts has been a flat floor plan or vertical
         cross-section viewed from outside. Porting this exact texture-based strategy to 3D
         means replacing 2D textures with 3D voxel volumes, cubing memory consumption and
-        jump-flood rebuild costs overnight. So in part four I am stepping into 3D by
+        jump-flood rebuild costs overnight. So part four steps into 3D by
         dropping the stored distance texture altogether and writing the distance field as a
         pure math function evaluated directly by every ray.
       </p>

@@ -55,12 +55,12 @@
         on their neighbors.
       </p>
       <p>
-        To bring that behavior into our browser sim, I followed Shao, Huang, and Michels'
+        To bring that behavior into a browser sim, this part follows Shao, Huang, and Michels'
         <a href="https://doi.org/10.1109/TVCG.2022.3211414">"A Current Loop Model for the Fast
         Simulation of Ferrofluids"</a> (2022). Their formulation supplies the two pieces Part 1
         lacked: a self-consistent way to compute every particle's magnetic moment, and a pairwise
         force model that pulls inward along the surface instead of blasting outer particles away
-        the way the textbook Kelvin force does. We stay in a 2D cross-section for now, running
+        the way the textbook Kelvin force does. The sim stays in a 2D cross-section for now, running
         20,000 particles in the interactive figures below and 24,000 in the wide pool at the top
         (where moving your cursor drops an extra magnet over the crown).
       </p>
@@ -95,7 +95,7 @@
 B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which sums the fields of all other moments</span></code></pre>
       <p>
         Rather than treating each particle as a singular point dipole whose field blows up at
-        zero distance, we smear each moment over the particle's SPH smoothing kernel to obtain a
+        zero distance, the solver smears each moment over the particle's SPH smoothing kernel to obtain a
         <em>smoothed</em> dipole. Beyond the kernel radius it behaves like an ordinary point
         dipole; up close, two overlapping particles feel a finite, well-behaved field with no
         arbitrary softening constant to hand-tune.
@@ -130,7 +130,7 @@ B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which sums the fi
             the expression collapses to the textbook dipole formula.
           </p>
           <p>
-            That original derivation lives in 3D. Because our slice here is 2D, each particle
+            That original derivation lives in 3D. Because the slice here is 2D, each particle
             really represents a long cylindrical rod extending into the screen, so its field is
             that of a line dipole falling off as 1/r² rather than 1/r³. Fortunately the algebra
             keeps the exact same structure: the spherical average becomes an average over a disk
@@ -146,7 +146,7 @@ B(r_i) = H_applied + Σ_j field(m_j)    <span class="cm">// …which sums the fi
       <h2 id="solver"><span class="kicker">Step 2 · Iterative solution</span>One sweep a frame</h2>
       <p>
         In an offline render, you solve that linear moment system all the way to convergence on
-        every single time step. To hold 60 frames per second in a browser, I cut an aggressive
+        every single time step. To hold 60 frames per second in a browser, this version cuts an aggressive
         corner: each rendered frame runs just <em>one</em> sweep of a dead-simple relaxation
         update, starting from last frame's moments as the initial guess. Every particle sums the
         field from its neighbors' current moments, then nudges its own moment 60% of the way
@@ -159,8 +159,8 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
       <p>
         Technically the system never fully converges on any given frame, and visually you can
         hardly tell. A Rosensweig crown takes dozens of frames to rise and shift, whereas the
-        moments chase the exact solution only a frame or two behind the particles. We take the
-        same bargain on the magnetic forces: both the moment sweep and the pairwise force pass run
+        moments chase the exact solution only a frame or two behind the particles. The magnetic
+        forces strike the same bargain: both the moment sweep and the pairwise force pass run
         once per rendered frame on the first substep, and the remaining four substeps reuse that
         cached magnetic acceleration since particles barely budge in a sixtieth of a second.
       </p>
@@ -168,7 +168,7 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
       <!-- ================================================================ -->
       <h2 id="force"><span class="kicker">Step 3 · The sign of the force</span>Kelvin vs. current loop</h2>
       <p>
-        Once every particle knows its magnetic moment, we have to turn those moments into forces.
+        Once every particle knows its magnetic moment, those moments have to become forces.
         Classical ferrohydrodynamics actually offers several competing force formulas that
         disagree about how stress is distributed inside the liquid. In 1977, J. V. Byrne proved
         that once you include the matching magnetic pressure jump across the free boundary, all
@@ -206,7 +206,7 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
           <p>
             The 2022 paper computes the exact force between two overlapping particles by
             integrating the smoothed force density across their overlap volume and approximating
-            the integral with fitted polynomials. Here I take a lighter shortcut and evaluate both
+            the integral with fitted polynomials. This sim takes a lighter shortcut and evaluates both
             force terms directly at the particle centers. The Kelvin piece takes the gradient of
             one smoothed dipole's field dotted with the other particle's moment, while the extra
             current-loop bulk piece acts inside two kernel radii and pulls aligned neighbors
@@ -264,7 +264,7 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
         Measured against the 2022 KAUST paper, this browser version is unapologetically scrappy.
         Their reference solver runs in full 3D, computes implicit incompressibility, integrates
         every overlapping pair force, and iterates the magnetic moments to tight convergence,
-        spending seconds on a single frame where we have sixteen milliseconds. Even so, a few
+        spending seconds on a single frame where a browser gets sixteen milliseconds. Even so, a few
         core ideas survive the diet intact. When a coupled linear system evolves slowly from frame
         to frame, chasing it with one warm-started relaxation sweep gets surprisingly close for a
         fraction of the cost. Formulations that are provably equivalent in continuum equations can
@@ -273,7 +273,7 @@ var m = mix(mi, kappa * b, 0.6);   <span class="cm">// under-relaxed so it can't
         attraction and repulsion.
       </p>
       <p>
-        If I kept pushing this 2D solver, I'd look at replacing the six-radius magnetic cutoff
+        Pushing this 2D solver further would mean replacing the six-radius magnetic cutoff
         with a fast multipole method (which the paper also recommends) and testing whether a few
         conjugate-gradient iterations sharpen the crown noticeably over one Jacobi-style sweep.
         Before optimizing 2D further, though, there is a much bigger jump waiting: lifting the

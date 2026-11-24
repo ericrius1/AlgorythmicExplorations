@@ -56,7 +56,7 @@
         and why their pitches climb in exact multiples: 110, 220, 330, all the way to 880 Hz. That
         sympathetic cascade under the untouched strings is the central clue to how music works. A
         single musical note turns out to be a small crowd of vibrations happening at once. Before
-        this series builds up to synthesizers, harmony, scales, and chords, we need to see what a
+        this series builds up to synthesizers, harmony, scales, and chords, it needs to show what a
         single note is actually made of: how high it sounds, how loud it is, and what gives it its
         distinct character.
       </p>
@@ -137,7 +137,7 @@
         anywhere along its length, pull it aside, and let go. At release, the simulation projects
         your triangular shape onto the first 24 standing-wave modes and lets each one swing and
         decay on its own clock. Because a real string vibrating at 110 Hz is just a faint blur to
-        our eyes, the drawing runs in slow motion so the fundamental always rocks at 1.25 cycles
+        the eye, the drawing runs in slow motion so the fundamental always rocks at 1.25 cycles
         per second (88× slower than the sound at the default pitch).
       </p>
 
@@ -237,7 +237,7 @@ const heard = (p: number, n: number): number =&gt; Math.sin(n * Math.PI * p) / n
         Higher up, though, the series drifts off the keyboard grid. Harmonic 5 sits 14 cents flat
         of a modern piano's C♯ (a cent is one hundredth of a semitone), and harmonic 7 lands 31
         cents flat of G, far enough into the crack between keys that standard pianos can't play it.
-        We'll dig into why keyboards had to bend these ratios in Part 4.
+        Part 4 digs into why keyboards had to bend these ratios.
       </p>
       <aside class="note">
         <span class="note-label">Aside · Helmholtz and the glass spheres</span>
@@ -306,7 +306,7 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
         of breath noise. A violin starts with the bright sawtooth of a bowed string and filters it
         through a carved wooden box that amplifies certain frequency bands and damps others. Their
         beginnings differ just as sharply: a flute note blooms out of air, whereas a violin note
-        opens with a brief rosin scratch, and our brains rely heavily on those first few tens of
+        opens with a brief rosin scratch, and the brain relies heavily on those first few tens of
         milliseconds to name an instrument.
       </p>
 
@@ -400,7 +400,7 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
       <h2 id="shepard"><span class="kicker">Step 7 · Two kinds of high</span>A staircase that never ends</h2>
       <p>
         Back in the harmonic ladder, you saw that notes separated by an octave share the same
-        letter name and color because our ears perceive them as versions of the same note. That
+        letter name and color because the ear perceives them as versions of the same note. That
         means pitch actually has two distinct dimensions: raw <em>height</em> (low rumble versus
         high squeak) and <em>chroma</em> (which pitch class a note belongs to, cycling through C,
         C♯, D, and back around every octave). Put both together and pitch wraps into a
@@ -440,7 +440,7 @@ triangle: (n) =&gt; [n % 2 ? 1 / (n * n) : 0, (n - 1) % 4 === 2 ? Math.PI : 0],<
       <h2 id="epilogue"><span class="kicker">Epilogue</span>Inside one sound</h2>
       <p>
         Taken together, these seven experiments dismantle the naive idea that a note is just a
-        single frequency. Pitch begins as a repetition rate heard in ratios, yet our brains infer
+        single frequency. Pitch begins as a repetition rate heard in ratios, yet the brain infers
         it from the whole harmonic spacing, even when the fundamental is stripped out or the
         octaves loop back on themselves like an Escher staircase. Timbre emerges from the
         harmonic recipe a vibrating body emits (reshaped by where you pluck or bow it), sculpted

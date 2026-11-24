@@ -54,12 +54,12 @@
         The pool at the top of the page actually jumps ahead to the end of
         <a href="/pages/strange-matter/crown.html">Part 2</a>, where every particle becomes a
         magnet in its own right under a uniform field (with your cursor dropping in an extra
-        dipole). Before tackling mutual magnetization, we need a working base layer. Fortunately,
-        most of the fluid engine already exists: we can borrow the particle layout, spatial grid
-        sort, and double-density relaxation from
-        <a href="/pages/particle-worlds/part3.html">Sorting Water</a>, grab the cohesion force
-        from <a href="/pages/bounced-light/lava.html">The Lava Lamp</a>, and drop a single dipole
-        magnet into the force pass. The big new piece here is rendering: pulling the liquid's
+        dipole). Mutual magnetization needs a working base layer first. Fortunately,
+        most of the fluid engine already exists: the particle layout, spatial grid
+        sort, and double-density relaxation come straight from
+        <a href="/pages/particle-worlds/part3.html">Sorting Water</a>, the cohesion force
+        comes from <a href="/pages/bounced-light/lava.html">The Lava Lamp</a>, and a single dipole
+        magnet drops into the force pass. The big new piece here is rendering: pulling the liquid's
         outline out as crisp line segments every frame with marching squares on the GPU.
       </p>
       <aside class="note">
@@ -82,8 +82,8 @@
       <p>
         Every ferrofluid peak is an uneasy truce between three competing pulls. Gravity drags
         raised fluid back down toward a flat pool, and surface tension helps it by penalizing
-        extra surface area and blunting sharp tips (in our particle sim, that comes from the
-        Akinci-style cohesion term we used to hold lava-lamp wax together). The magnet pulls the
+        extra surface area and blunting sharp tips (in this particle sim, that comes from the
+        same Akinci-style cohesion term that held the lava-lamp wax together). The magnet pulls the
         opposite way, yanking fluid into whichever region has the strongest magnetic field.
       </p>
       <p>
@@ -101,7 +101,7 @@ F ∝ ∇|B|²                     <span class="cm">// pulls toward the pole and
         can get. When a uniform field spans an entire dish, this same tug-of-war repeats across
         the surface at a wavelength dictated purely by gravity and surface tension: the first
         crown appears with a spacing of 2π times the capillary length, √(σ/ρg). With one small
-        bar magnet hovering over a tray, we get a single spike tracking underneath it.
+        bar magnet hovering over a tray, a single spike rises and tracks underneath it.
       </p>
       <p>
         In the SPH compute shader, the magnet drops cleanly into the existing force pass alongside
@@ -132,11 +132,11 @@ acc += macc;</code></pre>
         For the lava lamp, splatting every particle into a soft density texture and shading any
         pixel above a threshold worked well enough because glowing wax is soft and forgiving.
         Ferrofluid is dark, oily, and mirror-glossy. Almost everything your eye reads as liquid
-        lives along the sharp silhouette and the bright reflections skimming its rim, so I wanted
-        to extract the surface itself as explicit geometry.
+        lives along the sharp silhouette and the bright reflections skimming its rim, so this
+        renderer extracts the surface itself as explicit geometry.
       </p>
       <p>
-        The boundary we want is the contour where the splatted density field crosses a fixed
+        The boundary in question is the contour where the splatted density field crosses a fixed
         threshold, and <em>marching squares</em> pulls it out cleanly. Lay a regular square grid
         over the field and test the four corners of each cell against the threshold. With four
         binary inside-or-outside corners, there are 16 possible patterns, and each pattern tells
@@ -176,7 +176,7 @@ acc += macc;</code></pre>
           1987 to reconstruct surfaces from medical CT and MRI scans, and it quickly became one
           of the most cited papers in computer graphics. Because the original algorithm was
           patented until 2005, plenty of graphics programmers routed around it with marching
-          tetrahedra instead, which is the first 3D extractor we'll build in Part 3.
+          tetrahedra instead, which is the first 3D extractor Part 3 builds.
         </p>
       </aside>
       <details class="fold">
@@ -187,7 +187,7 @@ acc += macc;</code></pre>
             remaining two are diagonal saddles: two opposite corners sit inside the fluid while
             the other two sit outside. You can connect the four edge crossings either as one
             continuous neck or as two separate droplets barely missing each other, and the four
-            corners alone cannot tell which is right. Our compute shader settles the tie by
+            corners alone cannot tell which is right. The compute shader here settles the tie by
             sampling the density field one more time at the exact center of the cell. Whenever a
             droplet pinches off a tall spike, that extra center sample decides the precise frame
             it breaks free.
@@ -198,7 +198,7 @@ acc += macc;</code></pre>
       <!-- ================================================================ -->
       <h2 id="dish"><span class="kicker">Step 3 · Assembly</span>The dish</h2>
       <p>
-        Putting everything together gives us 20,000 particles integrated across five substeps per
+        Putting everything together yields 20,000 particles integrated across five substeps per
         frame, the cursor dipole, and the live marching-squares surface, now filled and shaded.
         The particles splat into a half-resolution density texture that goes through two blurs. A
         tight blur irons out individual particle bumps so marching squares sees a clean liquid

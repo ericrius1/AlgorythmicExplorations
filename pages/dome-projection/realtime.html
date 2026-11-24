@@ -45,7 +45,7 @@
       <p>
         The moment you want a live Three.js world running at 60 frames a second across a
         multi-projector dome, you hit a clean fork in the road. In
-        <a href="/pages/dome-projection/show.html">part four</a> we wired up the back half
+        <a href="/pages/dome-projection/show.html">part four</a>, the series wired up the back half
         of the theater (projector cameras, measured warp meshes, and light-linear edge
         blends) assuming a seamless dome image was already sitting in memory. When that
         image is rendered live every frame, do you still generate a shared 180-degree
@@ -301,7 +301,7 @@ color correction  → matched black floor, brightness, and white point</code></p
         edge blending, and black-level matching) finishes the frame on every path.
       </p>
       <p>
-        The natural next step past our pixel counter in Figure 1 would be profiling a real
+        The natural next step past the pixel counter in Figure 1 would be profiling a real
         Three.js scene with GPU timestamp queries around every pass, plotting the actual
         millisecond crossover between direct cameras, cubemaps, and ray-traced fisheyes as
         geometry complexity climbs. Together, these five parts trace the full stack of a

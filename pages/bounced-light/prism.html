@@ -209,7 +209,7 @@ if (rnd() &lt; P) {
       </p>
       <p>
         Monte Carlo offers a clean escape. A pixel's visible color is already an integral
-        over the visible spectrum, so we can sample wavelength alongside bounce directions.
+        over the visible spectrum, so wavelength can be sampled alongside bounce directions.
         Whenever a path hits dispersive glass for the first time, it locks onto a single
         wavelength λ between 380 and 720 nm, refracts strictly by <code>n(λ)</code> from
         that point onward, and converts its final accumulated energy back into linear RGB
@@ -223,13 +223,13 @@ if (rnd() &lt; P) {
 ...
 return wavelengthRGB(sp.lambda) * sp.weight;    <span class="cm">// convert single λ back to RGB</span></code></pre>
       <p>
-        Inside <code>wavelengthRGB</code>, I evaluate the piecewise-Gaussian fits to the
-        CIE 1931 color-matching functions published by Chris Wyman, Peter-Pike Sloan, and
-        Peter Shirley in 2013, then transform CIE XYZ into linear sRGB. Pure monochromatic
+        Inside <code>wavelengthRGB</code>, the shader evaluates the piecewise-Gaussian fits
+        to the CIE 1931 color-matching functions published by Chris Wyman, Peter-Pike Sloan,
+        and Peter Shirley in 2013, then transforms CIE XYZ into linear sRGB. Pure monochromatic
         wavelengths sit outside the sRGB gamut triangle, producing negative channels; rather
-        than hard-clipping those negatives to zero (which shifts cyan and yellow hues), I
-        desaturate out-of-gamut colors by adding just enough white to lift the smallest
-        channel to zero, then normalize the curves so a flat spectrum from 380 to 720 nm
+        than hard-clipping those negatives to zero (which shifts cyan and yellow hues), it
+        desaturates out-of-gamut colors by adding just enough white to lift the smallest
+        channel to zero, then normalizes the curves so a flat spectrum from 380 to 720 nm
         averages cleanly to <code>(1, 1, 1)</code>. Paths that never touch dispersive glass
         bypass spectral locking altogether and stay plain white, adding zero overhead to
         opaque reflections.
@@ -237,7 +237,7 @@ return wavelengthRGB(sp.lambda) * sp.weight;    <span class="cm">// convert sing
       <p>
         Left to raw pseudo-random rolls, single-wavelength sampling suffers from stubborn
         chromatic speckle. To tame it, each pixel advances its wavelength parameter
-        <code>u</code> across frames in golden-ratio steps offset by our 64×64 blue-noise
+        <code>u</code> across frames in golden-ratio steps offset by a 64×64 blue-noise
         tile, and each frame's light-tracing batch sweeps across the spectrum the same way.
         Even the first dozen samples per pixel span violet through red fairly evenly.
       </p>
@@ -267,7 +267,7 @@ return wavelengthRGB(sp.lambda) * sp.weight;    <span class="cm">// convert sing
       <h2 id="assembly"><span class="kicker">Step 4 · Assembly</span>Prism, ball, and lens</h2>
       <p>
         The final scene lines up both the prism and the glass ball inside one beam and swaps
-        our pinhole camera for a thin lens. A pinhole shoots every pixel's rays from a
+        the pinhole camera for a thin lens. A pinhole shoots every pixel's rays from a
         single point, keeping the entire world sharply in focus at once. Give the lens a
         finite <em>aperture</em>, start each camera ray from a random point across that disk,
         and steer it toward the focal plane at <em>focus distance</em>: points resting on
@@ -320,14 +320,14 @@ return wavelengthRGB(sp.lambda) * sp.weight;    <span class="cm">// convert sing
         discover from the camera, launching rays from the light end turns a storm of sparks
         into a crisp caustic. And treating color itself as another sampled dimension lets a
         prism split white sunlight into a full spectrum without slowing down opaque paths at
-        all. If I kept pushing this spectral engine, I would upgrade to hero-wavelength
+        all. Pushing this spectral engine further would mean upgrading to hero-wavelength
         sampling (carrying four wavelengths per ray until dispersive glass forces them to
-        branch), swap Cauchy's fit for Sellmeier glass tables, and animate a rippling water
+        branch), swapping Cauchy's fit for Sellmeier glass tables, and animating a rippling water
         surface to cast dancing pool caustics.
       </p>
       <p>
-        That brings <em>Bounced Light</em> full circle. We began inside a 2D lava lamp where
-        radiance cascades let every pixel gather global illumination by matching spatial and
+        That brings <em>Bounced Light</em> full circle. The series began inside a 2D lava lamp
+        where radiance cascades let every pixel gather global illumination by matching spatial and
         angular resolution to distance, then stretched that 2D hierarchy to thousands of
         bonfire embers, multi-bounce rooms, and sunlit volumetric fog. Stepping out of
         flatland in part four traded cascades for analytic signed distance functions and

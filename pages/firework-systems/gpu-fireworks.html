@@ -129,7 +129,7 @@
           <em>Star Trek II</em> (1982), and laid out the technique in his 1983 SIGGRAPH
           paper. Each of his particles carried position, velocity, size, color,
           transparency, and lifetime, initialized from random variations around animator
-          parameters. Aside from a depth value, our 80-byte record is practically identical.
+          parameters. Aside from a depth value, this page's 80-byte record is practically identical.
           Two decades later, Lutz Latta's "Building a Million Particle System" shifted the
           entire particle state into GPU memory so simulation and rendering never had to
           round-trip through the CPU, which is the direct ancestor of the pipeline here.
@@ -250,7 +250,7 @@ drawIndirect     <span class="cm">// compacted particle list, sized by finishFra
           GPU-populated draw arguments first landed in mainstream APIs with Direct3D 11 in
           2009 and OpenGL 4.0 in 2010. Direct3D 11 also packaged the atomic-append pattern
           as a dedicated resource type called <code>AppendStructuredBuffer</code>. WebGPU
-          leaves that abstraction out, so we build it from a raw storage buffer paired with
+          leaves that abstraction out, so this renderer builds it from a raw storage buffer paired with
           an atomic counter, which is all an append buffer ever was in the first place.
         </p>
       </aside>
@@ -261,13 +261,13 @@ drawIndirect     <span class="cm">// compacted particle list, sized by finishFra
         Most particle demos hardcode a safe ceiling like "max 150,000 particles" so nobody
         accidentally melts a laptop. That mixes a tuning preference with a hardware boundary.
         What the hardware actually enforces is the maximum size of a single storage buffer
-        binding, and our per-buffer particle capacity falls directly out of dividing that
-        limit by our 80-byte stride:
+        binding, and the per-buffer particle capacity falls directly out of dividing that
+        limit by the 80-byte stride:
       </p>
       <pre><code>capacity = floor(device.limits.maxStorageBufferBindingSize / 80)</code></pre>
       <p>
-        Because this page requests a WebGPU device with default limits, every browser gives
-        us a 128 MiB storage binding, which works out to 1,677,721 particles per buffer.
+        Because this page requests a WebGPU device with default limits, every browser hands
+        it a 128 MiB storage binding, which works out to 1,677,721 particles per buffer.
         Most desktop GPUs will happily grant much larger bindings if you request them via
         <code>requiredLimits</code>, and the diagram below queries your adapter to show
         what it would allow. With two ping-pong buffers, particle storage takes 256 MiB.
@@ -452,11 +452,11 @@ device.popErrorScope().then((error) =&gt; {
         code and bandwidth small.
       </p>
       <p>
-        If I keep pushing this renderer further, three experiments are right at the top of
-        my list. First, letting a compute pass append new emit commands into a GPU-side
+        Three experiments sit right at the top of the list for pushing this
+        renderer further. First, letting a compute pass append new emit commands into a GPU-side
         queue would move the delayed satellite pops around each main shell off the CPU too,
         making multi-stage shells completely self-sustaining on the GPU. Second, wiring
-        WebGPU timestamp queries around each pass would tell us cleanly whether a frame drop
+        WebGPU timestamp queries around each pass would show cleanly whether a frame drop
         at 1.7 million particles is bound by emission, compaction, or sheer billboard fill
         rate. Finally, rendering smoke in a separate alpha-blended pass would let it occlude
         and darken the bright bursts behind it, though that immediately reintroduces sorting

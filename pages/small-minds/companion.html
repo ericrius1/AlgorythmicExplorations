@@ -60,11 +60,11 @@
       <p>
         A pet that never changes gets stale in five minutes; a neural network that only trains on
         the newest message suffers <strong>catastrophic forgetting</strong>, overwriting its entire
-        vocabulary with the last sentence you typed. Our companion solves this with an
+        vocabulary with the last sentence you typed. The companion solves this with an
         <strong>episodic replay buffer</strong>.
       </p>
       <p>
-        Whenever you send a message, the pet first runs real autoregressive decoding through our
+        Whenever you send a message, the pet first runs real autoregressive decoding through a
         pure-WebGPU micro-Transformer (<code>RMSNorm + RoPE + FlashAttention + SwiGLU</code>) and
         captures its live Layer-0 attention heatmap. It then appends your exchange to its personal
         memory bank and executes a short burst of conservative WebGPU gradient steps sampled from a

@@ -52,9 +52,9 @@
         so its troughs meander and dead-end in isolated bowls.
       </p>
       <p>
-        To give the terrain that missing geological history, we run particle-based
-        <em>hydraulic erosion</em>. Rather than solving shallow-water fluid equations across
-        the entire map at once, we release individual raindrops onto the heightfield, let
+        Particle-based <em>hydraulic erosion</em> gives the terrain that missing geological
+        history. Rather than solving shallow-water fluid equations across the entire map at
+        once, the simulation releases individual raindrops onto the heightfield, lets
         each one roll downhill while picking up and dropping dirt, and repeat the process
         tens of thousands of times until separate dents merge into connected channels.
       </p>
@@ -98,8 +98,8 @@ water *= (1 − evaporation)                          <span class="cm">// and it
         inspects only the slope directly beneath it, yet paths arriving from wide stretches
         of hillside converge into the same narrow drainage lines simply because gravity
         funnels them toward the lowest ground. Once a droplet goes six steps without hitting
-        a new elevation minimum, it is sloshing back and forth inside a basin, so we stop
-        tracing its trail and stamp a faint blue dot where water would collect into a pond.
+        a new elevation minimum, it is sloshing back and forth inside a basin, so the tracer stops
+        following its trail and stamps a faint blue dot where water would collect into a pond.
         Push <strong>inertia</strong> up and watch droplets overshoot turns and climb partway
         up opposing slopes; hit <strong>downpour (500)</strong> to drop a burst at once.
       </p>
@@ -216,7 +216,7 @@ else:                   erode toward capacity          <span class="cm">// fast 
       <p>
         Just as useful is the side ledger maintained alongside the heights. Every cell keeps
         a running total of its net elevation change, negative where water stripped away rock
-        and positive where silt settled out. Keeping that one extra array hands us a free
+        and positive where silt settled out. Keeping that one extra array yields a free
         soil map: bare scoured stone in steep chutes, deep alluvial soil across the valley
         bottoms. Part three will read straight from that ledger to decide where grass grows.
       </p>
@@ -229,12 +229,11 @@ else:                   erode toward capacity          <span class="cm">// fast 
         isolation with zero stored state. Erosion is inherently stateful and sequential:
         every droplet modifies the ground that later droplets roll across, so the carved
         result only exists inside a bounded grid simulated from start to finish. That works
-        beautifully for a standalone patch of mountains, and becomes a real headache once we
-        want an endless world with no edges. We will confront that trade-off directly in
-        part six.
+        beautifully for a standalone patch of mountains, and becomes a real headache once the
+        goal is an endless world with no edges. Part six confronts that trade-off directly.
       </p>
       <p>
-        If I were extending this simulation next, I would port the droplets to a GPU compute
+        The natural next extension of this simulation would port the droplets to a GPU compute
         shader and accept the occasional write collision for an order-of-magnitude speed
         boost, add a thermal weathering pass so sheer gully walls slump into realistic scree
         aprons, and test eroding at a coarse grid resolution before layering fine procedural

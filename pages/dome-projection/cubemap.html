@@ -279,12 +279,12 @@ cubemap test pattern:
         and swapping between them costs a single texture fetch per pixel. Choosing between
         them comes down to where your work sits: delivery pipelines lean toward a single
         fisheye frame, rasterized 3D worlds lean toward standard 90-degree cube cameras, and
-        hybrid setups comfortably mix the two. If I were extending Figure 1, I would render
+        hybrid setups comfortably mix the two. A natural extension of Figure 1 would render
         the hero's live starfield into five actual cubemap render targets side by side and
         turn on a per-face bloom pass so those cube-edge seams become impossible to miss.
       </p>
       <p>
-        Up to now we have pretended the dome receives one clean seamless image all by
+        Up to now this series has pretended the dome receives one clean seamless image all by
         itself. Once a theater grows larger than a small inflatable tent, though, one
         projector can no longer light the entire ceiling, and multiple overlapping beams
         have to stitch that master back together in physical space.

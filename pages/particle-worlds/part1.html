@@ -246,8 +246,8 @@ for (var t = 0u; t &lt; numTiles; t++) {
         The slider now starts at 30,000 bodies and stretches all the way to 120,000, pushing
         the wall dozens of times farther out than the CPU could reach. Even so, the quadratic
         curve is still waiting: at 120,000 bodies the GPU is grinding through 14.4 billion pair
-        forces on every single tick. To reach hundreds of thousands of bodies cleanly, we have
-        to compute far fewer forces in the first place.
+        forces on every single tick. Reaching hundreds of thousands of bodies cleanly means
+        computing far fewer forces in the first place.
       </p>
 
       <!-- ================================================================ -->
@@ -473,7 +473,7 @@ force    → every body walks the implicit tree            <span class="cm">(Bar
       <p>
         On a modern laptop GPU, this runs 300,000 bodies at 60 frames per second with two
         substeps per frame, roughly 36 million body-steps every second, using the exact same
-        softened Newton formula we started with. Stacking up each step shows where the gains
+        softened Newton formula the series started with. Stacking up each step shows where the gains
         actually came from:
       </p>
       <pre><code>two loops in JS             ~4,000 bodies          (Step 2)
@@ -499,7 +499,7 @@ force    → every body walks the implicit tree            <span class="cm">(Bar
           hundred particles and watched their flat disks repeatedly buckle into rotating bars.
           Because real spiral galaxies stay flat for billions of years, they argued that
           visible disks must sit embedded inside a much heavier invisible halo, providing one
-          of the foundational arguments for dark matter. Our demo uses a simple cored halo
+          of the foundational arguments for dark matter. The demo uses a simple cored halo
           pull, v²·r / (r² + core²), which yields the flat rotation curve astronomers observe
           in real spirals.
         </p>

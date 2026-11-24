@@ -49,8 +49,8 @@
         <a href="/pages/ground-truth/heightfield.html">Part one</a> kept the mountains
         stateless so any coordinate evaluates without a stored map, and
         <a href="/pages/ground-truth/biomes.html">part five</a> tied every tree and rock to
-        world-indexed grid integers so no tile ever needs to consult its neighbors. Now we
-        cash in both guarantees and drop the boundary completely.
+        world-indexed grid integers so no tile ever needs to consult its neighbors. This
+        final part cashes in both guarantees and drops the boundary completely.
       </p>
       <p>
         Memory is finite, so an endless landscape has to behave like a sliding window
@@ -136,7 +136,7 @@
             away chunk borders just as easily. Surface normals come from elevation
             differences between adjacent vertices, and a vertex sitting on a tile edge has
             no neighbor inside its own mesh. Falling back to a one-sided difference there
-            prints a faint lighting crease along every chunk boundary. Because our height
+            prints a faint lighting crease along every chunk boundary. Because the height
             function is stateless, the fix is almost free: evaluate one extra hidden row of
             heights outside all four borders so edge vertices run the exact same two-sided
             central difference as their neighbors.
@@ -158,7 +158,7 @@
       <h2 id="budget"><span class="kicker">Step 3 · The budget</span>Building a few milliseconds at a time</h2>
       <p>
         Hitting 60 frames per second gives you 16.7 milliseconds for everything: simulation,
-        mesh generation, and rendering. On my laptop, building one full-resolution chunk
+        mesh generation, and rendering. On a typical laptop, building one full-resolution chunk
         with its shadow bake takes roughly 4 ms, scattering its trees takes well under 1 ms,
         and planting a quarter-chunk of grass takes around 2 ms. Every time the camera
         crosses a chunk boundary, dozens of tiles simultaneously need creating or upgrading;
@@ -241,7 +241,7 @@ for (const w of wanted) {
         Looking back across all six parts of Ground Truth, the whole landscape grew out of
         one recurring engineering trade-off: deciding what can stay pure math and what
         genuinely needs state. Hashed gradient noise summed across rotated octaves, ridged,
-        warped, and shaped gave us reproducible mountains at any coordinate. Where a scene
+        warped, and shaped yielded reproducible mountains at any coordinate. Where a scene
         could afford bounded memory, simulated raindrops carved connected drainage networks
         and handed over a soil ledger for free. Grass and trees pushed static placement and
         self-shadowing to build time so the GPU could animate hundreds of thousands of

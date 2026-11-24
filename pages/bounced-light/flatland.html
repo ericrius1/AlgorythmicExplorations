@@ -210,7 +210,7 @@ t += clamp(h, 0.012, 0.3);</code></pre>
       <p>
         Ambient occlusion borrows the exact same distance trick to darken tucked-away
         crevices. Stepping outward along the surface normal five times and comparing how far
-        we stepped (<code>h</code>) against what <code>map</code> reports as the true
+        each step went (<code>h</code>) against what <code>map</code> reports as the true
         nearest distance reveals whether nearby geometry is crowding overhead:
       </p>
       <pre><code>for (var i = 1; i &lt;= 5; i++) {
@@ -254,14 +254,14 @@ return clamp(1.0 - 1.6 * occ, 0.0, 1.0);</code></pre>
       ></div>
 
       <p>
-        Look closely at the lighting here and you can spot every shortcut we had to accept
+        Look closely at the lighting here and you can spot every shortcut accepted
         in exchange for real-time 3D speed. Bright metallic copper hovers right above a pale
         stone pedestal, yet the stone never picks up a warm copper tint from it; the subtle
-        warmth on downward-facing surfaces is just a constant fake bounce term I typed into
+        warmth on downward-facing surfaces is just a constant fake bounce term typed into
         the shader. The mirror-like reflections on the metal come from an analytic fake
         studio with two softboxes and a flat ground color rather than the actual concrete
         grid and pedestal underneath. Even the distant haze is a plain distance blend toward
-        the horizon color, with none of the physical scattering we built in part three.
+        the horizon color, with none of the physical scattering built in part three.
       </p>
 
       <!-- ================================================================ -->
@@ -270,8 +270,8 @@ return clamp(1.0 - 1.6 * occ, 0.0, 1.0);</code></pre>
         Analytic distance functions get a surprising amount of mileage out of a single
         function: one <code>map(p)</code> yields exact safe steps for ray intersections, four-tap surface
         normals, near-miss penumbras, and five-tap ambient occlusion, all running smoothly
-        inside a fragment shader with zero geometry buffers. If I wanted to push sphere
-        tracing further, I would look at domain repetition (tiling infinite geometry for the
+        inside a fragment shader with zero geometry buffers. Pushing sphere
+        tracing further would open up domain repetition (tiling infinite geometry for the
         cost of a modulo), cone tracing to anti-alias edges, and over-relaxed stepping
         (Keinert et al., 2014), which dares to step slightly past the safe radius and backs
         up on overshoot to cut down those expensive grazing silhouette steps.
@@ -289,8 +289,8 @@ return clamp(1.0 - 1.6 * occ, 0.0, 1.0);</code></pre>
         All of those heuristics are trying to imitate a single physical law that James
         Kajiya wrote down in 1986 as the <em>rendering equation</em>: the light leaving any
         surface point equals what it emits plus all light arriving from every direction,
-        scattered according to the material. In 3D we cannot easily tile the whole volume
-        with radiance cascades, but we can solve Kajiya's integral directly by averaging
+        scattered according to the material. In 3D, radiance cascades cannot easily tile the
+        whole volume, but Kajiya's integral can be solved directly by averaging
         random light paths.
       </p>
       <p class="continue">

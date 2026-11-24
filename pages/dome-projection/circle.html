@@ -57,7 +57,7 @@
         its angle while a blue point slides back and forth along its radius.
       </p>
       <p>
-        Over the next five articles we will build all the way from that simple circle to a
+        The next five articles build all the way from that simple circle to a
         calibrated multi-projector show and a real-time 3D rendering loop. Right now,
         though, everything comes down to converting cleanly between Cartesian
         (<em>x</em>, <em>y</em>) coordinates on a pixel grid and polar
@@ -137,7 +137,7 @@ v = clamp(r, 0, 1)   <span class="cm">// center to edge, 0..1</span></code></pre
       </p>
       <p>
         Even though the coordinates jump across the seam, the rendered image can still look
-        completely continuous. Our 12-column texture cycles smoothly around a color wheel so
+        completely continuous. The 12-column texture cycles smoothly around a color wheel so
         column 11 blends naturally into column 0, and its bilinear filter wraps horizontally.
         When a visible stripe does appear along <em>θ</em> = 0 in a real shader, one of two
         bugs is almost always responsible. The obvious culprit is leaving the sampler's
@@ -183,7 +183,7 @@ v = clamp(r, 0, 1)   <span class="cm">// center to edge, 0..1</span></code></pre
       <p>
         Working backward guarantees that every single output pixel asks once and receives a
         cleanly filtered color with zero gaps. That three-line loop drives the circle in
-        Figure 1, the ray-traced hero above, and every projection stage we will build for
+        Figure 1, the ray-traced hero above, and every projection stage built for
         the rest of this series.
       </p>
       <details class="fold">
@@ -207,15 +207,15 @@ v = clamp(r, 0, 1)   <span class="cm">// center to edge, 0..1</span></code></pre
       <p>
         Recovering full-quadrant angles with <code>atan2</code>, respecting the wrap
         boundary in both filtering and mip gradients, and sampling backward from output
-        pixels form the bedrock of every fulldome shader. One thing I
-        would still love to add to Figure 1 someday is a live GPU toggle that intentionally
+        pixels form the bedrock of every fulldome shader. One addition Figure 1
+        still deserves someday is a live GPU toggle that intentionally
         breaks the mipmap derivatives at <em>θ</em> = 0 so you can watch that infamous
         one-pixel seam line pop into view and vanish again under <code>textureSampleGrad</code>.
       </p>
       <p>
-        Right now our radius <em>r</em> just walks outward across a flat disk. Next, we
-        lift that circle into three dimensions so each pixel represents a ray pointing into
-        the dome, and see how different fisheye lens formulas fight over how to spend the
+        Right now the radius <em>r</em> just walks outward across a flat disk. Next, that
+        circle lifts into three dimensions so each pixel represents a ray pointing into
+        the dome, revealing how different fisheye lens formulas fight over how to spend the
         radius from zenith to horizon.
       </p>
       <p class="continue">
