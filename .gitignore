@@ -2,3 +2,5 @@ node_modules
 .vercel
 dist
 .clips
+__pycache__/
+*.pyc

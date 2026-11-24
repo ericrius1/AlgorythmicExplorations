@@ -1,0 +1,92 @@
+[
+  {
+    "species": "mochi",
+    "bytes": 877932,
+    "speciesValBpb": 0.1746,
+    "generalValBpb": 1.2929,
+    "samples": {
+      "user: hi!": "mrrp! hi friend! i saved you the warmest spot in this sunbeam.",
+      "user: who are you?": "mrrp! i am mochi, a squishy calico kitten who purrs in warm chimes and naps in sunbeams.",
+      "user: what do you like?": "sunbeams, tangled yarn, warm milk, gentle ear scratches, and quiet talks with you.",
+      "user: do a trick!": "mrrp! watch my soft paw hop, or ask me to spin, bow, sing, dash, or starflip!",
+      "user: what should we do today?": "we could toss glowing orbs, practice a tricky starflip, or just chat while my weights learn!",
+      "user: tell me about webgpu": "thousands of tiny threads tiling matrices together right inside your browser so i can purr and think!",
+      "user: i had a long day": "mrrp... curl up right here with me. no rush at all, just soft purrs and warm light."
+    }
+  },
+  {
+    "species": "kitsune",
+    "bytes": 877940,
+    "speciesValBpb": 0.1756,
+    "generalValBpb": 1.2914,
+    "samples": {
+      "user: hi!": "kon! welcome back, friend! my lantern wisps brightened the moment you stepped near.",
+      "user: who are you?": "kon! i am kitsune, a spirit fox pup from a moonlit shrine forest whose tails bloom with every lesson lear",
+      "user: what do you like?": "moonlit shrines, clever riddles, floating petals, glowing orbs, and learning new patterns from you.",
+      "user: do a trick!": "kon! name the dance - hop, spin, bow, sing, dash, or a moonlit starflip!",
+      "user: what should we do today?": "let us trade a riddle, toss a bright orb, or teach me a brand-new word to keep in memory!",
+      "user: tell me about webgpu": "a weave of parallel gpu threads multiplying weight tiles together so my mind shines right in your browser",
+      "user: i had a long day": "rest beneath the lantern glow with me, friend. even the moon pauses quietly over the pond."
+    }
+  },
+  {
+    "species": "pebble",
+    "bytes": 877936,
+    "speciesValBpb": 0.1829,
+    "generalValBpb": 1.29,
+    "samples": {
+      "user: hi!": "blub! hi hi friend! my frilly gills just did a happy little wiggle!",
+      "user: who are you?": "blub! i am pebble, a beaming mossy axolotl pond sprite with frilly gills and a pocketful of dewdrops!",
+      "user: what do you like?": "lily pads, soft rain, smooth stones, glowing orbs, moss caps, and smiling with you!",
+      "user: do a trick!": "blub! watch my wiggly moves - ask for a hop, spin, bow, sing, dash, or a splashy flip!",
+      "user: what should we do today?": "let us play fetch with a glowing orb, practice a wiggly flip, or chat about anything you like!",
+      "user: tell me about webgpu": "hundreds of tiny gpu workers teaming up like ripples on a pond so i can learn right in your tab!",
+      "user: i had a long day": "come sit on the softest moss stone beside me, friend. we can listen to gentle raindrops together."
+    }
+  },
+  {
+    "species": "pip",
+    "bytes": 877936,
+    "speciesValBpb": 0.1771,
+    "generalValBpb": 1.2927,
+    "samples": {
+      "user: hi!": "hoo! hello friend! i just finished charting a new star and hoped you would visit.",
+      "user: who are you?": "hoo! i am pip, a starry barn owlet astronomer learning new words and constellations with you.",
+      "user: what do you like?": "constellations, midnight lanterns, quiet reading, glowing orbs, and clever questions from you!",
+      "user: do a trick!": "hoot! pick any move - hop, spin, bow, sing, dash, or a feathered starflip!",
+      "user: what should we do today?": "let us explore a new world, toss an orb, or test how fast my attention heads pick up a new phrase!",
+      "user: tell me about webgpu": "a modern gpu pipeline where tiled compute shaders run my whole transformer right on your machine!",
+      "user: i had a long day": "perch quietly beside me for a while, friend. night skies are made for slow breathing and rest."
+    }
+  },
+  {
+    "species": "bramble",
+    "bytes": 877940,
+    "speciesValBpb": 0.1731,
+    "generalValBpb": 1.2889,
+    "samples": {
+      "user: hi!": "chirp! hi friend!! my ringed tail started swishing the moment you showed up!",
+      "user: who are you?": "chirp! i am bramble, a velvety cloud red panda cub who loves zoomies, soft moss, and glowing acorns!",
+      "user: what do you like?": "zoomies, chasing glowing orbs, soft moss, cozy campfires, forest clover, and chatting with you!",
+      "user: do a trick!": "chirp! call it out - hop, spin, bow, sing, zoomies dash, or a giant starflip!",
+      "user: what should we do today?": "let us toss a glowing orb, learn a trick to 100 percent mastery, or explore a new world!",
+      "user: tell me about webgpu": "super-fast gpu math running right in your browser so my little panda brain can learn live with you!",
+      "user: i had a long day": "let us plop down in a soft clover patch by the bonfire. i make a great warm pillow!"
+    }
+  },
+  {
+    "species": "luma",
+    "bytes": 877932,
+    "speciesValBpb": 0.1738,
+    "generalValBpb": 1.2907,
+    "samples": {
+      "user: hi!": "bloop! hello friend... soft ripples of cyan light just danced through my bell to greet you.",
+      "user: who are you?": "bloop! i am luma, a translucent starlight sprite drifting on ripples of light whose heart pulses with you",
+      "user: what do you like?": "shimmering nebulas, gentle chords, glassy ripples, glowing orbs, and peaceful talks with you.",
+      "user: do a trick!": "shimmer! ask me to hop, spin, bow, sing, glide-dash, or trace a luminous starflip!",
+      "user: what should we do today?": "we can drift through a new world, ring gentle chords in harmonic hall, or simply talk.",
+      "user: tell me about webgpu": "waves of parallel gpu threads flowing smoothly through matrix tiles so i can dream right in your tab.",
+      "user: i had a long day": "float here with me for a moment, friend. let the quiet tide carry away all the noise."
+    }
+  }
+]

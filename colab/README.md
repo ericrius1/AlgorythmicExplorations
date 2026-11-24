@@ -27,6 +27,16 @@ Zero Google Drive storage required — every notebook streams data directly into
 
 ## Recommended Colab Runtime Setup (Google AI Ultra)
 
+### Option A: Automated from Terminal (`colab` CLI)
+If you have `google-colab-cli` installed (`colab --auth=adc whoami`):
+```bash
+colab --auth=adc new -s small-minds --gpu A100   # or L4 / H100 / T4
+colab --auth=adc exec -s small-minds -f colab/small_minds_companion_trainer.ipynb --timeout 0
+colab --auth=adc download -s small-minds /content/small-minds-models.zip ./small-minds-models.zip
+colab --auth=adc stop -s small-minds
+```
+
+### Option B: Browser UI
 1. Open either notebook in Google Colab (via the GitHub link above or `File → Upload notebook`).
 2. **Runtime → Change runtime type → `A100 GPU`** (or `L4` for fast cheap runs).
 3. Turn on **Runtime → Manage sessions / Background execution** if you want the overnight AutoResearch sweep to keep running with your laptop closed.

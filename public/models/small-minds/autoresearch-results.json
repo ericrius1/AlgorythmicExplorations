@@ -1,0 +1,113 @@
+{
+  "gpu": "NVIDIA L4",
+  "winner": {
+    "trial": 6,
+    "label": "swiglu_adamw_3e-3",
+    "activation": "swiglu",
+    "optimizer": "adamw",
+    "lr": 0.003,
+    "ropeTheta": 10000.0,
+    "wd": 0.02,
+    "steps": 630,
+    "valLoss": 0.9774,
+    "valBpb": 1.41
+  },
+  "history": [
+    {
+      "trial": 1,
+      "label": "baseline_gelu_adamw",
+      "activation": "gelu",
+      "optimizer": "adamw",
+      "lr": 0.002,
+      "ropeTheta": 10000.0,
+      "wd": 0.02,
+      "steps": 571,
+      "valLoss": 1.0236,
+      "valBpb": 1.4767
+    },
+    {
+      "trial": 2,
+      "label": "swiglu_adamw",
+      "activation": "swiglu",
+      "optimizer": "adamw",
+      "lr": 0.002,
+      "ropeTheta": 10000.0,
+      "wd": 0.02,
+      "steps": 621,
+      "valLoss": 0.9964,
+      "valBpb": 1.4375
+    },
+    {
+      "trial": 3,
+      "label": "swiglu_muon_2e-3",
+      "activation": "swiglu",
+      "optimizer": "muon",
+      "lr": 0.002,
+      "ropeTheta": 10000.0,
+      "wd": 0.02,
+      "steps": 303,
+      "valLoss": 1.0069,
+      "valBpb": 1.4527
+    },
+    {
+      "trial": 4,
+      "label": "swiglu_muon_3e-3",
+      "activation": "swiglu",
+      "optimizer": "muon",
+      "lr": 0.003,
+      "ropeTheta": 10000.0,
+      "wd": 0.02,
+      "steps": 302,
+      "valLoss": 1.002,
+      "valBpb": 1.4456
+    },
+    {
+      "trial": 5,
+      "label": "swiglu_muon_theta1000",
+      "activation": "swiglu",
+      "optimizer": "muon",
+      "lr": 0.0025,
+      "ropeTheta": 1000.0,
+      "wd": 0.02,
+      "steps": 304,
+      "valLoss": 1.0012,
+      "valBpb": 1.4444
+    },
+    {
+      "trial": 6,
+      "label": "swiglu_adamw_3e-3",
+      "activation": "swiglu",
+      "optimizer": "adamw",
+      "lr": 0.003,
+      "ropeTheta": 10000.0,
+      "wd": 0.02,
+      "steps": 630,
+      "valLoss": 0.9774,
+      "valBpb": 1.41
+    },
+    {
+      "trial": 7,
+      "label": "swiglu_adamw_theta1000",
+      "activation": "swiglu",
+      "optimizer": "adamw",
+      "lr": 0.0025,
+      "ropeTheta": 1000.0,
+      "wd": 0.02,
+      "steps": 629,
+      "valLoss": 0.9814,
+      "valBpb": 1.4159
+    },
+    {
+      "trial": 8,
+      "label": "gelu_muon_2.5e-3",
+      "activation": "gelu",
+      "optimizer": "muon",
+      "lr": 0.0025,
+      "ropeTheta": 1000.0,
+      "wd": 0.02,
+      "steps": 304,
+      "valLoss": 1.0004,
+      "valBpb": 1.4432
+    }
+  ]
+}

@@ -526,8 +526,8 @@ export class PetBrain {
       }
       const prompt = encodeText(promptStr);
       const gen = await this.llm.generate(prompt, {
-        maxNewTokens: this.isPretrained ? 110 : 48,
-        temperature: this.isPretrained ? 0.68 : 0.72,
+        maxNewTokens: this.isPretrained ? 140 : 48,
+        temperature: this.isPretrained ? 0.65 : 0.72,
         topP: 0.9,
         stopTokenIds: [NL_ID, EOS_ID],
       });
