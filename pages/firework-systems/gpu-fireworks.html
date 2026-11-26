@@ -42,6 +42,15 @@
     </header>
 
     <main>
+      <p class="series-intro">
+        <span class="series-intro-label">Series overview · Firework Systems</span>
+        <strong>Firework Systems</strong> examines how to scale a real-time particle show past a
+        million sparks by handing the entire particle lifecycle over to the GPU. Rather than
+        pushing individual sparks from JavaScript, this essay builds a complete WebGPU fireworks
+        engine where the CPU uploads only compact 96-byte launch recipes while compute shaders
+        handle parallel emission, ballistic flight, dead-particle stream compaction into a tight
+        live list, indirect draw calls, and non-blocking counter readbacks.
+      </p>
       <p>
         If you build a fireworks demo with a standard CPU ring buffer, everything behaves
         politely right up until you hold the mouse button down. A single rocket is cheap,
@@ -306,7 +315,7 @@ drawIndirect     <span class="cm">// compacted particle list, sized by finishFra
         <p>
           Web browsers intentionally avoid exposing a portable "total VRAM available to
           this tab" API. WebGPU hands you concrete binding limits, and your own code knows
-          exactly how many bytes it allocated, so those are the two honest numbers to
+          exactly how many bytes it allocated, so those are the two reliable numbers to
           surface: the largest legal particle buffer and the total VRAM the effect actually
           claimed.
         </p>

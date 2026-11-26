@@ -101,6 +101,9 @@ export function initNav(): void {
   right.appendChild(github);
 
   const toggle = el("button", "site-nav-toggle", "all posts ▾");
+  toggle.type = "button";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-haspopup", "true");
   right.appendChild(toggle);
   nav.appendChild(right);
 
@@ -133,6 +136,9 @@ export function initNav(): void {
     });
   }
 
+  const backdrop = el("div", "site-nav-backdrop");
+  backdrop.setAttribute("aria-hidden", "true");
+
   const menu = buildMenu(post);
   // phones hide the Contact / GitHub buttons, so the menu carries them too
   const extras = el("div", "site-nav-menu-links");
@@ -142,18 +148,56 @@ export function initNav(): void {
     extras.appendChild(a);
   }
   menu.appendChild(extras);
-  nav.appendChild(menu);
+
+  const syncMenuTop = () => {
+    const top = Math.round(nav.getBoundingClientRect().bottom + 6);
+    menu.style.setProperty("--site-nav-menu-top", `${top}px`);
+  };
+
+  const setMenuOpen = (open: boolean) => {
+    if (open) syncMenuTop();
+    menu.classList.toggle("is-open", open);
+    backdrop.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const cur = menu.querySelector<HTMLElement>(".site-nav-item.is-current");
+      if (cur) {
+        const top = cur.offsetTop;
+        const bottom = top + cur.offsetHeight;
+        if (top < menu.scrollTop || bottom > menu.scrollTop + menu.clientHeight) {
+          menu.scrollTop = Math.max(0, top - menu.clientHeight * 0.35);
+        }
+      }
+    }
+  };
+
   toggle.addEventListener("click", (e) => {
     e.stopPropagation();
-    menu.classList.toggle("is-open");
+    setMenuOpen(!menu.classList.contains("is-open"));
   });
+  backdrop.addEventListener("click", () => setMenuOpen(false));
+  backdrop.addEventListener("touchmove", (e) => {
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
   document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target as Node)) menu.classList.remove("is-open");
+    if (menu.classList.contains("is-open") && !menu.contains(e.target as Node) && !toggle.contains(e.target as Node)) {
+      setMenuOpen(false);
+    }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") menu.classList.remove("is-open");
+    if (e.key === "Escape") setMenuOpen(false);
   });
+  window.addEventListener("resize", () => {
+    if (menu.classList.contains("is-open")) syncMenuTop();
+  }, { passive: true });
+  window.visualViewport?.addEventListener("resize", () => {
+    if (menu.classList.contains("is-open")) syncMenuTop();
+  }, { passive: true });
 
+  // Mount menu and backdrop directly on body (outside the fixed+backdrop-filter nav)
+  // so iOS Safari's touch-scroll hit-testing attaches to the menu cleanly.
+  document.body.prepend(menu);
+  document.body.prepend(backdrop);
   document.body.prepend(nav);
 
   // ---- hero scroll hint (markup lives in each page's <header.hero>) ----------

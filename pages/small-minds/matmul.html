@@ -50,10 +50,10 @@
         <a href="/pages/small-minds/learning.html">Part 3</a>. Now comes the leap from toy 2D planes
         to a real modern Transformer running straight on your computer's graphics chip using
         <strong>pure WebGPU</strong> and hand-written WGSL compute shaders — no ML frameworks, no
-        PyTorch in the browser, no hidden black boxes.
+        PyTorch in the browser, no external runtime.
       </p>
       <p>
-        Two huge practical questions stand right at the entrance of any real language model:
+        Two practical questions stand right at the entrance of any real language model:
       </p>
       <ol>
         <li>
@@ -62,7 +62,7 @@
           a clean grid of numbers without losing meaning or exploding vocabulary size?
         </li>
         <li>
-          <strong>The hardware bottleneck:</strong> Strip away the mystique around a Transformer and
+          <strong>The hardware bottleneck:</strong> Break a Transformer down into its compute graph and
           almost every layer — projecting tokens into attention queries, routing concepts through
           feed-forward memory, predicting the next symbol, and sending gradients backward — is one
           operation repeated hundreds of times per second: multiplying two dense grids of numbers. Why

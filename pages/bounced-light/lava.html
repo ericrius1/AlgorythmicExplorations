@@ -44,6 +44,19 @@
     </header>
 
     <main>
+      <p class="series-intro">
+        <span class="series-intro-label">Series overview · Bounced Light</span>
+        <strong>Bounced Light</strong> leaves fake additive glow behind and simulates how light
+        actually travels, shadows, scatters, and splits through a scene. Over six interactive
+        essays, the series builds a self-lit 2D lava lamp powered by radiance cascades here, a
+        bonfire of thousands of glowing embers in
+        <a href="/pages/bounced-light/bonfire.html">Part 2</a>, volumetric light scattering through
+        fog in <a href="/pages/bounced-light/fog.html">Part 3</a>, 3D sphere-traced soft shadows in
+        <a href="/pages/bounced-light/flatland.html">Part 4</a>, a Monte Carlo path-traced Cornell
+        box in <a href="/pages/bounced-light/cornell.html">Part 5</a>, and a dispersive glass prism
+        that splits white light into a spectrum in
+        <a href="/pages/bounced-light/prism.html">Part 6</a>.
+      </p>
       <p>
         The six parts of the
         <a href="/pages/particle-worlds/part1.html">Particle Worlds</a> series simulate
@@ -159,7 +172,7 @@ occlusion = 1 inside the wax           <span class="cm">// hot or cold, wax bloc
         Whether a blob is glowing hot or cooled to dark plum, it blocks light behind it. The
         same mass of wax starts out as a bright light source near the bottom coil, drifts up
         past cooler wax, and eventually becomes a dark occluder catching warm rim light from
-        the next rising plume. To render that honestly, every pixel needs to gather light
+        the next rising plume. To render that accurately, every pixel needs to gather light
         from across the entire canvas while respecting whatever wax sits in the way.
       </p>
 

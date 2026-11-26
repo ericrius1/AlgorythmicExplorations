@@ -1148,19 +1148,41 @@ body.ui-off .demo-readout {
   }
 }
 
+.site-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgba(6, 7, 11, 0.35);
+  touch-action: none;
+}
+
+.site-nav-backdrop.is-open {
+  display: block;
+}
+
 .site-nav-menu {
   display: none;
-  position: absolute;
-  top: calc(100% + 0.4rem);
+  position: fixed;
+  top: var(--site-nav-menu-top, 3.4rem);
   right: 0.8rem;
+  z-index: 60;
   width: min(24rem, calc(100vw - 1.6rem));
-  max-height: min(70vh, 34rem);
+  max-height: min(34rem, calc(100vh - var(--site-nav-menu-top, 3.4rem) - 0.8rem));
+  max-height: min(34rem, calc(100dvh - var(--site-nav-menu-top, 3.4rem) - 0.8rem));
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.6rem;
+  padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.82rem;
 }
 
 .site-nav-menu.is-open {
@@ -1548,6 +1570,67 @@ body {
   max-width: 46rem;
   margin: 1.6rem auto 3rem;
   font-size: 1.05rem;
+}
+
+.home-overview {
+  max-width: 48rem;
+  margin: 2rem auto 3.2rem;
+  padding-bottom: 2.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.home-overview-kicker {
+  margin: 0 0 0.4rem;
+  font: 600 0.74rem ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.home-overview h2 {
+  margin: 0 0 1.1rem;
+  font-size: clamp(1.5rem, 3.2vw, 1.95rem);
+}
+
+.home-overview p {
+  font-size: 1.02rem;
+  line-height: 1.72;
+  color: var(--text);
+}
+
+.home-pillars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.home-pillar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.home-pillar strong {
+  font-size: 0.86rem;
+  color: #eef1f8;
+}
+
+.home-pillar span {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 44rem) {
+  .home-pillars {
+    grid-template-columns: 1fr;
+  }
 }
 
 .home-series h2 {
@@ -2350,6 +2433,24 @@ body {
 }
 
 .essay main li::marker {
+  color: var(--accent);
+}
+
+.essay .series-intro {
+  margin: 0 0 1.65rem;
+  padding: 0.95rem 1.15rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  background: rgba(122, 162, 255, 0.06);
+  color: #e4e8f4;
+}
+
+.essay .series-intro-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font: 600 0.68rem ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 

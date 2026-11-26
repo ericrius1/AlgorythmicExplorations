@@ -10,7 +10,7 @@
     <title>The Guessing Game — Small Minds</title>
     <meta
       name="description"
-      content="Starting AI and language models from absolute zero: next-token prediction, counting Markov tables, surprise and cross-entropy loss, logits, softmax, temperature, top-p sampling, and why simple tables hit an exponential wall."
+      content="Starting AI and language models from scratch: next-token prediction, counting Markov tables, surprise and cross-entropy loss, logits, softmax, temperature, top-p sampling, and why simple tables hit an exponential wall."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -40,8 +40,18 @@
     </header>
 
     <main>
+      <p class="series-intro">
+        <span class="series-intro-label">Series overview · Small Minds</span>
+        <strong>Small Minds</strong> is an eight-part series on how neural networks and large
+        language models work—built from scratch in pure WebGPU right inside your browser tab, with
+        no Python frameworks, no ONNX, and no remote servers. Starting from letter-counting tables
+        and probability here, the series builds vectors and matrices, gradient descent and
+        backpropagation, tiled GPU matrix multiplication, rotary attention and FlashAttention, live
+        browser Transformer training, a 4-bit autonomous AutoResearch loop, and finally a living 3D
+        companion whose brain trains, chats, plays, and dreams on your own GPU.
+      </p>
       <p>
-        Modern AI chat assistants feel almost magical when you first talk to them. You ask a question
+        At first glance, modern AI chat assistants can seem hard to explain. You ask a question
         about biology, drop in a half-broken line of code, or ask for a bedtime story about a sleepy
         octopus, and fluent paragraphs stream across the screen. It is natural to imagine a giant
         encyclopedia hidden inside the server, or thousands of hand-written grammar rules stitched
@@ -67,9 +77,8 @@
         as side effects of becoming extraordinarily good at predicting what comes next.
       </p>
       <p>
-        This eight-part series builds a complete modern language model from absolute zero right inside
-        your browser tab — no Python frameworks, no hidden cloud servers, and no prior machine-learning
-        or linear-algebra background assumed. The path climbs one honest rung at a time:
+        Here is how the eight parts build from that single guessing game to a complete WebGPU
+        language model, step by step:
       </p>
       <ul>
         <li>
@@ -82,7 +91,7 @@
         </li>
         <li>
           <a href="/pages/small-minds/learning.html"><strong>Part 3 · Rolling Downhill</strong></a> —
-          slopes without calculus tears, loss valleys, Adam, and backpropagation worked out by hand.
+          slopes, loss valleys, Adam, and backpropagation worked out by hand.
         </li>
         <li>
           <a href="/pages/small-minds/matmul.html"><strong>Part 4 · The Grid That Thinks</strong></a> —
@@ -98,7 +107,7 @@
         </li>
         <li>
           <a href="/pages/small-minds/autoresearch.html"><strong>Part 7 · The Browser That Researches Itself</strong></a> —
-          KV caches, 4-bit weights, honest validation scores, and an autonomous WebGPU research loop.
+          KV caches, 4-bit weights, held-out validation scores, and an autonomous WebGPU research loop.
         </li>
         <li>
           <a href="/pages/small-minds/companion.html"><strong>Part 8 · A Creature of Your Own</strong></a> —

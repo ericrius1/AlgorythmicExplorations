@@ -181,13 +181,13 @@ acc = fma(w, x[col + lane], acc);</code></pre>
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="val-bpb"><span class="kicker">Step 3 · An honest compass</span>Validation bits-per-byte (val_bpb)</h2>
+      <h2 id="val-bpb"><span class="kicker">Step 3 · A fair benchmark</span>Validation bits-per-byte (val_bpb)</h2>
       <p>
         Now turn to the second half of this essay: <em>how do ML researchers systematically discover better
         model architectures and training recipes?</em>
       </p>
       <p>
-        Before letting an automated loop touch a single knob, you need one incorruptible scoreboard.
+        Before letting an automated loop touch a single knob, you need a reliable scoreboard.
         Remember Part 3's warning about <strong>overfitting</strong>: raw training loss is dangerously easy
         to game. Make a model 3× wider and its training loss plummets simply by memorizing training lines
         verbatim — even while it gets <em>worse</em> on new text! Worse still, if you change a model's
@@ -195,7 +195,7 @@ acc = fma(w, x[col + lane], acc);</code></pre>
         longer tokens carry more letters per guess.
       </p>
       <p>
-        The gold-standard compass solves both problems at once:
+        One metric solves both problems at once:
       </p>
       <ol>
         <li>
@@ -214,7 +214,7 @@ acc = fma(w, x[col + lane], acc);</code></pre>
         </li>
       </ol>
       <p>
-        Under a fixed budget, every architectural idea has to earn its keep honestly: a wider layer that
+        Under a fixed budget, every architectural change has to pay for its own runtime: a wider layer that
         runs slower or overfits loses; a cleaner activation or better learning-rate schedule that
         generalizes faster wins.
       </p>
@@ -222,9 +222,9 @@ acc = fma(w, x[col + lane], acc);</code></pre>
       <!-- ================================================================ -->
       <h2 id="autoresearch"><span class="kicker">Step 4 · The research loop</span>Autoresearch inside the browser</h2>
       <p>
-        Inspired by Andrej Karpathy's <em>autoresearch</em> — where an AI agent edits a training script,
-        runs a timed GPU experiment, checks <code>val_bpb</code>, and commits or reverts like a tireless
-        scientist — <code>BrowserAutoResearcher</code> brings that exact closed scientific loop straight
+        Inspired by Andrej Karpathy's <em>autoresearch</em> — where an agent edits a training script,
+        runs a timed GPU experiment, checks <code>val_bpb</code>, and keeps or discards the change —
+        <code>BrowserAutoResearcher</code> brings that closed experimental loop straight
         into your browser tab:
       </p>
       <ol>

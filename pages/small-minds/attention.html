@@ -163,7 +163,7 @@ out[i] = Σ (weight[i, j] · V[j])             <span class="cm">// blend the mat
         met token #600, it had never seen position 600 before.
       </p>
       <p>
-        In 2021, Jianlin Su and collaborators introduced a breathtakingly cleaner geometric idea now used
+        In 2021, Jianlin Su and collaborators introduced a much cleaner geometric idea now used
         by nearly every modern open-weight LLM (Llama, Qwen, DeepSeek, Mistral, and <em>Small Minds</em>):
         <strong>Rotary Positional Embeddings (RoPE)</strong>.
       </p>
@@ -183,7 +183,7 @@ angle   = t · ω_p
 x₀_rot  = x₀ · cos(angle) − x₁ · sin(angle)
 x₁_rot  = x₀ · sin(angle) + x₁ · cos(angle)</code></pre>
       <p>
-        Why is rotation pure magic? Suppose Query sits at position <code>m</code> (rotated by
+        Why does rotation work so well? Suppose Query sits at position <code>m</code> (rotated by
         <code>m · ω</code>) and Key sits at position <code>n</code> (rotated by <code>n · ω</code>).
         Remember Part 2's dot-product identity: the dot product of two 2D arrows depends <em>only on the
         angle between them</em>! Subtract their two angles:

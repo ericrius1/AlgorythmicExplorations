@@ -48,8 +48,8 @@
       </p>
       <p>
         So you take a careful step downhill. Pause, feel the slope under your boots again, take another
-        step downhill, and repeat. Astonishingly, that blindfolded hike — called <strong>gradient
-        descent</strong> — is how virtually every neural network in existence learns, whether it has
+        step downhill, and repeat. That simple local rule — called <strong>gradient
+        descent</strong> — is how virtually every neural network learns, whether it has
         three weights on a scratchpad or a trillion weights spread across a datacenter.
       </p>
       <p>
@@ -407,7 +407,7 @@ training loss dropping + validation loss CLIMBING   ──▶  overfitting (memo
       <ul>
         <li><strong>What an LLM outputs:</strong> logits → softmax probabilities over the next token, controlled by temperature and top-p, graded by cross-entropy surprise.</li>
         <li><strong>How an LLM thinks:</strong> vectors, dot products, matrix transformations, and nonlinear bends that fold high-dimensional space.</li>
-        <li><strong>How an LLM learns:</strong> backpropagation sweeping slopes backward via the chain rule, Adam steering weights smoothly down narrow valleys, and validation splits keeping it honest.</li>
+        <li><strong>How an LLM learns:</strong> backpropagation sweeping slopes backward via the chain rule, Adam steering weights smoothly down narrow valleys, and validation splits checking whether the model generalizes.</li>
       </ul>
       <p>
         Now it is time to leave toy 2D planes behind and step onto real graphics silicon. In Part 4, words

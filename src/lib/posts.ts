@@ -340,7 +340,7 @@ export const POSTS: Post[] = [
     series: "Small Minds",
     part: 3,
     title: "Rolling Downhill",
-    subtitle: "Loss valleys, slopes without calculus tears, Adam, and backpropagation by hand",
+    subtitle: "Loss valleys, derivatives, Adam, and backpropagation by hand",
   },
   {
     href: "/pages/small-minds/matmul.html",

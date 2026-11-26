@@ -42,6 +42,19 @@
     </header>
 
     <main>
+      <p class="series-intro">
+        <span class="series-intro-label">Series overview · Dome Projection</span>
+        <strong>Dome Projection</strong> traces the full geometry and rendering pipeline behind
+        planetarium fulldome visuals, from a single flat circle to a live 3D sky. Across five
+        essays, the series builds polar coordinate mapping and inverse texture sampling here,
+        converts 3D dome directions into fulldome fisheye frames in
+        <a href="/pages/dome-projection/fisheye.html">Part 2</a>, compares six-face cubemaps
+        against fisheye buffers in <a href="/pages/dome-projection/cubemap.html">Part 3</a>,
+        calibrates and edge-blends multiple projectors into one seamless show in
+        <a href="/pages/dome-projection/show.html">Part 4</a>, and wires up a real-time
+        dome-native Three.js renderer in
+        <a href="/pages/dome-projection/realtime.html">Part 5</a>.
+      </p>
       <p>
         Lean back in a planetarium seat and look straight overhead, and the entire screen
         reads as a disk. Before you touch a projector mount, a calibration mesh, or a
@@ -57,9 +70,7 @@
         its angle while a blue point slides back and forth along its radius.
       </p>
       <p>
-        The next five articles build all the way from that simple circle to a
-        calibrated multi-projector show and a real-time 3D rendering loop. Right now,
-        though, everything comes down to converting cleanly between Cartesian
+        In this first part, everything comes down to converting cleanly between Cartesian
         (<em>x</em>, <em>y</em>) coordinates on a pixel grid and polar
         (<em>r</em>, <em>θ</em>) coordinates around a center, while keeping careful track of
         the cut where the circle opens into a rectangle.
