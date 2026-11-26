@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Numbers That Point — Small Minds</title>
+    <meta
+      name="description"
+      content="The linear algebra and neural network foundations behind every AI, built visually from scratch: vectors, dot products, cosine similarity, matrices as space transformations, neurons, and why nonlinear activations are essential."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 2</p>
+        <h1>Numbers That Point</h1>
+        <p class="subtitle">
+          Vectors, dot products, matrices, and neurons — the compact toolkit of linear algebra that
+          turns words into geometry and folds space to separate ideas.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        The phrase <em>"linear algebra"</em> sounds like an intimidating sophomore college course full
+        of row-reduction worksheets and Greek letters. In practice, almost every modern neural network
+        — from a 70,000-parameter browser model up to the largest AI systems ever built — leans on just
+        <strong>three geometric ideas</strong> you can see with your own eyes in two dimensions:
+      </p>
+      <ol>
+        <li>A <strong>vector</strong>: a list of numbers that acts like an arrow in space.</li>
+        <li>A <strong>dot product</strong>: one multiply-and-add rule that measures how much two arrows point the same way.</li>
+        <li>A <strong>matrix</strong>: a grid of numbers that stretches, rotates, and shears an entire space at once.</li>
+      </ol>
+      <p>
+        Add one tiny fourth ingredient — a smooth nonlinear <strong>bend</strong> so stacked layers do
+        not collapse back into a single flat line — and you have the core mathematical vocabulary of
+        deep learning. Watch the grid overhead smoothly morphing, shearing, and twisting: every frame is
+        literally a <code>2 × 2</code> grid of four numbers moving every point on the plane in lockstep.
+      </p>
+      <aside class="note">
+        <span class="note-label">Companion guides · Free visual linear algebra primers</span>
+        <p>
+          Everything required for this series is built right here with zero prerequisites. If you want
+          to go even deeper into linear algebra alongside these essays, three free resources are
+          unbeatable for visual intuition:
+          <a href="https://www.3blue1brown.com/topics/linear-algebra"><strong>3Blue1Brown — Essence of Linear Algebra</strong></a>
+          (short animated videos that treat matrices as moving geometry),
+          <a href="https://immersivemath.com/ila/index.html"><strong>Immersive Linear Algebra</strong></a>
+          (an interactive online textbook with draggable 3D figures), and
+          <a href="https://www.khanacademy.org/math/linear-algebra"><strong>Khan Academy — Linear Algebra</strong></a>
+          (for step-by-step practice exercises).
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="vectors"><span class="kicker">Step 1 · Lists as arrows</span>What is a vector?</h2>
+      <p>
+        If you have ever plotted a point <code>(3, 2)</code> on graph paper in algebra class, you have
+        already used a vector. A <strong>vector</strong> is simply an ordered list of numbers — and it
+        helps to think of it in two ways at the same time:
+      </p>
+      <ul>
+        <li>
+          <strong>To a programmer or data scientist:</strong> a vector is a list of measurements or
+          features describing one thing. A pet might be described by <code>[size, fluffiness, energy]</code>
+          = <code>[0.2, 0.9, 0.7]</code>. A house might be <code>[square_feet, bedrooms, age]</code>.
+          In Part 4, every letter or word in a language model gets its own list of 64 (or 128, or 4,096)
+          learned coordinates!
+        </li>
+        <li>
+          <strong>To a geometer:</strong> a vector is an <strong>arrow</strong> starting at the origin
+          <code>(0, 0)</code> and landing at those coordinates. Two similar things produce two arrows
+          pointing into the same neighborhood of space; opposite concepts point in opposite directions.
+        </li>
+      </ul>
+      <p>
+        Vectors obey two super-clean arithmetic rules, both done slot-by-slot:
+      </p>
+      <pre><code><span class="cm">// 1. Adding two vectors (walking arrow a, then arrow b):</span>
+[2, 1] + [1, 3]  =  [2+1, 1+3]  =  [3, 4]
+
+<span class="cm">// 2. Scaling a vector by a plain number (stretching or flipping the arrow):</span>
+2.5 × [2, -1]    =  [5.0, -2.5]
+
+<span class="cm">// 3. Length (magnitude) — straight from the Pythagorean theorem!</span>
+|[3, 4]|  =  √(3² + 4²)  =  √(9 + 16)  =  5</code></pre>
+      <p>
+        Notice that Pythagoras does not care whether your list has 2 numbers or 4,096 numbers. The length
+        of a 64-number vector is still just the square root of the sum of all 64 squares:
+        <code>√(v₁² + v₂² + … + v₆₄²)</code>. Humans cannot picture 64-dimensional space directly, yet
+        every geometric rule — length, distance, angle, and shadow — works identically in 64 dimensions
+        as it does on flat 2D graph paper.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="dot"><span class="kicker">Step 2 · Measuring alignment</span>The dot product: AI's similarity detector</h2>
+      <p>
+        Suppose you have two vectors of the same length, <code>a = [a₁, a₂]</code> and
+        <code>b = [b₁, b₂]</code>. How do you ask a single arithmetic question that checks whether they
+        point in the same direction? You compute their <strong>dot product</strong>: multiply matching
+        slots together, then add the products into one single number:
+      </p>
+      <pre><code>a · b  =  a₁·b₁ + a₂·b₂          <span class="cm">// in 2D</span>
+a · b  =  a₁·b₁ + a₂·b₂ + … + aₙ·bₙ   <span class="cm">// in any number of dimensions!</span></code></pre>
+      <p>
+        At first that formula looks weirdly arbitrary — why multiply matching coordinates and add them?
+        Because of a miraculous geometric identity you can verify with basic trigonometry (the Law of
+        Cosines):
+      </p>
+      <pre><code>a · b  =  |a| · |b| · cos(θ)</code></pre>
+      <p>
+        where <code>θ</code> is the angle between the two arrows! Look at what <code>cos(θ)</code> does
+        as the angle changes:
+      </p>
+      <ul>
+        <li>
+          When <code>a</code> and <code>b</code> point the <strong>exact same way</strong> (<code>θ = 0°</code>),
+          <code>cos(0°) = +1</code>, so the dot product hits its maximum positive value <code>+|a||b|</code>.
+        </li>
+        <li>
+          When they sit at a <strong>right angle</strong> (<code>θ = 90°</code>, called
+          <em>orthogonal</em>), <code>cos(90°) = 0</code>, so the dot product is <strong>exactly zero</strong>.
+          In geometric terms, moving along <code>a</code> makes zero progress along <code>b</code>.
+        </li>
+        <li>
+          When they point in <strong>opposite directions</strong> (<code>θ = 180°</code>),
+          <code>cos(180°) = −1</code>, so the dot product is maximally negative: <code>−|a||b|</code>.
+        </li>
+      </ul>
+      <p>
+        Divide the dot product by both lengths — <code>(a · b) / (|a||b|) = cos(θ)</code> — and you strip
+        away arrow size completely, leaving pure directional alignment between <code>−1</code> and
+        <code>+1</code>. Machine learning calls that <strong>cosine similarity</strong>.
+      </p>
+      <p>
+        Drag the tips of the blue arrow <strong><code>a</code></strong> and amber arrow
+        <strong><code>b</code></strong> directly on the grid below. Watch the green shadow cast by
+        <code>a</code> onto the line of <code>b</code>, and check that the simple multiply-and-add
+        formula on the top right always equals <code>|a|·|b|·cos(θ)</code> on the bottom right to the
+        last decimal place!
+      </p>
+
+      <div
+        data-demo="dot-product"
+        data-title="Interactive Dot Product &amp; Projection"
+        data-hint="Drag the blue and amber arrow tips on the grid"
+      ></div>
+
+      <p>
+        Try lining <code>a</code> up perpendicular to <code>b</code> (or press <strong>perpendicular (0)</strong>):
+        the green shadow collapses to a single dot at the origin and <code>a · b</code> hits
+        <code>0.00</code>. Now drag <code>a</code> past 90° into the opposite half-plane: the shadow
+        flips backward along the dashed line and the dot product turns negative.
+      </p>
+      <p>
+        Why is this single operation the beating heart of modern AI? Because every time a neural network
+        asks a question, it uses a dot product:
+      </p>
+      <ul>
+        <li>
+          <strong>Feature detection:</strong> Store a template pattern in a weight vector <code>w</code>
+          and dot it with input <code>x</code>. High score means "this input matches my pattern!"
+        </li>
+        <li>
+          <strong>Attention (Part 5):</strong> Every token broadcasts a <em>Query</em> arrow ("what am I
+          looking for?") and dots it against every earlier token's <em>Key</em> arrow ("what do I have?").
+          Large positive dot product = pay strong attention!
+        </li>
+        <li>
+          <strong>Predicting the next word:</strong> Take the Transformer's final thought arrow and dot
+          it against every word vector in the vocabulary. The words pointing closest to the thought arrow
+          get the highest logits!
+        </li>
+      </ul>
+      <details class="fold">
+        <summary>Deep dive: why a₁b₁ + a₂b₂ equals |a||b|cos(θ)</summary>
+        <div class="fold-body">
+          <p>
+            Write both arrows using polar angles from the positive x-axis:
+            <code>a = [|a| cos α, |a| sin α]</code> and <code>b = [|b| cos β, |b| sin β]</code>.
+            Plug them into the multiply-and-add formula:
+          </p>
+          <pre><code>a · b = (|a| cos α)(|b| cos β) + (|a| sin α)(|b| sin β)
+      = |a| |b| (cos α cos β + sin α sin β)
+      = |a| |b| cos(α − β)</code></pre>
+          <p>
+            That last step uses the classic high-school angle-difference identity
+            <code>cos(α − β) = cos α cos β + sin α sin β</code> — the exact same trigonometry identity
+            that will come back in <a href="/pages/small-minds/attention.html">Part 5</a> to power
+            Rotary Positional Embeddings (RoPE)!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="matrices"><span class="kicker">Step 3 · Grids that warp space</span>What is a matrix, really?</h2>
+      <p>
+        One dot product asks one question about an input vector <code>x</code>. What if a neural layer
+        wants to ask <strong>64 different questions</strong> about <code>x</code> at the exact same time,
+        producing a new 64-number vector of answers?
+      </p>
+      <p>
+        Stack those 64 weight vectors on top of each other as rows in a rectangular grid. That grid is a
+        <strong>matrix</strong> <code>W</code>! Multiplying a matrix <code>W</code> (say 2 rows × 2
+        columns) by a vector <code>x</code> (2 numbers) simply runs <strong>one dot product per row</strong>:
+      </p>
+      <pre><code>┌ a  b ┐ ┌ x₁ ┐   ┌ a·x₁ + b·x₂ ┐   ← dot(row 0, x)
+└ c  d ┘ └ x₂ ┘ = └ c·x₁ + d·x₂ ┘   ← dot(row 1, x)</code></pre>
+      <p>
+        There is a second, equally magical way to read the exact same multiplication — by
+        <strong>columns</strong> instead of rows:
+      </p>
+      <pre><code>┌ a  b ┐ ┌ x₁ ┐       ┌ a ┐       ┌ b ┐
+└ c  d ┘ └ x₂ ┘ = x₁ ·└ c ┘ + x₂ ·└ d ┘</code></pre>
+      <p>
+        Look closely at what that column view says:
+      </p>
+      <ul>
+        <li>
+          Feed in the unit right-arrow <code>î = [1, 0]</code> and out pops the <strong>first column</strong>
+          <code>[a, c]</code>.
+        </li>
+        <li>
+          Feed in the unit up-arrow <code>ĵ = [0, 1]</code> and out pops the <strong>second column</strong>
+          <code>[b, d]</code>.
+        </li>
+        <li>
+          Every other vector <code>[x₁, x₂]</code> is carried smoothly along for the ride as
+          <code>x₁</code> steps along the new <code>î</code> plus <code>x₂</code> steps along the new
+          <code>ĵ</code>!
+        </li>
+      </ul>
+      <p>
+        That means a matrix is not just a static spreadsheet of numbers — <strong>a matrix is a
+        geometric verb</strong>. It takes the entire coordinate space and rotates it, stretches it,
+        shears it, mirrors it, or squashes it onto a line, while always keeping grid lines straight,
+        parallel, and evenly spaced (which is why this whole subject is called <em>linear</em> algebra).
+      </p>
+      <p>
+        Try warping space yourself in Figure 2 below. Move the four sliders <code>a, b, c, d</code> (or
+        hit the preset buttons) and drag the dashed blue input vector <strong><code>x</code></strong>
+        around the plane. Watch the bright pink output <strong><code>W·x</code></strong> move with the
+        warped grid, and watch the green/amber basis arrows always match the columns of <code>W</code>.
+      </p>
+
+      <div
+        data-demo="matrix-transform"
+        data-title="A 2×2 Matrix as a Space Transformation"
+        data-hint="Slide matrix entries or drag input vector x on the grid"
+      ></div>
+
+      <p>
+        Press <strong>squash (rank 1)</strong> and watch what happens: both columns line up along the
+        exact same slope, so the entire 2D plane collapses onto a single 1D line and the shaded unit
+        square loses all its area (<code>det = 0</code>). In neural networks, rectangular matrices do
+        this deliberately all the time: a <code>128 × 64</code> matrix lifts a 64D vector up into a
+        roomier 128D workspace (like an FFN "up-projection"), and a <code>64 × 128</code> matrix
+        compresses it right back down to 64D!
+      </p>
+      <p>
+        And what about multiplying <strong>two matrices together</strong>, <code>A × B</code>? If
+        <code>B</code> is a batch of vectors stacked side-by-side as columns (say, all 48 tokens in a
+        sentence!), then <code>A × B</code> simply transforms <em>every token vector in the sentence
+        simultaneously</em> — or equivalently, applies transformation <code>B</code> followed by
+        transformation <code>A</code>. In <a href="/pages/small-minds/matmul.html">Part 4</a>, that
+        single grid-times-grid operation turns out to account for over 95% of all arithmetic inside an LLM.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Matrix shapes rule: inner numbers must match!</span>
+        <p>
+          Whenever you see a matrix multiply like <code>[48, 64] × [64, 128] → [48, 128]</code> later in
+          this series, use one quick visual check: the <strong>inner two dimensions</strong>
+          (<code>64</code> and <code>64</code>) must match because those are the lengths of the vectors
+          being dotted together, and the <strong>outer two dimensions</strong> (<code>48</code> and
+          <code>128</code>) give the shape of the result! Keeping track of tensor shapes like this is
+          literally half the skill of reading any ML paper or GPU shader.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="neurons"><span class="kicker">Step 4 · Adding a bend</span>From matrices to neural networks (and why straight lines fail)</h2>
+      <p>
+        You are now one line of algebra away from a real artificial neuron. Take an input vector
+        <code>x</code>, dot it with a weight vector <code>w</code>, add one shift number called a
+        <strong>bias</strong> <code>b</code> (so the dividing boundary does not have to pass through
+        <code>(0, 0)</code>), and pass the result through a nonlinear bend <code>f</code>:
+      </p>
+      <pre><code><span class="cm">// One artificial neuron:</span>
+z = w · x + b                  <span class="cm">// linear score (dot product + threshold shift)</span>
+a = activation(z)              <span class="cm">// nonlinear bend (ReLU, tanh, GELU, or SiLU)</span>
+
+<span class="cm">// A whole layer of H neurons at once (matrix × vector!):</span>
+h = activation(W · x + b)      <span class="cm">// W has one row of weights per neuron</span></code></pre>
+      <p>
+        Wait — why bother with that <code>activation(z)</code> bend at the end? Why not just stack ten
+        matrices in a row: <code>W₁₀ · W₉ · … · W₂ · W₁ · x</code>?
+      </p>
+      <p>
+        Because <strong>the product of two matrices is just another single matrix!</strong> Rotate a
+        sheet of graph paper, then shear it, then stretch it: grid lines still stay perfectly straight
+        and parallel. You could stack a thousand linear layers deep and the entire mega-network would
+        mathematically collapse into <em>one</em> flat linear layer <code>W<sub>combined</sub> · x</code>.
+        And a flat linear classifier can only ever slice space with <strong>one straight line</strong>
+        (or flat plane in higher dimensions).
+      </p>
+      <p>
+        In 1969, Marvin Minsky and Seymour Papert famously pointed out a dead-simple puzzle that no
+        single straight line can ever solve: <strong>XOR</strong> ("exclusive OR"). Put blue dots in the
+        bottom-left and top-right corners, and mint dots in the top-left and bottom-right corners. Try
+        drawing one straight line across the square that puts both mint corners on one side and both blue
+        corners on the other. It is geometrically impossible!
+      </p>
+      <p>
+        Now watch what happens the instant you insert a tiny nonlinear bend — like
+        <code>ReLU(z) = max(0, z)</code> (which bends negative numbers flat to zero),
+        <code>tanh(z)</code> (a smooth S-curve), or modern Transformers' favorite
+        <code>SiLU(z) = z / (1 + e<sup>−z</sup>)</code> — between two matrix layers. Instead of merely
+        stretching and rotating the grid, the hidden layer can <strong>crease, fold, and curl space
+        itself</strong>!
+      </p>
+      <p>
+        Watch that fold happen live in Figure 3 below. On the left is the original 2D input space with
+        the network's predicted decision boundary; on the right is the <strong>hidden-layer space</strong>
+        showing where the first layer moved the grid and the dots.
+      </p>
+
+      <div
+        data-demo="nonlinear-fold"
+        data-title="Why Linear Layers Fail — and How a Bend Folds Space"
+        data-hint="Toggle activation OFF vs ON, or switch XOR to Rings"
+      ></div>
+
+      <p>
+        Try three quick tests on Figure 3:
+      </p>
+      <ol>
+        <li>
+          Click <strong>activation: tanh (bend ON)</strong> to switch it to <strong>LINEAR (bend OFF)</strong>.
+          Watch the network spin its wheels hopelessly at <strong>50% accuracy</strong> (pure coin flip!).
+          Look at the right panel: the hidden grid stayed flat and uncreased, so the mint and blue dots
+          remain hopelessly tangled.
+        </li>
+        <li>
+          Flip the bend back <strong>ON</strong> and drag <strong>hidden neurons</strong> down to
+          <code>2</code>. Watch the right panel closely as it trains: the nonlinear bend literally folds
+          the two opposite blue corners right on top of each other while pulling the mint corners apart,
+          so the dashed amber <strong>straight line</strong> in the output layer slices them cleanly at
+          <strong>100% accuracy</strong>!
+        </li>
+        <li>
+          Click <strong>task: XOR</strong> to switch to <strong>Rings</strong> (a mint bullseye trapped
+          inside a blue outer ring) and bump hidden neurons to <code>3</code> or <code>4</code>. A
+          straight line in input space stands zero chance — yet three bent neurons pinch the plane into a
+          triangle/dome in hidden space and lift the inner mint bullseye cleanly out of the blue ring!
+        </li>
+      </ol>
+      <details class="fold">
+        <summary>Deep dive: the four famous activation curves (ReLU, tanh, GELU, SiLU)</summary>
+        <div class="fold-body">
+          <p>
+            Almost any smooth nonlinear curve works in theory (the <em>Universal Approximation
+            Theorem</em> proves that even a single sufficiently wide hidden layer with a non-polynomial
+            bend can approximate any continuous function on a bounded region). In practice, modern deep
+            learning settled on a few favorites because of how nicely their slopes behave during training:
+          </p>
+          <pre><code>ReLU(z) = max(0, z)                 <span class="cm">// crisp hinge; fast, but negative side goes totally flat (slope 0)</span>
+tanh(z) = (eᶻ − e⁻ᶻ) / (eᶻ + e⁻ᶻ)   <span class="cm">// smooth S-curve in (−1, +1); classic for tiny nets</span>
+GELU(z) ≈ 0.5·z·(1 + tanh(…))       <span class="cm">// smooth probabilistic ReLU used in GPT-2 and BERT</span>
+SiLU(z) = z / (1 + e⁻ᶻ)             <span class="cm">// "Swish": smooth dip below zero, used inside SwiGLU (Llama, Qwen, Small Minds)</span></code></pre>
+          <p>
+            Notice how <code>SiLU(z)</code> behaves almost like <code>ReLU(z)</code> for large positive
+            and negative numbers, yet has a gentle, everywhere-differentiable curve around zero so
+            gradients never hit a sudden dead cliff.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="summary"><span class="kicker">Looking ahead</span>The missing half: where do the weights come from?</h2>
+      <p>
+        Take a breath and notice how far two essays have already climbed. You now understand every single
+        piece of the <em>forward pass</em> of a neural network:
+      </p>
+      <ul>
+        <li>Inputs and concepts are <strong>vectors</strong> (lists of coordinates / arrows in space).</li>
+        <li>Alignment and feature matching are <strong>dot products</strong> (multiply matching slots and add).</li>
+        <li>A layer of neurons is a <strong>matrix multiply</strong> (warping space / running many dot products at once) followed by a <strong>nonlinear bend</strong> that folds space.</li>
+        <li>At the top, raw scores (<strong>logits</strong>) turn into probabilities via <strong>softmax</strong> and get graded by <strong>cross-entropy surprise</strong>.</li>
+      </ul>
+      <p>
+        Wait — in Figure 3 above, those weights <code>W₁, b₁, W₂, b₂</code> started out as random junk,
+        yet within two seconds the network folded XOR and the concentric rings to 100% accuracy all by
+        itself. <em>How?</em> Nobody typed in the right numbers for <code>W₁</code>. The network figured
+        out which way to twist every single knob automatically by measuring slopes and rolling downhill.
+      </p>
+      <p>
+        Understanding that automatic knob-turning engine — <strong>gradient descent</strong> and
+        <strong>backpropagation</strong> — is the heart of all machine learning, and it is surprisingly
+        visual once you strip away scary calculus notation.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/learning.html">Part 3, Rolling Downhill</a>.</strong>
+        Loss landscapes, derivatives as plain sensitivity, why Adam beats naive gradient descent in narrow
+        canyons, and working through backpropagation by hand on a live circuit.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        Recommended linear algebra &amp; neural net primers:
+        <a href="https://www.3blue1brown.com/topics/linear-algebra">3Blue1Brown — Essence of Linear Algebra</a> ·
+        <a href="https://immersivemath.com/ila/index.html">Ström, Åström &amp; Akenine-Möller — Immersive Linear Algebra</a> ·
+        <a href="https://www.khanacademy.org/math/linear-algebra">Khan Academy — Linear Algebra</a> ·
+        <a href="https://www.3blue1brown.com/topics/neural-networks">3Blue1Brown — Neural Networks</a> ·
+        Minsky &amp; Papert (1969), <em>Perceptrons</em> ·
+        Cybenko (1989) &amp; Hornik (1991), Universal Approximation Theorems
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/vectors.ts"></script>
+  </body>
+</html>

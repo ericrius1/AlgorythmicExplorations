@@ -10,7 +10,7 @@
     <title>Paying Attention in One Pass — Small Minds</title>
     <meta
       name="description"
-      content="Modern Transformer internals in pure WebGPU: Rotary Positional Embeddings (RoPE), FlashAttention's online safe softmax, RMSNorm, and SwiGLU gated feed-forward blocks."
+      content="The complete modern Transformer forward pass built from intuition up in pure WebGPU: Queries, Keys, Values, causal multi-head attention, Rotary Positional Embeddings (RoPE), FlashAttention's online safe softmax, RMSNorm, and SwiGLU."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -26,11 +26,11 @@
     <header class="hero">
       <div data-demo="hero"></div>
       <div class="hero-title">
-        <p class="hero-kicker">Small Minds · Part 2</p>
+        <p class="hero-kicker">Small Minds · Part 5</p>
         <h1>Paying Attention in One Pass</h1>
         <p class="subtitle">
-          How RoPE encodes distance as rotation, why FlashAttention never writes its score matrix to
-          VRAM, and how RMSNorm + SwiGLU replaced the 2017 Transformer.
+          How isolated token vectors learn to talk to each other: Queries, Keys, Values, RoPE
+          clockwork, FlashAttention's single-pass trick, and the modern RMSNorm + SwiGLU block.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -41,71 +41,245 @@
 
     <main>
       <p>
-        Once a sentence becomes a sequence of embedding vectors, each token sits in isolation: the
-        vector for <em>"it"</em> has no idea whether it refers to <em>"cat"</em> or
-        <em>"star"</em> five positions earlier. Self-attention solves that by turning every token
-        into three projections — a <strong>Query</strong> (what this token is looking for), a
-        <strong>Key</strong> (what it offers), and a <strong>Value</strong> (what information it passes
-        along if matched) — and blending earlier values in proportion to how strongly their keys
-        align with its query.
+        Consider two English sentences containing the exact same word:
+      </p>
+      <blockquote>
+        <p>
+          <em>"She sat beside the mossy river <strong>bank</strong>."</em><br />
+          <em>"She walked into the downtown <strong>bank</strong>."</em>
+        </p>
+      </blockquote>
+      <p>
+        Right after the embedding table in <a href="/pages/small-minds/matmul.html">Part 4</a>, both
+        occurrences of <code>"bank"</code> pull the <em>exact same row</em> from <code>W_E</code>. That
+        static vector has no idea whether water or money is sitting three words earlier. Worse, look at
+        the sentence marching across the hero overhead: <em>"The small cat saw a star and chased
+        <strong>its</strong> warm glow."</em> On its own, the pronoun <code>"its"</code> is an empty
+        placeholder — to know what <code>"its"</code> means (and predict <code>"warm glow"</code> instead
+        of <code>"tail"</code>), position 8 has to reach backward across the sentence and pull context
+        from <code>"star"</code> and <code>"cat"</code>!
       </p>
       <p>
-        Because the model under construction predicts the next token, position
-        <code>t</code> is only allowed to look backward at positions <code>0..t</code> — never into
-        the future. Above, click <strong>next head</strong> to watch different attention heads
-        specialize: one locks onto subjects, another tracks local syntax, and another bridges
-        long-range pronouns across the sentence.
+        In 2017, a team of researchers published <em>Attention Is All You Need</em>, introducing the
+        <strong>Transformer</strong> — an architecture whose central mechanism lets every token
+        dynamically search all earlier tokens and blend their information using nothing more than
+        <strong>dot products</strong> (Part 2) and <strong>softmax</strong> (Part 1). Every modern LLM
+        ever since — GPT, Claude, Gemini, Llama, Qwen, DeepSeek, and the WebGPU model running on this
+        site — is a stack of Transformer blocks.
+      </p>
+      <p>
+        Click <strong>next head</strong> in the hero above to watch four parallel attention heads inspect
+        the same sentence with four different jobs: Head 0 tracks the subject (<code>"cat"</code>), Head 1
+        hugs neighboring syntax, Head 2 links long-range pronouns (<code>"its" → "cat"</code>,
+        <code>"glow" → "star"</code>), and Head 3 averages broad tone. Notice that bright ribbons only
+        ever arc <strong>backward to the left</strong>: because this model predicts the next token,
+        position <code>t</code> is strictly forbidden from peeking into the future (<code>t+1, t+2, …</code>).
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="rope"><span class="kicker">Step 1 · Position as angle</span>Rotary Positional Embeddings (RoPE)</h2>
+      <h2 id="qkv"><span class="kicker">Step 1 · Searching context</span>Queries, Keys, and Values</h2>
       <p>
-        Raw dot products are blind to word order: shuffle the sentence and every query-key score
-        stays identical. Early Transformers added a learned position vector straight onto the token
-        embedding. Modern architectures (Llama, Qwen, DeepSeek) do something far cleaner:
+        How do you let every token ask a question of every earlier token using only matrix math? Imagine
+        walking into a quiet library where every earlier token is a book sitting on a shelf. Three
+        separate roles make a search work:
+      </p>
+      <ul>
+        <li>
+          <strong>Query (<code>Q</code>) — "What am I looking for?"</strong> The current token
+          (<code>"its"</code>) writes down a search request vector, something like <em>"looking for a
+          singular noun that came earlier!"</em>
+        </li>
+        <li>
+          <strong>Key (<code>K</code>) — "What label is on my spine?"</strong> Every earlier token
+          advertises a short index card describing what kind of information it holds (<em>"I am a noun:
+          star!"</em>, <em>"I am a verb: chased!"</em>).
+        </li>
+        <li>
+          <strong>Value (<code>V</code>) — "What notes should I hand over if you pick me?"</strong> If a
+          book's Key matches the Query, it hands over its Value vector — the actual semantic payload to
+          blend into the current token's representation!
+        </li>
+      </ul>
+      <p>
+        How does one token vector <code>x</code> (say, 64 numbers long) produce three different vectors
+        <code>q</code>, <code>k</code>, and <code>v</code>? By multiplying it by three learned weight
+        matrices — <code>W_Q</code>, <code>W_K</code>, and <code>W_V</code>! Remember Part 2: each matrix
+        just projects the same token arrow through a different geometric lens.
+      </p>
+      <p>
+        Now wire up the entire <strong>scaled dot-product self-attention</strong> recipe in four lines
+        that use <em>only</em> tools from Parts 1 and 2:
+      </p>
+      <pre><code><span class="cm">// 1. Project every token into Query, Key, and Value grids (using Part 4's tiled matmul):</span>
+Q = X · W_Qᵀ      K = X · W_Kᵀ      V = X · W_Vᵀ
+
+<span class="cm">// 2. Score every (query i, key j) pair with a dot product, scaled by 1/√d_h:</span>
+score[i, j] = (Q[i] · K[j]) / √d_h           <span class="cm">// dot product = alignment!</span>
+
+<span class="cm">// 3. Causal mask (no peeking ahead!) + Softmax across valid past keys j ≤ i:</span>
+if (j &gt; i) score[i, j] = −∞                  <span class="cm">// exp(−∞) = 0% attention on future tokens</span>
+weight[i, 0..i] = softmax(score[i, 0..i])    <span class="cm">// probabilities summing to 100%!</span>
+
+<span class="cm">// 4. Weighted average of earlier Value vectors:</span>
+out[i] = Σ (weight[i, j] · V[j])             <span class="cm">// blend the matching books' notes!</span></code></pre>
+      <p>
+        Pause on two tiny details that trip up almost every newcomer until someone spells them out:
+      </p>
+      <ul>
+        <li>
+          <strong>Why divide by <code>√d_h</code>?</strong> Suppose each query and key has
+          <code>d_h = 64</code> random numbers around size <code>±1</code>. When you multiply 64 pairs
+          and add them up, a random walk of 64 terms has typical spread around <code>√64 = 8</code> (so
+          scores swing between <code>−16</code> and <code>+16</code>). Feed <code>+16</code> into
+          <code>softmax</code> and <code>e<sup>16</sup> ≈ 8,886,110</code> — one single lucky token grabs
+          99.9999% of the weight, every other token gets 0%, and the softmax curve goes totally flat so
+          gradients die! Dividing by <code>√d_h</code> keeps the typical score spread right around
+          <code>±1</code> regardless of head width, so softmax stays smooth and trainable.
+        </li>
+        <li>
+          <strong>Why multiple heads (Multi-Head Attention)?</strong> A single attention score has to
+          blend <em>everything</em> into one average. Instead of using one giant 64D head, the model
+          slices the 64D vector into <strong><code>H = 4</code> parallel heads of <code>d_h = 16</code>
+          dimensions each</strong>! Head 0 can focus exclusively on finding the subject, Head 1 can copy
+          the previous character, Head 2 can track open quotation marks, and Head 3 can watch rhyming
+          syllables — all at the exact same time. Afterwards, the 4 heads' outputs concatenate back into a
+          64D vector and pass through an output mixing matrix <code>W_O</code>.
+        </li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="rope"><span class="kicker">Step 2 · Position as angle</span>Rotary Positional Embeddings (RoPE)</h2>
+      <p>
+        Look back at the attention equation <code>Q[i] · K[j]</code> and notice a sneaky problem:
+        <strong>dot products are completely blind to word order!</strong> Take the two sentences
+        <em>"dog bites man"</em> and <em>"man bites dog."</em> Aside from the causal mask, every token
+        vector is identical — attention is a "bag of words" that cannot tell whether <code>"cat"</code>
+        appeared 2 tokens ago or 200 tokens ago!
+      </p>
+      <p>
+        The original 2017 Transformer patched this by <em>adding</em> a fixed sine/cosine vector directly
+        onto each token's embedding at the entrance of the network. That worked, yet it tangled "what a
+        word means" together with "its absolute page number" — if a model trained on 512-token essays ever
+        met token #600, it had never seen position 600 before.
+      </p>
+      <p>
+        In 2021, Jianlin Su and collaborators introduced a breathtakingly cleaner geometric idea now used
+        by nearly every modern open-weight LLM (Llama, Qwen, DeepSeek, Mistral, and <em>Small Minds</em>):
         <strong>Rotary Positional Embeddings (RoPE)</strong>.
       </p>
       <p>
-        Pair up adjacent dimensions <code>(x₀, x₁), (x₂, x₃), …</code> inside every Query and Key
-        head, and rotate each pair in its 2D plane by an angle proportional to token position
-        <code>t · ω_p</code>, where frequencies sweep geometrically from fast local clocks
-        (<code>ω = 1</code>) down to slow long-range clocks (<code>ω = θ⁻¹</code>). When you take
-        the dot product between query at position <code>m</code> and key at position <code>n</code>,
-        the absolute angles cancel out and leave a function of <em>only</em> their relative distance
-        <code>m − n</code>:
+        Instead of <em>adding</em> a position stamp to a token, RoPE <strong>rotates</strong> its Query
+        and Key vectors like hands on a wall of clocks! Take a head's coordinates and group adjacent
+        entries into 2D pairs: <code>(x₀, x₁)</code>, <code>(x₂, x₃)</code>, <code>(x₄, x₅)</code>, …
+        Each pair is a tiny 2D arrow on a circle (just like Part 2!). For a token sitting at position
+        <code>t</code>, rotate pair <code>p</code> counterclockwise by an angle proportional to
+        <code>t</code>:
       </p>
-      <pre><code>⟨R(m) q, R(n) k⟩ = qᵀ R(n − m) k   <span class="cm">// pure relative distance!</span></code></pre>
+      <pre><code><span class="cm">// Frequency of clock p: fast second-hand for pair 0, slow hour-hand for later pairs</span>
+ω_p     = θ^(−2p / d_h)                       <span class="cm">// θ is typically 10,000 (or 1,000 for short ctx)</span>
+angle   = t · ω_p
+
+<span class="cm">// Exact 2D rotation matrix from high-school trigonometry (rope_apply in ops.wgsl):</span>
+x₀_rot  = x₀ · cos(angle) − x₁ · sin(angle)
+x₁_rot  = x₀ · sin(angle) + x₁ · cos(angle)</code></pre>
+      <p>
+        Why is rotation pure magic? Suppose Query sits at position <code>m</code> (rotated by
+        <code>m · ω</code>) and Key sits at position <code>n</code> (rotated by <code>n · ω</code>).
+        Remember Part 2's dot-product identity: the dot product of two 2D arrows depends <em>only on the
+        angle between them</em>! Subtract their two angles:
+      </p>
+      <pre><code>(m · ω) − (n · ω)  =  (m − n) · ω      <span class="cm">// absolute positions cancel — ONLY relative distance survives!</span></code></pre>
+      <p>
+        Whether the phrase <em>"the small cat"</em> sits at positions <code>(5, 6, 7)</code> or at
+        positions <code>(1005, 1006, 1007)</code>, the relative angle between <code>"cat"</code> and
+        <code>"small"</code> is <strong>mathematically identical</strong>! Fast clocks
+        (<code>ω ≈ 1</code>) track crisp neighbor-to-neighbor syntax ("1 word back vs. 2 words back"),
+        while slow clocks (<code>ω ≈ 0.001</code>) barely turn over hundreds of tokens, letting the model
+        measure long-range paragraph distance without wrapping around.
+      </p>
+      <p>
+        Prove this invariance to yourself live in Figure 1 below. Move <strong>query pos m</strong> and
+        <strong>key pos n</strong> upward by the exact same step — for example, shift
+        <code>(12, 5)</code> up to <code>(20, 13)</code>, keeping their distance <code>Δ = 7</code>
+        unchanged. Watch all four clock hands spin around their circles while every green wedge and every
+        cosine score stays frozen to the third decimal place!
+      </p>
 
       <div
         data-demo="rope"
         data-title="Rotary Positional Embeddings as 2D clocks"
-        data-hint="Move m and n together — relative angle stays frozen"
+        data-hint="Move m and n together by the same amount — relative angle stays frozen"
       ></div>
 
       <p>
-        Try moving both <strong>query pos m</strong> and <strong>key pos n</strong> upward by the
-        same amount (say from <code>(12, 5)</code> to <code>(20, 13)</code>). All four phasor pairs
-        spin around their circles, yet every green wedge and every cosine score stays locked to the
-        exact same number. And during backpropagation, the gradient through RoPE is trivial: just
-        call the exact same shader with <code>sign = -1.0</code> to rotate backward.
+        Try also dragging <strong>RoPE base θ</strong> down toward <code>100</code> versus up to
+        <code>10,000</code>: smaller <code>θ</code> spins the slower clocks faster (sharper resolution on
+        short sequences, which is why Part 7's AutoResearcher tests <code>θ = 1000</code> vs
+        <code>10000</code>!). And when backpropagation flows backward through RoPE in Part 6, inverting a
+        rotation by angle <code>+α</code> is simply rotating by <code>−α</code> — the exact same WGSL
+        shader <code>rope_apply</code> called with <code>sign = -1.0</code>!
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="flash"><span class="kicker">Step 2 · Online softmax</span>FlashAttention in one pass</h2>
+      <h2 id="flash"><span class="kicker">Step 3 · Online softmax</span>FlashAttention in one pass</h2>
       <p>
-        Textbook attention computes <code>S = QKᵀ / √d</code>, writes that entire
-        <code>T × T</code> matrix to GPU memory, reads it back to compute softmax, writes the
-        probabilities out again, and reads them back a third time to multiply by <code>V</code>.
-        For long sequences, those quadratic <code>O(T²)</code> global memory reads dominate
-        everything.
+        You now have causal multi-head attention with RoPE. Write it the naive textbook way, however, and
+        you slam straight into the exact same GPU memory-bandwidth wall from Part 4 — only now it scales
+        <strong>quadratically</strong> with sequence length <code>T</code>!
       </p>
       <p>
-        <strong>FlashAttention</strong> eliminates the <code>T × T</code> matrix completely using
-        <em>online safe softmax</em>. Each GPU thread keeps its query vector plus three tiny running
-        values in on-chip registers: the largest score seen so far <code>m_i</code>, the running
-        exponential sum <code>l_i</code>, and the running weighted value vector <code>O_i</code>. As
-        each new key-value arrives, if a larger score appears the thread simply rescales the accumulated sum
-        by <code>exp(m_old − m_new)</code> and keeps going:
+        Count the VRAM trips of textbook attention on a sequence of length <code>T</code>:
+      </p>
+      <ol>
+        <li>Compute all pairwise scores <code>S = QKᵀ / √d_h</code> and <strong>write the entire <code>T × T</code> grid to slow VRAM</strong>.</li>
+        <li><strong>Read that <code>T × T</code> grid back out of VRAM</strong> to compute row-wise softmax probabilities <code>P</code>, then <strong>write the <code>T × T</code> matrix <code>P</code> back to VRAM</strong>.</li>
+        <li><strong>Read <code>P</code> out of VRAM a third time</strong> to multiply by <code>V</code>!</li>
+      </ol>
+      <p>
+        For a tiny 48-token demo, <code>48 × 48 = 2,304</code> floats is harmless. At
+        <code>T = 16,384</code> tokens across 32 attention heads, a single <code>T × T</code> score grid
+        swells to <strong>34 gigabytes of temporary scratch memory per layer</strong> — instantly blowing
+        up a GPU before a single answer finishes!
+      </p>
+      <p>
+        Why did textbook softmax force the GPU to write the whole row to VRAM first? Because safe softmax
+        (remember Part 1's deep dive!) seems to require <em>two</em> passes over all keys: Pass 1 to find
+        the row's maximum score <code>m</code> and denominator sum <code>l = Σ exp(s_j − m)</code>, and
+        Pass 2 to divide every weight by <code>l</code> and blend <code>V</code>.
+      </p>
+      <p>
+        In 2022, Tri Dao and colleagues realized you can compute <strong>exact</strong> softmax and the
+        weighted average of <code>V</code> in <strong>one single streaming pass</strong> — never
+        allocating or writing the <code>T × T</code> matrix to VRAM at all! That algorithm is
+        <strong>FlashAttention</strong>, and its mathematical trick (<em>online safe softmax</em>) is
+        shockingly simple once you trace three numbers by hand.
+      </p>
+      <p>
+        Suppose scores arrive one by one: first <code>s₀ = 1.0</code>, then <code>s₁ = 3.0</code>, then
+        <code>s₂ = 2.0</code>. Keep just three tiny numbers in ultra-fast GPU registers: the largest score
+        seen so far <code>m</code>, the running exponential sum <code>l</code>, and the running weighted
+        output <code>O</code>:
+      </p>
+      <pre><code><span class="cm">// Key 0 arrives with score s₀ = 1.0 (value V₀):</span>
+m = 1.0,   l = exp(1.0 − 1.0) = 1.0,   O = 1.0 · V₀
+
+<span class="cm">// Key 1 arrives with a BIGGER score s₁ = 3.0! Oops — the old max was too small!</span>
+<span class="cm">// Fix every past term in ONE multiply: rescale old l and old O by α = exp(m_old − m_new):</span>
+m_new = 3.0,   α = exp(1.0 − 3.0) = exp(−2.0) ≈ 0.1353
+l = 1.0 · exp(−2.0) + exp(3.0 − 3.0) = 1.1353
+O = O   · exp(−2.0) + 1.0 · V₁       = exp(−2)·V₀ + 1.0·V₁   <span class="cm">// EXACTLY as if max=3 was known from start!</span>
+
+<span class="cm">// Key 2 arrives with s₂ = 2.0 (smaller than m=3.0, so α = exp(3−3) = 1):</span>
+l = 1.1353 + exp(2.0 − 3.0) = 1.5032
+O = O      + exp(−1.0) · V₂
+
+<span class="cm">// End of row: divide O by l once!</span>
+final_out = O / l</code></pre>
+      <p>
+        Check the algebra on <code>O</code>: multiplying the earlier <code>exp(1 − 1)</code> by
+        <code>exp(1 − 3)</code> gives <code>exp(1 − 1 + 1 − 3) = exp(1 − 3)</code>! The old maximum
+        cancels out identically, leaving the exact mathematical output of two-pass softmax with zero
+        approximation! Here is the entire inner loop inside <code>attention.wgsl</code>:
       </p>
       <pre><code>let m_new = max(m_i, score);
 let alpha = exp(m_i - m_new);
@@ -113,55 +287,188 @@ let p_ij  = exp(score - m_new);
 oAcc = oAcc * alpha + p_ij * V[kt];
 l_i  = l_i * alpha + p_ij;
 m_i  = m_new;</code></pre>
+      <p>
+        Test the real <code>flash_attn_fwd</code> WebGPU compute shader live in Figure 2 below. Every time
+        you drag <strong>sequence T</strong>, your GPU runs the real single-pass FlashAttention kernel and
+        compares its output element-by-element against exact naive softmax on the CPU!
+      </p>
 
       <div
         data-demo="flash-attn"
         data-title="FlashAttention running (m, l, O) verified on WebGPU"
-        data-hint="Slide sequence length T to compare VRAM traffic"
+        data-hint="Slide sequence length T to compare VRAM traffic and live numerical parity"
       ></div>
 
       <p>
-        The readout above isn't a mockup: every time you drag <strong>sequence T</strong>, the
-        actual <code>flash_attn_fwd</code> WGSL compute shader executes on your GPU and checks its
-        output against exact naive softmax. The maximum numerical difference sits around
-        <code>10⁻⁷</code> (pure floating-point rounding), while VRAM traffic drops from
-        <code>O(T²)</code> down to a single scalar log-sum-exp per query row — which is also all the
-        backward pass needs to recompute probabilities!
+        Check the status bar above: the maximum numerical difference between FlashAttention and exact
+        two-pass attention sits around <strong><code>10⁻⁷</code></strong> (pure 32-bit floating-point
+        rounding dust!), while the VRAM traffic bars on the right show naive <code>O(T²)</code> memory
+        ballooning as <code>T</code> grows while FlashAttention stores only one tiny scalar
+        <code>LSE = m_i + ln(l_i)</code> ("log-sum-exp") per query row — which turns out to be the only
+        summary Part 6's backward pass needs to recompute attention gradients on the fly!
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="block"><span class="kicker">Step 3 · Modern block</span>RMSNorm and SwiGLU</h2>
+      <h2 id="block"><span class="kicker">Step 4 · Modern block</span>The residual highway, RMSNorm, and SwiGLU</h2>
       <p>
-        Between attention layers sits the feed-forward network — the model's key-value memory bank.
-        Two quiet upgrades since 2017 make small models train dramatically cleaner:
+        Attention lets tokens gather context from their neighbors, yet attention alone is only half of a
+        Transformer layer. Once token <code>"its"</code> has gathered information from <code>"star"</code>,
+        it needs a private workbench to digest what it learned, recall memorized patterns ("stars glow
+        warmly in haiku!"), and update its meaning vector. That workbench is the <strong>Feed-Forward
+        Network (FFN)</strong> — a miniature two-layer MLP (just like Part 2!) applied independently to
+        each token vector.
       </p>
       <p>
-        First, <strong>RMSNorm</strong> drops mean-centering from LayerNorm and divides each vector
-        only by its root-mean-square length, cutting memory passes in half while keeping activation
-        scales rock-steady. Second, <strong>SwiGLU</strong> projects the normalized stream through
-        two parallel matrices — a <em>gate</em> passed through <code>SiLU(g) = g · σ(g)</code> and
-        an <em>up</em> path — then multiplies them elementwise so every feature can smoothly switch
-        itself on or off.
+        Here is the complete wiring diagram of <strong>one modern Transformer block</strong> (used in
+        Llama 3, Qwen, DeepSeek, and <em>Small Minds</em>):
+      </p>
+      <pre><code>                  ┌──────────────────────────────────────────┐
+                  │         (residual skip connection)       │
+input stream x ───┴─▶ RMSNorm ─▶ Multi-Head FlashAttn (+RoPE) ─▶ (+) ──▶ x_mid
+                                                                           │
+                  ┌──────────────────────────────────────────┐             │
+                  │         (residual skip connection)       │             │
+x_mid ────────────┴─▶ RMSNorm ─▶ SwiGLU Feed-Forward Net ──────▶ (+) ──▶ x_out</code></pre>
+      <p>
+        Three quiet engineering breakthroughs hold that diagram together — and explain why modern models
+        train so much more cleanly than the original 2017 design:
+      </p>
+      <ol>
+        <li>
+          <strong>The Residual Stream (<code>x + sublayer(x)</code>):</strong> Notice that neither
+          attention nor the FFN <em>replaces</em> the token vector <code>x</code> — they both
+          <strong>add</strong> a small refinement back onto <code>x</code>! Think of <code>x</code> as a
+          conveyor belt rolling straight from the embedding table at layer 0 all the way to the final
+          vocabulary head. Layer 1 reads from the belt and writes a note onto it; Layer 2 reads both the
+          original token and Layer 1's note and adds another refinement. And as Part 6 will prove, that
+          addition highway also lets gradients cruise smoothly backward through dozens of layers without
+          dying.
+        </li>
+        <li>
+          <strong>Pre-Norm with RMSNorm:</strong> If you keep adding vectors layer after layer, some
+          token vectors drift up to length <code>500</code> while others shrink to <code>0.01</code>,
+          making dot products and bends go haywire. Before each sub-block, <strong>RMSNorm</strong> (Root
+          Mean Square Normalization) measures the vector's root-mean-square size
+          <code>rms = √(mean(x²) + ε)</code>, divides every entry by <code>rms</code> to lock the
+          vector's scale back to <code>1.0</code>, and multiplies by a learned per-dimension gain
+          <code>γ</code>. Compared to 2017's LayerNorm, RMSNorm skips subtracting the mean, cutting
+          memory reads in half with identical accuracy.
+        </li>
+        <li>
+          <strong>SwiGLU Gated Feed-Forward Network:</strong> A classic FFN runs one linear layer up to a
+          wider workspace, applies ReLU/GELU, and projects back down. <strong>SwiGLU</strong> (introduced
+          by Noam Shazeer in 2020) splits the upward projection into <em>two</em> parallel paths: a
+          <strong>gate</strong> passed through smooth <code>SiLU(g) = g · σ(g)</code>, and an
+          <strong>up</strong> signal, then multiplies them element-by-element before projecting back down:
+          <pre><code>SwiGLU(x) = W_down · ( SiLU(W_gate · x) ⊙ (W_up · x) )</code></pre>
+          Multiplying by a smooth gate gives every hidden feature its own continuous dimmer switch —
+          passing useful memories through cleanly while silencing irrelevant ones without sharp kinks.
+        </li>
+      </ol>
+      <p>
+        Poke both stability mechanisms live in Figure 3 below. Push <strong>signal scale</strong> all the
+        way up to <code>6.0×</code> with RMSNorm ON, then toggle <strong>RMSNorm: OFF</strong> and watch
+        the downstream SwiGLU bars blow straight off the chart! Also drag <strong>SwiGLU gate</strong>
+        negative vs. positive to watch the smooth multiplicative valve shut features off or open them wide.
       </p>
 
       <div
         data-demo="block"
         data-title="RMSNorm stability &amp; SwiGLU multiplicative gating"
-        data-hint="Crank signal scale up and toggle RMSNorm off"
+        data-hint="Crank signal scale up to 6× and toggle RMSNorm OFF"
       ></div>
 
+      <!-- ================================================================ -->
+      <h2 id="counting-params"><span class="kicker">Step 5 · Zooming out</span>Stacking blocks: from 100K to 100 Billion</h2>
       <p>
-        Try pushing <strong>signal scale</strong> to <code>6×</code> with RMSNorm on: columns 2 and
-        3 don't even flinch. Now click <strong>RMSNorm: OFF</strong> and watch the downstream
-        activations explode off the rails. With tiled SGEMM, RoPE, FlashAttention, RMSNorm, and
-        SwiGLU all running in WGSL, the complete forward pass of a modern LLM is in place. Time to send
-        gradients backward and teach the weights to speak in
-        <a href="/pages/small-minds/training.html">Part 3: Teaching the Weights</a>.
+        Stack <code>L</code> copies of that exact block one after another, apply one final
+        <code>RMSNorm</code>, and multiply by the final output matrix <code>W_LM</code>
+        (<code>[vocabSize, dModel]</code>) to turn each token's <code>D</code>-dimensional final thought
+        into <code>V</code> raw logits — right back to Part 1's softmax!
+      </p>
+      <p>
+        Here is the wild truth about modern AI: <strong>the browser model running on this page and a
+        frontier 70-billion-parameter model have the exact same blueprint</strong> — literally the same
+        RMSNorm, RoPE, multi-head causal FlashAttention, SwiGLU FFN, and residual stream. The only
+        difference is how wide and tall the rectangles are! Count every weight inside one block using the
+        exact formula from <code>checkpoint.ts</code>:
+      </p>
+      <pre><code>embeddings (W_E):     V × D
+per layer (× L):      D (rms1) + 4·D² (W_Q, W_K, W_V, W_O) + D (rms2) + 3·D·F (W_gate, W_up, W_down)
+output head:          D (rms_final) + V × D (W_LM)</code></pre>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Layers <code>L</code></th>
+              <th>Width <code>D</code></th>
+              <th>Heads <code>H</code></th>
+              <th>FFN <code>F</code></th>
+              <th>Total Weights</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Part 6 Browser Live Trainer</strong></td>
+              <td><code>2</code></td>
+              <td><code>64</code></td>
+              <td><code>4</code></td>
+              <td><code>128</code></td>
+              <td><strong>~95K</strong> (trains in seconds!)</td>
+            </tr>
+            <tr class="is-winner">
+              <td><strong>Part 8 Shipped Companion Brains</strong></td>
+              <td><code>6</code></td>
+              <td><code>128</code></td>
+              <td><code>4</code></td>
+              <td><code>256</code></td>
+              <td><strong>~780K</strong> (~857 KB in Q8!)</td>
+            </tr>
+            <tr>
+              <td><strong>GPT-2 Small (2019)</strong></td>
+              <td><code>12</code></td>
+              <td><code>768</code></td>
+              <td><code>12</code></td>
+              <td><code>3,072</code></td>
+              <td><strong>124M</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Llama 3 8B (2024)</strong></td>
+              <td><code>32</code></td>
+              <td><code>4,096</code></td>
+              <td><code>32</code></td>
+              <td><code>14,336</code></td>
+              <td><strong>8.0B</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Every piece of the forward pass is now running in pure WGSL compute shaders on your GPU: tiled
+        matrix multiplication, embeddings, RoPE, FlashAttention, RMSNorm, SwiGLU, and softmax. Right now,
+        though, all 95,000 weights are still unshaped Gaussian static — feed it Shakespeare and it spits
+        pure gibberish. Time to connect Part 3's backpropagation engine to every single WGSL kernel and
+        watch language rise out of static live on your screen.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/training.html">Part 6, Teaching the Weights</a>.</strong>
+        Teacher forcing, the single cleanest gradient formula in deep learning, why residual highways
+        prevent gradients from dying, race-free GPU FlashAttention backward, AdamW vs. Muon, and a live
+        pure-WebGPU Transformer you can train right in your browser.
       </p>
     </main>
 
     <footer>
-      <p><a href="/index.html">← All essays</a></p>
+      <p>
+        References &amp; further reading:
+        <a href="https://arxiv.org/abs/1706.03762">Vaswani et al. (2017), <em>Attention Is All You Need</em></a> ·
+        <a href="https://arxiv.org/abs/2104.09864">Su et al. (2021), <em>RoFormer: Enhanced Transformer with Rotary Position Embedding</em></a> ·
+        <a href="https://arxiv.org/abs/2205.14135">Dao et al. (2022), <em>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</em></a> ·
+        <a href="https://arxiv.org/abs/1910.07467">Zhang &amp; Sennrich (2019), <em>Root Mean Square Layer Normalization</em></a> ·
+        <a href="https://arxiv.org/abs/2002.05202">Shazeer (2020), <em>GLU Variants Improve Transformer</em></a> ·
+        <a href="https://www.3blue1brown.com/lessons/attention">3Blue1Brown — Attention in Transformers, Visually Explained</a>
+      </p>
     </footer>
 
     <script type="module" src="/src/pages/small-minds/attention.ts"></script>

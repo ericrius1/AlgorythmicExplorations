@@ -48,8 +48,8 @@ colab --auth=adc stop -s small-minds
 
 ### Instant test (zero rebuild!)
 1. Unzip `small-minds-models.zip`.
-2. Open Part 5 ([`pages/small-minds/companion.html`](../pages/small-minds/companion.html)) → **Brain Peek** tab → click **Load `.smw` Brain** and pick any species file (e.g. `mochi.smw`) — it mounts straight onto your browser's WebGPU buffers and starts chatting immediately.
-3. You can also load any `.smw` checkpoint (including `autoresearch-best.smw`) into Part 3 ([`pages/small-minds/training.html`](../pages/small-minds/training.html)) via **load .smw**.
+2. Open Part 8 ([`pages/small-minds/companion.html`](../pages/small-minds/companion.html)) → **Brain Peek** tab → click **Load `.smw` Brain** and pick any species file (e.g. `mochi.smw`) — it mounts straight onto your browser's WebGPU buffers and starts chatting immediately.
+3. You can also load any `.smw` checkpoint (including `autoresearch-best.smw`) into Part 6 ([`pages/small-minds/training.html`](../pages/small-minds/training.html)) via **load .smw**.
 
 ### Ship permanently on the site (zero cloud storage lock-in!)
 Drop the `.smw` files into:

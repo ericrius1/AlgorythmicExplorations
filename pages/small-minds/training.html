@@ -10,7 +10,7 @@
     <title>Teaching the Weights — Small Minds</title>
     <meta
       name="description"
-      content="Full Transformer backpropagation and live training in pure WebGPU: fused cross-entropy backward, FlashAttention gradients, AdamW vs Muon-style updates, and live text generation."
+      content="Wiring complete Transformer backpropagation and live GPU training from scratch in pure WebGPU: teacher forcing, fused softmax cross-entropy gradients, residual gradient highways, race-free FlashAttention backward, AdamW vs. Muon, and live in-browser text generation."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -26,11 +26,11 @@
     <header class="hero">
       <div data-demo="hero"></div>
       <div class="hero-title">
-        <p class="hero-kicker">Small Minds · Part 3</p>
+        <p class="hero-kicker">Small Minds · Part 6</p>
         <h1>Teaching the Weights</h1>
         <p class="subtitle">
-          Sending gradients backward through every WGSL kernel — and watching coherent words rise
-          out of Gaussian noise on your GPU in real time.
+          Wiring backpropagation through every WGSL kernel — and watching real English, haiku, and
+          jazz chord progressions rise out of Gaussian static on your GPU in real time.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -41,111 +41,319 @@
 
     <main>
       <p>
-        The curve dropping overhead right now is not a pre-recorded animation. Every animation
-        frame, a real two-layer Transformer living inside WebGPU storage buffers reads a batch of
-        haiku lines, predicts the next character at every position, computes its cross-entropy error,
-        propagates exact gradients backward through SwiGLU, RMSNorm, FlashAttention, and RoPE, and
-        updates roughly 70,000 weights — all inside a single command encoder submission.
+        The glowing mint curve plunging downward overhead is not a pre-recorded video or a fake math
+        plot. On every animation frame, a genuine two-layer Transformer living entirely inside your
+        browser's WebGPU storage buffers grabs a random batch of haiku lines, predicts the next character
+        at every position in parallel, grades its own surprise with cross-entropy loss, sends exact
+        gradients backward through SwiGLU, RMSNorm, FlashAttention, RoPE, and the embedding table, and
+        nudges roughly 70,000 floating-point weights downhill — all inside one single GPU command
+        submission.
+      </p>
+      <p>
+        In <a href="/pages/small-minds/learning.html">Part 3</a>, backpropagation ran on a 3-weight
+        circuit you could check with a pocket calculator. Scaling that exact same chain-rule sweep up to
+        a full Transformer takes just four clean pieces: packing dozens of quizzes into a single pass,
+        fusing the output gradient, keeping gradients alive across deep layers, and choosing an optimizer
+        that stays calm on noisy mini-batches.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="loss"><span class="kicker">Step 1 · One clean gradient</span>Fused softmax and cross-entropy</h2>
+      <h2 id="teacher"><span class="kicker">Step 1 · 48 quizzes at once</span>Teacher forcing and starting from static</h2>
       <p>
-        At the top of the network, the LM head outputs one raw score (logit) per token in the
-        vocabulary. Turning those scores into probabilities via softmax and grading the true next
-        token with negative log-likelihood sounds complicated, yet their combined derivative collapses
-        into the single cleanest formula in deep learning:
+        Suppose you grab one 49-character slice of Shakespeare from the training text:
+        <code>"ROMEO:\nBut soft, what light through yonder windo"</code>. Notice how you can slice that
+        single string into an <strong>input sequence</strong> (characters <code>0..47</code>) and a
+        <strong>target sequence</strong> shifted right by one character (characters <code>1..48</code>):
+      </p>
+      <pre><code>position t:   0    1    2    3    4    5    6    7    8   …
+input[t]:    'R'  'O'  'M'  'E'  'O'  ':'  '\n' 'B'  'u'  …
+target[t]:   'O'  'M'  'E'  'O'  ':'  '\n' 'B'  'u'  't'  …</code></pre>
+      <p>
+        Because Part 5's causal mask guarantees that position <code>t</code> can <em>never</em> peek at
+        positions <code>t+1</code> or later, running <strong>one single forward pass</strong> over those
+        48 characters secretly grades the model on <strong>48 independent next-character quizzes
+        simultaneously</strong>! Position 0 predicts <code>'O'</code> from <code>"R"</code>; position 1
+        predicts <code>'M'</code> from <code>"RO"</code>; position 7 predicts <code>'u'</code> from
+        <code>"ROMEO:\nB"</code> — all in parallel! Stack <code>B = 4</code> random chunks into a
+        mini-batch and one single step grades <code>4 × 48 = 192</code> predictions at once. That
+        massively parallel training trick is called <strong>teacher forcing</strong>.
+      </p>
+      <p>
+        Before step 1 begins, every weight matrix is initialized to tiny random bell-curve (Gaussian)
+        numbers with standard deviation around <code>0.02</code> (remember Part 3's symmetry-breaking
+        rule: never initialize weights to zero!). Because the logits start tiny and random near zero,
+        softmax assigns roughly <code>1 / 98 ≈ 1.02%</code> probability to every character in the
+        98-symbol vocabulary, so step 1's cross-entropy loss always begins right near Part 1's landmark
+        baseline: <code>−ln(1/98) = ln(98) ≈ 4.58 nats</code>.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="loss"><span class="kicker">Step 2 · One clean gradient</span>Fused softmax and cross-entropy</h2>
+      <p>
+        At the very top of the Transformer, each token position outputs 98 raw scores (logits). Turning
+        those 98 scores into probabilities via <code>softmax</code> and grading the true next character
+        with <code>L = −ln(p[target])</code> sounds like a messy tangle of exponentials, divisions, and
+        logarithms to differentiate. Yet when you apply the chain rule to their combination, almost every
+        messy term miraculously cancels out, leaving the single cleanest derivative formula in all of
+        deep learning:
       </p>
       <pre><code><span class="cm">// fused softmax + cross-entropy backward in ops.wgsl</span>
 let prob = exp(logits[v] - maxVal) / sumExp;
-let y    = select(0.0, 1.0, v == target);
-dLogits[v] = (prob - y) / f32(N);</code></pre>
+let y    = select(0.0, 1.0, v == target);      <span class="cm">// 1.0 for the true character, 0.0 for all others</span>
+dLogits[v] = (prob - y) / f32(N);              <span class="cm">// predicted probability minus truth!</span></code></pre>
       <p>
-        That's it: <em>predicted probability minus truth</em>. If the model gave the right letter 95%
-        probability, the push is tiny (<code>−0.05</code>). If it gave a wrong letter 80%, the
-        gradient pushes that logit straight down by <code>+0.80</code>. Fusing the forward loss and
-        backward gradient into one WGSL pass means a separate probability buffer never even gets
-        allocated.
+        Stop and check that formula on a concrete 4-letter example! Suppose after seeing <code>"t"</code>,
+        the true next letter is <code>'h'</code>, and the model's current softmax probabilities are:
       </p>
-
-      <!-- ================================================================ -->
-      <h2 id="highway"><span class="kicker">Step 2 · The residual highway</span>Why deep gradients don't die</h2>
+      <pre><code>candidate letter:        'a'       'e'       'h' (TRUTH)    'z'
+predicted prob:          0.10      0.65       0.20          0.05
+true one-hot y:          0.00      0.00       1.00          0.00
+gradient (prob − y):    +0.10     +0.65      −0.80         +0.05
+update (−lr · grad):   push ↓    push ↓↓    PULL ↑↑       push ↓</code></pre>
       <p>
-        From <code>dLogits</code>, backpropagation walks backward layer by layer. Notice something
-        crucial about this architecture: every sub-block adds its output back into the main stream
-        via <code>x_next = x + f(RMSNorm(x))</code>. Because the derivative of addition is
-        <code>1</code>, gradients flow untouched straight down the residual stream from the top
-        layer all the way to the token embeddings, picking up gentle corrections at each layer
-        rather than multiplying together and blowing up.
+        Look how physically intuitive every single sign is:
       </p>
-
-      <div
-        data-demo="grad-flow"
-        data-title="Backward gradient norms across depth"
-        data-hint="Toggle Residual or RMSNorm off and adjust weight gain"
-      ></div>
-
+      <ul>
+        <li>
+          The model wrongly put <strong>65%</strong> confidence on <code>'e'</code>, so its gradient is
+          <code>+0.65</code> — subtracting the gradient shoves <code>'e'</code>'s logit sharply
+          <strong>downward</strong>!
+        </li>
+        <li>
+          The true letter <code>'h'</code> only got <strong>20%</strong>, so its gradient is
+          <code>0.20 − 1.00 = −0.80</code> — subtracting a negative pulls <code>'h'</code>'s logit
+          strongly <strong>upward</strong>!
+        </li>
+        <li>
+          Notice the conservation law: <code>+0.10 + 0.65 − 0.80 + 0.05 = 0.00</code>! Every upward tug
+          on the right answer is balanced by downward nudges across the wrong guesses. And once the model
+          learns to give <code>'h'</code> 99% probability, the gradient shrinks to a whisper
+          (<code>−0.01</code>), leaving well-learned patterns undisturbed.
+        </li>
+      </ul>
       <p>
-        Try turning <strong>Residual: OFF</strong> and nudging <strong>weight gain</strong> just
-        slightly above or below <code>1.0</code>. Over 12 layers, even a tiny <code>1.2×</code>
-        factor explodes gradients by an order of magnitude, while <code>0.8×</code> starves the
-        earliest layers to zero. Flip <strong>Residual: ON</strong> back on and the highway
-        stabilizes immediately.
+        Even better for GPU speed: fusing the forward loss calculation and the backward
+        <code>dLogits</code> gradient into a single WGSL compute pass (<code>cross_entropy_fwd_bwd</code>
+        in <code>ops.wgsl</code>) means the GPU never even allocates a separate <code>[N, V]</code>
+        probability buffer in VRAM!
       </p>
       <details class="fold">
-        <summary>How FlashAttention backward avoids atomic contention</summary>
+        <summary>Deep dive: the 4-line calculus proof that ∂L/∂z_i = p_i − y_i</summary>
         <div class="fold-body">
           <p>
-            In WebGPU, floating-point storage buffers do not support native
-            <code>atomicAdd(f32)</code>. Rather than fighting software CAS loops, the
-            <code>attention.wgsl</code> splits attention backward into two clean, race-free compute
-            passes: <code>flash_attn_bwd_dq</code> assigns one thread per query position
-            <code>qt</code> (looping over keys <code>0..qt</code>), and
-            <code>flash_attn_bwd_dkv</code> assigns one thread per key position <code>kt</code>
-            (looping over future queries <code>kt..T-1</code>). Both recompute exact attention
-            probabilities from the saved scalar log-sum-exp <code>LSE</code>, writing directly to
-            their own rows with zero atomics and zero <code>T × T</code> matrices.
+            Write the cross-entropy loss for target class <code>t</code> directly in terms of raw logits
+            <code>z</code>:
+          </p>
+          <pre><code>L = −ln( e^(z_t) / Σ e^(z_k) )  =  −z_t + ln( Σ e^(z_k) )</code></pre>
+          <p>
+            Now differentiate with respect to any logit <code>z_i</code> using the chain rule on
+            <code>ln(u)</code> (whose derivative is <code>u' / u</code>):
+          </p>
+          <pre><code>∂L / ∂z_i  =  −(1 if i==t else 0)  +  e^(z_i) / (Σ e^(z_k))
+           =  p_i − y_i</code></pre>
+          <p>
+            Four lines of algebra — and notice that it never divides by <code>p_t</code> directly, so
+            even if the model gave the true token <code>0.00001%</code> probability, the gradient stays
+            perfectly bounded between <code>−1</code> and <code>+1</code> instead of blowing up!
           </p>
         </div>
       </details>
 
       <!-- ================================================================ -->
-      <h2 id="trainer"><span class="kicker">Step 3 · Live training</span>Train your own micro-LLM in WebGPU</h2>
+      <h2 id="highway"><span class="kicker">Step 3 · The residual highway</span>Why deep gradients don't die</h2>
       <p>
-        Once every parameter buffer has its gradient, the optimizer pass takes a step. You can
-        switch between classic decoupled <strong>AdamW</strong> (tracking per-weight first and
-        second moments) and a <strong>Muon-inspired</strong> RMS-steered Nesterov update that
-        equalizes step norms across 2D weight projections.
+        Starting from <code>dLogits</code>, backpropagation walks backward through every single operation
+        of the Transformer in reverse order:
+      </p>
+      <pre><code>dLogits  ──▶  LM head (matmul_tiled &amp; matmul_tn)
+         ──▶  final RMSNorm backward (rmsnorm_bwd_x &amp; rmsnorm_bwd_w)
+         ──▶  for each layer L−1 down to 0:
+                ├─ residual add (clones gradient straight onto the highway!)
+                ├─ SwiGLU FFN backward (W_down, gated_act_bwd, W_gate &amp; W_up, RMSNorm)
+                ├─ residual add (clones gradient onto highway again!)
+                └─ Attention backward (W_O, FlashAttn bwd, RoPE sign=-1, W_Q/W_K/W_V, RMSNorm)
+         ──▶  Embedding table gather (embed_bwd)</code></pre>
+      <p>
+        For twenty years (from the late 1980s until roughly 2015), stacking more than five or six layers
+        deep broke backpropagation completely. Why? Remember Part 3's chain rule: backward gradients
+        <strong>multiply</strong> local slopes at every single layer! If a 20-layer plain network has an
+        average layer gain of just <code>0.8×</code>, the gradient arriving back at Layer 1 shrinks to
+        <code>0.8<sup>20</sup> = 0.011</code> — a <strong>vanishing gradient</strong> that leaves early
+        layers frozen in random noise. Nudge the average gain to <code>1.2×</code> instead and it blasts
+        to <code>1.2<sup>20</sup> = 38.3×</code> (and <code>1.2<sup>50</sup> = 9,100×</code>) — an
+        <strong>exploding gradient</strong> that slams weights into <code>NaN</code>!
       </p>
       <p>
-        Pick a corpus below, press <strong>train</strong>, and watch the live loss curve plunge from
-        random guessing (<code>ln(98) ≈ 4.58</code> nats) down past <code>1.5</code> in just a few
-        seconds. Every 25 steps — or whenever you hit <strong>sample now</strong> — the model
-        generates fresh text straight from your GPU and renders its live causal attention matrix on
+        Look back at the <strong>add gate</strong> from Part 3's table: the derivative of
+        <code>x_next = x + f(RMSNorm(x))</code> with respect to <code>x</code> is
+        <strong><code>1 + ∂f/∂x</code></strong>! That innocent little <code>1 +</code> creates an
+        unbroken express lane — the <strong>residual highway</strong> — carrying the output gradient
+        straight back to Layer 1 untouched while each layer merely adds gentle corrections on top. Pair
+        that highway with <code>RMSNorm</code> (which holds activation magnitudes steady at every floor)
+        and even 100-layer Transformers train smoothly from step 1.
+      </p>
+      <p>
+        Break that highway on purpose in Figure 1 below! Toggle <strong>Residual: OFF</strong>, leave
+        <strong>RMSNorm: OFF</strong>, and nudge <strong>weight gain</strong> just slightly above or
+        below <code>1.00×</code> while raising <strong>layers</strong> toward <code>20</code>.
+      </p>
+
+      <div
+        data-demo="grad-flow"
+        data-title="Backward gradient norms across depth"
+        data-hint="Toggle Residual or RMSNorm OFF and nudge weight gain away from 1.0×"
+      ></div>
+
+      <p>
+        Look how violently the log-scale bars crash into amber starvation (<code>0.001×</code>) or flare
+        into crimson explosion (<code>1000×</code>) the instant both safeguards are switched off. Now
+        click <strong>Residual: ON</strong> and <strong>RMSNorm: ON</strong> back on: even 24 layers deep
+        with a <code>1.35×</code> gain mismatch, every single layer from L24 back down to L1 stays calmly
+        green right beside the dashed <code>1.0</code> reference line!
+      </p>
+      <details class="fold">
+        <summary>Deep dive: how FlashAttention backward avoids atomic contention in WebGPU</summary>
+        <div class="fold-body">
+          <p>
+            During attention's backward pass, every query position <code>qt</code> contributes a gradient
+            into earlier keys and values <code>0..qt</code>. If you assign one thread per query and let
+            all of them add into the same <code>dK[kt]</code> slot at once, threads collide in a race
+            condition! CUDA handles that with hardware floating-point <code>atomicAdd(f32)</code>, which
+            WebGPU does not expose natively.
+          </p>
+          <p>
+            Rather than fighting slow software compare-and-swap loops, <code>attention.wgsl</code> splits
+            attention backward into two clean, 100% race-free passes:
+            <code>flash_attn_bwd_dq</code> assigns one thread per query row <code>qt</code> (looping over
+            keys <code>0..qt</code> and writing exclusively to <code>dQ[qt]</code>), and
+            <code>flash_attn_bwd_dkv</code> assigns one thread per key row <code>kt</code> (looping over
+            future queries <code>kt..T−1</code> and writing exclusively to <code>dK[kt]</code> and
+            <code>dV[kt]</code>). Both passes recompute exact attention probabilities on the fly from the
+            single saved scalar <code>LSE[qt]</code> — zero atomics, zero race conditions, and still zero
+            <code>T × T</code> matrices in VRAM!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="optimizers"><span class="kicker">Step 4 · Stepping downhill</span>AdamW, Muon, gradient clipping, and weight decay</h2>
+      <p>
+        Once every parameter buffer has its gradient ready on the GPU, a single compute shader
+        (<code>optimizer_step</code> in <code>ops.wgsl</code>) updates all ~95,000 weights in parallel.
+        Three real-world guardrails inside that shader turn Part 3's textbook Adam into a rock-solid LLM
+        trainer:
+      </p>
+      <ul>
+        <li>
+          <strong>Gradient clipping:</strong> One unlucky mini-batch full of bizarre punctuation can
+          produce a giant freak gradient spike. Clamping every gradient element safely inside
+          <code>[−2.5, +2.5]</code> (and guarding against <code>NaN</code>) prevents one bad batch from
+          destroying 200 steps of careful progress.
+        </li>
+        <li>
+          <strong>Decoupled Weight Decay (the "W" in AdamW):</strong> On every step, every weight gets a
+          tiny gentle shrink toward zero: <code>w ← w · (1 − lr · wd)</code>. That mild gravity discourages
+          any single weight from growing huge to memorize training noise, improving generalization. In 2017,
+          Ilya Loshchilov and Frank Hutter noticed that folding weight decay inside Adam's gradient mixed
+          it with adaptive scaling <code>√v</code> — pulling it outside ("decoupled AdamW") noticeably
+          improved Transformer training and became the default across the entire industry.
+        </li>
+        <li>
+          <strong>AdamW vs. Muon-style updates:</strong> AdamW scales every individual scalar weight by
+          its own running squared slope. A newer family of optimizers led by <strong>Muon</strong>
+          (<em>MomentUm Orthogonalized by Newton-schulz</em>, popular in speedrun LLM training) takes a
+          more geometric view: normalize the direction of 2D weight updates using Nesterov lookahead
+          momentum so no single direction dominates a matrix update. The live trainer below lets you
+          toggle directly between <strong>AdamW</strong> and a browser-friendly <strong>Muon-inspired
+          RMS-steered Nesterov</strong> kernel to watch both race on the exact same text!
+        </li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="trainer"><span class="kicker">Step 5 · Live GPU lab</span>Train your own micro-LLM right here</h2>
+      <p>
+        Everything from Parts 1 through 6 is wired together inside Figure 2 below. Choose one of the four
+        built-in corpora (<em>Tiny Shakespeare</em>, <em>Nature Haiku</em>, <em>Jazz Progressions</em>, or
+        <em>Companion Dialogue</em>), hit <strong>train</strong>, and watch the cross-entropy loss on the
+        left plunge from random noise (<code>4.58 nats</code>) down below <code>1.5 nats</code> in just
+        seconds on your GPU! Every 25 steps — or whenever you press <strong>sample now</strong> — the GPU
+        generates fresh text from its live weights and plots Layer 0 Head 0's causal attention heatmap on
         the right.
       </p>
 
       <div
         data-demo="live-trainer"
         data-title="Pure-WebGPU Micro-LLM Trainer"
-        data-hint="Pick a corpus, hit Train, and watch words emerge from noise"
+        data-hint="Pick a corpus, hit train, and watch language emerge from static"
       ></div>
 
       <p>
-        Watch the progression carefully: around step 15 it discovers spaces and line breaks; by step
-        60 it captures character pairs, speaker colons, or chord arrows; past step 150 real words,
-        rhymes, and jazz progressions emerge from weights that started as pure Gaussian static.
+        Watch the generated text carefully as the step counter climbs — you are witnessing the entire
+        curriculum of language modeling unfold in fast-forward:
       </p>
+      <ol>
+        <li>
+          <strong>Steps 1–15 (loss 4.6 → 3.0):</strong> Pure ASCII static (<code>q#9x!k</code>) rapidly
+          discovers letter frequencies, spaces, and line breaks — essentially catching up to Part 1's
+          <code>k = 1</code> counting table!
+        </li>
+        <li>
+          <strong>Steps 25–80 (loss 3.0 → 1.9):</strong> Character pairs, word lengths, speaker tags
+          (<code>ROMEO:</code>), or jazz arrows (<code>Cmaj7 -&gt;</code>) snap into place as the
+          attention heads wake up (watch diagonal stripes and sharp vertical anchor bars appear in the
+          causal attention heatmap on the right!).
+        </li>
+        <li>
+          <strong>Steps 120–300+ (loss &lt; 1.4):</strong> Real English words, rhythm, haiku line breaks,
+          and valid chord progressions emerge from weights that started out as pure Gaussian static just
+          moments ago.
+        </li>
+      </ol>
       <p>
-        Now imagine not just training one fixed model by hand. What if inference were squeezed down
-        to 4-bit weights and the browser got to run its <em>own</em> scientific loop — proposing
-        architectural tweaks, running timed WebGPU experiments, keeping improvements, and discarding
-        dead ends? That is <a href="/pages/small-minds/autoresearch.html">Part 4: The Browser That Researches Itself</a>.
+        Experiment freely with the controls to feel how real ML engineers debug training runs:
+      </p>
+      <ul>
+        <li>
+          Crank <strong>lr</strong> all the way up to <code>0.025</code> mid-training and watch the smooth
+          mint curve jitter violently as steps overshoot the canyon walls; cool <strong>lr</strong> down
+          to <code>0.004</code> late in training and watch the loss settle cleanly lower (a preview of
+          <em>learning-rate warmdown</em> in Part 7!).
+        </li>
+        <li>
+          Slide <strong>temp</strong> down to <code>0.30</code> (crisp, conservative, repetitive) versus up
+          to <code>1.30</code> (creative, chaotic, inventing new spellings) and click <strong>sample
+          now</strong>.
+        </li>
+        <li>
+          Notice the <strong>export .smw</strong> and <strong>load .smw</strong> buttons: any model you
+          train right here can be quantized to a compact binary <code>.smw</code> checkpoint file on your
+          disk — and any larger 780K-parameter checkpoint trained on a cloud GPU using this project's
+          Google Colab notebooks can be loaded straight back into this browser trainer!
+        </li>
+      </ul>
+      <p>
+        Training works, words emerge, and weights save cleanly. Now flip the coin to two brand-new
+        questions: once a model is trained, how do you make it <em>talk</em> fast (especially inside a
+        browser's memory budget)? And once a full GPU training run takes under a second, what happens when
+        you hand the scientific method itself to the browser and let it evolve better Transformers
+        automatically?
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/autoresearch.html">Part 7, The Browser That Researches Itself</a>.</strong>
+        Why generating tokens hits a totally different bottleneck than reading them, KV caches, squeezing
+        32-bit weights down to 4 bits, honest validation bits-per-byte, and an autonomous WebGPU
+        AutoResearch workbench.
       </p>
     </main>
 
     <footer>
-      <p><a href="/index.html">← All essays</a></p>
+      <p>
+        References &amp; further reading:
+        <a href="https://arxiv.org/abs/1512.03385">He et al. (2015), <em>Deep Residual Learning</em> (ResNet skip connections)</a> ·
+        <a href="https://arxiv.org/abs/1711.05101">Loshchilov &amp; Hutter (2017), <em>Decoupled Weight Decay Regularization</em> (AdamW)</a> ·
+        <a href="https://kellerjordan.github.io/posts/muon/">Keller Jordan (2024), <em>Muon: An optimizer for hidden layers in neural networks</em></a> ·
+        <a href="https://arxiv.org/abs/2307.08691">Dao (2023), <em>FlashAttention-2</em></a>
+      </p>
     </footer>
 
     <script type="module" src="/src/pages/small-minds/training.ts"></script>

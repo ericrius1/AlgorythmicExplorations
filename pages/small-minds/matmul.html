@@ -10,7 +10,7 @@
     <title>The Grid That Thinks — Small Minds</title>
     <meta
       name="description"
-      content="Building a language model from first principles in pure WebGPU: why LLMs are 95% matrix multiplication, workgroup shared-memory tiling, arithmetic intensity, and BPE tokenization."
+      content="Bridging human language to GPU silicon in pure WebGPU: Byte-Pair Encoding (BPE), learned embedding tables, why LLMs are 95% matrix multiplication, CPU vs. GPU memory bandwidth, arithmetic intensity, and 16×16 shared-memory tiling."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -26,11 +26,11 @@
     <header class="hero">
       <div data-demo="hero"></div>
       <div class="hero-title">
-        <p class="hero-kicker">Small Minds · Part 1</p>
+        <p class="hero-kicker">Small Minds · Part 4</p>
         <h1>The Grid That Thinks</h1>
         <p class="subtitle">
-          Before a single word is predicted, a language model is a memory-bandwidth puzzle solved
-          in tiny 16×16 tiles of shared GPU silicon.
+          How plain sentences become lists of vectors, why a language model is 95% matrix
+          multiplication, and how 256 GPU threads team up inside tiny 16×16 squares of fast memory.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -41,117 +41,111 @@
 
     <main>
       <p>
-        Strip away the mystique around modern language models and you are left with a remarkably
-        compact machine. Almost everything a Transformer does — projecting tokens into queries,
-        keys, and values, routing concepts through gated feed-forward layers, predicting the next
-        character, and sending gradients backward through time — boils down to one operation repeated
-        hundreds of times per second: multiplying two dense grids of floating-point numbers.
+        Parts 1 through 3 built the core conceptual engine of machine learning on small, inspectable
+        examples: predicting probability distributions in
+        <a href="/pages/small-minds/guessing.html">Part 1</a>, representing ideas as vectors and
+        transforming them with matrices in
+        <a href="/pages/small-minds/vectors.html">Part 2</a>, and adjusting weights downhill via
+        backpropagation in
+        <a href="/pages/small-minds/learning.html">Part 3</a>. Now comes the leap from toy 2D planes
+        to a real modern Transformer running straight on your computer's graphics chip using
+        <strong>pure WebGPU</strong> and hand-written WGSL compute shaders — no ML frameworks, no
+        PyTorch in the browser, no hidden black boxes.
       </p>
       <p>
-        This five-part series builds an entire modern language model from raw
-        metal inside your browser tab using <strong>pure WebGPU</strong> and hand-written WGSL
-        compute shaders — no ML runtimes, no ONNX, no black boxes. It starts with matrix math
-        and tokens here, build RoPE and FlashAttention in
-        <a href="/pages/small-minds/attention.html">Part 2</a>, wire up full GPU backpropagation in
-        <a href="/pages/small-minds/training.html">Part 3</a>, turn your browser into an autonomous
-        researcher that mutates and improves its own models in
-        <a href="/pages/small-minds/autoresearch.html">Part 4</a>, and finally pour all of it into a
-        <a href="/pages/small-minds/companion.html">living 3D companion</a> that chats, plays,
-        dreams, and grows with you across visits.
+        Two huge practical questions stand right at the entrance of any real language model:
+      </p>
+      <ol>
+        <li>
+          <strong>The language bridge:</strong> Matrix multipliers only speak floating-point numbers,
+          never letters or words. How does a sentence like <em>"The small cat saw a star"</em> become
+          a clean grid of numbers without losing meaning or exploding vocabulary size?
+        </li>
+        <li>
+          <strong>The hardware bottleneck:</strong> Strip away the mystique around a Transformer and
+          almost every layer — projecting tokens into attention queries, routing concepts through
+          feed-forward memory, predicting the next symbol, and sending gradients backward — is one
+          operation repeated hundreds of times per second: multiplying two dense grids of numbers. Why
+          does a naive GPU shader run slowly, and what single memory trick makes it fly?
+        </li>
+      </ol>
+      <p>
+        Watch the animation overhead: three grids of squares — activations <code>A</code>, weights
+        <code>B</code>, and output <code>C</code> — pulsing as small <code>16 × 16</code> tiles glide
+        across rows and columns while a real WebGPU compute shader benchmarks itself live on your GPU.
+        Before unpacking that hardware race, start with how English enters matrix <code>A</code> in the
+        first place.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="roofline"><span class="kicker">Step 1 · Hardware reality</span>Why GPUs wait on memory, not math</h2>
+      <h2 id="tokens"><span class="kicker">Step 1 · Slicing language</span>Tokenization and Byte-Pair Encoding (BPE)</h2>
       <p>
-        A modern laptop or phone GPU can perform trillions of floating-point multiply-adds every
-        second, yet its main memory (VRAM or unified DRAM) can only feed a tiny fraction of those
-        numbers across the wire each cycle. Computer architects call the ratio between math done and
-        bytes moved <strong>arithmetic intensity</strong>.
+        To feed text into a computer, you first have to chop the raw string into discrete chunks and
+        assign each chunk an integer ID — a process called <strong>tokenization</strong>. Three obvious
+        designs immediately suggest themselves, and comparing them reveals why modern AI systems settled
+        on the third:
+      </p>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Example: <code>"unbelievable!"</code></th>
+              <th>Vocab size</th>
+              <th>Strength &amp; Weakness</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Characters</strong></td>
+              <td><code>['u','n','b','e','l','i','e','v','a','b','l','e','!']</code></td>
+              <td>~98–256</td>
+              <td>Tiny vocabulary and can spell <em>anything</em>, but sequences become very long (13 slots for one word).</td>
+            </tr>
+            <tr>
+              <td><strong>Whole words</strong></td>
+              <td><code>['unbelievable', '!']</code></td>
+              <td>500,000+</td>
+              <td>Short sequences, but crashes on typos (<code>"unbeleivable"</code>), slang, invented names, or code identifiers.</td>
+            </tr>
+            <tr class="is-winner">
+              <td><strong>Subwords (BPE)</strong></td>
+              <td><code>['un', 'believ', 'able', '!']</code></td>
+              <td>~32K–128K</td>
+              <td>Common words become 1 token; rare words cleanly break into meaningful reusable roots and pieces!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Almost every frontier language model (GPT, Claude, Llama, Qwen, Gemini) uses a dead-simple
+        compression algorithm invented in 1994 called <strong>Byte-Pair Encoding (BPE)</strong> to build
+        its subword vocabulary automatically from raw text:
+      </p>
+      <ol>
+        <li>Start with every single character (or raw UTF-8 byte) as its own token.</li>
+        <li>Scan the entire training text and count every adjacent pair of tokens.</li>
+        <li>Take the <strong>single most frequent pair</strong> (for instance <code>'t' + 'h'</code>) and mint a brand-new token ID for <code>"th"</code>, replacing every adjacent <code>'t','h'</code> across the text with <code>"th"</code>.</li>
+        <li>Repeat step 2 and 3 — hundreds of times for a small demo, or 50,000 to 100,000 times for a frontier model!</li>
+      </ol>
+      <p>
+        Walk through four merges on a miniature example — <code>"low lower lowest"</code>:
+      </p>
+      <pre><code>start:   l o w · l o w e r · l o w e s t          <span class="cm">(16 tokens)</span>
+merge 1: 'l'+'o' → "lo" (×3)    ⇒  lo w · lo w e r · lo w e s t
+merge 2: "lo"+'w' → "low" (×3)  ⇒  low · low e r · low e s t
+merge 3: "low"+'e' → "lowe" (×2)⇒  low · lowe r · lowe s t   <span class="cm">(8 tokens — 2× shorter!)</span></code></pre>
+      <p>
+        Notice the elegance: without anyone teaching the tokenizer a word of English linguistics, pure
+        frequency counting naturally discovers roots (<code>"low"</code>), suffixes (<code>"ing"</code>,
+        <code>"tion"</code>, <code>"able"</code>), common spaces, and code keywords!
       </p>
       <p>
-        When you write the textbook triple-loop matrix multiply in a compute shader — one thread per
-        output element <code>C[row, col]</code>, looping <code>k = 0..K-1</code> — every fused
-        multiply-add (2 FLOPs) reads two 4-byte floats (8 bytes) straight from global memory. That
-        gives an arithmetic intensity of just <code>0.25 FLOP/byte</code>. Your GPU's arithmetic
-        units sit idle almost the entire time waiting for bytes to arrive.
-      </p>
-      <pre><code><span class="cm">// Naive: every thread hits global DRAM 2·K times</span>
-for (var k = 0u; k &lt; dims.K; k++) {
-  acc = fma(A[row * dims.K + k], B[k * dims.N + col], acc);
-}</code></pre>
-
-      <!-- ================================================================ -->
-      <h2 id="tiling"><span class="kicker">Step 2 · Shared memory</span>Sixteen-by-sixteen cooperation</h2>
-      <p>
-        The trick that unlocks GPU speed is noticing that neighboring output cells need the exact
-        same rows of <code>A</code> and columns of <code>B</code>. Instead of letting 256 threads
-        fetch the same numbers independently from slow global memory, the kernel groups them into a
-        <code>16 × 16</code> workgroup and gives them two tiny scratchpads inside fast on-chip SRAM
-        using WGSL's <code>var&lt;workgroup&gt;</code>.
-      </p>
-      <pre><code>var&lt;workgroup&gt; tileA: array&lt;f32, 256&gt;;
-var&lt;workgroup&gt; tileB: array&lt;f32, 256&gt;;
-
-for (var t = 0u; t &lt; numTiles; t++) {
-  tileA[ly * 16u + lx] = A[row * K + t * 16u + lx];
-  tileB[ly * 16u + lx] = B[(t * 16u + ly) * N + col];
-  workgroupBarrier();
-  for (var k = 0u; k &lt; 16u; k++) {
-    acc = fma(tileA[ly * 16u + k], tileB[k * 16u + lx], acc);
-  }
-  workgroupBarrier();
-}</code></pre>
-      <p>
-        Each thread loads just <em>one</em> element of <code>A</code> and <em>one</em> element of
-        <code>B</code> per tile, waits at <code>workgroupBarrier()</code>, and then performs 16
-        multiply-adds out of on-chip SRAM before touching main memory again. Global memory traffic
-        instantly drops by <strong>16×</strong>, pushing arithmetic intensity up to
-        <code>4.0 FLOP/byte</code>. Below, both WGSL kernels race live on your actual GPU and
-        verify their outputs match to floating-point precision.
-      </p>
-
-      <div
-        data-demo="gemm-race"
-        data-title="Naive vs. 16×16 shared-memory SGEMM"
-        data-hint="Slide matrix size N to race both WebGPU kernels"
-      ></div>
-
-      <p>
-        Try pushing <code>N</code> up to 1024. At small sizes, dispatch overhead hides the gap; once
-        matrices outgrow the L1 cache, the tiled kernel pulls dramatically ahead because its threads
-        cooperate instead of competing for the memory bus. Every linear layer in the Transformer —
-        forward projections (<code>A @ Bᵀ</code>), backward activation gradients
-        (<code>dY @ W</code>), and weight gradients (<code>dYᵀ @ X</code>) — reuses this exact
-        16×16 workgroup-tiling engine.
-      </p>
-      <details class="fold">
-        <summary>Why three matmul layouts matter for backpropagation</summary>
-        <div class="fold-body">
-          <p>
-            A linear layer computes <code>Y = X · Wᵀ</code> where <code>X</code> is
-            <code>[N, D_in]</code> and <code>W</code> is <code>[D_out, D_in]</code>. During the
-            backward pass needs two different transposes without copying or transposing buffers in
-            memory: <code>dX = dY · W</code> (standard tiled <code>A @ B</code>) and
-            <code>dW += dYᵀ · X</code> (tiled <code>Aᵀ @ B</code> with an accumulate flag). Writing
-            those three tiled entry points in <code>matmul.wgsl</code> eliminates every intermediate
-            transpose kernel from the training step.
-          </p>
-        </div>
-      </details>
-
-      <!-- ================================================================ -->
-      <h2 id="tokens"><span class="kicker">Step 3 · Words into vectors</span>Tokenization and embeddings</h2>
-      <p>
-        Matrix multipliers only speak floats, so the first bridge from human language to silicon is
-        twofold: slice text into integer IDs (<strong>tokenization</strong>), then look up each ID
-        in a learned table of vectors <code>W_E</code> (<strong>embeddings</strong>).
-      </p>
-      <p>
-        Real frontier models use <strong>Byte-Pair Encoding (BPE)</strong>: start with individual
-        characters, count every adjacent pair in the text, merge the single most frequent pair into
-        a new token ID, and repeat. Common words collapse into single integers while rare words fall
-        back cleanly to pieces. Type anything into the box below and drag the merge slider to watch
-        BPE compress the stream and project every unique token into a vector neighborhood.
+        Try it live in Figure 1 below. Type any sentence you like into the text box — try repeating a
+        word or pasting a short chorus — and drag the <strong>BPE merges</strong> slider from
+        <code>0</code> up to <code>32</code>. Watch individual letters fuse into multi-character chunks
+        along the top, inspect the exact merge rules discovered on the bottom left, and see every unique
+        token mapped into a 2D vector space on the bottom right.
       </p>
 
       <div
@@ -160,18 +154,287 @@ for (var t = 0u; t &lt; numTiles; t++) {
         data-hint="Type your own sentence and drag BPE merges"
       ></div>
 
+      <aside class="note">
+        <span class="note-label">Aside · Why famous AI models struggled to count the "r"s in "strawberry"</span>
+        <p>
+          Subword tokenization solves sequence length so well that it creates a hilarious blind spot.
+          To a BPE tokenizer, the word <code>"strawberry"</code> is often <em>not</em> ten letters — it
+          might arrive as just two or three integer IDs like <code>["str", "aw", "berry"]</code> (or even
+          one single ID!). Asking a model to count individual letters inside a fused token is like asking
+          a human to count how many brush strokes make up a Chinese character from memory without looking
+          at it. The interactive browser trainer in Parts 6 through 8 sidesteps that quirk entirely by
+          using a crisp <strong>98-token printable-ASCII vocabulary</strong> (<code>&lt;bos&gt;</code>,
+          <code>&lt;eos&gt;</code>, newline, plus ASCII 32–126): that keeps the final output matrix tiny
+          (<code>[N, 98]</code> instead of <code>[N, 100000]</code>) so a full Transformer can train live
+          at thousands of tokens per second on a browser GPU while spelling arbitrary English, punctuation,
+          and chord progressions letter-by-letter!
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="embeddings"><span class="kicker">Step 2 · IDs into arrows</span>Embeddings: a learnable dictionary of meaning</h2>
       <p>
-        The interactive in-browser GPU trainer in Parts 3 through 5 uses a crisp
-        98-token printable-ASCII vocabulary. That keeps the output softmax matrix tiny —
-        <code>[N, 98]</code> instead of <code>[N, 50257]</code> — so a complete Transformer can train
-        at hundreds of steps per second on your browser GPU while still spelling arbitrary English,
-        punctuation, and code from scratch. Next up: teaching those token vectors how to talk to
-        each other in <a href="/pages/small-minds/attention.html">Part 2: Paying Attention in One Pass</a>.
+        Suppose tokenization turns <code>"cat sat"</code> into integer IDs <code>[14, 72, 3, 55]</code>.
+        A beginner's natural instinct is to feed those integers straight into a neural network. Why
+        doesn't that work?
+      </p>
+      <p>
+        Because token IDs are <em>arbitrary locker numbers</em>, not measurements! If <code>'a'</code> is
+        ID <code>68</code>, <code>'b'</code> is ID <code>69</code>, and <code>'z'</code> is ID
+        <code>93</code>, feeding raw integers tells the matrix math that <code>'z'</code> is "37% larger"
+        than <code>'a'</code>, or that <code>'b'</code> sits halfway between <code>'a'</code> and
+        <code>'c'</code> in meaning — total nonsense! Worse, in a 50,000-word BPE vocabulary, word
+        <code>#4102</code> (<code>"guitar"</code>) and word <code>#4103</code> (<code>"Tuesday"</code>)
+        have nothing in common.
+      </p>
+      <p>
+        The fix is an <strong>embedding table</strong> <code>W_E</code>: a big rectangular matrix with
+        <strong>one row per token in the vocabulary</strong> (<code>V</code> rows) and
+        <strong><code>D</code> columns</strong> (called <code>dModel</code> — <code>64</code> in Part 6's
+        browser trainer, <code>128</code> in Part 8's pretrained companions, up to <code>12,288</code> in
+        giant frontier models).
+      </p>
+      <pre><code><span class="cm">// Embedding lookup: simply fetch row [token_id] from table W_E[V × D]</span>
+token ID  0 ("&lt;bos&gt;") ──▶ row 0  of W_E: [ +0.12, -0.44, +0.08, … ]   (D numbers)
+token ID 35 ("A")     ──▶ row 35 of W_E: [ -0.31, +0.19, +0.62, … ]   (D numbers)
+token ID 68 ("a")     ──▶ row 68 of W_E: [ -0.28, +0.22, +0.59, … ]   (D numbers)</code></pre>
+      <p>
+        Look closely at rows 35 and 68 above. On step 0 of training, every row of <code>W_E</code> is
+        filled with random Gaussian numbers — every token is dropped at a random spot in
+        <code>D</code>-dimensional space. As backpropagation runs (Part 3), <code>W_E</code> is treated
+        like any other weight matrix and nudged by gradients on every step! Tokens that play similar roles
+        in text — vowels together, digits together, punctuation together, or in word-level models
+        <code>cat / kitten / dog</code> and <code>Paris / London / Tokyo</code> — receive similar
+        gradients and drift into tight geometric neighborhoods.
+      </p>
+      <p>
+        In large word-level models, that geometry becomes famously algebraic: directions in embedding
+        space start encoding real concepts like gender, tense, or geography, so vector arithmetic like
+        <code>vec("king") − vec("man") + vec("woman")</code> lands right next to <code>vec("queen")</code>!
+        And mathematically, looking up row <code>id</code> in <code>W_E</code> is identical to multiplying
+        a "one-hot" vector (all zeros except a single <code>1</code> in slot <code>id</code>) by
+        <code>W_E</code> — just without wasting time multiplying by all the zeros.
+      </p>
+      <p>
+        Once a 48-token sentence looks up its 48 rows from <code>W_E</code>, the entire sentence is now
+        a crisp <strong><code>[48 × 64]</code> matrix of floating-point numbers</strong>: 48 rows (one per
+        position in the sentence), 64 columns (each token's coordinate arrow). Now every layer of the
+        Transformer simply transforms that <code>[48 × 64]</code> grid by multiplying it with weight
+        matrices!
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="roofline"><span class="kicker">Step 3 · Hardware reality</span>Why GPUs wait on memory, not math</h2>
+      <p>
+        Before writing a single Transformer layer, pause and ask: <em>why does modern AI run on graphics
+        cards (GPUs) instead of ordinary CPUs?</em>
+      </p>
+      <p>
+        Compare the two chips like two very different kitchens:
+      </p>
+      <ul>
+        <li>
+          A <strong>CPU</strong> is a team of <strong>8–16 Michelin-star chefs</strong>. Each chef is
+          blazingly fast, handles tricky branching recipes (<code>if/else</code>, pointer chasing,
+          operating-system tasks), and has a huge private counter of ultra-fast cache memory right next to
+          them.
+        </li>
+        <li>
+          A <strong>GPU</strong> is a stadium holding <strong>thousands of line cooks</strong> working in
+          lockstep. Each cook is slower individually and terrible at unpredictable branching, yet all
+          thousands of them can chop identical vegetables at the exact same millisecond. That design was
+          built to shade millions of video-game pixels 60 times a second — and by pure mathematical luck,
+          computing every cell <code>C[row, col]</code> of a matrix multiplication is 100% independent,
+          just like pixels!
+        </li>
+      </ul>
+      <p>
+        There is, however, one brutal bottleneck inside every GPU on Earth — from a phone chip to an
+        NVIDIA H100: <strong>math is ridiculously cheap, while moving numbers from memory is agonizingly
+        slow.</strong>
+      </p>
+      <p>
+        Picture a chef who can chop 1,000 carrots per second, except every single carrot lives in a pantry
+        across the street and only one slow runner fetches them two at a time. The chef spends 99% of the
+        day standing idle staring out the window! Computer architects measure this balance with a single
+        number called <strong>arithmetic intensity</strong>: how many floating-point math operations
+        (<strong>FLOPs</strong>) you perform for every <strong>byte</strong> hauled across the main memory
+        bus (VRAM or unified DRAM).
+      </p>
+      <p>
+        Check the arithmetic intensity of the textbook matrix multiply loop — assigning one GPU thread to
+        compute each output cell <code>C[row, col]</code> as the dot product of row <code>row</code> of
+        <code>A</code> and column <code>col</code> of <code>B</code>:
+      </p>
+      <pre><code><span class="cm">// Naive WGSL kernel (matmul_naive in matmul.wgsl):</span>
+<span class="cm">// Every thread computes one dot product straight out of global DRAM</span>
+for (var k = 0u; k &lt; dims.K; k++) {
+  acc = fma(A[row * dims.K + k], B[k * dims.N + col], acc);
+}</code></pre>
+      <p>
+        Count the math and the memory traffic for <em>one single iteration</em> of that inner loop
+        (<code>fma</code> stands for <em>fused multiply-add</em>: <code>a * b + acc</code>):
+      </p>
+      <pre><code>math performed  = 1 multiply + 1 add                 = 2 FLOPs
+bytes fetched   = 1 float from A (4 B) + 1 from B (4 B) = 8 bytes
+arithmetic intensity = 2 FLOPs / 8 bytes             = 0.25 FLOP/byte!</code></pre>
+      <p>
+        Wait — a modern laptop GPU can often execute <strong>30 to 80 FLOPs for every single byte</strong>
+        its memory bus can deliver! At <code>0.25 FLOP/byte</code>, your graphics chip's arithmetic units
+        sit idle well over 95% of the time waiting for numbers to crawl across the memory wires. Even
+        worse, look at how wasteful those reads are: for a <code>1024 × 1024</code> matrix, 1,024
+        different threads all read the <em>exact same row</em> of <code>A</code> from slow main memory
+        1,024 separate times!
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · How video games accidentally built the AI era</span>
+        <p>
+          In 2012, Alex Krizhevsky, Ilya Sutskever, and Geoffrey Hinton trained a deep vision network
+          (<em>AlexNet</em>) on two consumer NVIDIA GTX 580 gaming graphics cards tucked into a bedroom
+          desktop — shattering the ImageNet benchmark by more than 10 percentage points. The hardware was
+          designed to shade dragons and explosions in 3D games, yet its massively parallel matrix pipes
+          turned out to be the exact engine neural networks had been waiting for since 1986.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="tiling"><span class="kicker">Step 4 · Shared memory</span>Sixteen-by-sixteen cooperation</h2>
+      <p>
+        The trick that breaks the memory wall is pure teamwork. Neighboring output cells
+        <code>C[row, col]</code> inside a <code>16 × 16</code> square block all need the exact same 16
+        rows of <code>A</code> and the exact same 16 columns of <code>B</code>.
+      </p>
+      <p>
+        Inside a GPU, threads are launched in tiny neighborhoods called <strong>workgroups</strong>. All
+        256 threads in a <code>16 × 16</code> workgroup live on the same compute core and share a tiny,
+        blazing-fast patch of <strong>on-chip SRAM</strong> (declared in WGSL as
+        <code>var&lt;workgroup&gt;</code>) that sits micrometers away from the math circuits — orders of
+        magnitude faster than global VRAM.
+      </p>
+      <p>
+        Instead of each thread marching all the way across global memory alone, the 256 threads march in
+        <code>16 × 16</code> <strong>tiles</strong>:
+      </p>
+      <ol>
+        <li>
+          <strong>Cooperative fetch:</strong> Each thread loads just <em>one</em> float from <code>A</code>
+          into <code>tileA</code> and just <em>one</em> float from <code>B</code> into <code>tileB</code>.
+          Together, the 256 threads populate both 256-float scratchpads in parallel.
+        </li>
+        <li>
+          <strong>First barrier (<code>workgroupBarrier()</code>):</strong> Every thread pauses until all
+          256 teammates have finished setting their numbers on the shared counter.
+        </li>
+        <li>
+          <strong>Fast SRAM math:</strong> Now every thread runs <code>16</code> fused multiply-adds using
+          its row of <code>tileA</code> and column of <code>tileB</code> — zero global memory reads!
+        </li>
+        <li>
+          <strong>Second barrier (<code>workgroupBarrier()</code>):</strong> Everyone finishes reading the
+          current tile before anyone overwrites it with the next tile along <code>K</code>.
+        </li>
+      </ol>
+      <pre><code>var&lt;workgroup&gt; tileA: array&lt;f32, 256&gt;;
+var&lt;workgroup&gt; tileB: array&lt;f32, 256&gt;;
+
+for (var t = 0u; t &lt; numTiles; t++) {
+  tileA[ly * 16u + lx] = A[row * K + t * 16u + lx];        <span class="cm">// 1 read from A</span>
+  tileB[ly * 16u + lx] = B[(t * 16u + ly) * N + col];      <span class="cm">// 1 read from B</span>
+  workgroupBarrier();                                      <span class="cm">// wait until tile is loaded</span>
+  for (var k = 0u; k &lt; 16u; k++) {
+    acc = fma(tileA[ly * 16u + k], tileB[k * 16u + lx], acc); <span class="cm">// 16 FMAs from fast SRAM!</span>
+  }
+  workgroupBarrier();                                      <span class="cm">// wait before loading next tile</span>
+}</code></pre>
+      <p>
+        Re-run the arithmetic intensity math on this tiled inner loop: each thread still fetches only
+        <code>8 bytes</code> from global VRAM per tile, yet now executes <code>16</code> fused
+        multiply-adds (<code>32 FLOPs</code>) out of fast on-chip SRAM before touching VRAM again! Global
+        memory traffic instantly drops by <strong><code>16×</code></strong>, jumping arithmetic intensity
+        from <code>0.25</code> straight up to <strong><code>4.0 FLOP/byte</code></strong>.
+      </p>
+      <p>
+        Watch both real WGSL kernels from <code>matmul.wgsl</code> race head-to-head on your actual GPU
+        in Figure 2 below — and notice the verification check in the status bar confirming their outputs
+        match to floating-point precision.
+      </p>
+
+      <div
+        data-demo="gemm-race"
+        data-title="Naive vs. 16×16 shared-memory SGEMM"
+        data-hint="Slide matrix size N up to 1024 to race both WebGPU kernels"
+      ></div>
+
+      <p>
+        Slide <strong>matrix N</strong> from <code>128</code> all the way up to <code>1024</code> and
+        watch the green bar pull away from the coral bar. At <code>128 × 128</code>, the entire matrix is
+        only 64 KB — tiny enough to sit inside the GPU's automatic hardware L1 cache, hiding the naive
+        kernel's wastefulness. The moment <code>N</code> climbs to <code>512</code> and <code>1024</code>,
+        the matrices overflow L1 cache, the naive kernel slams into the main memory bus, and cooperative
+        <code>16 × 16</code> workgroup tiling rockets ahead!
+      </p>
+      <details class="fold">
+        <summary>Deep dive: why three matmul layouts live in matmul.wgsl (and eliminate every transpose)</summary>
+        <div class="fold-body">
+          <p>
+            Every linear layer in a neural network stores its weight matrix <code>W</code> with shape
+            <code>[D_out, D_in]</code> (one row per output neuron) and multiplies a batch of token
+            vectors <code>X</code> of shape <code>[N, D_in]</code> by <code>W</code>'s transpose:
+            <code>Y = X · Wᵀ</code>, giving shape <code>[N, D_out]</code>.
+          </p>
+          <p>
+            When backpropagation runs in Part 6, that same linear layer needs <em>two</em> more matrix
+            multiplies to send gradients backward (the matrix version of Part 3's multiply-gate swap!):
+          </p>
+          <pre><code>forward:          Y  = X   · Wᵀ     <span class="cm">// [N, D_in]  × [D_out, D_in]ᵀ → [N, D_out]   (matmul_nt)</span>
+activation grad:  dX = dY  · W      <span class="cm">// [N, D_out] × [D_out, D_in]  → [N, D_in]    (matmul_tiled)</span>
+weight grad:      dW += dYᵀ · X     <span class="cm">// [N, D_out]ᵀ × [N, D_in]     → [D_out, D_in](matmul_tn, alpha=1)</span></code></pre>
+          <p>
+            Writing those three tiled entry points directly in <code>matmul.wgsl</code> — where the tile
+            loader simply swaps indices while filling <code>tileA</code> or <code>tileB</code> — means
+            the GPU never wastes memory or time copying transposed buffers during training. Production
+            libraries like cuBLAS push this same idea further with register-level sub-tiling (each thread
+            computes an <code>8 × 8</code> micro-tile) and dedicated Tensor Cores that multiply
+            <code>16 × 16</code> half-precision tiles in a single hardware clock cycle!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="next-bridge"><span class="kicker">The engine is humming</span>What tokens still cannot do yet</h2>
+      <p>
+        Pause and check what is now alive on your GPU:
+      </p>
+      <ul>
+        <li>Raw text slices cleanly into token IDs (BPE in frontier models; 98-symbol ASCII in the live browser trainer).</li>
+        <li>Each token ID fetches its learned vector arrow from the embedding table <code>W_E</code>, turning a sentence into a <code>[T × D]</code> grid of numbers.</li>
+        <li>A pure-WebGPU <code>16 × 16</code> tiled SGEMM engine transforms those grids in parallel in all three forward and backward orientations.</li>
+      </ul>
+      <p>
+        Yet one giant limitation still remains: right after the embedding lookup, every
+        token row in that <code>[T × D]</code> matrix sits in <strong>complete isolation</strong>. The
+        vector for <code>"bank"</code> looks identical in <em>"river bank"</em> and <em>"bank vault"</em>;
+        the vector for <code>"its"</code> has no clue whether it refers back to <code>"cat"</code> or
+        <code>"star"</code>. To understand a sentence, tokens need a fast, differentiable way to look
+        backward across the sequence and talk to one another.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/attention.html">Part 5, Paying Attention in One Pass</a>.</strong>
+        Queries, Keys, and Values from scratch, why word order vanishes until RoPE turns position into
+        spinning clock hands, how FlashAttention avoids quadratic VRAM blowups, and how RMSNorm and
+        SwiGLU complete a modern Transformer block.
       </p>
     </main>
 
     <footer>
-      <p><a href="/index.html">← All essays</a></p>
+      <p>
+        References &amp; further reading:
+        Gage (1994), <em>A New Algorithm for Data Compression</em> (Byte-Pair Encoding) ·
+        <a href="https://arxiv.org/abs/1508.07909">Sennrich et al. (2015), <em>Neural Machine Translation of Rare Words with Subword Units</em></a> ·
+        <a href="https://arxiv.org/abs/1301.3781">Mikolov et al. (2013), <em>Word2Vec</em></a> ·
+        Williams, Waterman &amp; Patterson (2009), <em>Roofline: An Insightful Visual Performance Model</em> ·
+        <a href="https://siboehm.com/articles/22/CUDA-MMM">Simon Boehm, <em>How to Optimize a CUDA Matmul Kernel</em></a>
+      </p>
     </footer>
 
     <script type="module" src="/src/pages/small-minds/matmul.ts"></script>

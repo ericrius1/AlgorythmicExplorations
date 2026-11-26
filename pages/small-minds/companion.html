@@ -10,7 +10,7 @@
     <title>A Creature of Your Own — Small Minds</title>
     <meta
       name="description"
-      content="The Small Minds keystone project: an adorable 3D WebGPU companion powered by a live pure-WebGPU micro-LLM, continual online memory, trick reinforcement learning, and dream-time AutoResearch across five worlds."
+      content="The Small Minds keystone project: an interactive 3D WebGPU companion powered by a 780K-parameter Q8 micro-LLM, pretraining and fine-tuning, episodic replay continual learning, REINFORCE trick policy gradients, and dream-time AutoResearch across five worlds."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -26,110 +26,224 @@
     <header class="hero hero-title-below">
       <div data-demo="hero"></div>
       <div class="hero-title">
-        <p class="hero-kicker">Small Minds · Part 5 · Keystone Project</p>
+        <p class="hero-kicker">Small Minds · Part 8 · Keystone Project</p>
         <h1>A Creature of Your Own</h1>
         <p class="subtitle">
-          Adopt a tiny 3D companion whose brain trains live on your GPU — chat, pet, toss glowing
-          orbs, teach moves, explore five worlds, and put them to sleep to run AutoResearch dreams.
+          Adopt a tiny 3D companion whose brain runs and learns live on your GPU — chat, pet, toss
+          glowing orbs, teach moves with reinforcement learning, explore five worlds, and put them to
+          sleep to run AutoResearch dreams.
         </p>
       </div>
     </header>
 
     <main>
       <p>
-        Everything in the sanctuary above runs locally in your browser with zero servers and zero
-        cloud APIs. Click directly on your companion to pet them, double-click the ground (or hit
-        <strong>Toss Orb ✦</strong>) to play fetch, chat to teach them your name and favorite words,
-        cue and reward physical tricks, or switch between six distinct species and five worlds drawn
-        from the other series on this site. Every weight tensor, episodic memory, trick score, and
-        evolution stage is persisted quietly in your browser's <code>IndexedDB</code>, so when you
-        return tomorrow, your companion picks up right where you left off.
+        Every single line of the sanctuary above executes locally inside your browser tab with zero
+        cloud APIs and zero remote inference servers. Click directly on your companion to pet them,
+        tap anywhere on the ground to invite them to wander over, double-click the floor (or click
+        <strong>Toss Orb ✦</strong>) to play fetch, chat to teach them your name and favorite topics,
+        cue and reward physical tricks, or switch across six evolving species and five worlds drawn from
+        earlier series on this site. Every weight checkpoint, episodic memory, trick mastery score, and
+        evolution stage saves quietly in your browser's private <code>IndexedDB</code>, so returning
+        tomorrow picks up right where you left off.
       </p>
       <aside class="note">
         <span class="note-label">Debug mode · press <code>;</code></span>
         <p>
-          Hit the semicolon key <code>;</code> anywhere outside a text box (or add
+          Press the semicolon key <code>;</code> anywhere outside a text box (or append
           <code>?debug</code> to the URL) to open the live telemetry overlay: frame rate, frame time,
-          JS heap, active species, <strong>3D model author</strong>, WebGPU LLM parameter count,
-          training steps, decode speed, plus one-click buttons to preview evolution stages 1–4.
+          JS heap, active species, <strong>3D model author</strong>, WebGPU LLM architecture and
+          parameter count, brain checkpoint source, online training steps, decode speed, plus one-click
+          buttons to preview evolution stages 1–4.
         </p>
       </aside>
 
       <!-- ================================================================ -->
-      <h2 id="brain"><span class="kicker">Architecture · Part 1</span>Continual learning without forgetting</h2>
+      <h2 id="pretrain"><span class="kicker">Architecture · Stage 1</span>Pretraining vs. Fine-Tuning: how a blank mind gets a voice</h2>
       <p>
-        A pet that never changes gets stale in five minutes; a neural network that only trains on
-        the newest message suffers <strong>catastrophic forgetting</strong>, overwriting its entire
-        vocabulary with the last sentence you typed. The companion solves this with an
-        <strong>episodic replay buffer</strong>.
+        If you ever wondered how companies turn a raw next-token predictor into a helpful assistant with
+        a consistent personality — instead of a chaotic autocomplete engine — the six companions above use
+        the exact same <strong>two-stage recipe</strong> at miniature scale:
+      </p>
+      <ol>
+        <li>
+          <strong>Stage 1 · Pretraining (general language):</strong> Starting from random Gaussian
+          weights, one shared base Transformer — the winning <strong>780K-parameter</strong> architecture
+          discovered by Part 7's AutoResearch run (<code>6 layers, dModel = 128, 4 heads, SwiGLU,
+          context = 128</code>) — reads millions of characters of clean cozy English stories
+          (<em>TinyStories</em>) plus general conversation on an NVIDIA L4 GPU. During pretraining, the
+          weights learn spelling, punctuation, sentence rhythm, and everyday English structure, dropping
+          validation bits-per-byte down to <strong><code>~1.29 bpb</code></strong> (saved as
+          <code>companion-base.smw</code>).
+        </li>
+        <li>
+          <strong>Stage 2 · Fine-Tuning (bespoke personality):</strong> Starting from that shared
+          <code>companion-base.smw</code> mind — <em>never</em> from scratch! — six separate copies are
+          trained for a brief, gentle sprint on species-specific <code>user: … / pet: …</code> dialogue
+          tailored to each creature's voice: sleepy sunbeam purrs for <em>Mochi</em>, moonlit riddles for
+          <em>Kitsune</em>, mossy pond splashes for <em>Pebble</em>, starry astronomy notes for
+          <em>Pip</em>, zoomies and embers for <em>Bramble</em>, and translucent harmonic ripples for
+          <em>Luma</em>. On-character validation drops to <strong><code>~0.17 bpb</code></strong> while
+          preserving general English fluency (<code>~1.29 bpb</code>)!
+        </li>
+      </ol>
+      <p>
+        Each finished species brain is then group-quantized to Part 7's compact <strong>Q8
+        <code>.smw</code> format</strong> (~857 KB each — roughly the size of a single medium JPEG
+        photo!) and shipped statically right alongside the page. When you pick a species above, your
+        browser fetches its <code>.smw</code> file, unpacks all 780,000 weights straight onto WebGPU
+        storage buffers, and starts generating replies live on your graphics card. (If WebGPU is
+        unavailable or a custom checkpoint isn't found, <code>PetBrain</code> gracefully falls back to a
+        nimble 48D scratch model that warm-starts on the spot.)
+      </p>
+      <details class="fold">
+        <summary>Deep dive: train your own custom .smw companion brain on Google Colab</summary>
+        <div class="fold-body">
+          <p>
+            The exact PyTorch implementation matching this browser's WebGPU shaders bit-for-bit lives in
+            this repository's <code>colab/</code> folder (<code>small_minds_model.py</code> plus two
+            ready-to-run Colab notebooks: <code>small_minds_companion_trainer.ipynb</code> and
+            <code>small_minds_autoresearch_a100.ipynb</code>). You can train a brand-new 324K, 780K, or
+            1.8M personality on a Colab GPU in minutes, download the Q8 <code>.smw</code> file, open the
+            <strong>Brain Peek</strong> tab above, and click <strong>Load .smw Brain</strong> to drop your
+            own custom-trained mind straight into the 3D creature without rebuilding a single line of site
+            code!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="brain"><span class="kicker">Architecture · Stage 2</span>Continual learning without catastrophic forgetting</h2>
+      <p>
+        A static pretrained pet quickly feels scripted, yet updating a live neural network while someone
+        chats with it immediately runs into one of deep learning's hardest unsolved puzzles:
+        <strong>catastrophic forgetting</strong> (the <em>stability–plasticity dilemma</em>).
       </p>
       <p>
-        Whenever you send a message, the pet first runs real autoregressive decoding through a
-        pure-WebGPU micro-Transformer (<code>RMSNorm + RoPE + FlashAttention + SwiGLU</code>) and
-        captures its live Layer-0 attention heatmap. It then appends your exchange to its personal
-        memory bank and executes a short burst of conservative WebGPU gradient steps sampled from a
-        mixture of its species personality seed, core dialogue, and your personal memories. Open the
-        <strong>Brain Peek</strong> tab above after a few chats to inspect the live attention map,
-        falling cross-entropy loss, and raw token samples straight from GPU memory.
+        Imagine your companion already speaks fluent cozy English, and you type <em>"My name is Maya and I
+        love telescopes!"</em> If you immediately run 50 aggressive gradient steps exclusively on that one
+        sentence, backpropagation happily drives the loss on <em>"Maya and telescopes"</em> down to zero —
+        by hijacking and overwriting the weights that used to know how to say hello, answer questions, or
+        form ordinary grammar! After two chats, every reply turns into garbled repetitions of your last
+        message.
+      </p>
+      <p>
+        <code>PetBrain</code> balances stability and plasticity with two practical defenses:
+      </p>
+      <ul>
+        <li>
+          <strong>An episodic replay buffer:</strong> Rather than training on your newest line in
+          isolation, every chat exchange gets appended to a personal memory bank. Online gradient steps
+          sample mini-batches from a <em>blend</em> of the species' core personality seed, general pet
+          dialogue, and your personal memories (gently repeated so your name and topics carry weight
+          without drowning out English).
+        </li>
+        <li>
+          <strong>Conservative micro-updates:</strong> Whenever you chat with a pretrained 780K brain,
+          the companion first runs real autoregressive WebGPU decoding (<code>temperature = 0.65</code>,
+          <code>top-p = 0.9</code>), captures its live Layer-0 attention heatmap, and then executes just
+          <strong>3 tiny gradient steps at <code>lr = 0.0008</code></strong> (roughly 10× gentler than
+          scratch training!) before persisting the updated Q8 checkpoint to <code>IndexedDB</code>.
+        </li>
+      </ul>
+      <p>
+        Open the <strong>Brain Peek</strong> tab above after a few messages to inspect the real WebGPU
+        readouts: backend, checkpoint source, architecture, parameter count, live Layer-0 causal attention
+        map, raw WebGPU token sample, and a <strong>Train +15 Steps</strong> button to watch online loss
+        shift live.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="tricks"><span class="kicker">Architecture · Part 2</span>Teaching moves with policy gradients</h2>
+      <h2 id="tricks"><span class="kicker">Architecture · Stage 3</span>Teaching moves with reinforcement learning (policy gradients)</h2>
       <p>
-        Chat is only one channel. Real companions learn physical habits through play and
-        reinforcement. Inside the <strong>Teach Moves</strong> tab, six procedural animations
-        (<em>Hop</em>, <em>Spin</em>, <em>Sing</em>, <em>Zoomies</em>, <em>Bow</em>, and
-        <em>Starflip</em>) sit behind a compact policy weight table.
+        Every training loop in Parts 1 through 7 used <strong>supervised learning</strong> (or
+        <em>self-supervised</em> next-token prediction): for every input, the dataset already knew the
+        exact right answer letter so cross-entropy could grade the error directly.
       </p>
       <p>
-        When you cue a move and click <strong>Reward ✦</strong>, a reward-modulated policy step
-        raises that trick's logit and mastery score while boosting bond and experience. As mastery
-        climbs, your companion begins performing favorite learned moves spontaneously when happy and
-        unlocks higher visual evolution stages.
+        Teaching physical tricks works differently! When you teach a puppy to spin or bow, you do not hand
+        the puppy a spreadsheet of exact muscle torques — you let it try a move and hand out a
+        <strong>treat</strong> when it does what you hoped! That paradigm — learning from sparse
+        <strong>scalar rewards</strong> rather than labeled answer keys — is <strong>Reinforcement
+        Learning (RL)</strong>.
+      </p>
+      <p>
+        Inside the <strong>Teach Moves</strong> tab, six procedural moves (<em>Hop</em>, <em>Spin</em>,
+        <em>Sing</em>, <em>Zoomies</em>, <em>Bow</em>, and <em>Starflip</em>) sit behind a compact
+        <strong>policy weight table</strong> mapping companion state to action logits. When you cue a
+        move and click <strong>Reward ✦</strong>, a <strong>REINFORCE-style policy gradient step</strong>
+        raises that trick's policy weights and mastery score in proportion to how much room remains to
+        learn:
+      </p>
+      <pre><code><span class="cm">// Policy gradient intuition (REINFORCE):</span>
+<span class="cm">// If action 'a' earned a positive reward R, push log-probability log π(a) UP!</span>
+Δθ  ∝  +R · ∇θ log π_θ(action)</code></pre>
+      <p>
+        As mastery climbs, your companion's autonomous sampling distribution shifts — whenever they feel
+        happy and idle, they begin performing their favorite rewarded moves spontaneously on their own,
+        earning XP and unlocking higher visual evolution stages!
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · How trick rewards connect to RLHF in frontier AI</span>
+        <p>
+          Modern AI assistants go through a remarkably similar third stage right after pretraining and
+          fine-tuning: <strong>Reinforcement Learning from Human Feedback (RLHF)</strong> (and verifiable
+          reasoning RL). Instead of only predicting the average next word on the internet, the model
+          generates complete candidate answers, receives a scalar reward score (from human raters, a
+          reward model, or unit tests passing!), and uses policy gradients to make high-reward reasoning
+          paths more probable and unhelpful ones less probable. Rewarding <em>Mochi</em> for a starflip
+          uses the exact same core idea!
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="dreams"><span class="kicker">Architecture · Stage 4</span>Recursive self-improvement while dreaming</h2>
+      <p>
+        Neuroscientists have long noticed that sleeping mammalian brains do not simply switch off — during
+        quiet rest, the hippocampus rapidly <strong>replays</strong> snippets of the day's experiences so
+        the cortex can consolidate new memories without breaking old ones.
+      </p>
+      <p>
+        Tap <strong>Start Dream Cycle ☽</strong> inside the <strong>Dream (AutoResearch)</strong> tab
+        above. The sanctuary lighting dims to twilight, your companion curls down, closes its eyes, and
+        breathes slowly while <a href="/pages/small-minds/autoresearch.html">Part 7's Browser
+        AutoResearcher</a> wakes up in the background! It runs a real UCB-bandit WebGPU trial over your
+        companion's personal replay buffer, logs the architectural hypothesis and validation
+        <code>val_bpb</code>, consolidates the live brain with a calm replay burst, and saves the newly
+        consolidated weights to <code>IndexedDB</code> before your creature wakes up wiser (and a little
+        closer to its next evolution!).
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="dreams"><span class="kicker">Architecture · Part 3</span>Recursive self-improvement while dreaming</h2>
+      <h2 id="worlds"><span class="kicker">Architecture · Stage 5</span>Five worlds and six evolving rigs</h2>
       <p>
-        Why should a pet stop learning when the conversation pauses? Tap
-        <strong>Start Dream Cycle ☽</strong> in the <strong>Dream</strong> tab and the sanctuary
-        dims to twilight. Your creature closes its eyes and breathes slowly while the
-        <a href="/pages/small-minds/autoresearch.html">Part 4 Browser AutoResearcher</a> wakes up in
-        the background, running UCB-bandit optimization experiments over your pet's personal replay
-        buffer on WebGPU and consolidating calmer, lower-loss weights before waking back up.
-      </p>
-
-      <!-- ================================================================ -->
-      <h2 id="worlds"><span class="kicker">Architecture · Part 4</span>Five worlds from across this site</h2>
-      <p>
-        Every sanctuary backdrop borrows an idea from an earlier series in
+        Every sanctuary backdrop borrows an algorithmic idea from another series across
         <em>Algorythmic Explorations</em>:
       </p>
       <ul>
         <li><strong>Meadow Valley</strong> (<em>Ground Truth</em>) — procedural terrain contour, hundreds of instanced wind-swaying grass blades, and drifting twilight fireflies.</li>
-        <li><strong>Starlight Nebula</strong> (<em>Particle Worlds</em>) — a floating crystal plinth ringed by Keplerian orbital dust motes that accelerate when your pet plays.</li>
+        <li><strong>Starlight Nebula</strong> (<em>Particle Worlds</em>) — a floating crystal plinth ringed by Keplerian orbital dust motes that accelerate when your companion plays.</li>
         <li><strong>Bonfire Clearing</strong> (<em>Bounced Light</em>) — a flickering warm campfire sending luminous embers curling into the dark sky.</li>
-        <li><strong>Harmonic Hall</strong> (<em>Living Music &amp; Acoustic Spaces</em>) — concentric acoustic floor rings that pulse with gentle pentatonic Web Audio chimes whenever your pet hops or sings.</li>
-        <li><strong>Ferro Sanctuary</strong> (<em>Strange Matter</em>) — a glossy obsidian magnetic pool that ripples and raises Rosensweig-style spikes whenever your pet moves or you tap the floor.</li>
+        <li><strong>Harmonic Hall</strong> (<em>Living Music &amp; Acoustic Spaces</em>) — concentric acoustic floor rings that pulse with gentle pentatonic Web Audio chimes whenever your companion hops or sings.</li>
+        <li><strong>Ferro Sanctuary</strong> (<em>Strange Matter</em>) — a glossy obsidian magnetic pool that ripples and raises Rosensweig-style spikes whenever your companion moves or you tap the floor.</li>
       </ul>
-
-      <!-- ================================================================ -->
-      <h2 id="species"><span class="kicker">Architecture · Part 5</span>Six evolving species, built to grow to twenty</h2>
       <p>
-        Each species is defined by a self-contained procedural 3D rig implementing a shared
-        <code>SpeciesDefinition</code> interface — smooth look-at eye tracking, natural blinks,
-        happy crescent squints when petted, neural glow tied to live WebGPU attention energy, and
-        four visual evolution stages (<em>Hatchling → Curious Sprout → Radiant Friend → Starlight
-        Sage</em>) that unlock collars, constellations, spirit fox tails, and celestial crowns.
-        Three of the six starter species (<em>Mochi</em>, <em>Kitsune</em>, and <em>Pebble</em>)
-        were modeled by <strong>Claude Opus 5.5</strong> and three (<em>Pip</em>, <em>Bramble</em>,
-        and <em>Luma</em>) by <strong>Gemini 4 Neon</strong> — press <code>;</code> at any time
-        to inspect the active creature's model author alongside frame rate and live WebGPU metrics.
+        Each of the six starter species is a self-contained procedural 3D WebGPU rig built with
+        SDF-sculpted geometry, backlit subsurface scattering, instanced fur shells, filmic AgX tone
+        mapping, and HDR bloom. Every rig implements a shared <code>SpeciesDefinition</code> contract —
+        smooth look-at eye tracking following your pointer or tossed orb, natural blinks, happy crescent
+        squints when petted, a neural aura tied directly to live WebGPU attention energy, and four visual
+        evolution stages (<em>Hatchling → Curious Sprout → Radiant Friend → Starlight Sage</em>) unlocking
+        collars, floating constellations, spirit fox tails, and celestial crowns.
       </p>
       <p>
-        Adding a seventh or twentieth creature only takes registering one more builder in
-        <code>speciesRegistry.ts</code>. Spin the gallery turntable below to inspect all six
-        companions across every evolution stage and watch their signature moves up close.
+        Three of the six starter species (<em>Mochi</em>, <em>Kitsune</em>, and <em>Pebble</em>) were
+        modeled by <strong>Claude Opus 5.5</strong> and three (<em>Pip</em>, <em>Bramble</em>, and
+        <em>Luma</em>) by <strong>Gemini 4 Neon</strong> — press <code>;</code> at any time to inspect the
+        active creature's model author alongside frame rate and live WebGPU metrics. Registering a seventh
+        or twentieth companion takes only adding one builder to <code>speciesRegistry.ts</code>. Spin the
+        gallery turntable below to inspect all six creatures across every evolution stage and watch their
+        signature moves up close.
       </p>
 
       <div
@@ -138,14 +252,85 @@
         data-hint="Drag to orbit · cycle species and evolution stage 1–4"
       ></div>
 
+      <!-- ================================================================ -->
+      <h2 id="epilogue"><span class="kicker">Epilogue</span>From counting letters to a dreaming mind</h2>
       <p>
-        From a single 16×16 shared-memory tile in Part 1 to a tiny evolving creature dreaming better
-        weights in your browser tab — every layer of the stack is right here in the source, open to
-        poke, break, and expand with new species, new worlds, and new learning rules.
+        Step back and trace the entire eight-part tower you just climbed from scratch — not a single black
+        box left unopened along the way:
+      </p>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Part</th>
+              <th>Core question answered</th>
+              <th>Building block added</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="/pages/small-minds/guessing.html"><strong>1. The Guessing Game</strong></a></td>
+              <td>What does an LLM actually do?</td>
+              <td>Next-token probabilities, softmax, temperature, top-p, cross-entropy surprise</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/vectors.html"><strong>2. Numbers That Point</strong></a></td>
+              <td>How does math represent ideas?</td>
+              <td>Vectors, dot products, matrix transformations, nonlinear space folding</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/learning.html"><strong>3. Rolling Downhill</strong></a></td>
+              <td>How do weights teach themselves?</td>
+              <td>Derivatives as sensitivity, gradient descent, Adam, backpropagation chain rule</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/matmul.html"><strong>4. The Grid That Thinks</strong></a></td>
+              <td>How do words enter GPU silicon fast?</td>
+              <td>BPE tokens, learned embeddings <code>W_E</code>, 16×16 shared-memory GPU tiling</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/attention.html"><strong>5. Paying Attention in One Pass</strong></a></td>
+              <td>How do tokens share context?</td>
+              <td>Queries/Keys/Values, RoPE clocks, FlashAttention online softmax, RMSNorm, SwiGLU</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/training.html"><strong>6. Teaching the Weights</strong></a></td>
+              <td>How does a whole Transformer train?</td>
+              <td>Teacher forcing, fused <code>(prob − y)</code> grad, residual highways, AdamW &amp; Muon</td>
+            </tr>
+            <tr>
+              <td><a href="/pages/small-minds/autoresearch.html"><strong>7. The Browser That Researches Itself</strong></a></td>
+              <td>How do models decode fast &amp; self-improve?</td>
+              <td>KV caches, INT8/INT4 bit-packing, <code>val_bpb</code>, UCB-bandit AutoResearch</td>
+            </tr>
+            <tr class="is-winner">
+              <td><strong>8. A Creature of Your Own</strong></td>
+              <td>How does it become an interactive agent?</td>
+              <td>Pretraining + fine-tuning, episodic replay, REINFORCE tricks, dreaming 3D rig</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Everything powering these eight essays — every WGSL compute shader, every forward and backward
+        kernel, every 3D species rig, and both Google Colab notebooks — sits open in the repository ready
+        to inspect, break, remix, and scale. If you followed along from knowing zero linear algebra all the
+        way to watching a pure-WebGPU Transformer dream calmer weights in your browser tab, the mystery
+        behind modern AI is gone — replaced by something much better: clean, touchable geometry and code
+        you can build with yourself.
       </p>
     </main>
 
     <footer>
+      <p>
+        References &amp; next steps:
+        <a href="https://arxiv.org/abs/2305.07759">Eldan &amp; Li (2023), <em>TinyStories</em></a> ·
+        McCloskey &amp; Cohen (1989), <em>Catastrophic Interference in Connectionist Networks</em> ·
+        <a href="https://link.springer.com/article/10.1007/BF00992696">Williams (1992), <em>Simple Statistical Gradient-Following Algorithms</em> (REINFORCE)</a> ·
+        <a href="https://arxiv.org/abs/2203.02155">Ouyang et al. (2022), <em>Training language models to follow instructions with human feedback</em> (RLHF)</a> ·
+        <a href="https://karpathy.ai/zero-to-hero.html">Karpathy — Neural Networks: Zero to Hero</a> ·
+        <a href="https://github.com/ericrius1/AlgorythmicExplorations/tree/main/colab">Small Minds Colab Training Pack</a>
+      </p>
       <p><a href="/index.html">← All essays</a></p>
     </footer>
 

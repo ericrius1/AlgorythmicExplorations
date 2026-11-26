@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>The Guessing Game — Small Minds</title>
+    <meta
+      name="description"
+      content="Starting AI and language models from absolute zero: next-token prediction, counting Markov tables, surprise and cross-entropy loss, logits, softmax, temperature, top-p sampling, and why simple tables hit an exponential wall."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 1</p>
+        <h1>The Guessing Game</h1>
+        <p class="subtitle">
+          Before a single neuron or matrix enters the room, a language model is a remarkably simple
+          machine: guess the next symbol, measure how surprised you were, and roll weighted dice.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Modern AI chat assistants feel almost magical when you first talk to them. You ask a question
+        about biology, drop in a half-broken line of code, or ask for a bedtime story about a sleepy
+        octopus, and fluent paragraphs stream across the screen. It is natural to imagine a giant
+        encyclopedia hidden inside the server, or thousands of hand-written grammar rules stitched
+        together by engineers.
+      </p>
+      <p>
+        Neither picture is right. Strip away the chat window, the system prompt, and the billion-dollar
+        server farms, and every large language model on Earth is playing <strong>one single game</strong>
+        over and over again:
+      </p>
+      <blockquote>
+        <p>
+          Read the text so far, assign a probability to every possible next piece of text, pick one,
+          glue it onto the end, and repeat.
+        </p>
+      </blockquote>
+      <p>
+        Watch the figure overhead for a few seconds. A line of poetry slides in from the left, one
+        character at a time. At every step the machine pauses on the empty box, scores every character
+        in its alphabet, turns those scores into percentages that add up to 100%, and picks the next
+        character. There is no separate "grammar module," no built-in dictionary of facts, and no
+        separate "reasoning chip." Fluency, rhyme, coding skill, and world knowledge all have to emerge
+        as side effects of becoming extraordinarily good at predicting what comes next.
+      </p>
+      <p>
+        This eight-part series builds a complete modern language model from absolute zero right inside
+        your browser tab — no Python frameworks, no hidden cloud servers, and no prior machine-learning
+        or linear-algebra background assumed. The path climbs one honest rung at a time:
+      </p>
+      <ul>
+        <li>
+          <strong>Part 1 (this essay)</strong> — the guessing game itself: counting tables,
+          probabilities, surprise, softmax, and temperature.
+        </li>
+        <li>
+          <a href="/pages/small-minds/vectors.html"><strong>Part 2 · Numbers That Point</strong></a> —
+          vectors, dot products, matrices, and why neural networks need a nonlinear bend.
+        </li>
+        <li>
+          <a href="/pages/small-minds/learning.html"><strong>Part 3 · Rolling Downhill</strong></a> —
+          slopes without calculus tears, loss valleys, Adam, and backpropagation worked out by hand.
+        </li>
+        <li>
+          <a href="/pages/small-minds/matmul.html"><strong>Part 4 · The Grid That Thinks</strong></a> —
+          turning text into tokens and embeddings, and multiplying giant grids in 16×16 tiles on your GPU.
+        </li>
+        <li>
+          <a href="/pages/small-minds/attention.html"><strong>Part 5 · Paying Attention in One Pass</strong></a> —
+          Queries, Keys, Values, RoPE clocks, FlashAttention, RMSNorm, and SwiGLU.
+        </li>
+        <li>
+          <a href="/pages/small-minds/training.html"><strong>Part 6 · Teaching the Weights</strong></a> —
+          wiring full backpropagation through a real Transformer and watching English rise out of noise live on WebGPU.
+        </li>
+        <li>
+          <a href="/pages/small-minds/autoresearch.html"><strong>Part 7 · The Browser That Researches Itself</strong></a> —
+          KV caches, 4-bit weights, honest validation scores, and an autonomous WebGPU research loop.
+        </li>
+        <li>
+          <a href="/pages/small-minds/companion.html"><strong>Part 8 · A Creature of Your Own</strong></a> —
+          pretraining, fine-tuning, episodic memory, policy-gradient tricks, and a living 3D companion that dreams.
+        </li>
+      </ul>
+      <aside class="note">
+        <span class="note-label">Prerequisites · What you actually need</span>
+        <p>
+          High-school algebra (variables, exponents, basic graphs) and curiosity are enough for the
+          entire series. Whenever a new piece of math shows up — logarithms here, vectors and matrices
+          in Part 2, slopes and the chain rule in Part 3, sine and cosine in Part 5 — the essay builds
+          it visually from scratch and links to great free visual primers if you ever want a side detour.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="counting"><span class="kicker">Step 1 · Before neural networks</span>A language model made of pure counting</h2>
+      <p>
+        Before inventing artificial brains, ask the simplest possible engineering question: how far can
+        you get at predicting text using <em>nothing more than a tally sheet</em>?
+      </p>
+      <p>
+        Suppose you open a play by Shakespeare and walk through it one character at a time with a pencil
+        and a giant grid. Every time you see the letter <code>t</code> followed immediately by
+        <code>h</code>, you add one tally mark to the box <code>(t → h)</code>. Every time
+        <code>t</code> is followed by <code>o</code>, you add a mark to <code>(t → o)</code>. After a
+        few thousand characters, divide every row by its row total so the counts become probabilities:
+      </p>
+      <pre><code><span class="cm">// Example row after tallying a small English passage:</span>
+after "t":   'h' 38%   ' ' 21%   'o' 12%   'e' 11%   'i' 7%   'r' 5%   …   'z' 0%
+after "q":   'u' 99%   ' '  1%   (almost everything else: 0%)
+after "th":  'e' 52%   'a' 16%   'i' 11%   'o'  9%   'r' 5%   …</code></pre>
+      <p>
+        That tiny lookup table is called an <strong>n-gram model</strong> (or a <strong>Markov
+        chain</strong> of order <code>k</code>, where <code>k</code> is how many previous characters
+        you look at before guessing). Notice how embarrassingly simple it is: zero calculus, zero
+        matrices, zero GPUs — just counting how often each suffix followed each prefix in the training
+        text.
+      </p>
+      <p>
+        Even so, it already behaves like a miniature language model! Look at the live table builder
+        below. Pick one of the four built-in texts (<em>Tiny Shakespeare</em>, <em>Nature Haiku</em>,
+        <em>Jazz Progressions</em>, or <em>Companion Dialogue</em>), drag the <strong>context k</strong>
+        slider from <code>1</code> up to <code>5</code>, and click <strong>generate</strong> or
+        <strong>step 1 char</strong>. You can also type your own prefix into the box to inspect the
+        exact tally marks sitting behind that prefix.
+      </p>
+
+      <div
+        data-demo="markov-builder"
+        data-title="A language model built purely from counting"
+        data-hint="Slide context k from 1 to 5 and hit generate"
+      ></div>
+
+      <p>
+        Play with <strong>context k</strong> carefully, because the progression from <code>1</code> to
+        <code>5</code> reveals the central tension of all machine learning:
+      </p>
+      <ul>
+        <li>
+          At <strong><code>k = 1</code></strong> (looking only at the single previous letter), the
+          output looks like alien gibberish that vaguely resembles English syllable patterns:
+          vowels alternate with consonants, <code>q</code> drags <code>u</code> along, spaces show up
+          every few letters, yet real words rarely survive.
+        </li>
+        <li>
+          At <strong><code>k = 2</code></strong> and <strong><code>k = 3</code></strong>, recognizable
+          fragments click into focus — <code>the</code>, <code>and</code>, <code>soft</code>,
+          <code>Cmaj7 -&gt;</code> — because three characters of context is enough to finish common
+          short words and chord symbols.
+        </li>
+        <li>
+          Push to <strong><code>k = 5</code></strong> on these short texts and something suspicious
+          happens: the output suddenly reads like flawless Shakespeare or haiku — because it has stopped
+          <em>generating</em> and started <em>copy-pasting</em>! Almost every 5-character prefix in a
+          2,000-character passage appeared only once, so there is only a single candidate with 100%
+          probability and the table simply replays the original text verbatim.
+        </li>
+      </ul>
+      <p>
+        Even worse, type a slightly unusual 4-letter prefix like <code>star</code> or <code>moon</code>
+        into the prefix box when <code>Tiny Shakespeare</code> is selected and <code>k = 4</code>. The
+        left panel flashes red: <em>zero hits</em>. The counting table is completely blind to any
+        sequence it did not witness byte-for-byte during training. It has no idea that
+        <code>"The little cat"</code> and <code>"The small kitten"</code> mean almost the same thing.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Claude Shannon's 1948 parlor game</span>
+        <p>
+          In his landmark 1948 paper <em>A Mathematical Theory of Communication</em>, Claude Shannon
+          built English Markov approximations by hand — opening a book at random, searching for the last
+          two letters he had written, copying down whatever letter came next, and repeating! By third-order
+          characters he already got eerie pseudo-English like
+          <em>"IN NO IST LAT WHEY CRATICT FROURE BIRS GROCID"</em>, and by second-order words he got
+          <em>"THE HEAD AND IN FRONTAL ATTACK ON AN ENGLISH WRITER THAT THE CHARACTER OF THIS POINT IS
+          THEREFORE ANOTHER METHOD."</em> Shannon was measuring how predictable English is — and in the
+          process invented the mathematical foundation of both data compression and modern LLM training.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="wall"><span class="kicker">Step 2 · The combinatorial wall</span>Why counting tables die around k = 6</h2>
+      <p>
+        At first glance, the fix for a blind counting table sounds obvious: "Just feed it the entire
+        internet and make <code>k = 50</code> so it can see the whole sentence!" Look at the red bars on
+        the right side of Figure 1 to see why that plan crashes straight into the laws of physics.
+      </p>
+      <p>
+        The browser trainer later in this series uses a compact alphabet of <strong>98 symbols</strong>
+        (printable English letters, digits, punctuation, newline, and start/end markers). How many
+        cells does a complete lookup table need if you condition on <code>k</code> previous characters?
+        There are <code>98<sup>k</sup></code> possible prefixes, and each prefix needs 98 probabilities
+        for the next character, giving <code>98<sup>k+1</sup></code> cells in total:
+      </p>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Context <code>k</code></th>
+              <th>Example prefix</th>
+              <th>Table cells <code>98<sup>k+1</sup></code></th>
+              <th>Rough physical scale</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>k = 1</code></td>
+              <td><code>"t"</code></td>
+              <td><code>9,604</code></td>
+              <td>Fits in 38 KB (smaller than one photo)</td>
+            </tr>
+            <tr>
+              <td><code>k = 2</code></td>
+              <td><code>"th"</code></td>
+              <td><code>941,192</code></td>
+              <td>~3.7 MB (a single MP3 song)</td>
+            </tr>
+            <tr>
+              <td><code>k = 3</code></td>
+              <td><code>"the"</code></td>
+              <td><code>92,236,816</code></td>
+              <td>~370 MB (already heavy for a phone)</td>
+            </tr>
+            <tr>
+              <td><code>k = 4</code></td>
+              <td><code>"the "</code></td>
+              <td><code>9.0 × 10<sup>9</sup></code></td>
+              <td>~36 GB (more RAM than most laptops)</td>
+            </tr>
+            <tr>
+              <td><code>k = 10</code></td>
+              <td><code>"Once upon "</code></td>
+              <td><code>8.0 × 10<sup>21</sup></code></td>
+              <td>More cells than grains of sand on Earth</td>
+            </tr>
+            <tr>
+              <td><code>k = 48</code></td>
+              <td>One short sentence</td>
+              <td><code>3.7 × 10<sup>97</sup></code></td>
+              <td>10<sup>17</sup> times more cells than atoms in the observable universe</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        That explosion is called the <strong>curse of dimensionality</strong>. Even if you owned a hard
+        drive the size of a galaxy, you could never fill those boxes because almost every 12-word English
+        sentence you speak today has never been written before in human history.
+      </p>
+      <p>
+        This is the exact moment neural networks earn their keep. Instead of memorizing every possible
+        prefix in a separate cubbyhole, a neural network tries to build a <strong>smooth, compressed
+        function</strong> that takes a sequence of symbols, discovers shared structure (that
+        <code>cat</code> and <code>dog</code> act similarly, that <code>he</code> refers back to a
+        masculine subject, that an opening parenthesis expects a closing one), and outputs a probability
+        distribution over the next symbol — even for sentences it has never seen before.
+      </p>
+      <p>
+        Before building that function in Part 2, however, two crucial pieces of machinery belong right
+        here on the ground floor: <strong>how to score a probability guess</strong>, and <strong>how raw
+        numbers turn into probabilities in the first place</strong>.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="surprise"><span class="kicker">Step 3 · Grading a guesser</span>Surprise, logarithms, and cross-entropy loss</h2>
+      <p>
+        Suppose two weather forecasters predict rain tomorrow. Forecaster A says "90% chance of rain."
+        Forecaster B says "55% chance of rain." The next morning it pours. Both forecasters leaned toward
+        rain, yet Forecaster A clearly made a better prediction. What if it had stayed sunny instead?
+        Forecaster A, who was 90% sure of rain and gave sunshine only 10%, deserves a much harsher
+        penalty than Forecaster B.
+      </p>
+      <p>
+        A language model needs a single score — called the <strong>loss</strong> — that grades how well
+        its predicted probability <code>p</code> matched the symbol that actually appeared next. What
+        properties should a fair penalty score have?
+      </p>
+      <ol>
+        <li>
+          If the model puts <code>p = 1.0</code> (100% probability) on the true next letter, its error
+          should be <strong><code>0</code></strong> — zero surprise, nothing left to improve.
+        </li>
+        <li>
+          If the model puts a tiny probability like <code>p = 0.01</code> on the true letter, the penalty
+          should be <strong>huge</strong>, climbing toward infinity as <code>p → 0</code> (being 100%
+          confident and dead wrong should hurt infinitely!).
+        </li>
+        <li>
+          When predicting two independent letters in a row with probabilities <code>p₁</code> and
+          <code>p₂</code>, the combined probability multiplies (<code>p₁ × p₂</code>), and it would be
+          wonderfully clean if the total surprise simply <strong>added</strong>
+          (<code>surprise(p₁) + surprise(p₂)</code>).
+        </li>
+      </ol>
+      <p>
+        In high-school algebra, there is only <em>one</em> family of functions that turns multiplication
+        into addition: the <strong>logarithm</strong> (<code>log(a × b) = log(a) + log(b)</code>)!
+        Since probabilities sit between <code>0</code> and <code>1</code>, their logarithms are negative,
+        so putting a minus sign in front flips them positive:
+      </p>
+      <pre><code>surprise in bits = −log₂(p)          <span class="cm">// how many yes/no questions to identify the symbol</span>
+loss in nats     = −ln(p)            <span class="cm">// natural log (base e ≈ 2.718), preferred for calculus</span>
+bits             = nats / ln(2)      <span class="cm">// divide by 0.6931 to convert nats → bits</span></code></pre>
+      <p>
+        Pause and check a few numbers in your head — logarithms stop feeling abstract the instant you
+        plug in coin flips:
+      </p>
+      <pre><code>p = 1.00   (certain)          → −log₂(1.00) = 0.00 bits   (0.00 nats)   <span class="cm">// zero surprise</span>
+p = 0.50   (fair coin)        → −log₂(0.50) = 1.00 bit    (0.69 nats)   <span class="cm">// 1 yes/no question</span>
+p = 0.25   (1 in 4)           → −log₂(0.25) = 2.00 bits   (1.39 nats)   <span class="cm">// 2 yes/no questions</span>
+p = 0.125  (1 in 8)           → −log₂(0.125)= 3.00 bits   (2.08 nats)   <span class="cm">// 3 yes/no questions</span>
+p = 0.01   (1 in 100)         → −log₂(0.01) = 6.64 bits   (4.61 nats)   <span class="cm">// shocked!</span>
+p = 1/98   (blind uniform)    → −log₂(1/98) = 6.61 bits   (4.58 nats)   <span class="cm">// untrained model baseline</span></code></pre>
+      <p>
+        Look at that last line: <code>4.58 nats</code> (or <code>6.61 bits</code>). Remember that number!
+        When an untrained 98-character neural network initializes with random noise in
+        <a href="/pages/small-minds/training.html">Part 6</a>, it assigns roughly <code>1/98 ≈ 1.02%</code>
+        probability to every character, so its starting loss chart always begins right around
+        <strong>4.58 nats</strong>. If a freshly built model does <em>not</em> start near
+        <code>ln(vocab_size)</code>, you immediately know there is a bug in your initialization before
+        running a single training step!
+      </p>
+      <p>
+        Averaging <code>−ln(p<sub>true</sub>)</code> over every character in a batch of text is called
+        <strong>cross-entropy loss</strong> (or negative log-likelihood). Lower cross-entropy means the
+        model puts higher probability on reality, is less surprised by real English, and — by Shannon's
+        coding theorem — could literally compress the text into fewer bits per character.
+      </p>
+      <details class="fold">
+        <summary>Deep dive: why compression and intelligence are the same metric</summary>
+        <div class="fold-body">
+          <p>
+            Using a trick called arithmetic coding, any predictor that assigns probability
+            <code>p<sub>i</sub></code> to the true <code>i</code>-th character can losslessly pack an
+            entire book into roughly <code>Σ −log₂(p<sub>i</sub>)</code> bits, and decompress it back
+            character-for-character using the exact same model. An uncompressed ASCII file spends 8 full
+            bits on every letter. A naive frequency table drops English to ~4.5 bits per character. The
+            tiny 780K-parameter browser models shipped in Part 8 reach <strong>~1.29 bits per
+            byte</strong> on cozy English stories, and giant frontier LLMs push below 0.7 bits per
+            byte. To compress a murder mystery down to 0.7 bits per character without losing a word, the
+            compressor eventually has to deduce who the killer is before the final chapter reveals it!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="softmax"><span class="kicker">Step 4 · Scores into odds</span>Logits, Softmax, Temperature, and Top-p</h2>
+      <p>
+        Inside a neural network, layers do not naturally output clean percentages between 0% and 100%
+        that sum to 1. They just multiply and add numbers, spitting out one arbitrary real number per
+        vocabulary symbol — maybe <code>+2.6</code> for <code>'h'</code>, <code>+1.3</code> for
+        <code>'o'</code>, <code>−0.3</code> for <code>'a'</code>, and <code>−1.8</code> for
+        <code>'z'</code>. Those raw, unconstrained scores are called <strong>logits</strong>.
+      </p>
+      <p>
+        How do you turn any list of raw logits (negative, positive, huge, tiny) into a valid probability
+        distribution? Three steps, packed into a single function called <strong>softmax</strong>:
+      </p>
+      <ol>
+        <li>
+          <strong>Exponentiate every score:</strong> replace each logit <code>z<sub>i</sub></code> with
+          <code>e<sup>z<sub>i</sub></sup></code> (where <code>e ≈ 2.71828</code>). Why <code>e<sup>z</sup></code>?
+          Because <code>e<sup>z</sup></code> is <em>strictly positive</em> for every real number (even
+          <code>e<sup>−1.8</sup> = 0.165 &gt; 0</code>), and it widens the lead of higher scores smoothly.
+        </li>
+        <li>
+          <strong>Sum all the exponentials:</strong> compute <code>Z = Σ e<sup>z<sub>j</sub></sup></code>.
+        </li>
+        <li>
+          <strong>Divide each entry by the sum:</strong> <code>p<sub>i</sub> = e<sup>z<sub>i</sub></sup> / Z</code>.
+          Now every probability sits cleanly between <code>0</code> and <code>1</code>, and all of them
+          add up to exactly <code>1.0</code> (100%).
+        </li>
+      </ol>
+      <pre><code><span class="cm">// Worked example with 4 scores:  z = [ 2.0,  1.0,  0.0, -1.0 ]</span>
+exp(z)    = [ 7.389, 2.718, 1.000, 0.368 ]
+sum       = 7.389 + 2.718 + 1.000 + 0.368 = 11.475
+softmax(z)= [ 64.4%, 23.7%,  8.7%,  3.2% ]   <span class="cm">// sums to 100.0%</span></code></pre>
+      <p>
+        There is one extra dial you have probably seen in AI playgrounds: <strong>temperature
+        <code>T</code></strong>. Before exponentiating, divide every logit by <code>T</code>:
+        <code>softmax(z / T)</code>.
+      </p>
+      <ul>
+        <li>
+          When <strong><code>T = 1.0</code></strong>, nothing changes — you sample straight from the
+          model's learned distribution.
+        </li>
+        <li>
+          When <strong><code>T &lt; 1.0</code></strong> (say <code>T = 0.25</code>), dividing by a small
+          number stretches the gaps between logits by <code>4×</code>. After exponentiating, the winner
+          steals almost all the probability mass. As <code>T → 0</code>, the model becomes deterministic
+          ("greedy decoding"), always picking the single highest-scoring token — safe and factual, but
+          often repetitive.
+        </li>
+        <li>
+          When <strong><code>T &gt; 1.0</code></strong> (say <code>T = 2.0</code>), dividing shrinks all
+          gaps toward zero. Since <code>e<sup>0</sup> = 1</code>, every token starts looking equally likely
+          — creative at <code>T ≈ 1.1</code>, chaotic word salad at <code>T = 2.5</code>.
+        </li>
+      </ul>
+      <p>
+        Even at moderate temperature, a 50,000-word vocabulary has a dangerous "long tail": 49,950
+        nonsense tokens each holding <code>0.0002%</code> probability can add up to a 10% chance of
+        derailing a sentence with a bizarre random word. <strong>Top-p (nucleus) sampling</strong> fixes
+        that cleanly: sort tokens from highest probability to lowest, walk down the list until the
+        cumulative probability crosses <code>p</code> (typically <code>90%</code>), and chop off the
+        entire tail before rolling the dice.
+      </p>
+      <p>
+        Test every piece of this machinery live in Figure 2 below. <strong>Drag any blue logit bar</strong>
+        up or down, <strong>click a letter box</strong> along the bottom to change which letter was the
+        "true" next character, slide <strong>temperature T</strong> and <strong>top-p nucleus</strong>,
+        and click <strong>roll dice</strong> to sample from the active amber bars.
+      </p>
+
+      <div
+        data-demo="softmax-temp"
+        data-title="Logits, Softmax, Temperature, Top-p &amp; Surprise"
+        data-hint="Drag any blue logit bar · click a letter below to set truth"
+      ></div>
+
+      <p>
+        Try two quick experiments on the figure above:
+      </p>
+      <ol>
+        <li>
+          Click <strong>wrong guess!</strong> (setting the true letter to <code>'z'</code> while the
+          model put its highest logit on <code>'h'</code>). Watch the mint dot rocket up the steep left
+          wall of the <code>−ln(p)</code> curve past <code>4.8 nats</code>! Now slowly drag the blue
+          <code>'z'</code> bar upward — notice how steeply the loss drops at first, then flattens out as
+          <code>p('z')</code> approaches 100%. That steep slope is the exact force that will yank a
+          neural network's weights in the right direction during training.
+        </li>
+        <li>
+          Click <strong>confident</strong>, then drag <strong>temperature T</strong> down to
+          <code>0.20</code> and up to <code>2.20</code>. Notice that raising temperature never changes
+          <em>which</em> token is #1 — it only controls how sharp or flat the race between #1 and the
+          runners-up becomes. And watch gray bars drop out of the <strong>top-p</strong> nucleus as you
+          pull the cutoff down toward <code>50%</code>.
+        </li>
+      </ol>
+      <details class="fold">
+        <summary>Deep dive: the numerical stability trick inside every real softmax</summary>
+        <div class="fold-body">
+          <p>
+            A computer stores 32-bit floats up to about <code>3.4 × 10<sup>38</sup></code>. If a logit
+            ever reaches <code>90</code>, computing <code>exp(90)</code> overflows straight to
+            <code>Infinity</code>, and <code>Infinity / Infinity</code> collapses into <code>NaN</code>
+            (Not a Number), poisoning the entire model.
+          </p>
+          <p>
+            Fortunately, subtracting the same constant <code>m</code> from every logit does not change
+            softmax at all, because <code>e<sup>z<sub>i</sub> − m</sup> / Σ e<sup>z<sub>j</sub> − m</sup></code>
+            factors out <code>e<sup>−m</sup></code> from top and bottom and cancels it identically! So
+            every real GPU shader (including <code>ops.wgsl</code> and <code>attention.wgsl</code> in
+            this series) first finds <code>m = max(z)</code> and computes <code>exp(z<sub>i</sub> − m)</code>.
+            The largest exponent is now always <code>e<sup>0</sup> = 1.0</code>, making overflow
+            mathematically impossible.
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="next-bridge"><span class="kicker">Putting it together</span>From tally sheets to geometry</h2>
+      <p>
+        Look at what is already in place before writing a single neural equation:
+      </p>
+      <pre><code>text so far  ──▶  [ some predictor ]  ──▶  raw logits z[0..V-1]
+                                               │
+                                               ▼  softmax(z / T)
+                                          probabilities p[0..V-1]
+                                          ├─ training: grade with loss = −ln(p[true])
+                                          └─ chatting: filter by top-p and roll the dice</code></pre>
+      <p>
+        The whole outer shell of ChatGPT, Claude, Gemini, and the WebGPU model in this series is already
+        sitting right there in those four lines. Only the box in the middle —
+        <code>[ some predictor ]</code> — needs to be replaced. A counting table fails inside that box
+        because prefixes explode as <code>98<sup>k</sup></code> and never share knowledge between similar
+        phrases.
+      </p>
+      <p>
+        To replace a lookup table with a smooth mathematical machine that generalizes to brand-new
+        sentences, text has to stop being isolated labels and start living as <strong>geometry</strong>
+        — points, arrows, angles, and spaces that can be stretched, rotated, and folded. That geometry
+        takes only three simple building blocks: vectors, dot products, and matrices.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/vectors.html">Part 2, Numbers That Point</a>.</strong>
+        Vectors, dot products, matrices, and why stacking straight lines fails until you add a bend —
+        all the linear algebra you need for AI, built interactively from scratch.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        References &amp; further reading:
+        <a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf">Shannon (1948), <em>A Mathematical Theory of Communication</em></a> ·
+        <a href="https://arxiv.org/abs/1904.09751">Holtzman et al. (2019), <em>The Curious Case of Neural Text Degeneration</em> (Top-p / Nucleus Sampling)</a> ·
+        <a href="https://karpathy.ai/zero-to-hero.html">Andrej Karpathy, <em>Neural Networks: Zero to Hero</em></a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/guessing.ts"></script>
+  </body>
+</html>

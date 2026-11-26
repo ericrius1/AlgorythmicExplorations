@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <link rel="icon" href="/favicon.png" sizes="512x512" type="image/png" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0b10" />
+    <title>Rolling Downhill — Small Minds</title>
+    <meta
+      name="description"
+      content="How neural networks actually learn from scratch: loss landscapes, derivatives as sensitivity without a calculus course, gradient descent, learning rates, momentum, Adam, backpropagation worked out live, and overfitting vs. generalization."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/styles/small-minds.css" />
+    <script>
+      if (navigator.maxTouchPoints > 0) {
+        const no = (e) => { if (e.cancelable) e.preventDefault(); }, held = { passive: false };
+        for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, no, held);
+        document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) no(e); }, held);
+      }
+    </script>
+  </head>
+  <body class="essay">
+    <header class="hero">
+      <div data-demo="hero"></div>
+      <div class="hero-title">
+        <p class="hero-kicker">Small Minds · Part 3</p>
+        <h1>Rolling Downhill</h1>
+        <p class="subtitle">
+          How a blank grid of random numbers teaches itself to fit a world: loss valleys, slopes as
+          plain sensitivity, Adam, and backpropagation you can check on a pocket calculator.
+        </p>
+      </div>
+      <div class="hero-scroll-hint" aria-hidden="true">
+        <span class="hero-scroll-hint-text">Scroll down to read</span>
+        <span class="hero-scroll-hint-arrow">↓</span>
+      </div>
+    </header>
+
+    <main>
+      <p>
+        Imagine standing blindfolded on a foggy mountainside. Your goal is to reach the lowest valley
+        floor, where the model's prediction error — its <strong>loss</strong> — is as small as possible.
+        You cannot see a map of the whole mountain range. All you can feel is the tilt of the ground
+        directly beneath your boots: uphill to your left, downhill slightly ahead and to the right.
+      </p>
+      <p>
+        So you take a careful step downhill. Pause, feel the slope under your boots again, take another
+        step downhill, and repeat. Astonishingly, that blindfolded hike — called <strong>gradient
+        descent</strong> — is how virtually every neural network in existence learns, whether it has
+        three weights on a scratchpad or a trillion weights spread across a datacenter.
+      </p>
+      <p>
+        The contour map overhead shows three different hikers tackling the exact same narrow canyon:
+        plain <strong>SGD</strong> (coral), <strong>Momentum</strong> (amber), and <strong>Adam</strong>
+        (mint). Before diving into a 70,000-weight WebGPU Transformer, this essay builds the entire
+        learning engine on small, transparent numbers you can verify by hand.
+      </p>
+      <aside class="note">
+        <span class="note-label">Companion guides · Free visual calculus &amp; backprop primers</span>
+        <p>
+          You do not need a calculus class to follow this essay — every slope here is explained as
+          plain "nudge sensitivity." If you want to build deeper calculus fluency alongside it, check out
+          <a href="https://www.3blue1brown.com/topics/calculus"><strong>3Blue1Brown — Essence of Calculus</strong></a>,
+          <a href="https://www.3blue1brown.com/lessons/backpropagation"><strong>3Blue1Brown — What is Backpropagation Really Doing?</strong></a>,
+          and Andrej Karpathy's classic
+          <a href="https://karpathy.ai/zero-to-hero.html"><strong>micrograd</strong></a> walkthrough,
+          which builds a tiny automatic-differentiation engine in ~100 lines of Python.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="knobs"><span class="kicker">Step 1 · Sensitivity</span>What is a derivative? (No calculus required)</h2>
+      <p>
+        Think of a neural network as a giant audio mixing board covered in adjustable knobs — the
+        <strong>weights</strong> and <strong>biases</strong>. At the top sits one glowing red meter
+        displaying the <strong>loss <code>L</code></strong>: how badly the network guessed on the current
+        training examples. The goal of training is to twist the knobs until that red meter drops as close
+        to zero as possible.
+      </p>
+      <p>
+        For any single knob <code>w</code>, ask one dead-simple question:
+      </p>
+      <blockquote>
+        <p>
+          If knob <code>w</code> nudges upward by a tiny amount <code>h</code> (say
+          <code>+0.001</code>), how much does the loss <code>L</code> change per unit of nudge?
+        </p>
+      </blockquote>
+      <pre><code>slope of L with respect to w   =   ∂L / ∂w   ≈   ( L(w + h) − L(w) ) / h</code></pre>
+      <p>
+        That ratio — <em>rise over run</em>, straight from ninth-grade algebra — is the entire meaning of
+        a <strong>partial derivative</strong> <code>∂L/∂w</code>! The curly <code>∂</code> simply warns
+        you that there are other knobs on the board, and you are holding all of them still while testing
+        knob <code>w</code> alone.
+      </p>
+      <ul>
+        <li>
+          Suppose <code>∂L/∂w = +4.0</code>. Twisting <code>w</code> <em>up</em> makes the error shoot
+          <em>up</em> four times as fast. Therefore, to reduce the error, twist <code>w</code>
+          <strong>down</strong> (subtract a small piece of <code>+4.0</code>).
+        </li>
+        <li>
+          Suppose <code>∂L/∂w = −2.5</code>. Twisting <code>w</code> <em>up</em> makes the error go
+          <em>down</em>. Subtracting a negative number (<code>− (−2.5) = +2.5</code>) automatically
+          twists <code>w</code> <strong>up</strong>!
+        </li>
+        <li>
+          Suppose <code>∂L/∂w = 0.0</code>. The ground is flat — you have reached the bottom of a bowl
+          (or a ridge/saddle), so <code>w</code> stops moving.
+        </li>
+      </ul>
+      <p>
+        Put every knob's slope into one vector — the <strong>gradient</strong> <code>∇L</code> — and
+        notice that it always points straight <em>uphill</em> (the direction that increases loss fastest).
+        Walking in the exact opposite direction gives the universal learning update:
+      </p>
+      <pre><code>w_new  =  w_old  −  lr · (∂L / ∂w)</code></pre>
+      <p>
+        Here <code>lr</code> is the <strong>learning rate</strong> (step size): a small positive number
+        like <code>0.01</code> or <code>0.001</code> controlling how bold each downhill step is.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="canyon"><span class="kicker">Step 2 · Navigating valleys</span>Learning rates, ravines, Momentum, and Adam</h2>
+      <p>
+        If every loss surface looked like a round soup bowl, plain gradient descent would stroll straight
+        to the center and call it a day. Real neural networks never live in round bowls. Some weights
+        (like an output scale) sit on razor-steep cliffs where a tiny nudge swings the loss wildly, while
+        other weights (like a rare word's embedding) sit on an almost flat plain. Put those two axes
+        together and you get a <strong>long, steep, narrow ravine</strong> — steep side walls and a
+        gently sloping canyon floor.
+      </p>
+      <p>
+        In a narrow ravine, plain gradient descent (<strong>SGD</strong>) hits a miserable Catch-22:
+      </p>
+      <ul>
+        <li>
+          Pick a <strong>tiny learning rate</strong> and SGD safely avoids bouncing off the steep walls,
+          yet crawls along the flat canyon floor at a glacial pace.
+        </li>
+        <li>
+          Pick a <strong>larger learning rate</strong> to move faster down the floor, and SGD slams back
+          and forth across the narrow walls in violent zig-zags — push just a hair too far and each bounce
+          lands higher than the last until the numbers explode to <code>Infinity</code>!
+        </li>
+      </ul>
+      <p>
+        Two clean physics-inspired upgrades solve the ravine problem so well that almost every modern LLM
+        uses them:
+      </p>
+      <ol>
+        <li>
+          <strong>Momentum (a heavy rolling ball):</strong> Instead of forgetting your previous step,
+          keep a running velocity <code>v = β·v + g</code> (usually <code>β ≈ 0.9</code>). Back-and-forth
+          zig-zags across the canyon walls point alternately <code>+</code> and <code>−</code>, so they
+          <em>cancel each other out</em> in the running average! Meanwhile, the gentle consistent push down
+          the canyon floor keeps adding in the same direction, building smooth speed straight toward the
+          minimum.
+        </li>
+        <li>
+          <strong>Adam (a personal speedometer for every single knob):</strong> Along with tracking the
+          running average slope <code>m</code> (momentum), Adam also tracks the running average of the
+          <em>squared</em> slope <code>v = β₂·v + (1 − β₂)·g²</code> for each individual weight, then
+          divides the step by <code>√v</code>:
+          <pre><code><span class="cm">// Adam gives steep axes tiny steps and flat axes bolder steps:</span>
+m = β₁·m + (1 − β₁)·g            <span class="cm">// smoothed direction (1st moment)</span>
+v = β₂·v + (1 − β₂)·g²           <span class="cm">// typical squared slope (2nd moment)</span>
+w = w − lr · m̂ / (√v̂ + ε)        <span class="cm">// divide by typical slope magnitude!</span></code></pre>
+          If one axis has slopes 10× steeper than another, its <code>√v</code> is 10× larger too, so
+          dividing by <code>√v</code> automatically rescales the ravine back into a comfortable round bowl!
+        </li>
+      </ol>
+      <p>
+        Drop all three optimizers onto the loss landscape in Figure 1 below. <strong>Click anywhere</strong>
+        on the contour map to choose a starting ridge, switch between <strong>Ravine</strong>,
+        <strong>Two Valleys</strong>, and <strong>Bowl</strong>, and drag <strong>learning rate</strong>
+        up and down!
+      </p>
+
+      <div
+        data-demo="grad-descent"
+        data-title="Loss Canyon Race: SGD vs. Momentum vs. Adam"
+        data-hint="Click anywhere on the map · crank learning rate up to watch SGD explode"
+      ></div>
+
+      <p>
+        Try three revealing experiments on Figure 1:
+      </p>
+      <ul>
+        <li>
+          On <strong>Ravine</strong>, slide <strong>learning rate</strong> to <code>0.50</code> and click
+          near the top-left corner. Coral <strong>SGD</strong> immediately zig-zags wider and wider until
+          it shoots straight off the canyon walls (<code>EXPLODED!</code>), while amber
+          <strong>Momentum</strong> swings dramatically and mint <strong>Adam</strong> calmly glides
+          straight down the center of the ravine!
+        </li>
+        <li>
+          Pull <strong>learning rate</strong> down to <code>0.06</code>: now SGD stays safe, yet check the
+          loss chart on the right — it barely budges along the flat horizontal floor while Momentum and
+          Adam finish in half the steps.
+        </li>
+        <li>
+          Switch to <strong>Two Valleys</strong> (a shallower local valley on the left, a deeper global
+          valley on the right). Click near the middle ridge or slightly left of center: watch how
+          starting position and momentum can carry a marble over a gentle saddle into the deeper basin —
+          or trap it in the shallower one.
+        </li>
+      </ul>
+      <details class="fold">
+        <summary>Deep dive: what are the little hats m̂ and v̂ in Adam?</summary>
+        <div class="fold-body">
+          <p>
+            Both running averages <code>m</code> and <code>v</code> start at <code>0</code> on step 0.
+            With <code>β₂ = 0.999</code>, after step 1 the running average is only
+            <code>0.001 · g²</code> — artificially 1,000× too small because it is still mostly mixed with
+            its starting zero! Dividing by <code>(1 − β<sup>t</sup>)</code> ("bias correction") cancels
+            that cold-start shrinkage exactly on early steps and smoothly approaches <code>1.0</code> as
+            step <code>t</code> grows. You will see those exact lines —
+            <code>mHat = m / (1.0 - pow(b1, step))</code> — running inside the real GPU optimizer shader
+            <code>ops.wgsl</code> in Part 6!
+          </p>
+        </div>
+      </details>
+
+      <!-- ================================================================ -->
+      <h2 id="backprop"><span class="kicker">Step 3 · Credit assignment</span>The chain rule and backpropagation by hand</h2>
+      <p>
+        Wait a second. Earlier, the essay showed how to estimate one slope by nudging a weight:
+        <code>(L(w + 0.001) − L(w)) / 0.001</code>. Why not just use that nudge trick for every weight in
+        a language model?
+      </p>
+      <p>
+        Do the math! Running the whole network once just to test <em>one</em> knob takes one forward
+        pass. For the tiny 70,000-weight browser Transformer, measuring all 70,000 slopes by nudging them
+        one by one would require <strong>70,001 full forward passes</strong> just to take a single tiny
+        learning step! For a 70-billion-parameter model, one step would take centuries.
+      </p>
+      <p>
+        <strong>Backpropagation</strong> is the brilliant algorithm (popularized in 1986 by David
+        Rumelhart, Geoffrey Hinton, and Ronald Williams) that computes <strong>every single slope for all
+        70,000 — or 70 billion — weights in ONE single reverse sweep</strong> costing roughly the same as
+        two forward passes!
+      </p>
+      <p>
+        Its entire secret is one intuitive rule from calculus: the <strong>chain rule</strong>. Picture
+        three interlocking bicycle gears — A, B, and C:
+      </p>
+      <ul>
+        <li>If turning gear A by 1 degree makes gear B turn by <strong>3 degrees</strong> (<code>∂B/∂A = 3</code>),</li>
+        <li>and turning gear B by 1 degree makes gear C turn by <strong>2 degrees</strong> (<code>∂C/∂B = 2</code>),</li>
+        <li>then turning gear A by 1 degree makes gear C turn by <strong><code>3 × 2 = 6</code> degrees</strong>!</li>
+      </ul>
+      <pre><code>∂C / ∂A  =  (∂C / ∂B) · (∂B / ∂A)     <span class="cm">// sensitivities along a chain simply multiply!</span></code></pre>
+      <p>
+        A neural network is nothing more than a chain of tiny, elementary math gates — multiply, add,
+        <code>SiLU</code> bend, square the error — and every single gate knows its own dead-simple local
+        sensitivity:
+      </p>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Simple gate</th>
+              <th>Forward rule</th>
+              <th>Local backward rule ("multiply incoming blame by…")</th>
+              <th>Intuition</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Add</strong></td>
+              <td><code>z = u + b</code></td>
+              <td><code>∂z/∂u = 1</code>, <code>∂z/∂b = 1</code></td>
+              <td>Addition is a <em>gradient distributor</em>: it copies incoming blame unchanged to both branches!</td>
+            </tr>
+            <tr>
+              <td><strong>Multiply</strong></td>
+              <td><code>u = w · x</code></td>
+              <td><code>∂u/∂w = x</code>, <code>∂u/∂x = w</code></td>
+              <td>Multiplication is a <em>gradient swapper</em>: each input's slope is the <em>other</em> input's value!</td>
+            </tr>
+            <tr>
+              <td><strong>Squared error</strong></td>
+              <td><code>L = ½(ŷ − y)²</code></td>
+              <td><code>∂L/∂ŷ = (ŷ − y)</code></td>
+              <td>Blame equals raw prediction error: too high → push down; too low → push up.</td>
+            </tr>
+            <tr>
+              <td><strong>SiLU bend</strong></td>
+              <td><code>h = z · σ(z)</code></td>
+              <td><code>∂h/∂z = σ(z)·(1 + z·(1 − σ(z)))</code></td>
+              <td>Scales incoming blame by the local steepness of the bend at <code>z</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Watch all four gates work together in a real two-weight neural circuit in Figure 2 below. Start
+        on the left with input <code>x = 1.5</code>, multiply by <code>w₁</code>, add bias
+        <code>b₁</code>, bend through <code>SiLU</code>, multiply by <code>w₂</code> to produce prediction
+        <code>ŷ</code>, and measure squared error against <code>target y</code>.
+      </p>
+      <p>
+        Every box displays <strong>two numbers</strong>: its blue <strong>forward value</strong>
+        computed left-to-right, and its amber <strong>backward gradient</strong> (<code>∂L/∂node</code>)
+        swept right-to-left by multiplying local slopes along the chain. Check the chain-rule bar along
+        the bottom with a calculator, drag any weight slider to watch every number recompute instantly,
+        and press <strong>take 1 step</strong> repeatedly to watch backpropagation train the circuit right
+        in front of you!
+      </p>
+
+      <div
+        data-demo="backprop-graph"
+        data-title="Live Interactive Backpropagation Circuit"
+        data-hint="Drag sliders or press 'take 1 step' to watch weights learn"
+      ></div>
+
+      <p>
+        Stop and check one concrete step by hand at the starting settings (<code>x = 1.5</code>,
+        <code>w₁ = 0.60</code>, <code>b₁ = −0.20</code>, <code>w₂ = −0.80</code>, <code>y = 1.20</code>):
+      </p>
+      <pre><code><span class="cm">// 1. FORWARD PASS (left → right):</span>
+u    = w₁ · x       = 0.60 × 1.50 = +0.90
+z    = u + b₁       = 0.90 − 0.20 = +0.70
+h    = SiLU(0.70)   = 0.70 × 0.668 = +0.468
+ŷ    = w₂ · h       = −0.80 × 0.468 = −0.374     <span class="cm">// way below target 1.20!</span>
+L    = ½(ŷ − y)²    = ½(−1.574)²    = 1.239
+
+<span class="cm">// 2. BACKWARD PASS (right → left, multiplying local slopes):</span>
+∂L/∂ŷ  = ŷ − y              = −1.574             <span class="cm">// "prediction is too low, push ŷ UP!"</span>
+∂L/∂w₂ = (−1.574) × h       = −0.736             <span class="cm">// negative grad → increase w₂ (make it less negative!)</span>
+∂L/∂h  = (−1.574) × w₂      = +1.259             <span class="cm">// since w₂ is negative right now, bigger h makes ŷ WORSE!</span>
+∂L/∂z  = (+1.259) × SiLU'   = +1.037
+∂L/∂b₁ = (+1.037) × 1       = +1.037             <span class="cm">// add gate passes blame straight through</span>
+∂L/∂w₁ = (+1.037) × x       = +1.556             <span class="cm">// positive grad → nudge w₁ down while w₂ is negative</span></code></pre>
+      <p>
+        Now click <strong>take 1 step</strong> five or six times and watch something delightful happen:
+        as <code>w₂</code> crosses from negative to positive, the sign of <code>∂L/∂w₁</code>
+        <em>flips automatically</em>! Backpropagation instantly realizes that increasing <code>w₁</code>
+        now pushes <code>ŷ</code> upward toward <code>1.20</code>, reverses course, and drives the loss
+        all the way down to <code>0.000</code>.
+      </p>
+      <p>
+        Every giant AI training run on Earth is literally this exact diagram scaled up from 3 parameters
+        to millions or billions — with matrix multiplies replacing single scalar multiplies, and
+        cross-entropy replacing squared error.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="batches"><span class="kicker">Step 4 · Reality checks</span>Mini-batches, overfitting, and why the practice test lies</h2>
+      <p>
+        Before moving to real GPU matrix math in Part 4, two practical realities govern every real
+        training loop — including the live browser trainer you will run in Part 6:
+      </p>
+      <p>
+        <strong>1. Mini-batches (Stochastic Gradient Descent).</strong> If your training dataset holds
+        a million sentences, computing the exact average loss over all one million before taking a single
+        step is hopelessly slow. Instead, grab a small random handful — a <strong>mini-batch</strong> of,
+        say, 4 or 64 snippets — compute the average gradient on that handful, take one optimizer step,
+        and grab the next random handful. Each step is slightly noisy (which is why real training loss
+        curves wiggle up and down instead of falling smoothly), yet taking 1,000 fast approximate steps
+        beats taking 1 slow exact step by orders of magnitude — and that slight noise even helps shake
+        weights out of shallow traps!
+      </p>
+      <p>
+        <strong>2. Memorizing vs. Understanding (Overfitting).</strong> Imagine a student who memorizes
+        the exact answer key to a 20-question practice sheet (<em>1-B, 2-D, 3-A…</em>) without learning
+        how to solve the problems. On the practice sheet, the student scores 100% (loss near zero!). On
+        the real exam with fresh numbers, the student bombs.
+      </p>
+      <p>
+        Neural networks can cheat in the exact same way: given enough parameters and enough steps on a
+        small corpus, a network can memorize every single sentence verbatim while failing miserably on
+        new text. That failure mode is called <strong>overfitting</strong>.
+      </p>
+      <p>
+        The cure is scientific discipline: before training begins, lock away a held-out chunk of text
+        (typically 10%–15%) called the <strong>validation set</strong> that the optimizer is
+        <em>never</em> allowed to update weights on. Track two curves side by side:
+      </p>
+      <pre><code>training loss dropping + validation loss dropping   ──▶  genuinely learning patterns!
+training loss dropping + validation loss CLIMBING   ──▶  overfitting (memorizing noise!)</code></pre>
+      <p>
+        Every experiment in Part 7's Browser AutoResearcher uses that exact held-out validation exam so a
+        bloated model that merely memorizes the training text gets rejected immediately.
+      </p>
+      <aside class="note">
+        <span class="note-label">Aside · Why small random weights beat all-zeros</span>
+        <p>
+          What happens if you initialize every weight in a neural network to <code>0.0</code>? Check
+          Figure 2's multiply gate: <code>∂u/∂w = x</code> and <code>∂u/∂x = w</code>! If every weight
+          starts at zero, every neuron in a hidden layer receives identical inputs, computes the identical
+          output <code>0</code>, and gets the exact same gradient on every step — all 64 neurons stay
+          identical clones forever! Starting every weight as tiny random Gaussian static breaks that
+          symmetry so each neuron can peel off and specialize in a different feature.
+        </p>
+      </aside>
+
+      <!-- ================================================================ -->
+      <h2 id="ready"><span class="kicker">Foundations complete</span>Ready to build a real GPU language model</h2>
+      <p>
+        Look at the complete conceptual toolkit now in your hands across Parts 1 through 3:
+      </p>
+      <ul>
+        <li><strong>What an LLM outputs:</strong> logits → softmax probabilities over the next token, controlled by temperature and top-p, graded by cross-entropy surprise.</li>
+        <li><strong>How an LLM thinks:</strong> vectors, dot products, matrix transformations, and nonlinear bends that fold high-dimensional space.</li>
+        <li><strong>How an LLM learns:</strong> backpropagation sweeping slopes backward via the chain rule, Adam steering weights smoothly down narrow valleys, and validation splits keeping it honest.</li>
+      </ul>
+      <p>
+        Now it is time to leave toy 2D planes behind and step onto real graphics silicon. In Part 4, words
+        turn into integer token IDs and learned embedding vectors, and your own browser GPU races two
+        hand-written WebGPU compute shaders to see why modern AI is really a battle over memory bandwidth.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/matmul.html">Part 4, The Grid That Thinks</a>.</strong>
+        Byte-Pair Encoding, embedding lookup tables, why GPUs wait on memory instead of math, and
+        16×16 shared-memory matrix tiling racing live on your actual graphics card.
+      </p>
+    </main>
+
+    <footer>
+      <p>
+        References &amp; further reading:
+        <a href="https://www.3blue1brown.com/topics/calculus">3Blue1Brown — Essence of Calculus</a> ·
+        <a href="https://www.3blue1brown.com/lessons/backpropagation">3Blue1Brown — Backpropagation</a> ·
+        <a href="https://www.nature.com/articles/323533a0">Rumelhart, Hinton &amp; Williams (1986), <em>Learning representations by back-propagating errors</em></a> ·
+        <a href="https://arxiv.org/abs/1412.6980">Kingma &amp; Ba (2014), <em>Adam: A Method for Stochastic Optimization</em></a> ·
+        <a href="https://github.com/karpathy/micrograd">Karpathy — micrograd</a>
+      </p>
+    </footer>
+
+    <script type="module" src="/src/pages/small-minds/learning.ts"></script>
+  </body>
+</html>

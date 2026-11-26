@@ -10,7 +10,7 @@
     <title>The Browser That Researches Itself — Small Minds</title>
     <meta
       name="description"
-      content="Quantized INT8/INT4 WebGPU decode kernels, KV caching, and a Karpathy-inspired autonomous browser AutoResearch loop that mutates, trains, evaluates, and keeps better LLMs."
+      content="Fast LLM inference and autonomous AI research in pure WebGPU: prefill vs. decode bottlenecks, KV caches, INT8 and INT4 group-wise quantization, validation bits-per-byte, and a Karpathy-inspired Browser AutoResearch loop."
     />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/styles/small-minds.css" />
@@ -26,11 +26,11 @@
     <header class="hero">
       <div data-demo="hero"></div>
       <div class="hero-title">
-        <p class="hero-kicker">Small Minds · Part 4</p>
+        <p class="hero-kicker">Small Minds · Part 7</p>
         <h1>The Browser That Researches Itself</h1>
         <p class="subtitle">
-          Bit-packed 4-bit inference on WebGPU, then a closed-loop autonomous researcher that
-          evolves better Transformers right inside your tab.
+          Making browser inference fly with KV caches and 4-bit weights, then handing the scientific
+          method to an autonomous WebGPU researcher that evolves better Transformers on its own.
         </p>
       </div>
       <div class="hero-scroll-hint" aria-hidden="true">
@@ -41,111 +41,385 @@
 
     <main>
       <p>
-        Training is compute-heavy because you process hundreds of tokens at once in wide matrix
-        multiplies. Generating a reply one token at a time is the exact opposite: every decode step
-        multiplies a <em>single</em> token vector by every giant weight matrix in the model. That
-        turns matrix-matrix multiplication (GEMM) into matrix-vector multiplication (GEMV), where
-        arithmetic intensity collapses back to <code>0.5 FLOP/byte</code> and memory bandwidth
-        becomes the absolute speed limit.
+        With a complete Transformer training live on your GPU in
+        <a href="/pages/small-minds/training.html">Part 6</a>, two fascinating frontiers open up right
+        away. The first is <strong>inference</strong> — making a trained model speak fast and fit inside
+        tight memory when generating replies one token at a time. The second is
+        <strong>automation</strong>: when training a tiny model takes less than a second on your browser
+        GPU, why should a human sit around tweaking learning rates, activation curves, and optimizers by
+        hand when the browser itself can form hypotheses, run controlled experiments, keep winners, and
+        discard dead ends?
+      </p>
+      <p>
+        The glowing lineage tree overhead shows exactly that loop in motion: each green node is a model
+        mutation whose validation score beat the current record and got committed as the new frontier;
+        each gray dashed branch is a hypothesis that regressed and got reverted cleanly.
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="quant"><span class="kicker">Step 1 · Smaller weights, faster tokens</span>KV caches and 4-bit dequantization</h2>
+      <h2 id="prefill-decode"><span class="kicker">Step 1 · Two speeds of thought</span>Prefill vs. Decode (and why chatting is memory-bound)</h2>
       <p>
-        Two hardware tricks make browser inference feel instantaneous. First, a
-        <strong>KV cache</strong> stores every previous token's projected Key and Value vectors so
-        generating token <code>t + 1</code> only computes projections for the single newest token
-        instead of re-running the whole prompt.
+        Have you ever noticed that an AI assistant can swallow a 50-page PDF in two seconds, yet still
+        streams its reply at maybe 60 words per second? That gap is not artificial throttling — it is pure
+        linear-algebra physics separating the two phases of LLM inference:
+      </p>
+      <ul>
+        <li>
+          <strong>Phase 1 · Prefill (reading your prompt):</strong> Every token in your prompt is already
+          known up front! Just like training in Part 6, all 1,000 prompt tokens march through every weight
+          matrix together in big, dense <strong>matrix × matrix</strong> multiplies (<strong>GEMM</strong>).
+          Part 4's <code>16 × 16</code> shared-memory tiling shines here, reusing every weight across
+          hundreds of tokens at once. Prefill is <em>compute-bound</em> and blazingly fast.
+        </li>
+        <li>
+          <strong>Phase 2 · Decode (writing the reply):</strong> Generating a reply is strictly sequential
+          (<em>autoregressive</em>). The model cannot even start thinking about token #12 until it finishes
+          sampling token #11! So every single generated token pushes a <strong>single 1-row vector</strong>
+          through every giant weight matrix in the network — turning matrix × matrix (GEMM) into
+          <strong>matrix × vector</strong> (<strong>GEMV</strong>).
+        </li>
+      </ul>
+      <p>
+        Check the arithmetic intensity of a 32-bit float matrix-vector multiply <code>y = W · x</code>:
+        every single weight float in <code>W</code> (<code>4 bytes</code>) gets hauled all the way out of
+        VRAM across the memory bus, used for <em>one</em> fused multiply-add (<code>2 FLOPs</code>), and
+        immediately thrown away until the next token! That drops arithmetic intensity right back down to
+        <strong><code>0.5 FLOP/byte</code></strong>.
+      </p>
+      <pre><code><span class="cm">// The hard physical speed limit of single-user LLM token generation:</span>
+max tokens / second  ≈  GPU memory bandwidth (GB/s)  ÷  total model size (GB)
+
+<span class="cm">// Example on a laptop with 150 GB/s memory bandwidth:</span>
+7B model in FP32 (28 GB)  ──▶  won't even fit in RAM (or crawls at ~5 tok/s)
+7B model in INT4 (3.8 GB) ──▶  150 ÷ 3.8  ≈  ~39 tokens / second!</code></pre>
+      <p>
+        That single division explains almost every headline in local AI engineering: during token
+        generation, your GPU's trillion-operation math cores are mostly bored waiting on VRAM wires. To
+        generate tokens faster, you either avoid redundant work (<strong>KV caching</strong>) or ship
+        dramatically fewer bytes across the wire (<strong>quantization</strong>).
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="quant"><span class="kicker">Step 2 · Caching &amp; shrinking</span>KV caches and 4-bit bit-packing</h2>
+      <p>
+        <strong>Trick 1: The KV Cache.</strong> Suppose your prompt is 200 tokens long and the model is
+        about to generate token #201. Remember Part 5's causal mask: earlier tokens can <em>never</em>
+        attend to later tokens! That means token #17's projected Key vector <code>K[17]</code> and Value
+        vector <code>V[17]</code> are <strong>completely frozen forever</strong> the moment token #17 is
+        first processed.
       </p>
       <p>
-        Second, if memory bandwidth is the bottleneck, ship fewer bits across the wire. Instead of
-        storing every weight as a 32-bit float, the quantizer chops each row into groups of 32 weights,
-        records one shared float scale per group, and packs <strong>four INT8 bytes</strong> or
-        <strong>eight INT4 nibbles</strong> into a single <code>u32</code> word. Inside the WGSL
-        decode shader, each thread loads one <code>u32</code>, unpacks 8 weights in registers with
-        bit shifts, multiplies by the group scale, and accumulates — cutting VRAM bandwidth by
-        nearly <strong>6.4×</strong> with tiny numerical error:
+        Without a cache, generating a 200-token reply recomputes <code>K</code> and <code>V</code> for
+        every earlier token on every single step — wasting <code>1 + 2 + 3 + … + 200 ≈ 20,000</code> token
+        passes instead of <code>200</code>! A <strong>KV cache</strong> simply parks every past token's
+        <code>K</code> and <code>V</code> vectors in a GPU buffer; each new decode step projects only the
+        single newest token, appends its <code>(K_new, V_new)</code> to the cache, and attends over the
+        stored history. (This is also why huge 100,000-token context windows eat gigabytes of VRAM — the
+        GPU has to hold <code>K</code> and <code>V</code> for every token in every layer!)
       </p>
-      <pre><code><span class="cm">// Unpack 8 signed 4-bit weights from a single u32 register word</span>
+      <p>
+        <strong>Trick 2: Weight Quantization (FP32 → INT8 → INT4).</strong> Every weight trained in Part 6
+        is stored as a 32-bit floating-point number (<code>f32</code>, 4 bytes), capable of distinguishing
+        billions of microscopic gradations like <code>0.14285715</code> vs. <code>0.14285719</code>. Does
+        a neural network actually need 7 decimal digits of precision on every weight just to predict the
+        next word?
+      </p>
+      <p>
+        Not even close! Imagine measuring ingredients for soup: a laser micrometer accurate to 0.001 mm is
+        pointless when rounding to 16 or 256 tidy steps gives practically the exact same bowl — especially
+        because when you sum hundreds of rounded weights inside a dot product, small positive and negative
+        rounding nudges largely cancel each other out.
+      </p>
+      <p>
+        There is just one catch: if a weight row contains 1,000 normal numbers near <code>±0.2</code> and
+        <em>one</em> giant outlier weight at <code>+4.0</code>, scaling the whole row to fit
+        <code>+4.0</code> would crush all 1,000 normal weights into a tiny handful of integer buckets!
+        <strong>Group-wise quantization</strong> prevents that neatly: chop each row into bite-sized
+        <strong>groups of 32 weights</strong>, save just <em>one</em> shared 32-bit float
+        <code>scale = max(|group|) / maxInt</code> for each group, and snap the 32 weights in that group
+        to small signed integers:
+      </p>
+      <ul>
+        <li>
+          <strong>INT8 (8-bit, 255 levels, <code>−127..+127</code>):</strong> Pack <strong>four 8-bit
+          weights</strong> inside a single 32-bit unsigned integer (<code>u32</code>). Including one float
+          scale per 32 weights, memory drops by <strong><code>3.56×</code></strong> with virtually zero
+          accuracy loss! This exact Q8 format is what powers the <code>.smw</code> ("Small Minds Weights")
+          checkpoints in this project — shrinking each 780K-parameter companion brain in Part 8 from
+          <code>3.12 MB</code> down to just <strong><code>857 KB</code></strong>!
+        </li>
+        <li>
+          <strong>INT4 (4-bit, 16 levels, <code>−8..+7</code>):</strong> Pack <strong>eight 4-bit
+          "nibbles"</strong> inside a single <code>u32</code> word! Inside <code>quant.wgsl</code>, one
+          memory load hauls 8 weights onto the chip at once, unpacks each nibble in registers with a fast
+          bit shift and mask, multiplies by <code>groupScale</code>, and accumulates — cutting VRAM
+          bandwidth by nearly <strong><code>6.4×</code></strong>!
+        </li>
+      </ul>
+      <pre><code><span class="cm">// Unpack 8 signed 4-bit weights from ONE 32-bit GPU register word (quant.wgsl)</span>
 let nib = (packedWord &gt;&gt; (lane * 4u)) &amp; 0xFu;
 let w   = f32(i32(nib) - 8) * groupScale;
 acc = fma(w, x[col + lane], acc);</code></pre>
+      <p>
+        Benchmark all three real WGSL decode kernels (<code>gemv_fp32</code>, <code>gemv_int8</code>, and
+        <code>gemv_int4</code>) live on your GPU in Figure 1 below. Adjust <strong>weight dim</strong> up
+        to <code>2048×2048</code> and inspect both the memory-footprint bars and the live numerical error
+        (<strong>RMSE</strong> = root-mean-square error compared against exact FP32).
+      </p>
 
       <div
         data-demo="kv-quant"
         data-title="Pure-WebGPU FP32 vs. INT8 vs. INT4 decode GEMV"
-        data-hint="Adjust weight dimension and benchmark real WGSL unpacking"
+        data-hint="Adjust weight dimension and benchmark real WGSL bit-unpacking"
       ></div>
 
       <p>
-        Look at the RMSE column alongside the memory bars: INT8 is virtually indistinguishable from
-        FP32 (error in the third decimal place) at a quarter the memory, and even 4-bit weights
-        reconstruct dot products closely enough that billion-parameter models fit comfortably inside
-        a laptop's unified memory.
+        Look closely at the RMSE numbers on the left: INT8 reproduces the exact 2048-element dot products
+        to the third decimal place while slashing memory by nearly 4×, and even ultra-compact INT4
+        (just 16 possible steps per group!) tracks the true floating-point dot product closely enough that
+        billion-parameter LLMs run comfortably on an ordinary laptop!
       </p>
 
       <!-- ================================================================ -->
-      <h2 id="autoresearch"><span class="kicker">Step 2 · The research loop</span>Autoresearch inside the browser</h2>
+      <h2 id="val-bpb"><span class="kicker">Step 3 · An honest compass</span>Validation bits-per-byte (val_bpb)</h2>
       <p>
-        Once a full training run on your browser GPU takes less than a second, something remarkable
-        becomes possible. Inspired by Andrej Karpathy's <em>autoresearch</em>, the steering wheel can be
-        handed to an automated research loop right inside the tab:
+        Now turn to the second half of this essay: <em>how do ML researchers systematically discover better
+        model architectures and training recipes?</em>
+      </p>
+      <p>
+        Before letting an automated loop touch a single knob, you need one incorruptible scoreboard.
+        Remember Part 3's warning about <strong>overfitting</strong>: raw training loss is dangerously easy
+        to game. Make a model 3× wider and its training loss plummets simply by memorizing training lines
+        verbatim — even while it gets <em>worse</em> on new text! Worse still, if you change a model's
+        tokenizer (Part 4), raw loss-per-token is no longer even comparable between two models because
+        longer tokens carry more letters per guess.
+      </p>
+      <p>
+        The gold-standard compass solves both problems at once:
       </p>
       <ol>
-        <li>Start from a baseline Transformer genome and measure its held-out validation <strong>bits per byte (val_bpb)</strong>.</li>
-        <li>Propose one concrete scientific mutation — switching GeGLU to SwiGLU, testing Muon against AdamW, adding cosine warmdown, adjusting RoPE frequency base <code>θ</code>, widening <code>dModel</code>, or expanding the FFN ratio.</li>
-        <li>Allocate a fresh pure-WebGPU model, train it for the exact same fixed step budget, and grade it on held-out validation tokens.</li>
-        <li>If <code>val_bpb</code> drops, <strong>commit</strong> the new genome as the frontier; if it regresses, <strong>revert</strong> and log what was learned.</li>
+        <li>
+          Hold out the final <strong>15% of the corpus</strong> as an unseen <strong>validation
+          exam</strong> that backpropagation never trains on.
+        </li>
+        <li>
+          Convert validation cross-entropy nats into <strong>validation bits per byte
+          (<code>val_bpb</code>)</strong>: <code>val_bpb = val_loss / ln(2)</code> (for these 1-byte
+          ASCII tokens, dividing by <code>ln(2) ≈ 0.6931</code> converts directly from nats into Shannon
+          bits per character!).
+        </li>
+        <li>
+          Enforce an <strong>identical fixed compute budget</strong> (the exact same number of training
+          steps or wall-clock seconds) for every candidate!
+        </li>
       </ol>
       <p>
-        Below, that exact loop runs live on your GPU. Pick a search strategy — greedy
-        <strong>Hill Climb</strong>, an exploration-aware <strong>UCB Bandit</strong> that tracks
-        which mutation axes pay off most, or an <strong>Evolutionary</strong> pool that branches
-        from the top-3 models — and hit <strong>auto-research</strong> to watch your browser
-        discover better architectures on its own.
+        Under a fixed budget, every architectural idea has to earn its keep honestly: a wider layer that
+        runs slower or overfits loses; a cleaner activation or better learning-rate schedule that
+        generalizes faster wins.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="autoresearch"><span class="kicker">Step 4 · The research loop</span>Autoresearch inside the browser</h2>
+      <p>
+        Inspired by Andrej Karpathy's <em>autoresearch</em> — where an AI agent edits a training script,
+        runs a timed GPU experiment, checks <code>val_bpb</code>, and commits or reverts like a tireless
+        scientist — <code>BrowserAutoResearcher</code> brings that exact closed scientific loop straight
+        into your browser tab:
+      </p>
+      <ol>
+        <li>
+          <strong>Establish baseline:</strong> Start from a deliberately vanilla 2-layer Transformer
+          genome (<code>dModel = 48</code>, <code>GeGLU</code>, <code>AdamW</code>, constant
+          <code>lr = 0.005</code>, <code>RoPE θ = 10000</code>) and measure its held-out
+          <code>val_bpb</code>.
+        </li>
+        <li>
+          <strong>Propose one concrete mutation:</strong> Pick a single scientific hypothesis along one of
+          10 axes — switching <code>GeGLU → SwiGLU</code>, testing <code>Muon</code> vs.
+          <code>AdamW</code>, adding <strong>cosine learning-rate warmdown</strong> over the final 35% of
+          steps, nudging <code>lr</code> up or down, tuning <code>weightDecay</code>, shifting
+          <code>RoPE θ</code> to <code>1000</code>, widening <code>dModel</code>, expanding the FFN ratio
+          from <code>2× → 3×</code>, or adding a 3rd Transformer layer.
+        </li>
+        <li>
+          <strong>Allocate, train, and grade:</strong> Spin up a fresh WebGPU model, train it on the exact
+          same deterministic mini-batch order for the exact same step budget, and grade it on the held-out
+          validation split.
+        </li>
+        <li>
+          <strong>Commit or revert:</strong> If <code>val_bpb</code> drops by more than <code>0.002</code>,
+          <strong>KEEP</strong> the new genome as the frontier; otherwise <strong>DROP</strong> it, revert
+          to the parent, and record the lesson.
+        </li>
+      </ol>
+      <p>
+        Notice the deeper algorithmic question lurking inside Step 2: <em>which mutation axis should the
+        researcher try next?</em> If changing the learning rate paid off twice, should it keep exploiting
+        learning rate forever, or explore untouched axes like SwiGLU and cosine warmdown? Computer science
+        calls this the <strong>exploration vs. exploitation dilemma</strong>, and Figure 2 lets you test
+        three distinct search strategies live on your GPU:
+      </p>
+      <ul>
+        <li>
+          <strong>Hill Climb:</strong> Always mutates the single best model so far using a random axis.
+          Simple and greedy, though it wastes trials re-testing unproductive axes.
+        </li>
+        <li>
+          <strong>UCB Bandit (Upper Confidence Bound):</strong> Treats each mutation axis like a slot
+          machine in a row of 10 machines, scoring each axis by:
+          <pre><code>UCB(axis) = average_improvement(axis)  +  √( 1.4 · ln(total_trials) / (tries_of_axis + 0.5) )
+            └─── exploitation (what worked) ───┘   └──── exploration (curiosity bonus!) ────┘</code></pre>
+          Axes that delivered big <code>val_bpb</code> drops get a high first term; axes that have barely
+          been tried get a big square-root curiosity bonus so nothing important gets overlooked!
+        </li>
+        <li>
+          <strong>Evolutionary Pool:</strong> Keeps the top-3 models alive simultaneously and branches off
+          any of them — avoiding getting trapped in one local peak when two different architectural recipes
+          are competing.
+        </li>
+      </ul>
+      <p>
+        Press <strong>auto-research</strong> (or <strong>run 1 experiment</strong> to step through slowly)
+        in Figure 2 below and watch your browser evolve better Transformers live on WebGPU!
       </p>
 
       <div
         data-demo="autoresearch-lab"
         data-title="Autonomous WebGPU AutoResearch Workbench"
-        data-hint="Hit Auto-Research or step one trial at a time"
+        data-hint="Hit auto-research or step one experiment at a time"
       ></div>
 
       <p>
-        Watch the green frontier line step downward across trials. Almost every run independently
-        rediscovers the same empirical truths modern LLM labs spent years finding: SwiGLU beats
-        GeGLU at small widths, cosine warmdown shaves off late-step noise, and hotter early learning
-        rates pay off hugely under tight compute budgets.
+        Let it run for 10 to 15 trials and study the green frontier staircase and log rows underneath.
+        Without any prior knowledge hard-coded into the search, your browser repeatedly rediscovers the
+        exact empirical principles frontier labs spent years publishing: hotter early learning rates win
+        under tight step budgets, SwiGLU edges out GeGLU at narrow widths, and cosine warmdown shaves off
+        late-step noise so weights settle cleanly into the valley floor.
       </p>
-      <details class="fold">
-        <summary>Why fixed-budget validation bits-per-byte is the cleanest compass</summary>
-        <div class="fold-body">
-          <p>
-            Comparing raw training loss across models is easy to fool — a wider model memorizes
-            training batches faster even while overfitting. Splitting off a held-out 15% validation
-            slice and measuring <code>val_bpb = val_loss / ln(2)</code> under an identical step
-            budget forces every mutation to earn its keep through genuine generalization.
-          </p>
-        </div>
-      </details>
 
       <!-- ================================================================ -->
-      <h2 id="bridge"><span class="kicker">Step 3 · From lab to life</span>What if a creature ran this loop in its sleep?</h2>
+      <h2 id="colab-results"><span class="kicker">Step 5 · Scaling up</span>What the same loop discovered on a cloud GPU</h2>
       <p>
-        Everything built across Parts 1 through 4 now fits in a few hundred kilobytes of
-        TypeScript and WGSL: tiled GPU math, FlashAttention, live on-device backpropagation, fast
-        decoding, and an autonomous self-improvement loop. What happens when that brain gets a
-        body, an episodic memory, a trick-learning policy, and a cozy 3D world — and is left to run
-        autoresearch cycles while it dreams?
+        Because this project shares its exact model math and binary <code>.smw</code> checkpoint format
+        between WebGPU and PyTorch (via the companion notebooks in <code>colab/</code>), the exact same
+        fixed-budget AutoResearch loop was also run on an <strong>NVIDIA L4 GPU</strong> over a much
+        larger 780K-parameter Transformer (<code>6 layers, dModel = 128, 4 heads, ctx = 128</code>)
+        training on real English stories (<em>TinyStories</em>). Here is the actual recorded experiment
+        log from <code>autoresearch-results.json</code>:
+      </p>
+      <div class="sm-table-wrap">
+        <table class="sm-table">
+          <thead>
+            <tr>
+              <th>Trial</th>
+              <th>Recipe tested</th>
+              <th>Steps (fixed time)</th>
+              <th>Val Loss</th>
+              <th>Val BPB</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>#1</td>
+              <td><code>GeGLU · AdamW · lr=0.002 · θ=10000</code> (baseline)</td>
+              <td>571</td>
+              <td>1.0236</td>
+              <td>1.4767</td>
+            </tr>
+            <tr>
+              <td>#2</td>
+              <td><code>SwiGLU · AdamW · lr=0.002 · θ=10000</code></td>
+              <td>621</td>
+              <td>0.9964</td>
+              <td>1.4375</td>
+            </tr>
+            <tr>
+              <td>#3</td>
+              <td><code>SwiGLU · Muon · lr=0.002 · θ=10000</code></td>
+              <td>303</td>
+              <td>1.0069</td>
+              <td>1.4527</td>
+            </tr>
+            <tr>
+              <td>#4</td>
+              <td><code>SwiGLU · Muon · lr=0.003 · θ=10000</code></td>
+              <td>302</td>
+              <td>1.0020</td>
+              <td>1.4456</td>
+            </tr>
+            <tr>
+              <td>#5</td>
+              <td><code>SwiGLU · Muon · lr=0.0025 · θ=1000</code></td>
+              <td>304</td>
+              <td>1.0012</td>
+              <td>1.4444</td>
+            </tr>
+            <tr class="is-winner">
+              <td>#6 ★</td>
+              <td><code>SwiGLU · AdamW · lr=0.003 · θ=10000</code></td>
+              <td>630</td>
+              <td>0.9774</td>
+              <td>1.4100</td>
+            </tr>
+            <tr>
+              <td>#7</td>
+              <td><code>SwiGLU · AdamW · lr=0.0025 · θ=1000</code></td>
+              <td>629</td>
+              <td>0.9814</td>
+              <td>1.4159</td>
+            </tr>
+            <tr>
+              <td>#8</td>
+              <td><code>GeGLU · Muon · lr=0.0025 · θ=1000</code></td>
+              <td>304</td>
+              <td>1.0004</td>
+              <td>1.4432</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Look at the subtle real-world engineering lesson hiding in that table — one you could never guess
+        from theory alone! Per individual step, Muon actually learned remarkably fast (reaching
+        <code>1.444 bpb</code> in just 304 steps!), yet because Muon's Newton-Schulz matrix
+        orthogonalization added overhead at small <code>128 × 128</code> widths, AdamW squeezed in twice as
+        many steps (630 vs. 304) within the exact same wall-clock budget and won the fixed-time race at
+        <strong><code>1.410 bpb</code></strong>! Fixed-budget validation caught that hardware trade-off
+        instantly — and that winning <code>SwiGLU + AdamW + θ = 10000</code> architecture is the exact
+        blueprint powering the six living companion brains in Part 8.
+      </p>
+
+      <!-- ================================================================ -->
+      <h2 id="bridge"><span class="kicker">From lab to life</span>What if a creature ran this loop in its sleep?</h2>
+      <p>
+        Look at everything now running inside a few hundred kilobytes of plain TypeScript and WGSL:
+        next-token probabilities and sampling (Part 1), vectors and nonlinear folding (Part 2),
+        backpropagation and Adam (Part 3), BPE and tiled GPU matrix math (Part 4), RoPE, FlashAttention,
+        RMSNorm, and SwiGLU (Part 5), live GPU training (Part 6), and quantized decode plus autonomous
+        self-improvement (Part 7).
       </p>
       <p>
-        Meet the keystone project of the series:
-        <a href="/pages/small-minds/companion.html">Part 5: A Creature of Your Own</a>.
+        Now give that brain a pretrained voice, a 3D body, an episodic memory, a reinforcement-learning
+        trick policy, and five cozy worlds drawn from across <em>Algorythmic Explorations</em> — and let
+        it wake up this exact AutoResearch loop while it dreams.
+      </p>
+      <p class="continue">
+        <strong>Next: <a href="/pages/small-minds/companion.html">Part 8, A Creature of Your Own</a>.</strong>
+        Pretraining vs. fine-tuning, combating catastrophic forgetting with episodic replay, teaching
+        moves with reinforcement learning, and adopting a living 3D WebGPU companion.
       </p>
     </main>
 
     <footer>
-      <p><a href="/index.html">← All essays</a></p>
+      <p>
+        References &amp; further reading:
+        <a href="https://arxiv.org/abs/2208.07339">Dettmers et al. (2022), <em>LLM.int8()</em></a> ·
+        <a href="https://arxiv.org/abs/2210.17323">Frantar et al. (2022), <em>GPTQ: Accurate Post-Training Quantization</em></a> ·
+        <a href="https://arxiv.org/abs/2306.00978">Lin et al. (2023), <em>AWQ: Activation-aware Weight Quantization</em></a> ·
+        Auer, Cesa-Bianchi &amp; Fischer (2002), <em>Finite-time Analysis of the Multiarmed Bandit Problem</em> (UCB1) ·
+        <a href="https://github.com/karpathy/autoresearch">Andrej Karpathy — autoresearch</a>
+      </p>
     </footer>
 
     <script type="module" src="/src/pages/small-minds/autoresearch.ts"></script>
